@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server"
-import { sql } from "@neondatabase/serverless"
+import { neon } from "@neondatabase/serverless"
 import { getSignedR2Url, isR2Configured } from "@/lib/r2"
 
 export const dynamic = "force-dynamic"
 
-const neonSql = sql(process.env.DATABASE_URL!)
-
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const sql = neon(process.env.DATABASE_URL!)
+
     const { id } = await params
     const artifactId = Number(id)
 
@@ -26,8 +26,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       )
     }
 
-    // Fetch artifact from database
-    const result = await neonSql("SELECT * FROM test_artifacts WHERE id = $1", [artifactId])
+    const result = await sql`SELECT * FROM test_artifacts WHERE id = ${artifactId}`
 
     if (result.length === 0) {
       return NextResponse.json({ error: "Artifact not found" }, { status: 404 })

@@ -1,38 +1,43 @@
 import { neon } from "@neondatabase/serverless"
 import type { TestExecution, TestResult, DashboardMetrics, TrendData } from "./types"
 
-const sql = neon(process.env.DATABASE_URL!)
+function getSql() {
+  return neon(process.env.DATABASE_URL!)
+}
 
 export async function getExecutions(limit = 50, status?: string, branch?: string) {
-  let query = "SELECT * FROM test_executions WHERE 1=1"
-  const params: any[] = []
-  let paramCount = 1
+  const sql = getSql()
+  const conditions = []
 
   if (status) {
-    query += ` AND status = $${paramCount++}`
-    params.push(status)
+    conditions.push(`status = '${status}'`)
   }
 
   if (branch) {
-    query += ` AND branch = $${paramCount++}`
-    params.push(branch)
+    conditions.push(`branch = '${branch}'`)
   }
 
-  query += ` ORDER BY started_at DESC LIMIT $${paramCount}`
-  params.push(limit)
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
-  const result = await sql(query, params)
+  const result = await sql`
+    SELECT * FROM test_executions 
+    ${sql.unsafe(whereClause)}
+    ORDER BY started_at DESC 
+    LIMIT ${limit}
+  `
+
   return result as TestExecution[]
 }
 
 export async function getExecutionById(id: number) {
-  const result = await sql("SELECT * FROM test_executions WHERE id = $1", [id])
+  const sql = getSql()
+  const result = await sql`SELECT * FROM test_executions WHERE id = ${id}`
   return result[0] as TestExecution | undefined
 }
 
 export async function getTestResultsByExecutionId(executionId: number) {
-  const results = await sql(
-    `
+  const sql = getSql()
+  const results = await sql`
     SELECT tr.*, 
            json_agg(
              json_build_object(
@@ -48,18 +53,17 @@ export async function getTestResultsByExecutionId(executionId: number) {
            ) FILTER (WHERE ta.id IS NOT NULL) as artifacts
     FROM test_results tr
     LEFT JOIN test_artifacts ta ON ta.test_result_id = tr.id
-    WHERE tr.execution_id = $1
+    WHERE tr.execution_id = ${executionId}
     GROUP BY tr.id
     ORDER BY tr.started_at ASC
-  `,
-    [executionId],
-  )
+  `
 
   return results as TestResult[]
 }
 
 export async function getDashboardMetrics() {
-  const metrics = await sql(`
+  const sql = getSql()
+  const metrics = await sql`
     SELECT 
       COUNT(*) as total_executions,
       ROUND(AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END), 2) as pass_rate,
@@ -68,16 +72,16 @@ export async function getDashboardMetrics() {
       COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions
     FROM test_executions
     WHERE completed_at IS NOT NULL
-  `)
+  `
 
-  const criticalFailures = await sql(`
+  const criticalFailures = await sql`
     SELECT COUNT(DISTINCT tr.id) as critical_failures
     FROM test_results tr
     JOIN test_executions te ON te.id = tr.execution_id
     WHERE tr.is_critical = true 
       AND tr.status = 'failed'
       AND te.started_at > NOW() - INTERVAL '7 days'
-  `)
+  `
 
   return {
     total_executions: Number(metrics[0].total_executions),
@@ -89,27 +93,29 @@ export async function getDashboardMetrics() {
 }
 
 export async function getTrendData(days = 7) {
-  const result = await sql(`
+  const sql = getSql()
+  const result = await sql`
     SELECT 
       DATE(started_at) as date,
       COUNT(*) FILTER (WHERE status = 'success') as passed,
       COUNT(*) FILTER (WHERE status = 'failure') as failed,
       COUNT(*) as total
     FROM test_executions
-    WHERE started_at > NOW() - INTERVAL '${days} days'
+    WHERE started_at > NOW() - INTERVAL '${sql.unsafe(days.toString())} days'
       AND completed_at IS NOT NULL
     GROUP BY DATE(started_at)
     ORDER BY date ASC
-  `)
+  `
 
   return result as TrendData[]
 }
 
 export async function getBranches() {
-  const result = await sql(`
+  const sql = getSql()
+  const result = await sql`
     SELECT DISTINCT branch 
     FROM test_executions 
     ORDER BY branch ASC
-  `)
+  `
   return result.map((r) => r.branch) as string[]
 }
