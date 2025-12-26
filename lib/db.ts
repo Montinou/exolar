@@ -8,6 +8,9 @@ import type {
   ExecutionRequest,
   TestResultRequest,
   ArtifactRequest,
+  TestSearchResult,
+  TestHistoryItem,
+  TestStatistics,
 } from "./types"
 
 function getSql() {
@@ -289,4 +292,106 @@ export async function insertArtifacts(
   }
 
   return insertedCount
+}
+
+// ============================================
+// Search and History Functions (Phase 04)
+// ============================================
+
+/**
+ * Search tests by name or file path
+ * Uses ILIKE for case-insensitive partial matching
+ */
+export async function searchTests(query: string, limit = 50): Promise<TestSearchResult[]> {
+  const sql = getSql()
+
+  if (!query || query.length < 2) {
+    return []
+  }
+
+  const searchPattern = `%${query}%`
+
+  const results = await sql`
+    SELECT
+      COALESCE(test_signature, MD5(test_file || '::' || test_name)) as test_signature,
+      test_name,
+      test_file,
+      COUNT(*) as run_count,
+      MAX(started_at) as last_run,
+      (
+        SELECT status FROM test_results tr2
+        WHERE tr2.test_name = test_results.test_name
+          AND tr2.test_file = test_results.test_file
+        ORDER BY started_at DESC LIMIT 1
+      ) as last_status,
+      ROUND(
+        COUNT(*) FILTER (WHERE status = 'passed')::decimal
+        / NULLIF(COUNT(*), 0) * 100, 1
+      ) as pass_rate
+    FROM test_results
+    WHERE test_name ILIKE ${searchPattern}
+       OR test_file ILIKE ${searchPattern}
+    GROUP BY test_name, test_file, test_signature
+    ORDER BY run_count DESC
+    LIMIT ${limit}
+  `
+
+  return results as TestSearchResult[]
+}
+
+/**
+ * Get test history by signature
+ * Returns recent runs for a specific test across all executions
+ */
+export async function getTestHistory(signature: string, limit = 20): Promise<TestHistoryItem[]> {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT
+      tr.*,
+      te.branch,
+      te.commit_sha,
+      te.status as execution_status
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE tr.test_signature = ${signature}
+       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature}
+    ORDER BY tr.started_at DESC
+    LIMIT ${limit}
+  `
+
+  return results as TestHistoryItem[]
+}
+
+/**
+ * Get aggregated statistics for a specific test by signature
+ */
+export async function getTestStatistics(signature: string): Promise<TestStatistics> {
+  const sql = getSql()
+
+  const result = await sql`
+    SELECT
+      COUNT(*) as total_runs,
+      ROUND(
+        COUNT(*) FILTER (WHERE status = 'passed')::decimal
+        / NULLIF(COUNT(*), 0) * 100, 1
+      ) as pass_rate,
+      ROUND(AVG(duration_ms)) as avg_duration_ms,
+      ROUND(
+        COUNT(*) FILTER (WHERE retry_count > 0 AND status = 'passed')::decimal
+        / NULLIF(COUNT(*) FILTER (WHERE status = 'passed'), 0) * 100, 1
+      ) as flaky_rate,
+      MAX(started_at) FILTER (WHERE status = 'failed') as last_failure
+    FROM test_results
+    WHERE test_signature = ${signature}
+       OR MD5(test_file || '::' || test_name) = ${signature}
+  `
+
+  return {
+    total_runs: Number(result[0].total_runs),
+    pass_rate: Number(result[0].pass_rate) || 0,
+    avg_duration_ms: Number(result[0].avg_duration_ms) || 0,
+    flaky_rate: Number(result[0].flaky_rate) || 0,
+    last_failure: result[0].last_failure,
+  }
 }

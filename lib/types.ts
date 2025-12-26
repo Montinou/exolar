@@ -159,3 +159,51 @@ export interface IngestResponse {
   artifacts_count?: number
   error?: string
 }
+
+// ============================================
+// Search and History Types (Phase 04)
+// ============================================
+
+/**
+ * Aggregated test search result
+ */
+export interface TestSearchResult {
+  test_signature: string
+  test_name: string
+  test_file: string
+  run_count: number
+  last_run: string
+  last_status: string
+  pass_rate: number
+}
+
+/**
+ * Test history item with execution context
+ */
+export interface TestHistoryItem extends TestResult {
+  branch: string
+  commit_sha: string
+  execution_status: string
+}
+
+/**
+ * Test statistics aggregated across all runs
+ */
+export interface TestStatistics {
+  total_runs: number
+  pass_rate: number
+  avg_duration_ms: number
+  flaky_rate: number
+  last_failure: string | null
+}
+
+/**
+ * Complete test history response
+ */
+export interface TestHistoryResponse {
+  test_signature: string
+  test_name: string
+  test_file: string
+  statistics: TestStatistics
+  history: TestHistoryItem[]
+}

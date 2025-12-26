@@ -5,6 +5,7 @@ import { TrendChart } from "@/components/dashboard/trend-chart"
 import { ExecutionsTable } from "@/components/dashboard/executions-table"
 import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
+import { SearchTests } from "@/components/dashboard/search-tests"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -67,7 +68,10 @@ export default async function DashboardPage({
               <h1 className="text-3xl font-bold tracking-tight text-balance">E2E Test Dashboard</h1>
               <p className="text-muted-foreground text-pretty">Monitor Playwright test executions from GitHub Actions</p>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-4">
+              <SearchTests />
+              <UserMenu />
+            </div>
           </div>
         </div>
       </div>
