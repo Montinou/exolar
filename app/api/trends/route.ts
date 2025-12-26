@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getTrendData } from "@/lib/db"
+import { getTrendData, type DateRangeFilter } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
@@ -7,8 +7,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const days = Number(searchParams.get("days")) || 7
+    const fromDate = searchParams.get("from") || undefined
+    const toDate = searchParams.get("to") || undefined
 
-    const trends = await getTrendData(days)
+    const dateRange: DateRangeFilter | undefined =
+      fromDate || toDate ? { from: fromDate, to: toDate } : undefined
+
+    const trends = await getTrendData(days, dateRange)
     return NextResponse.json(trends)
   } catch (error) {
     console.error("[v0] Error fetching trends:", error)

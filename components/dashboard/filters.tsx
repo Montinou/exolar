@@ -1,8 +1,11 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
+import { format, parseISO } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { DateRangePicker } from "@/components/dashboard/date-range-picker"
 import { X } from "lucide-react"
 
 interface FiltersProps {
@@ -15,6 +18,16 @@ export function Filters({ branches }: FiltersProps) {
 
   const currentStatus = searchParams.get("status")
   const currentBranch = searchParams.get("branch")
+  const currentFrom = searchParams.get("from")
+  const currentTo = searchParams.get("to")
+
+  const dateRange: DateRange | undefined =
+    currentFrom || currentTo
+      ? {
+          from: currentFrom ? parseISO(currentFrom) : undefined,
+          to: currentTo ? parseISO(currentTo) : undefined,
+        }
+      : undefined
 
   const updateFilter = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -26,14 +39,31 @@ export function Filters({ branches }: FiltersProps) {
     router.push(`?${params.toString()}`)
   }
 
+  const updateDateRange = (range: DateRange | undefined) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (range?.from) {
+      params.set("from", format(range.from, "yyyy-MM-dd"))
+    } else {
+      params.delete("from")
+    }
+    if (range?.to) {
+      params.set("to", format(range.to, "yyyy-MM-dd"))
+    } else {
+      params.delete("to")
+    }
+    router.push(`?${params.toString()}`)
+  }
+
   const clearFilters = () => {
     router.push("/")
   }
 
-  const hasFilters = currentStatus || currentBranch
+  const hasFilters = currentStatus || currentBranch || currentFrom || currentTo
 
   return (
     <div className="flex flex-wrap items-center gap-3">
+      <DateRangePicker value={dateRange} onChange={updateDateRange} />
+
       <Select
         value={currentStatus || "all"}
         onValueChange={(value) => updateFilter("status", value === "all" ? null : value)}

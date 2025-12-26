@@ -1,5 +1,11 @@
 import { Suspense } from "react"
-import { getDashboardMetrics, getTrendData, getExecutions, getBranches } from "@/lib/db"
+import {
+  getDashboardMetrics,
+  getTrendData,
+  getExecutions,
+  getBranches,
+  type DateRangeFilter,
+} from "@/lib/db"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TrendChart } from "@/components/dashboard/trend-chart"
 import { ExecutionsTable } from "@/components/dashboard/executions-table"
@@ -12,13 +18,17 @@ import { Card, CardContent } from "@/components/ui/card"
 async function DashboardContent({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string }>
+  searchParams: Promise<{ status?: string; branch?: string; from?: string; to?: string }>
 }) {
   const params = await searchParams
+
+  const dateRange: DateRangeFilter | undefined =
+    params.from || params.to ? { from: params.from, to: params.to } : undefined
+
   const [metrics, trends, executions, branches] = await Promise.all([
-    getDashboardMetrics(),
-    getTrendData(7),
-    getExecutions(50, params.status, params.branch),
+    getDashboardMetrics(dateRange),
+    getTrendData(7, dateRange),
+    getExecutions(50, params.status, params.branch, dateRange),
     getBranches(),
   ])
 
@@ -57,7 +67,7 @@ function DashboardSkeleton() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string }>
+  searchParams: Promise<{ status?: string; branch?: string; from?: string; to?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

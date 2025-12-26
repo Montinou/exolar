@@ -17,7 +17,17 @@ function getSql() {
   return neon(process.env.DATABASE_URL!)
 }
 
-export async function getExecutions(limit = 50, status?: string, branch?: string) {
+export interface DateRangeFilter {
+  from?: string // ISO date string
+  to?: string // ISO date string
+}
+
+export async function getExecutions(
+  limit = 50,
+  status?: string,
+  branch?: string,
+  dateRange?: DateRangeFilter
+) {
   const sql = getSql()
   const conditions = []
 
@@ -29,12 +39,20 @@ export async function getExecutions(limit = 50, status?: string, branch?: string
     conditions.push(`branch = '${branch}'`)
   }
 
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
 
   const result = await sql`
-    SELECT * FROM test_executions 
+    SELECT * FROM test_executions
     ${sql.unsafe(whereClause)}
-    ORDER BY started_at DESC 
+    ORDER BY started_at DESC
     LIMIT ${limit}
   `
 
@@ -73,26 +91,53 @@ export async function getTestResultsByExecutionId(executionId: number) {
   return results as TestResult[]
 }
 
-export async function getDashboardMetrics() {
+export async function getDashboardMetrics(dateRange?: DateRangeFilter) {
   const sql = getSql()
+  const conditions = ["completed_at IS NOT NULL"]
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
   const metrics = await sql`
-    SELECT 
+    SELECT
       COUNT(*) as total_executions,
       ROUND(AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END), 2) as pass_rate,
       ROUND(AVG(duration_ms)) as avg_duration_ms,
       COUNT(*) FILTER (WHERE status = 'failure' AND started_at > NOW() - INTERVAL '24 hours') as last_24h_failures,
       COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions
     FROM test_executions
-    WHERE completed_at IS NOT NULL
+    ${sql.unsafe(whereClause)}
   `
+
+  const criticalConditions = [
+    "tr.is_critical = true",
+    "tr.status = 'failed'",
+  ]
+
+  if (dateRange?.from) {
+    criticalConditions.push(`te.started_at >= '${dateRange.from}'`)
+  } else {
+    criticalConditions.push("te.started_at > NOW() - INTERVAL '7 days'")
+  }
+
+  if (dateRange?.to) {
+    criticalConditions.push(`te.started_at <= '${dateRange.to}'`)
+  }
+
+  const criticalWhereClause = `WHERE ${criticalConditions.join(" AND ")}`
 
   const criticalFailures = await sql`
     SELECT COUNT(DISTINCT tr.id) as critical_failures
     FROM test_results tr
     JOIN test_executions te ON te.id = tr.execution_id
-    WHERE tr.is_critical = true 
-      AND tr.status = 'failed'
-      AND te.started_at > NOW() - INTERVAL '7 days'
+    ${sql.unsafe(criticalWhereClause)}
   `
 
   return {
@@ -104,17 +149,30 @@ export async function getDashboardMetrics() {
   } as DashboardMetrics
 }
 
-export async function getTrendData(days = 7) {
+export async function getTrendData(days = 7, dateRange?: DateRangeFilter) {
   const sql = getSql()
+  const conditions = ["completed_at IS NOT NULL"]
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  } else {
+    conditions.push(`started_at > NOW() - INTERVAL '${days} days'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
   const result = await sql`
-    SELECT 
+    SELECT
       DATE(started_at) as date,
       COUNT(*) FILTER (WHERE status = 'success') as passed,
       COUNT(*) FILTER (WHERE status = 'failure') as failed,
       COUNT(*) as total
     FROM test_executions
-    WHERE started_at > NOW() - INTERVAL '${sql.unsafe(days.toString())} days'
-      AND completed_at IS NOT NULL
+    ${sql.unsafe(whereClause)}
     GROUP BY DATE(started_at)
     ORDER BY date ASC
   `
