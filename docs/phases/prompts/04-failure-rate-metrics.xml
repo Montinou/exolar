@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 04: Failure Rate Metrics
+  Add failure rate tracking to dashboard metrics for better reliability insights
+
+  Usage: Execute this prompt to implement failure rate metrics
+  Prerequisites: Basic dashboard implementation complete
+-->
+<implementation_prompt version="1.0">
+  <metadata>
+    <phase>04</phase>
+    <name>Failure Rate Metrics</name>
+    <priority>high</priority>
+    <complexity>low</complexity>
+    <estimated_hours>1-2</estimated_hours>
+    <dependencies>None</dependencies>
+  </metadata>
+
+  <context>
+    <project_stack>
+      <framework>Next.js 16 with App Router</framework>
+      <database>Neon PostgreSQL via @neondatabase/serverless</database>
+      <ui>shadcn/ui with TailwindCSS v4</ui>
+      <charts>Recharts</charts>
+    </project_stack>
+
+    <prerequisites>
+      <prerequisite>Basic dashboard implementation complete</prerequisite>
+      <prerequisite>StatsCards component exists</prerequisite>
+    </prerequisites>
+
+    <note>No database migrations required - failure rate is calculated from existing data</note>
+
+    <formulas>
+      <formula name="failure_rate">failure_rate = (failed_runs / total_runs) * 100</formula>
+      <formula name="failure_volume">failure_volume = failure_rate * total_runs / 100</formula>
+    </formulas>
+
+    <severity_thresholds>
+      <threshold level="positive" color="green">failure_rate less than or equal to 5%</threshold>
+      <threshold level="neutral" color="yellow">failure_rate less than or equal to 15%</threshold>
+      <threshold level="negative" color="red">failure_rate greater than 15%</threshold>
+    </severity_thresholds>
+  </context>
+
+  <task>
+    <objective>
+      <goal priority="1">Calculate failure rate as a core dashboard metric</goal>
+      <goal priority="2">Display failure rate in stats cards</goal>
+      <goal priority="3">Add failure rate trend to visualizations</goal>
+      <goal priority="4">Track failure volume (rate x frequency)</goal>
+    </objective>
+
+    <success_criteria>
+      <criterion>Failure rate displays correctly in stats cards</criterion>
+      <criterion>Failure rate updates with date filter</criterion>
+      <criterion>Failure volume calculates correctly</criterion>
+      <criterion>Failure trend chart renders properly</criterion>
+      <criterion>Trend chart shows average reference line</criterion>
+      <criterion>Tooltip shows correct breakdown</criterion>
+      <criterion>Empty state handled gracefully</criterion>
+      <criterion>Color coding matches severity (green/yellow/red)</criterion>
+    </success_criteria>
+  </task>
+
+  <implementation>
+    <backend>
+      <types file="lib/types.ts">
+        <![CDATA[
+// Update DashboardMetrics interface
+export interface DashboardMetrics {
+  total_executions: number;
+  pass_rate: number;
+  failure_rate: number;        // NEW
+  avg_duration_ms: number;
+  critical_failures: number;
+  last_24h_executions: number;
+  failure_volume: number;      // NEW: failure_rate * total_executions / 100
+}
+
+// New interface for failure trends
+export interface FailureTrendData {
+  date: string;
+  failure_rate: number;
+  total_tests: number;
+  failed_tests: number;
+}
+        ]]>
+      </types>
+
+      <database_functions file="lib/db.ts">
+        <function name="getDashboardMetrics" action="update">
+          <![CDATA[
+export async function getDashboardMetrics(
+  dateFrom?: string,
+  dateTo?: string
+): Promise<DashboardMetrics> {
+  const sql = getSql();
+
+  const result = await sql`
+    WITH execution_stats AS (
+      SELECT
+        COUNT(*) as total_executions,
+        COUNT(*) FILTER (WHERE status = 'success') as successful,
+        COUNT(*) FILTER (WHERE status = 'failure') as failed,
+        AVG(duration_ms) as avg_duration
+      FROM test_executions
+      WHERE
+        (${dateFrom || null}::text IS NULL OR started_at >= ${dateFrom}::timestamptz)
+        AND (${dateTo || null}::text IS NULL OR started_at <= ${dateTo}::timestamptz)
+    ),
+    recent_stats AS (
+      SELECT
+        COUNT(*) FILTER (
+          WHERE status = 'failure'
+          AND started_at > NOW() - INTERVAL '7 days'
+        ) as critical_failures,
+        COUNT(*) FILTER (
+          WHERE started_at > NOW() - INTERVAL '24 hours'
+        ) as last_24h_executions
+      FROM test_executions
+    )
+    SELECT
+      es.total_executions,
+      CASE
+        WHEN es.total_executions > 0
+        THEN ROUND(es.successful::decimal / es.total_executions * 100, 1)
+        ELSE 0
+      END as pass_rate,
+      CASE
+        WHEN es.total_executions > 0
+        THEN ROUND(es.failed::decimal / es.total_executions * 100, 1)
+        ELSE 0
+      END as failure_rate,
+      COALESCE(ROUND(es.avg_duration), 0) as avg_duration_ms,
+      rs.critical_failures,
+      rs.last_24h_executions,
+      CASE
+        WHEN es.total_executions > 0
+        THEN ROUND(es.failed::decimal / es.total_executions * 100 * es.total_executions / 100, 1)
+        ELSE 0
+      END as failure_volume
+    FROM execution_stats es, recent_stats rs
+  `;
+
+  return {
+    total_executions: Number(result[0].total_executions),
+    pass_rate: Number(result[0].pass_rate),
+    failure_rate: Number(result[0].failure_rate),
+    avg_duration_ms: Number(result[0].avg_duration_ms),
+    critical_failures: Number(result[0].critical_failures),
+    last_24h_executions: Number(result[0].last_24h_executions),
+    failure_volume: Number(result[0].failure_volume)
+  };
+}
+          ]]>
+        </function>
+
+        <function name="getFailureTrendData">
+          <![CDATA[
+export async function getFailureTrendData(
+  days: number = 7,
+  dateFrom?: string,
+  dateTo?: string
+): Promise<FailureTrendData[]> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT
+      DATE(started_at) as date,
+      COUNT(*) as total_tests,
+      COUNT(*) FILTER (WHERE status = 'failure') as failed_tests,
+      CASE
+        WHEN COUNT(*) > 0
+        THEN ROUND(COUNT(*) FILTER (WHERE status = 'failure')::decimal / COUNT(*) * 100, 2)
+        ELSE 0
+      END as failure_rate
+    FROM test_executions
+    WHERE status != 'running'
+      AND (
+        CASE
+          WHEN ${dateFrom}::text IS NOT NULL AND ${dateTo}::text IS NOT NULL
+          THEN started_at >= ${dateFrom}::timestamptz AND started_at <= ${dateTo}::timestamptz
+          ELSE started_at >= NOW() - (${days} || ' days')::interval
+        END
+      )
+    GROUP BY DATE(started_at)
+    ORDER BY date ASC
+  `;
+
+  return results as FailureTrendData[];
+}
+          ]]>
+        </function>
+      </database_functions>
+
+      <api_routes>
+        <route path="app/api/trends/route.ts" action="update">
+          <![CDATA[
+import { getTrendData, getFailureTrendData } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get("days") || "7");
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+    const type = searchParams.get("type") || "tests"; // "tests" or "failures"
+
+    if (type === "failures") {
+      const failureTrends = await getFailureTrendData(days, dateFrom, dateTo);
+      return NextResponse.json(failureTrends);
+    }
+
+    const trends = await getTrendData(days, dateFrom, dateTo);
+    return NextResponse.json(trends);
+  } catch (error) {
+    console.error("Error fetching trends:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch trends" },
+      { status: 500 }
+    );
+  }
+}
+          ]]>
+        </route>
+      </api_routes>
+    </backend>
+
+    <frontend>
+      <components>
+        <component file="components/dashboard/stats-cards.tsx" action="update">
+          <![CDATA[
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
+
+interface DashboardMetrics {
+  total_executions: number;
+  pass_rate: number;
+  failure_rate: number;
+  avg_duration_ms: number;
+  critical_failures: number;
+  last_24h_executions: number;
+  failure_volume: number;
+}
+
+interface StatsCardsProps {
+  metrics: DashboardMetrics;
+}
+
+export function StatsCards({ metrics }: StatsCardsProps) {
+  const formatDuration = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
+  };
+
+  const cards = [
+    {
+      title: "Pass Rate",
+      value: `${metrics.pass_rate}%`,
+      icon: CheckCircle2,
+      description: `${metrics.total_executions} total runs`,
+      trend: metrics.pass_rate >= 90 ? "positive" : metrics.pass_rate >= 70 ? "neutral" : "negative",
+    },
+    {
+      title: "Failure Rate",
+      value: `${metrics.failure_rate}%`,
+      icon: XCircle,
+      description: `Volume: ${metrics.failure_volume.toFixed(1)}`,
+      trend: metrics.failure_rate <= 5 ? "positive" : metrics.failure_rate <= 15 ? "neutral" : "negative",
+    },
+    {
+      title: "Avg Duration",
+      value: formatDuration(metrics.avg_duration_ms),
+      icon: Clock,
+      description: "per execution",
+      trend: "neutral",
+    },
+    {
+      title: "Critical Failures",
+      value: metrics.critical_failures.toString(),
+      icon: AlertTriangle,
+      description: "last 7 days",
+      trend: metrics.critical_failures === 0 ? "positive" : metrics.critical_failures <= 3 ? "neutral" : "negative",
+    },
+  ];
+
+  const getTrendColor = (trend: string) => {
+    switch (trend) {
+      case "positive":
+        return "text-green-500";
+      case "negative":
+        return "text-red-500";
+      default:
+        return "text-muted-foreground";
+    }
+  };
+
+  const getTrendBg = (trend: string) => {
+    switch (trend) {
+      case "positive":
+        return "bg-green-500/10";
+      case "negative":
+        return "bg-red-500/10";
+      default:
+        return "bg-muted";
+    }
+  };
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {cards.map((card) => (
+        <Card key={card.title}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+            <div className={`p-2 rounded-full ${getTrendBg(card.trend)}`}>
+              <card.icon className={`h-4 w-4 ${getTrendColor(card.trend)}`} />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{card.value}</div>
+            <p className="text-xs text-muted-foreground">{card.description}</p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+          ]]>
+        </component>
+
+        <component file="components/dashboard/failure-rate-chart.tsx">
+          <![CDATA[
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingDown } from "lucide-react";
+
+interface FailureTrendData {
+  date: string;
+  failure_rate: number;
+  total_tests: number;
+  failed_tests: number;
+}
+
+interface FailureRateChartProps {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
+  const [data, setData] = useState<FailureTrendData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const params = new URLSearchParams({ type: "failures" });
+        if (dateFrom) params.set("dateFrom", dateFrom);
+        if (dateTo) params.set("dateTo", dateTo);
+
+        const response = await fetch(`/api/trends?${params.toString()}`);
+        const json = await response.json();
+        setData(json);
+      } catch (error) {
+        console.error("Failed to fetch failure trends:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [dateFrom, dateTo]);
+
+  const formattedData = data.map((item) => ({
+    ...item,
+    date: new Date(item.date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+  }));
+
+  const avgFailureRate =
+    data.length > 0
+      ? data.reduce((sum, d) => sum + d.failure_rate, 0) / data.length
+      : 0;
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5" />
+            Failure Rate Trend
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px] bg-muted animate-pulse rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <TrendingDown className="h-5 w-5" />
+            Failure Rate Trend
+          </span>
+          <span className="text-sm font-normal text-muted-foreground">
+            Avg: {avgFailureRate.toFixed(1)}%
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={200}>
+          <LineChart data={formattedData}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 12 }}
+              className="text-muted-foreground"
+            />
+            <YAxis
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => `${value}%`}
+              className="text-muted-foreground"
+              domain={[0, "auto"]}
+            />
+            <Tooltip
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-popover border rounded-lg p-2 shadow-lg">
+                      <p className="font-medium">{data.date}</p>
+                      <p className="text-red-500">
+                        Failure Rate: {data.failure_rate.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {data.failed_tests} / {data.total_tests} executions
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <ReferenceLine
+              y={avgFailureRate}
+              stroke="#888"
+              strokeDasharray="3 3"
+              label={{
+                value: "Avg",
+                position: "right",
+                fontSize: 10,
+              }}
+            />
+            <Line
+              type="monotone"
+              dataKey="failure_rate"
+              stroke="#ef4444"
+              strokeWidth={2}
+              dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+          ]]>
+        </component>
+      </components>
+
+      <page_integration file="app/page.tsx">
+        <![CDATA[
+// Add import
+import { FailureRateChart } from "@/components/dashboard/failure-rate-chart";
+
+// In the dashboard grid, add alongside existing charts:
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <TrendChart data={trends} />
+  <FailureRateChart
+    dateFrom={searchParams?.dateFrom}
+    dateTo={searchParams?.dateTo}
+  />
+</div>
+        ]]>
+      </page_integration>
+    </frontend>
+
+    <api_specification>
+      <endpoint method="GET" path="/api/metrics">
+        <description>Get dashboard metrics including failure rate</description>
+        <parameters>
+          <parameter name="dateFrom" type="string" required="false">Start date (ISO 8601)</parameter>
+          <parameter name="dateTo" type="string" required="false">End date (ISO 8601)</parameter>
+        </parameters>
+        <response>
+          <![CDATA[
+{
+  "total_executions": 150,
+  "pass_rate": 85.5,
+  "failure_rate": 14.5,
+  "avg_duration_ms": 45000,
+  "critical_failures": 3,
+  "last_24h_executions": 12,
+  "failure_volume": 21.75
+}
+          ]]>
+        </response>
+      </endpoint>
+
+      <endpoint method="GET" path="/api/trends?type=failures">
+        <description>Get failure rate trend data</description>
+        <parameters>
+          <parameter name="type" type="string" required="false" default="tests">Set to "failures" for failure trends</parameter>
+          <parameter name="days" type="number" required="false" default="7">Days to look back</parameter>
+          <parameter name="dateFrom" type="string" required="false">Start date (ISO 8601)</parameter>
+          <parameter name="dateTo" type="string" required="false">End date (ISO 8601)</parameter>
+        </parameters>
+        <response>
+          <![CDATA[
+[
+  {
+    "date": "2025-12-20",
+    "failure_rate": 10.5,
+    "total_tests": 20,
+    "failed_tests": 2
+  },
+  {
+    "date": "2025-12-21",
+    "failure_rate": 5.0,
+    "total_tests": 20,
+    "failed_tests": 1
+  }
+]
+          ]]>
+        </response>
+      </endpoint>
+    </api_specification>
+  </implementation>
+
+  <files_manifest>
+    <create>
+      <file>components/dashboard/failure-rate-chart.tsx</file>
+    </create>
+    <modify>
+      <file>lib/types.ts</file>
+      <file>lib/db.ts</file>
+      <file>app/api/trends/route.ts</file>
+      <file>components/dashboard/stats-cards.tsx</file>
+      <file>app/page.tsx</file>
+    </modify>
+  </files_manifest>
+
+  <testing_checklist>
+    <test>Failure rate displays correctly in stats cards</test>
+    <test>Failure rate updates with date filter</test>
+    <test>Failure volume calculates correctly</test>
+    <test>Failure trend chart renders properly</test>
+    <test>Trend chart shows average reference line</test>
+    <test>Tooltip shows correct breakdown</test>
+    <test>Empty state handled gracefully</test>
+    <test>Color coding matches severity (green/yellow/red)</test>
+  </testing_checklist>
+
+  <next_phase>
+    Phase 05: Error Pattern Grouping - Cluster similar errors to identify systemic issues
+  </next_phase>
+</implementation_prompt>

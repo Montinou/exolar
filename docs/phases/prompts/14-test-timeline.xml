@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prompt version="1.0">
+  <metadata>
+    <phase_number>14</phase_number>
+    <phase_name>test_timeline</phase_name>
+    <priority>medium</priority>
+    <complexity>medium</complexity>
+    <dependencies>none</dependencies>
+    <estimated_files>5</estimated_files>
+  </metadata>
+
+  <context>
+    <project_stack>
+      <framework>Next.js 16 App Router</framework>
+      <database>Neon PostgreSQL via @neondatabase/serverless</database>
+      <ui>shadcn/ui + TailwindCSS v4</ui>
+      <auth>Stack Auth (@stackframe/stack)</auth>
+      <charts>Recharts</charts>
+    </project_stack>
+    <prerequisites>
+      <item>Basic dashboard implementation complete</item>
+      <item>Recharts library installed</item>
+    </prerequisites>
+  </context>
+
+  <task>
+    <objective>
+      Create visual timeline showing test execution duration and status with parallel test visualization.
+    </objective>
+    <goals>
+      <goal>Create horizontal bar chart timeline</goal>
+      <goal>Show test durations as bars</goal>
+      <goal>Color code by status</goal>
+      <goal>Interactive hover details</goal>
+      <goal>Support for parallel test visualization</goal>
+    </goals>
+    <success_criteria>
+      <criterion>Timeline loads for execution</criterion>
+      <criterion>Bar chart shows correct durations</criterion>
+      <criterion>Colors match test status</criterion>
+      <criterion>Tooltip shows test details</criterion>
+      <criterion>Large test suites render performantly</criterion>
+    </success_criteria>
+  </task>
+
+  <implementation>
+    <database_changes>
+      <note>No database migrations required - uses existing test results data</note>
+    </database_changes>
+
+    <backend>
+      <types file="lib/types.ts" action="append">
+        <![CDATA[
+// Timeline test data
+export interface TimelineTest {
+  id: number;
+  test_name: string;
+  test_file: string;
+  status: string;
+  duration_ms: number;
+  started_at: string;
+  completed_at: string | null;
+  is_flaky?: boolean;
+  is_critical?: boolean;
+  error_message?: string | null;
+}
+
+// Timeline execution data
+export interface TimelineData {
+  execution_id: number;
+  total_duration_ms: number;
+  tests: TimelineTest[];
+  parallel_groups?: TimelineTest[][];
+}
+        ]]>
+      </types>
+
+      <database_functions file="lib/db.ts" action="append">
+        <![CDATA[
+// Get timeline data for execution
+export async function getTimelineData(
+  executionId: number
+): Promise<TimelineData | null> {
+  const sql = getSql();
+
+  const execution = await getExecutionById(executionId);
+  if (!execution) return null;
+
+  const tests = await sql`
+    SELECT
+      id,
+      test_name,
+      test_file,
+      status,
+      duration_ms,
+      started_at,
+      completed_at,
+      is_flaky,
+      is_critical,
+      error_message
+    FROM test_results
+    WHERE execution_id = ${executionId}
+    ORDER BY started_at ASC
+  `;
+
+  const parallelGroups = groupParallelTests(tests as TimelineTest[]);
+
+  return {
+    execution_id: executionId,
+    total_duration_ms: execution.duration_ms || 0,
+    tests: tests as TimelineTest[],
+    parallel_groups: parallelGroups,
+  };
+}
+
+// Helper to group parallel tests
+function groupParallelTests(tests: TimelineTest[]): TimelineTest[][] {
+  if (tests.length === 0) return [];
+
+  const groups: TimelineTest[][] = [];
+  const sorted = [...tests].sort(
+    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+  );
+
+  let currentGroup: TimelineTest[] = [sorted[0]];
+  let groupEndTime = new Date(sorted[0].completed_at || sorted[0].started_at).getTime();
+
+  for (let i = 1; i < sorted.length; i++) {
+    const test = sorted[i];
+    const testStartTime = new Date(test.started_at).getTime();
+
+    if (testStartTime < groupEndTime) {
+      currentGroup.push(test);
+      const testEndTime = new Date(test.completed_at || test.started_at).getTime();
+      groupEndTime = Math.max(groupEndTime, testEndTime);
+    } else {
+      groups.push(currentGroup);
+      currentGroup = [test];
+      groupEndTime = new Date(test.completed_at || test.started_at).getTime();
+    }
+  }
+
+  groups.push(currentGroup);
+  return groups;
+}
+        ]]>
+      </database_functions>
+
+      <api_route file="app/api/executions/[id]/timeline/route.ts" action="create">
+        <![CDATA[
+import { getTimelineData } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const executionId = parseInt(id);
+
+    if (isNaN(executionId)) {
+      return NextResponse.json(
+        { error: "Invalid execution ID" },
+        { status: 400 }
+      );
+    }
+
+    const timeline = await getTimelineData(executionId);
+
+    if (!timeline) {
+      return NextResponse.json(
+        { error: "Execution not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(timeline);
+  } catch (error) {
+    console.error("Error fetching timeline:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch timeline" },
+      { status: 500 }
+    );
+  }
+}
+        ]]>
+      </api_route>
+    </backend>
+
+    <frontend>
+      <component file="components/dashboard/test-timeline.tsx" action="create">
+        <![CDATA[
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+
+interface TimelineTest {
+  id: number;
+  test_name: string;
+  test_file: string;
+  status: string;
+  duration_ms: number;
+  started_at: string;
+  completed_at: string | null;
+  is_flaky?: boolean;
+  is_critical?: boolean;
+  error_message?: string | null;
+}
+
+interface TimelineData {
+  execution_id: number;
+  total_duration_ms: number;
+  tests: TimelineTest[];
+}
+
+interface TestTimelineProps {
+  executionId: number;
+}
+
+const STATUS_COLORS = {
+  passed: "#22c55e",
+  failed: "#ef4444",
+  skipped: "#a1a1aa",
+  timedout: "#f97316",
+};
+
+export function TestTimeline({ executionId }: TestTimelineProps) {
+  const [data, setData] = useState<TimelineData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch(`/api/executions/${executionId}/timeline`);
+        const json = await response.json();
+        setData(json);
+      } catch (error) {
+        console.error("Failed to fetch timeline:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [executionId]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Test Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px] bg-muted animate-pulse rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || data.tests.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Test Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">No test data available</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const chartData = data.tests.map((test, index) => ({
+    index,
+    name: test.test_name.length > 30
+      ? test.test_name.substring(0, 30) + "..."
+      : test.test_name,
+    fullName: test.test_name,
+    duration: test.duration_ms / 1000,
+    status: test.status,
+    file: test.test_file,
+    isFlaky: test.is_flaky,
+    isCritical: test.is_critical,
+    errorMessage: test.error_message,
+    ...test,
+  }));
+
+  const avgDuration =
+    data.tests.reduce((sum, t) => sum + t.duration_ms, 0) /
+    data.tests.length /
+    1000;
+
+  const formatDuration = (seconds: number) => {
+    if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    return `${(seconds / 60).toFixed(1)}m`;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Test Timeline
+          </span>
+          <div className="flex items-center gap-4 text-sm font-normal">
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-green-500 rounded" />
+              Passed
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-red-500 rounded" />
+              Failed
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 bg-zinc-400 rounded" />
+              Skipped
+            </span>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[400px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 10, right: 30, left: 150, bottom: 10 }}
+            >
+              <XAxis
+                type="number"
+                tickFormatter={formatDuration}
+                domain={[0, "auto"]}
+                tick={{ fontSize: 12 }}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={140}
+                tick={{ fontSize: 11 }}
+                interval={0}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const test = payload[0].payload;
+                    return (
+                      <div className="bg-popover border rounded-lg p-3 shadow-lg max-w-xs">
+                        <p className="font-medium text-sm mb-1">{test.fullName}</p>
+                        <p className="text-xs text-muted-foreground mb-2">{test.file}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          {test.status === "passed" ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          ) : test.status === "failed" ? (
+                            <XCircle className="h-4 w-4 text-red-500" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          )}
+                          <span className="capitalize">{test.status}</span>
+                          {test.isFlaky && (
+                            <Badge variant="outline" className="text-xs">Flaky</Badge>
+                          )}
+                          {test.isCritical && (
+                            <Badge variant="destructive" className="text-xs">Critical</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm">
+                          Duration: <strong>{formatDuration(test.duration)}</strong>
+                        </p>
+                        {test.errorMessage && (
+                          <p className="text-xs text-red-500 mt-2 truncate">
+                            {test.errorMessage.substring(0, 100)}...
+                          </p>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <ReferenceLine
+                x={avgDuration}
+                stroke="#888"
+                strokeDasharray="3 3"
+                label={{
+                  value: `Avg: ${formatDuration(avgDuration)}`,
+                  position: "top",
+                  fontSize: 10,
+                }}
+              />
+              <Bar
+                dataKey="duration"
+                radius={[0, 4, 4, 0]}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={STATUS_COLORS[entry.status as keyof typeof STATUS_COLORS] || "#888"}
+                    cursor="pointer"
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-4 grid grid-cols-4 gap-4 text-center border-t pt-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Total Tests</p>
+            <p className="text-xl font-semibold">{data.tests.length}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Total Duration</p>
+            <p className="text-xl font-semibold">
+              {formatDuration(data.total_duration_ms / 1000)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Avg Duration</p>
+            <p className="text-xl font-semibold">{formatDuration(avgDuration)}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Slowest</p>
+            <p className="text-xl font-semibold">
+              {formatDuration(Math.max(...data.tests.map((t) => t.duration_ms)) / 1000)}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+        ]]>
+      </component>
+
+      <component file="components/dashboard/test-gantt.tsx" action="create">
+        <![CDATA[
+"use client";
+
+import { useEffect, useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Clock, CheckCircle2, XCircle } from "lucide-react";
+
+interface TimelineTest {
+  id: number;
+  test_name: string;
+  test_file: string;
+  status: string;
+  duration_ms: number;
+  started_at: string;
+  completed_at: string | null;
+}
+
+interface TimelineData {
+  execution_id: number;
+  total_duration_ms: number;
+  tests: TimelineTest[];
+}
+
+interface TestGanttProps {
+  executionId: number;
+}
+
+const STATUS_COLORS = {
+  passed: "bg-green-500",
+  failed: "bg-red-500",
+  skipped: "bg-zinc-400",
+  timedout: "bg-orange-500",
+};
+
+export function TestGantt({ executionId }: TestGanttProps) {
+  const [data, setData] = useState<TimelineData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch(`/api/executions/${executionId}/timeline`);
+        const json = await response.json();
+        setData(json);
+      } catch (error) {
+        console.error("Failed to fetch timeline:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [executionId]);
+
+  const { startTime, endTime, totalDuration } = useMemo(() => {
+    if (!data?.tests.length) return { startTime: 0, endTime: 0, totalDuration: 0 };
+
+    const times = data.tests.map((t) => new Date(t.started_at).getTime());
+    const endTimes = data.tests.map((t) =>
+      new Date(t.completed_at || t.started_at).getTime() + t.duration_ms
+    );
+
+    const start = Math.min(...times);
+    const end = Math.max(...endTimes);
+
+    return {
+      startTime: start,
+      endTime: end,
+      totalDuration: end - start,
+    };
+  }, [data]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <div className="h-[200px] bg-muted animate-pulse rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || data.tests.length === 0) {
+    return null;
+  }
+
+  const formatDuration = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Execution Timeline (Gantt)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1">
+          <TooltipProvider>
+            {data.tests.map((test) => {
+              const testStart = new Date(test.started_at).getTime();
+              const left = ((testStart - startTime) / totalDuration) * 100;
+              const width = (test.duration_ms / totalDuration) * 100;
+
+              return (
+                <Tooltip key={test.id}>
+                  <TooltipTrigger asChild>
+                    <div className="relative h-6 bg-muted/30 rounded">
+                      <div
+                        className={`absolute h-full rounded ${
+                          STATUS_COLORS[test.status as keyof typeof STATUS_COLORS] || "bg-gray-400"
+                        } opacity-80 hover:opacity-100 transition-opacity cursor-pointer`}
+                        style={{
+                          left: `${left}%`,
+                          width: `${Math.max(width, 1)}%`,
+                        }}
+                      />
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs truncate max-w-[200px]">
+                        {test.test_name}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="space-y-1">
+                      <p className="font-medium">{test.test_name}</p>
+                      <p className="text-xs text-muted-foreground">{test.test_file}</p>
+                      <div className="flex items-center gap-2">
+                        {test.status === "passed" ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-red-500" />
+                        )}
+                        <span className="capitalize text-sm">{test.status}</span>
+                        <span className="text-sm">• {formatDuration(test.duration_ms)}</span>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </TooltipProvider>
+        </div>
+
+        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+          <span>0s</span>
+          <span>{formatDuration(totalDuration / 2)}</span>
+          <span>{formatDuration(totalDuration)}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+        ]]>
+      </component>
+
+      <integration file="components/dashboard/test-detail-modal.tsx" action="modify">
+        <![CDATA[
+import { TestTimeline } from "./test-timeline";
+import { TestGantt } from "./test-gantt";
+
+// Add as a new tab:
+<TabsContent value="timeline" className="mt-4">
+  <div className="space-y-6">
+    <TestGantt executionId={execution.id} />
+    <TestTimeline executionId={execution.id} />
+  </div>
+</TabsContent>
+
+// Add tab trigger:
+<TabsTrigger value="timeline" className="gap-2">
+  <Clock className="h-4 w-4" />
+  Timeline
+</TabsTrigger>
+        ]]>
+      </integration>
+    </frontend>
+
+    <api_specification>
+      <endpoint method="GET" path="/api/executions/[id]/timeline">
+        <description>Get timeline data for execution</description>
+        <response>
+          <![CDATA[
+{
+  "execution_id": 123,
+  "total_duration_ms": 125000,
+  "tests": [
+    {
+      "id": 1,
+      "test_name": "should login successfully",
+      "test_file": "tests/auth.spec.ts",
+      "status": "passed",
+      "duration_ms": 1500,
+      "started_at": "2025-12-25T10:00:00Z",
+      "completed_at": "2025-12-25T10:00:01.5Z",
+      "is_flaky": false,
+      "is_critical": false,
+      "error_message": null
+    }
+  ],
+  "parallel_groups": [[/* tests that ran in parallel */]]
+}
+          ]]>
+        </response>
+      </endpoint>
+    </api_specification>
+  </implementation>
+
+  <visual_example>
+    <![CDATA[
+The timeline visualizes tests like this:
+
+Test Name                  Duration Bar
+─────────────────────────────────────────
+should login               ████████ 2.5s
+should add to cart         ████████████████ 5.2s
+should checkout            ██████████████████████ 8.1s
+should view order          ████ 1.2s
+should logout              ██ 0.5s
+                           │
+                           └── Average: 3.5s
+    ]]>
+  </visual_example>
+
+  <files_manifest>
+    <create>
+      <file>app/api/executions/[id]/timeline/route.ts</file>
+      <file>components/dashboard/test-timeline.tsx</file>
+      <file>components/dashboard/test-gantt.tsx</file>
+    </create>
+    <modify>
+      <file>lib/types.ts</file>
+      <file>lib/db.ts</file>
+      <file>components/dashboard/test-detail-modal.tsx</file>
+    </modify>
+  </files_manifest>
+
+  <testing_checklist>
+    <item>Timeline loads for execution</item>
+    <item>Bar chart shows correct durations</item>
+    <item>Colors match test status</item>
+    <item>Tooltip shows test details</item>
+    <item>Reference line shows average</item>
+    <item>Gantt view shows parallel tests</item>
+    <item>Click on bar selects test</item>
+    <item>Empty state handles gracefully</item>
+    <item>Large test suites render performantly</item>
+  </testing_checklist>
+
+  <rollback>
+    <note>No database changes to rollback. Remove created files.</note>
+  </rollback>
+
+  <project_complete>
+    <summary>All 14 phases documented and ready for implementation</summary>
+    <phases>
+      <phase number="1">Test Signatures and Search - Foundation for tracking</phase>
+      <phase number="2">Date Range Filter - Time-based filtering</phase>
+      <phase number="3">Flaky Test Detection - Identify unreliable tests</phase>
+      <phase number="4">Failure Rate Metrics - Track reliability</phase>
+      <phase number="5">Error Pattern Grouping - Cluster similar errors</phase>
+      <phase number="6">Test Explorer - Slowest - Performance analysis</phase>
+      <phase number="7">Test Explorer - Flakiest - Flakiness analysis</phase>
+      <phase number="8">Test Explorer - Most Failing - Reliability analysis</phase>
+      <phase number="9">AI Failure Categorization - Smart triage</phase>
+      <phase number="10">Slack Notifications - Team alerts</phase>
+      <phase number="11">GitHub PR Comments - CI integration</phase>
+      <phase number="12">CSV Export - Data portability</phase>
+      <phase number="13">Real-Time Streaming - Live updates</phase>
+      <phase number="14">Test Timeline - Visual duration analysis</phase>
+    </phases>
+  </project_complete>
+</prompt>

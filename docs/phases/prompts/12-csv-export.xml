@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prompt version="1.0">
+  <metadata>
+    <phase_number>12</phase_number>
+    <phase_name>csv_export</phase_name>
+    <priority>low</priority>
+    <complexity>low</complexity>
+    <dependencies>none</dependencies>
+    <estimated_files>6</estimated_files>
+  </metadata>
+
+  <context>
+    <project_stack>
+      <framework>Next.js 16 App Router</framework>
+      <database>Neon PostgreSQL via @neondatabase/serverless</database>
+      <ui>shadcn/ui + TailwindCSS v4</ui>
+      <auth>Stack Auth (@stackframe/stack)</auth>
+    </project_stack>
+    <prerequisites>
+      <item>Basic dashboard implementation complete</item>
+    </prerequisites>
+  </context>
+
+  <task>
+    <objective>
+      Export test data to CSV for offline analysis and reporting.
+    </objective>
+    <goals>
+      <goal>Create CSV export endpoints</goal>
+      <goal>Add download buttons to UI</goal>
+      <goal>Support filtering by date range and status</goal>
+      <goal>Include all relevant test data</goal>
+    </goals>
+    <success_criteria>
+      <criterion>CSV downloads work for executions, results, and flakiness</criterion>
+      <criterion>Filters apply correctly to exports</criterion>
+      <criterion>CSV opens correctly in Excel/Google Sheets</criterion>
+      <criterion>Special characters escaped properly</criterion>
+    </success_criteria>
+  </task>
+
+  <implementation>
+    <database_changes>
+      <note>No database migrations required - uses existing data</note>
+    </database_changes>
+
+    <backend>
+      <utility file="lib/csv.ts" action="create">
+        <![CDATA[
+/**
+ * Convert array of objects to CSV string
+ */
+export function toCSV<T extends Record<string, unknown>>(
+  data: T[],
+  columns?: { key: keyof T; header: string }[]
+): string {
+  if (data.length === 0) return "";
+
+  const cols = columns || Object.keys(data[0]).map((key) => ({
+    key: key as keyof T,
+    header: key,
+  }));
+
+  const header = cols.map((col) => escapeCSVField(col.header)).join(",");
+
+  const rows = data.map((row) =>
+    cols
+      .map((col) => {
+        const value = row[col.key];
+        return escapeCSVField(formatValue(value));
+      })
+      .join(",")
+  );
+
+  return [header, ...rows].join("\n");
+}
+
+/**
+ * Escape CSV field value
+ */
+function escapeCSVField(value: string): string {
+  if (value.includes(",") || value.includes("\n") || value.includes('"')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+/**
+ * Format value for CSV
+ */
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * Create response with CSV content
+ */
+export function createCSVResponse(
+  csv: string,
+  filename: string
+): Response {
+  return new Response(csv, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-cache",
+    },
+  });
+}
+        ]]>
+      </utility>
+
+      <api_route file="app/api/export/executions/route.ts" action="create">
+        <![CDATA[
+import { getExecutions } from "@/lib/db";
+import { toCSV, createCSVResponse } from "@/lib/csv";
+import { NextRequest } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status") || undefined;
+    const branch = searchParams.get("branch") || undefined;
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+    const limit = parseInt(searchParams.get("limit") || "1000");
+
+    const executions = await getExecutions(limit, status, branch, dateFrom, dateTo);
+
+    const columns = [
+      { key: "id" as const, header: "ID" },
+      { key: "run_id" as const, header: "Run ID" },
+      { key: "branch" as const, header: "Branch" },
+      { key: "commit_sha" as const, header: "Commit SHA" },
+      { key: "commit_message" as const, header: "Commit Message" },
+      { key: "triggered_by" as const, header: "Triggered By" },
+      { key: "workflow_name" as const, header: "Workflow" },
+      { key: "status" as const, header: "Status" },
+      { key: "total_tests" as const, header: "Total Tests" },
+      { key: "passed" as const, header: "Passed" },
+      { key: "failed" as const, header: "Failed" },
+      { key: "skipped" as const, header: "Skipped" },
+      { key: "duration_ms" as const, header: "Duration (ms)" },
+      { key: "started_at" as const, header: "Started At" },
+      { key: "completed_at" as const, header: "Completed At" },
+    ];
+
+    const csv = toCSV(executions, columns);
+
+    const timestamp = new Date().toISOString().split("T")[0];
+    const filename = `executions-${timestamp}.csv`;
+
+    return createCSVResponse(csv, filename);
+  } catch (error) {
+    console.error("Error exporting executions:", error);
+    return new Response("Export failed", { status: 500 });
+  }
+}
+        ]]>
+      </api_route>
+
+      <api_route file="app/api/export/results/route.ts" action="create">
+        <![CDATA[
+import { toCSV, createCSVResponse } from "@/lib/csv";
+import { NextRequest } from "next/server";
+import { neon } from "@neondatabase/serverless";
+
+export const dynamic = "force-dynamic";
+
+function getSql() {
+  return neon(process.env.DATABASE_URL!);
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const executionId = searchParams.get("executionId");
+    const status = searchParams.get("status") || undefined;
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+    const limit = parseInt(searchParams.get("limit") || "5000");
+
+    const sql = getSql();
+
+    const results = await sql`
+      SELECT
+        tr.id,
+        tr.test_name,
+        tr.test_file,
+        tr.test_signature,
+        tr.status,
+        tr.duration_ms,
+        tr.is_critical,
+        tr.is_flaky,
+        tr.failure_category,
+        tr.error_message,
+        tr.browser,
+        tr.retry_count,
+        tr.started_at,
+        tr.completed_at,
+        te.branch,
+        te.commit_sha,
+        te.run_id
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE
+        (${executionId}::int IS NULL OR tr.execution_id = ${executionId}::int)
+        AND (${status}::text IS NULL OR tr.status = ${status})
+        AND (${dateFrom}::text IS NULL OR tr.started_at >= ${dateFrom}::timestamptz)
+        AND (${dateTo}::text IS NULL OR tr.started_at <= ${dateTo}::timestamptz)
+      ORDER BY tr.started_at DESC
+      LIMIT ${limit}
+    `;
+
+    const columns = [
+      { key: "id" as const, header: "ID" },
+      { key: "test_name" as const, header: "Test Name" },
+      { key: "test_file" as const, header: "Test File" },
+      { key: "test_signature" as const, header: "Signature" },
+      { key: "status" as const, header: "Status" },
+      { key: "duration_ms" as const, header: "Duration (ms)" },
+      { key: "is_critical" as const, header: "Is Critical" },
+      { key: "is_flaky" as const, header: "Is Flaky" },
+      { key: "failure_category" as const, header: "Failure Category" },
+      { key: "error_message" as const, header: "Error Message" },
+      { key: "browser" as const, header: "Browser" },
+      { key: "retry_count" as const, header: "Retry Count" },
+      { key: "branch" as const, header: "Branch" },
+      { key: "commit_sha" as const, header: "Commit" },
+      { key: "run_id" as const, header: "Run ID" },
+      { key: "started_at" as const, header: "Started At" },
+      { key: "completed_at" as const, header: "Completed At" },
+    ];
+
+    const csv = toCSV(results as Record<string, unknown>[], columns);
+
+    const timestamp = new Date().toISOString().split("T")[0];
+    const filename = executionId
+      ? `test-results-${executionId}-${timestamp}.csv`
+      : `test-results-${timestamp}.csv`;
+
+    return createCSVResponse(csv, filename);
+  } catch (error) {
+    console.error("Error exporting results:", error);
+    return new Response("Export failed", { status: 500 });
+  }
+}
+        ]]>
+      </api_route>
+
+      <api_route file="app/api/export/flakiness/route.ts" action="create">
+        <![CDATA[
+import { getFlakiestTests } from "@/lib/db";
+import { toCSV, createCSVResponse } from "@/lib/csv";
+import { NextRequest } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "100");
+    const minRuns = parseInt(searchParams.get("minRuns") || "5");
+
+    const tests = await getFlakiestTests(limit, minRuns);
+
+    const columns = [
+      { key: "test_signature" as const, header: "Signature" },
+      { key: "test_name" as const, header: "Test Name" },
+      { key: "test_file" as const, header: "Test File" },
+      { key: "total_runs" as const, header: "Total Runs" },
+      { key: "flaky_runs" as const, header: "Flaky Runs" },
+      { key: "passed_runs" as const, header: "Passed Runs" },
+      { key: "failed_runs" as const, header: "Failed Runs" },
+      { key: "flakiness_rate" as const, header: "Flakiness Rate (%)" },
+      { key: "avg_duration_ms" as const, header: "Avg Duration (ms)" },
+      { key: "last_flaky_at" as const, header: "Last Flaky At" },
+      { key: "updated_at" as const, header: "Updated At" },
+    ];
+
+    const csv = toCSV(tests as unknown as Record<string, unknown>[], columns);
+
+    const timestamp = new Date().toISOString().split("T")[0];
+    const filename = `flaky-tests-${timestamp}.csv`;
+
+    return createCSVResponse(csv, filename);
+  } catch (error) {
+    console.error("Error exporting flakiness data:", error);
+    return new Response("Export failed", { status: 500 });
+  }
+}
+        ]]>
+      </api_route>
+    </backend>
+
+    <frontend>
+      <component file="components/dashboard/export-button.tsx" action="create">
+        <![CDATA[
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Download, FileSpreadsheet, Loader2 } from "lucide-react";
+
+interface ExportButtonProps {
+  executionId?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  status?: string;
+  branch?: string;
+}
+
+export function ExportButton({
+  executionId,
+  dateFrom,
+  dateTo,
+  status,
+  branch,
+}: ExportButtonProps) {
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async (type: "executions" | "results" | "flakiness") => {
+    setExporting(true);
+
+    try {
+      const params = new URLSearchParams();
+      if (executionId) params.set("executionId", executionId.toString());
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      if (status && status !== "all") params.set("status", status);
+      if (branch && branch !== "all") params.set("branch", branch);
+
+      const response = await fetch(`/api/export/${type}?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+
+      const contentDisposition = response.headers.get("Content-Disposition");
+      const filenameMatch = contentDisposition?.match(/filename="(.+)"/);
+      const filename = filenameMatch?.[1] || `export-${type}.csv`;
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Export failed. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" disabled={exporting}>
+          {exporting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
+          Export
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => handleExport("executions")}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          Export Executions
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("results")}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          Export Test Results
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleExport("flakiness")}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" />
+          Export Flaky Tests
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+        ]]>
+      </component>
+
+      <integration file="app/page.tsx" action="modify">
+        <![CDATA[
+import { ExportButton } from "@/components/dashboard/export-button";
+
+// In the header or filters section:
+<div className="flex items-center gap-4">
+  <Filters branches={branches} />
+  <ExportButton
+    dateFrom={searchParams?.dateFrom}
+    dateTo={searchParams?.dateTo}
+    status={searchParams?.status}
+    branch={searchParams?.branch}
+  />
+</div>
+        ]]>
+      </integration>
+    </frontend>
+
+    <api_specification>
+      <endpoint method="GET" path="/api/export/executions">
+        <description>Export test executions to CSV</description>
+        <query_params>
+          <param name="status" type="string">Filter by status</param>
+          <param name="branch" type="string">Filter by branch</param>
+          <param name="dateFrom" type="string">Start date filter</param>
+          <param name="dateTo" type="string">End date filter</param>
+          <param name="limit" type="number" default="1000">Max rows</param>
+        </query_params>
+        <response>CSV file download</response>
+      </endpoint>
+
+      <endpoint method="GET" path="/api/export/results">
+        <description>Export test results to CSV</description>
+        <query_params>
+          <param name="executionId" type="number">Filter by execution</param>
+          <param name="status" type="string">Filter by status</param>
+          <param name="dateFrom" type="string">Start date filter</param>
+          <param name="dateTo" type="string">End date filter</param>
+          <param name="limit" type="number" default="5000">Max rows</param>
+        </query_params>
+        <response>CSV file download</response>
+      </endpoint>
+
+      <endpoint method="GET" path="/api/export/flakiness">
+        <description>Export flaky test analysis to CSV</description>
+        <query_params>
+          <param name="limit" type="number" default="100">Max rows</param>
+          <param name="minRuns" type="number" default="5">Min runs threshold</param>
+        </query_params>
+        <response>CSV file download</response>
+      </endpoint>
+    </api_specification>
+  </implementation>
+
+  <sample_output>
+    <executions_csv>
+      <![CDATA[
+ID,Run ID,Branch,Commit SHA,Status,Total Tests,Passed,Failed,Duration (ms),Started At
+1,run-123,main,abc1234,success,42,40,2,125000,2025-12-25T10:00:00Z
+2,run-124,develop,def5678,failure,42,35,7,130000,2025-12-25T09:00:00Z
+      ]]>
+    </executions_csv>
+    <test_results_csv>
+      <![CDATA[
+ID,Test Name,Test File,Status,Duration (ms),Is Flaky,Error Message,Branch
+1,should login,tests/auth.spec.ts,passed,1500,false,,main
+2,should checkout,tests/cart.spec.ts,failed,3000,false,Timeout exceeded,main
+      ]]>
+    </test_results_csv>
+  </sample_output>
+
+  <files_manifest>
+    <create>
+      <file>lib/csv.ts</file>
+      <file>app/api/export/executions/route.ts</file>
+      <file>app/api/export/results/route.ts</file>
+      <file>app/api/export/flakiness/route.ts</file>
+      <file>components/dashboard/export-button.tsx</file>
+    </create>
+    <modify>
+      <file>app/page.tsx</file>
+    </modify>
+    <install>
+      <command>npx shadcn@latest add dropdown-menu</command>
+    </install>
+  </files_manifest>
+
+  <testing_checklist>
+    <item>Executions export downloads CSV</item>
+    <item>Test results export downloads CSV</item>
+    <item>Flakiness export downloads CSV</item>
+    <item>Date filters apply to export</item>
+    <item>Status filters apply to export</item>
+    <item>CSV opens correctly in Excel/Google Sheets</item>
+    <item>Special characters escaped properly</item>
+    <item>Large exports don't timeout</item>
+    <item>Filename includes date</item>
+  </testing_checklist>
+
+  <rollback>
+    <note>No database changes to rollback. Remove created files.</note>
+  </rollback>
+
+  <next_phase>
+    <number>13</number>
+    <name>realtime_streaming</name>
+    <description>Show live test results as they complete during execution</description>
+  </next_phase>
+</prompt>

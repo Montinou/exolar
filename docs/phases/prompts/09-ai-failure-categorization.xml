@@ -1,0 +1,917 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 09: AI Failure Categorization
+  Automatically classify test failures to prioritize investigation
+
+  Usage: Execute this prompt to implement AI failure categorization
+  Prerequisites: Phase 05 (Error Patterns) completed
+-->
+<implementation_prompt version="1.0">
+  <metadata>
+    <phase>09</phase>
+    <name>AI Failure Categorization</name>
+    <priority>high</priority>
+    <complexity>medium</complexity>
+    <estimated_hours>2-4</estimated_hours>
+    <dependencies>
+      <dependency phase="05" required="true">Error Pattern Grouping</dependency>
+    </dependencies>
+  </metadata>
+
+  <context>
+    <project_stack>
+      <framework>Next.js 16 with App Router</framework>
+      <database>Neon PostgreSQL via @neondatabase/serverless</database>
+      <ui>shadcn/ui with TailwindCSS v4</ui>
+      <charts>Recharts</charts>
+    </project_stack>
+
+    <prerequisites>
+      <prerequisite>Phase 05 completed (error patterns exist)</prerequisite>
+      <prerequisite>Understanding of common failure types</prerequisite>
+    </prerequisites>
+
+    <failure_categories>
+      <category name="product_bug">
+        <description>Actual application defect</description>
+        <examples>Assertion failures, unexpected behavior, wrong values</examples>
+        <color>red</color>
+        <icon>Bug</icon>
+      </category>
+      <category name="automation_issue">
+        <description>Test code problem</description>
+        <examples>Locator failures, stale elements, click intercepted</examples>
+        <color>orange</color>
+        <icon>Code</icon>
+      </category>
+      <category name="environment_issue">
+        <description>Infrastructure problem</description>
+        <examples>Timeouts, network errors, ECONNREFUSED, DNS failures</examples>
+        <color>yellow</color>
+        <icon>Server</icon>
+      </category>
+      <category name="flaky">
+        <description>Non-deterministic failure</description>
+        <examples>Passed on retry, timing issues, race conditions</examples>
+        <color>amber</color>
+        <icon>AlertTriangle</icon>
+      </category>
+    </failure_categories>
+
+    <heuristics_approach>
+      Uses regex pattern matching against error messages and stack traces.
+      Provides confidence scores (40-100%) based on pattern specificity.
+      Falls back to "product_bug" with low confidence if no patterns match.
+    </heuristics_approach>
+  </context>
+
+  <task>
+    <objective>
+      <goal priority="1">Implement heuristics-based failure categorization</goal>
+      <goal priority="2">Add category columns to database</goal>
+      <goal priority="3">Display category badges in UI</goal>
+      <goal priority="4">Show category distribution in pie chart</goal>
+    </objective>
+
+    <success_criteria>
+      <criterion>Migration adds columns without errors</criterion>
+      <criterion>Heuristics correctly identify environment issues</criterion>
+      <criterion>Heuristics correctly identify automation issues</criterion>
+      <criterion>Flaky tests marked when retry_count > 0 + passed</criterion>
+      <criterion>Category badge displays correctly</criterion>
+      <criterion>Tooltip shows reasoning and confidence</criterion>
+      <criterion>Stats card shows pie chart</criterion>
+      <criterion>Batch categorization works</criterion>
+      <criterion>Manual override updates category</criterion>
+    </success_criteria>
+  </task>
+
+  <implementation>
+    <database_changes>
+      <migration file="scripts/005_failure_categorization.sql">
+        <![CDATA[
+-- Add categorization columns to test_results
+ALTER TABLE test_results ADD COLUMN IF NOT EXISTS failure_category TEXT CHECK (
+  failure_category IN ('product_bug', 'automation_issue', 'environment_issue', 'flaky', NULL)
+);
+ALTER TABLE test_results ADD COLUMN IF NOT EXISTS category_confidence DECIMAL(5,2);
+ALTER TABLE test_results ADD COLUMN IF NOT EXISTS category_reasoning TEXT;
+ALTER TABLE test_results ADD COLUMN IF NOT EXISTS category_source TEXT DEFAULT 'heuristics' CHECK (
+  category_source IN ('heuristics', 'ai', 'manual', NULL)
+);
+ALTER TABLE test_results ADD COLUMN IF NOT EXISTS categorized_at TIMESTAMP WITH TIME ZONE;
+
+-- Index for category analysis
+CREATE INDEX IF NOT EXISTS idx_test_results_category ON test_results(failure_category);
+CREATE INDEX IF NOT EXISTS idx_test_results_category_source ON test_results(category_source);
+
+-- Update error_patterns with common categories
+ALTER TABLE error_patterns ADD COLUMN IF NOT EXISTS suggested_category TEXT CHECK (
+  suggested_category IN ('product_bug', 'automation_issue', 'environment_issue', 'flaky', NULL)
+);
+        ]]>
+      </migration>
+    </database_changes>
+
+    <backend>
+      <types file="lib/types.ts">
+        <![CDATA[
+// Failure category type
+export type FailureCategory =
+  | "product_bug"
+  | "automation_issue"
+  | "environment_issue"
+  | "flaky";
+
+// Category source
+export type CategorySource = "heuristics" | "ai" | "manual";
+
+// Categorization result
+export interface FailureCategorization {
+  category: FailureCategory;
+  confidence: number; // 0-100
+  reasoning: string;
+  source: CategorySource;
+}
+
+// Update TestResult interface
+export interface TestResult {
+  // ... existing fields
+  failure_category?: FailureCategory | null;
+  category_confidence?: number | null;
+  category_reasoning?: string | null;
+  category_source?: CategorySource | null;
+  categorized_at?: string | null;
+}
+
+// Category statistics
+export interface CategoryStats {
+  category: FailureCategory;
+  count: number;
+  percentage: number;
+}
+        ]]>
+      </types>
+
+      <utility file="lib/failure-categorization.ts">
+        <![CDATA[
+import { FailureCategorization, FailureCategory } from "./types";
+
+/**
+ * Heuristics-based failure categorization
+ * Analyzes error message and test metadata to determine failure type
+ */
+export function categorizeFailure(
+  errorMessage: string | null | undefined,
+  stackTrace: string | null | undefined,
+  retryCount: number,
+  status: string
+): FailureCategorization {
+  // Check for flaky first (passed after retry)
+  if (retryCount > 0 && status === "passed") {
+    return {
+      category: "flaky",
+      confidence: 95,
+      reasoning: "Test passed after retry, indicating non-deterministic behavior",
+      source: "heuristics",
+    };
+  }
+
+  const error = (errorMessage || "").toLowerCase();
+  const stack = (stackTrace || "").toLowerCase();
+
+  // Environment issues - highest priority patterns
+  const environmentPatterns = [
+    { pattern: /timeout|timed out/i, confidence: 85, reason: "Timeout error detected" },
+    { pattern: /econnrefused|econnreset/i, confidence: 90, reason: "Connection refused/reset" },
+    { pattern: /enotfound|dns/i, confidence: 90, reason: "DNS/network resolution failure" },
+    { pattern: /network|net::/i, confidence: 80, reason: "Network-related error" },
+    { pattern: /enoent|file not found/i, confidence: 75, reason: "File system error" },
+    { pattern: /memory|heap|oom/i, confidence: 85, reason: "Memory-related error" },
+    { pattern: /certificate|ssl|tls/i, confidence: 80, reason: "SSL/TLS error" },
+    { pattern: /container|docker|k8s/i, confidence: 75, reason: "Container infrastructure error" },
+    { pattern: /503|502|504|service unavailable/i, confidence: 85, reason: "Server unavailable" },
+    { pattern: /browsertype\.launch/i, confidence: 80, reason: "Browser launch failure" },
+  ];
+
+  for (const { pattern, confidence, reason } of environmentPatterns) {
+    if (pattern.test(error) || pattern.test(stack)) {
+      return {
+        category: "environment_issue",
+        confidence,
+        reasoning: reason,
+        source: "heuristics",
+      };
+    }
+  }
+
+  // Automation issues - test code problems
+  const automationPatterns = [
+    { pattern: /locator|selector|element.*not.*found/i, confidence: 85, reason: "Element locator failure" },
+    { pattern: /strict mode|multiple elements/i, confidence: 90, reason: "Strict mode locator issue" },
+    { pattern: /click.*intercepted/i, confidence: 80, reason: "Click intercepted by another element" },
+    { pattern: /stale.*element/i, confidence: 85, reason: "Stale element reference" },
+    { pattern: /navigation.*failed|goto.*failed/i, confidence: 75, reason: "Navigation failure" },
+    { pattern: /frame.*detached/i, confidence: 80, reason: "Frame detached during operation" },
+    { pattern: /waiting.*selector/i, confidence: 75, reason: "Selector wait timeout" },
+    { pattern: /page\.locator|page\.getby/i, confidence: 70, reason: "Playwright locator error" },
+    { pattern: /expect.*tobe.*visible/i, confidence: 70, reason: "Visibility assertion failed" },
+    { pattern: /attach.*snapshot/i, confidence: 75, reason: "Snapshot operation failed" },
+  ];
+
+  for (const { pattern, confidence, reason } of automationPatterns) {
+    if (pattern.test(error) || pattern.test(stack)) {
+      return {
+        category: "automation_issue",
+        confidence,
+        reasoning: reason,
+        source: "heuristics",
+      };
+    }
+  }
+
+  // Product bugs - application defects
+  const productBugPatterns = [
+    { pattern: /assert(ion)?.*fail|expect.*to(be|equal|have|match)/i, confidence: 70, reason: "Assertion failure - possible product bug" },
+    { pattern: /unexpected.*value|expected.*but.*got/i, confidence: 75, reason: "Unexpected value returned" },
+    { pattern: /400|401|403|404|500/i, confidence: 60, reason: "HTTP error status code" },
+    { pattern: /null|undefined.*error|cannot read/i, confidence: 65, reason: "Null/undefined reference error" },
+    { pattern: /validation.*error|invalid.*input/i, confidence: 70, reason: "Validation error" },
+    { pattern: /api.*error|response.*error/i, confidence: 65, reason: "API response error" },
+  ];
+
+  for (const { pattern, confidence, reason } of productBugPatterns) {
+    if (pattern.test(error) || pattern.test(stack)) {
+      return {
+        category: "product_bug",
+        confidence,
+        reasoning: reason,
+        source: "heuristics",
+      };
+    }
+  }
+
+  // Default: product bug with low confidence
+  return {
+    category: "product_bug",
+    confidence: 40,
+    reasoning: "Unable to determine category - requires manual investigation",
+    source: "heuristics",
+  };
+}
+
+/**
+ * Get category display info
+ */
+export function getCategoryInfo(category: FailureCategory) {
+  const info = {
+    product_bug: {
+      label: "Product Bug",
+      description: "Actual application defect",
+      color: "red",
+      icon: "Bug",
+    },
+    automation_issue: {
+      label: "Automation Issue",
+      description: "Test code or locator problem",
+      color: "orange",
+      icon: "Code",
+    },
+    environment_issue: {
+      label: "Environment Issue",
+      description: "Infrastructure or network problem",
+      color: "yellow",
+      icon: "Server",
+    },
+    flaky: {
+      label: "Flaky Test",
+      description: "Non-deterministic failure",
+      color: "amber",
+      icon: "AlertTriangle",
+    },
+  };
+
+  return info[category];
+}
+        ]]>
+      </utility>
+
+      <database_functions file="lib/db.ts">
+        <function name="categorizeTestResult">
+          <![CDATA[
+import { categorizeFailure } from "./failure-categorization";
+
+// Categorize a test result and update database
+export async function categorizeTestResult(
+  testResultId: number
+): Promise<FailureCategorization | null> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT error_message, stack_trace, retry_count, status
+    FROM test_results
+    WHERE id = ${testResultId}
+  `;
+
+  if (results.length === 0) return null;
+
+  const result = results[0];
+
+  if (result.status !== "failed") return null;
+
+  const categorization = categorizeFailure(
+    result.error_message,
+    result.stack_trace,
+    result.retry_count || 0,
+    result.status
+  );
+
+  await sql`
+    UPDATE test_results
+    SET
+      failure_category = ${categorization.category},
+      category_confidence = ${categorization.confidence},
+      category_reasoning = ${categorization.reasoning},
+      category_source = ${categorization.source},
+      categorized_at = NOW()
+    WHERE id = ${testResultId}
+  `;
+
+  return categorization;
+}
+          ]]>
+        </function>
+
+        <function name="categorizeUncategorizedResults">
+          <![CDATA[
+// Batch categorize uncategorized results
+export async function categorizeUncategorizedResults(
+  limit: number = 100
+): Promise<number> {
+  const sql = getSql();
+
+  const uncategorized = await sql`
+    SELECT id, error_message, stack_trace, retry_count, status
+    FROM test_results
+    WHERE status = 'failed'
+      AND failure_category IS NULL
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `;
+
+  let categorized = 0;
+
+  for (const result of uncategorized) {
+    const categorization = categorizeFailure(
+      result.error_message,
+      result.stack_trace,
+      result.retry_count || 0,
+      result.status
+    );
+
+    await sql`
+      UPDATE test_results
+      SET
+        failure_category = ${categorization.category},
+        category_confidence = ${categorization.confidence},
+        category_reasoning = ${categorization.reasoning},
+        category_source = ${categorization.source},
+        categorized_at = NOW()
+      WHERE id = ${result.id}
+    `;
+
+    categorized++;
+  }
+
+  return categorized;
+}
+          ]]>
+        </function>
+
+        <function name="getCategoryStats">
+          <![CDATA[
+// Get category statistics
+export async function getCategoryStats(
+  dateFrom?: string,
+  dateTo?: string
+): Promise<CategoryStats[]> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT
+      failure_category as category,
+      COUNT(*) as count
+    FROM test_results
+    WHERE status = 'failed'
+      AND failure_category IS NOT NULL
+      AND (${dateFrom || null}::text IS NULL OR started_at >= ${dateFrom}::timestamptz)
+      AND (${dateTo || null}::text IS NULL OR started_at <= ${dateTo}::timestamptz)
+    GROUP BY failure_category
+    ORDER BY count DESC
+  `;
+
+  const total = results.reduce((sum, r) => sum + Number(r.count), 0);
+
+  return results.map((r) => ({
+    category: r.category as FailureCategory,
+    count: Number(r.count),
+    percentage: total > 0 ? (Number(r.count) / total) * 100 : 0,
+  }));
+}
+          ]]>
+        </function>
+
+        <function name="overrideCategory">
+          <![CDATA[
+// Override category manually
+export async function overrideCategory(
+  testResultId: number,
+  category: FailureCategory,
+  reasoning?: string
+): Promise<void> {
+  const sql = getSql();
+
+  await sql`
+    UPDATE test_results
+    SET
+      failure_category = ${category},
+      category_confidence = 100,
+      category_reasoning = ${reasoning || 'Manually categorized'},
+      category_source = 'manual',
+      categorized_at = NOW()
+    WHERE id = ${testResultId}
+  `;
+}
+          ]]>
+        </function>
+      </database_functions>
+
+      <api_routes>
+        <route path="app/api/categorization/route.ts">
+          <![CDATA[
+import {
+  getCategoryStats,
+  categorizeUncategorizedResults,
+} from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+
+    const stats = await getCategoryStats(dateFrom, dateTo);
+
+    return NextResponse.json({ stats });
+  } catch (error) {
+    console.error("Error fetching category stats:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch category stats" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST to batch categorize
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const limit = body.limit || 100;
+
+    const categorized = await categorizeUncategorizedResults(limit);
+
+    return NextResponse.json({
+      success: true,
+      categorized,
+    });
+  } catch (error) {
+    console.error("Error categorizing results:", error);
+    return NextResponse.json(
+      { error: "Failed to categorize results" },
+      { status: 500 }
+    );
+  }
+}
+          ]]>
+        </route>
+
+        <route path="app/api/categorization/[id]/route.ts">
+          <![CDATA[
+import { overrideCategory } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    if (!body.category) {
+      return NextResponse.json(
+        { error: "Category is required" },
+        { status: 400 }
+      );
+    }
+
+    await overrideCategory(parseInt(id), body.category, body.reasoning);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error overriding category:", error);
+    return NextResponse.json(
+      { error: "Failed to override category" },
+      { status: 500 }
+    );
+  }
+}
+          ]]>
+        </route>
+      </api_routes>
+    </backend>
+
+    <frontend>
+      <components>
+        <component file="components/dashboard/category-badge.tsx">
+          <![CDATA[
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Bug, Code, Server, AlertTriangle } from "lucide-react";
+import { FailureCategory } from "@/lib/types";
+
+interface CategoryBadgeProps {
+  category: FailureCategory | null | undefined;
+  confidence?: number | null;
+  reasoning?: string | null;
+  showTooltip?: boolean;
+  size?: "sm" | "default";
+}
+
+const categoryConfig = {
+  product_bug: {
+    label: "Product Bug",
+    icon: Bug,
+    className: "bg-red-500/10 text-red-600 border-red-500/20",
+  },
+  automation_issue: {
+    label: "Automation",
+    icon: Code,
+    className: "bg-orange-500/10 text-orange-600 border-orange-500/20",
+  },
+  environment_issue: {
+    label: "Environment",
+    icon: Server,
+    className: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+  },
+  flaky: {
+    label: "Flaky",
+    icon: AlertTriangle,
+    className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  },
+};
+
+export function CategoryBadge({
+  category,
+  confidence,
+  reasoning,
+  showTooltip = true,
+  size = "default",
+}: CategoryBadgeProps) {
+  if (!category) return null;
+
+  const config = categoryConfig[category];
+  const Icon = config.icon;
+
+  const badge = (
+    <Badge
+      variant="outline"
+      className={`${config.className} gap-1 ${size === "sm" ? "text-xs px-1.5 py-0" : ""}`}
+    >
+      <Icon className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} />
+      {config.label}
+      {confidence && confidence < 80 && (
+        <span className="opacity-60">?</span>
+      )}
+    </Badge>
+  );
+
+  if (!showTooltip || !reasoning) {
+    return badge;
+  }
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="font-medium">{config.label}</p>
+          <p className="text-sm text-muted-foreground">{reasoning}</p>
+          {confidence && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Confidence: {confidence}%
+            </p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+          ]]>
+        </component>
+
+        <component file="components/dashboard/category-stats-card.tsx">
+          <![CDATA[
+"use client";
+
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
+import { BarChart3 } from "lucide-react";
+
+interface CategoryStats {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+const COLORS = {
+  product_bug: "#ef4444",
+  automation_issue: "#f97316",
+  environment_issue: "#eab308",
+  flaky: "#f59e0b",
+};
+
+const LABELS = {
+  product_bug: "Product Bug",
+  automation_issue: "Automation",
+  environment_issue: "Environment",
+  flaky: "Flaky",
+};
+
+export function CategoryStatsCard() {
+  const [stats, setStats] = useState<CategoryStats[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const response = await fetch("/api/categorization");
+        const data = await response.json();
+        setStats(data.stats || []);
+      } catch (error) {
+        console.error("Failed to fetch category stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const chartData = stats.map((s) => ({
+    name: LABELS[s.category as keyof typeof LABELS] || s.category,
+    value: s.count,
+    percentage: s.percentage,
+  }));
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Failure Categories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px] bg-muted animate-pulse rounded" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (stats.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Failure Categories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-sm">
+            No categorized failures yet.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="h-5 w-5" />
+          Failure Categories
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={200}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={40}
+              outerRadius={70}
+              paddingAngle={2}
+              dataKey="value"
+            >
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[stats[index].category as keyof typeof COLORS] || "#888"}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              content={({ active, payload }) => {
+                if (active && payload && payload.length) {
+                  const data = payload[0].payload;
+                  return (
+                    <div className="bg-popover border rounded-lg p-2 shadow-lg">
+                      <p className="font-medium">{data.name}</p>
+                      <p className="text-sm">
+                        {data.value} ({data.percentage.toFixed(1)}%)
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+            <Legend
+              verticalAlign="bottom"
+              height={36}
+              formatter={(value) => (
+                <span className="text-sm text-muted-foreground">{value}</span>
+              )}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+          ]]>
+        </component>
+      </components>
+
+      <page_integration file="app/page.tsx">
+        <![CDATA[
+import { CategoryStatsCard } from "@/components/dashboard/category-stats-card";
+
+// In the dashboard grid:
+<CategoryStatsCard />
+        ]]>
+      </page_integration>
+
+      <modal_integration file="components/dashboard/test-detail-modal.tsx">
+        <![CDATA[
+import { CategoryBadge } from "./category-badge";
+
+// In test item rendering for failed tests:
+{test.status === "failed" && (
+  <CategoryBadge
+    category={test.failure_category}
+    confidence={test.category_confidence}
+    reasoning={test.category_reasoning}
+  />
+)}
+        ]]>
+      </modal_integration>
+    </frontend>
+
+    <api_specification>
+      <endpoint method="GET" path="/api/categorization">
+        <description>Get category statistics</description>
+        <parameters>
+          <parameter name="dateFrom" type="string" required="false">Start date filter</parameter>
+          <parameter name="dateTo" type="string" required="false">End date filter</parameter>
+        </parameters>
+        <response>
+          <![CDATA[
+{
+  "stats": [
+    { "category": "automation_issue", "count": 45, "percentage": 45.0 },
+    { "category": "environment_issue", "count": 30, "percentage": 30.0 },
+    { "category": "product_bug", "count": 20, "percentage": 20.0 },
+    { "category": "flaky", "count": 5, "percentage": 5.0 }
+  ]
+}
+          ]]>
+        </response>
+      </endpoint>
+
+      <endpoint method="POST" path="/api/categorization">
+        <description>Batch categorize uncategorized results</description>
+        <request>
+          <![CDATA[
+{ "limit": 100 }
+          ]]>
+        </request>
+        <response>
+          <![CDATA[
+{ "success": true, "categorized": 42 }
+          ]]>
+        </response>
+      </endpoint>
+
+      <endpoint method="PATCH" path="/api/categorization/[id]">
+        <description>Override category manually</description>
+        <request>
+          <![CDATA[
+{
+  "category": "product_bug",
+  "reasoning": "Confirmed as API bug in PR #123"
+}
+          ]]>
+        </request>
+      </endpoint>
+    </api_specification>
+  </implementation>
+
+  <files_manifest>
+    <create>
+      <file>scripts/005_failure_categorization.sql</file>
+      <file>lib/failure-categorization.ts</file>
+      <file>app/api/categorization/route.ts</file>
+      <file>app/api/categorization/[id]/route.ts</file>
+      <file>components/dashboard/category-badge.tsx</file>
+      <file>components/dashboard/category-stats-card.tsx</file>
+    </create>
+    <modify>
+      <file>lib/types.ts</file>
+      <file>lib/db.ts</file>
+      <file>components/dashboard/test-detail-modal.tsx</file>
+      <file>app/page.tsx</file>
+    </modify>
+  </files_manifest>
+
+  <testing_checklist>
+    <test>Migration adds columns without errors</test>
+    <test>Heuristics correctly identify environment issues</test>
+    <test>Heuristics correctly identify automation issues</test>
+    <test>Flaky tests marked when retry_count > 0 + passed</test>
+    <test>Category badge displays correctly</test>
+    <test>Tooltip shows reasoning and confidence</test>
+    <test>Stats card shows pie chart</test>
+    <test>Batch categorization works</test>
+    <test>Manual override updates category</test>
+  </testing_checklist>
+
+  <rollback>
+    <![CDATA[
+-- Remove categorization columns
+ALTER TABLE test_results DROP COLUMN IF EXISTS failure_category;
+ALTER TABLE test_results DROP COLUMN IF EXISTS category_confidence;
+ALTER TABLE test_results DROP COLUMN IF EXISTS category_reasoning;
+ALTER TABLE test_results DROP COLUMN IF EXISTS category_source;
+ALTER TABLE test_results DROP COLUMN IF EXISTS categorized_at;
+ALTER TABLE error_patterns DROP COLUMN IF EXISTS suggested_category;
+    ]]>
+  </rollback>
+
+  <future_enhancement>
+    <![CDATA[
+// LLM Integration using Vercel AI SDK
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+async function categorizeWithAI(
+  errorMessage: string,
+  stackTrace: string
+): Promise<FailureCategorization> {
+  const { text } = await generateText({
+    model: openai("gpt-4-turbo"),
+    prompt: `Analyze this test failure and categorize it...`,
+  });
+  // Parse response
+}
+    ]]>
+  </future_enhancement>
+
+  <next_phase>
+    Phase 10: Slack Notifications
+  </next_phase>
+</implementation_prompt>

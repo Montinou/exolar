@@ -2,6 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { NeonAuthUIProvider } from "@neondatabase/neon-js/auth/react/ui"
+import { authClient } from "@/lib/auth/client"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -36,9 +38,11 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        {children}
+        <NeonAuthUIProvider authClient={authClient} emailOTP defaultTheme="dark">
+          {children}
+        </NeonAuthUIProvider>
         <Analytics />
       </body>
     </html>

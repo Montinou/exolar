@@ -1,0 +1,731 @@
+# Phase 10: Slack Notifications
+
+> **Priority:** Medium | **Complexity:** Low | **Dependencies:** None
+>
+> Send notifications to Slack when test runs complete.
+
+---
+
+## Objective
+
+1. Integrate Slack webhook for notifications
+2. Send summary on run completion
+3. Support configurable notification rules
+4. Include actionable links to dashboard
+
+---
+
+## Prerequisites
+
+- Slack workspace with webhook configured
+- Dashboard deployed with public URL
+
+---
+
+## Database Changes
+
+### Migration Script: `scripts/006_slack_notifications.sql`
+
+```sql
+-- Store notification settings
+CREATE TABLE IF NOT EXISTS notification_settings (
+  id SERIAL PRIMARY KEY,
+  channel_type TEXT NOT NULL CHECK (channel_type IN ('slack', 'email', 'webhook')),
+  channel_config JSONB NOT NULL,
+  is_enabled BOOLEAN DEFAULT true,
+  notify_on_success BOOLEAN DEFAULT false,
+  notify_on_failure BOOLEAN DEFAULT true,
+  notify_on_flaky BOOLEAN DEFAULT true,
+  branch_filter TEXT[], -- NULL = all branches, [] = none, ['main', 'develop'] = specific
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Log sent notifications
+CREATE TABLE IF NOT EXISTS notification_log (
+  id SERIAL PRIMARY KEY,
+  execution_id INTEGER REFERENCES test_executions(id),
+  setting_id INTEGER REFERENCES notification_settings(id),
+  channel_type TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('sent', 'failed', 'skipped')),
+  response_data JSONB,
+  error_message TEXT,
+  sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_log_execution ON notification_log(execution_id);
+CREATE INDEX IF NOT EXISTS idx_notification_log_status ON notification_log(status);
+```
+
+---
+
+## Backend Implementation
+
+### 1. Update Types (`lib/types.ts`)
+
+```typescript
+// Notification settings
+export interface NotificationSettings {
+  id: number;
+  channel_type: "slack" | "email" | "webhook";
+  channel_config: SlackConfig | WebhookConfig;
+  is_enabled: boolean;
+  notify_on_success: boolean;
+  notify_on_failure: boolean;
+  notify_on_flaky: boolean;
+  branch_filter: string[] | null;
+}
+
+export interface SlackConfig {
+  webhook_url: string;
+  channel?: string;
+  username?: string;
+  icon_emoji?: string;
+}
+
+export interface WebhookConfig {
+  url: string;
+  headers?: Record<string, string>;
+}
+
+// Notification payload
+export interface SlackNotificationPayload {
+  execution_id: number;
+  run_id: string;
+  status: "success" | "failure";
+  branch: string;
+  commit_sha: string;
+  passed: number;
+  failed: number;
+  skipped: number;
+  flaky: number;
+  duration_ms: number;
+  dashboard_url: string;
+}
+```
+
+### 2. Create Slack Notification Service (`lib/notifications/slack.ts`)
+
+```typescript
+import { SlackNotificationPayload, SlackConfig } from "../types";
+
+export async function sendSlackNotification(
+  config: SlackConfig,
+  payload: SlackNotificationPayload
+): Promise<{ success: boolean; error?: string }> {
+  const isSuccess = payload.status === "success";
+  const color = isSuccess ? "#22c55e" : "#ef4444";
+  const emoji = isSuccess ? ":white_check_mark:" : ":x:";
+
+  const totalTests = payload.passed + payload.failed + payload.skipped;
+  const passRate = totalTests > 0
+    ? ((payload.passed / totalTests) * 100).toFixed(1)
+    : "0";
+
+  const duration = payload.duration_ms < 60000
+    ? `${(payload.duration_ms / 1000).toFixed(1)}s`
+    : `${(payload.duration_ms / 60000).toFixed(1)}m`;
+
+  const slackPayload = {
+    username: config.username || "E2E Test Dashboard",
+    icon_emoji: config.icon_emoji || ":test_tube:",
+    channel: config.channel,
+    attachments: [
+      {
+        color,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: `${emoji} E2E Tests ${isSuccess ? "Passed" : "Failed"}`,
+              emoji: true,
+            },
+          },
+          {
+            type: "section",
+            fields: [
+              {
+                type: "mrkdwn",
+                text: `*Branch:*\n\`${payload.branch}\``,
+              },
+              {
+                type: "mrkdwn",
+                text: `*Commit:*\n\`${payload.commit_sha.substring(0, 7)}\``,
+              },
+              {
+                type: "mrkdwn",
+                text: `*Pass Rate:*\n${passRate}%`,
+              },
+              {
+                type: "mrkdwn",
+                text: `*Duration:*\n${duration}`,
+              },
+            ],
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: [
+                `✅ *Passed:* ${payload.passed}`,
+                `❌ *Failed:* ${payload.failed}`,
+                payload.skipped > 0 ? `⏭️ *Skipped:* ${payload.skipped}` : null,
+                payload.flaky > 0 ? `⚠️ *Flaky:* ${payload.flaky}` : null,
+              ]
+                .filter(Boolean)
+                .join("  |  "),
+            },
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: {
+                  type: "plain_text",
+                  text: "View Details",
+                  emoji: true,
+                },
+                url: payload.dashboard_url,
+                style: "primary",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(config.webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(slackPayload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `Slack API error: ${errorText}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+// Simple notification (without Block Kit)
+export async function sendSimpleSlackNotification(
+  webhookUrl: string,
+  payload: SlackNotificationPayload
+): Promise<{ success: boolean; error?: string }> {
+  const isSuccess = payload.status === "success";
+  const color = isSuccess ? "#22c55e" : "#ef4444";
+  const statusText = isSuccess ? "✅ Passed" : "❌ Failed";
+
+  const message = {
+    attachments: [
+      {
+        color,
+        fallback: `E2E Tests ${statusText} - ${payload.passed} passed, ${payload.failed} failed`,
+        title: `E2E Tests ${statusText}`,
+        title_link: payload.dashboard_url,
+        fields: [
+          { title: "Branch", value: payload.branch, short: true },
+          { title: "Commit", value: payload.commit_sha.substring(0, 7), short: true },
+          { title: "Passed", value: payload.passed.toString(), short: true },
+          { title: "Failed", value: payload.failed.toString(), short: true },
+        ],
+        footer: "E2E Test Dashboard",
+        ts: Math.floor(Date.now() / 1000),
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `HTTP ${response.status}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+```
+
+### 3. Add Notification Functions (`lib/db.ts`)
+
+```typescript
+// Get notification settings
+export async function getNotificationSettings(): Promise<NotificationSettings[]> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT *
+    FROM notification_settings
+    WHERE is_enabled = true
+  `;
+
+  return results as NotificationSettings[];
+}
+
+// Log notification
+export async function logNotification(
+  executionId: number,
+  settingId: number | null,
+  channelType: string,
+  status: "sent" | "failed" | "skipped",
+  responseData?: unknown,
+  errorMessage?: string
+): Promise<void> {
+  const sql = getSql();
+
+  await sql`
+    INSERT INTO notification_log (
+      execution_id, setting_id, channel_type, status, response_data, error_message
+    ) VALUES (
+      ${executionId},
+      ${settingId},
+      ${channelType},
+      ${status},
+      ${JSON.stringify(responseData || {})},
+      ${errorMessage || null}
+    )
+  `;
+}
+
+// Save notification settings
+export async function saveNotificationSettings(
+  settings: Omit<NotificationSettings, "id">
+): Promise<number> {
+  const sql = getSql();
+
+  const result = await sql`
+    INSERT INTO notification_settings (
+      channel_type, channel_config, is_enabled,
+      notify_on_success, notify_on_failure, notify_on_flaky, branch_filter
+    ) VALUES (
+      ${settings.channel_type},
+      ${JSON.stringify(settings.channel_config)},
+      ${settings.is_enabled},
+      ${settings.notify_on_success},
+      ${settings.notify_on_failure},
+      ${settings.notify_on_flaky},
+      ${settings.branch_filter || null}
+    )
+    RETURNING id
+  `;
+
+  return result[0].id;
+}
+```
+
+### 4. Create Notification Trigger (`lib/notifications/trigger.ts`)
+
+```typescript
+import { getNotificationSettings, logNotification } from "../db";
+import { sendSlackNotification } from "./slack";
+import { TestExecution, SlackConfig } from "../types";
+
+export async function triggerNotifications(
+  execution: TestExecution,
+  flakyCount: number = 0
+): Promise<void> {
+  const settings = await getNotificationSettings();
+
+  for (const setting of settings) {
+    // Check branch filter
+    if (setting.branch_filter && setting.branch_filter.length > 0) {
+      if (!setting.branch_filter.includes(execution.branch)) {
+        await logNotification(
+          execution.id,
+          setting.id,
+          setting.channel_type,
+          "skipped",
+          { reason: "Branch not in filter" }
+        );
+        continue;
+      }
+    }
+
+    // Check status filter
+    const shouldNotify =
+      (execution.status === "success" && setting.notify_on_success) ||
+      (execution.status === "failure" && setting.notify_on_failure) ||
+      (flakyCount > 0 && setting.notify_on_flaky);
+
+    if (!shouldNotify) {
+      await logNotification(
+        execution.id,
+        setting.id,
+        setting.channel_type,
+        "skipped",
+        { reason: "Status filter" }
+      );
+      continue;
+    }
+
+    // Send notification
+    if (setting.channel_type === "slack") {
+      const config = setting.channel_config as SlackConfig;
+      const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/executions/${execution.id}`;
+
+      const result = await sendSlackNotification(config, {
+        execution_id: execution.id,
+        run_id: execution.run_id,
+        status: execution.status as "success" | "failure",
+        branch: execution.branch,
+        commit_sha: execution.commit_sha,
+        passed: execution.passed,
+        failed: execution.failed,
+        skipped: execution.skipped,
+        flaky: flakyCount,
+        duration_ms: execution.duration_ms || 0,
+        dashboard_url: dashboardUrl,
+      });
+
+      await logNotification(
+        execution.id,
+        setting.id,
+        setting.channel_type,
+        result.success ? "sent" : "failed",
+        result,
+        result.error
+      );
+    }
+  }
+}
+```
+
+### 5. Create Notifications API (`app/api/notifications/route.ts`)
+
+```typescript
+import { getNotificationSettings, saveNotificationSettings } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  try {
+    const settings = await getNotificationSettings();
+    return NextResponse.json({ settings });
+  } catch (error) {
+    console.error("Error fetching notification settings:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch settings" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+
+    const id = await saveNotificationSettings({
+      channel_type: body.channel_type,
+      channel_config: body.channel_config,
+      is_enabled: body.is_enabled ?? true,
+      notify_on_success: body.notify_on_success ?? false,
+      notify_on_failure: body.notify_on_failure ?? true,
+      notify_on_flaky: body.notify_on_flaky ?? true,
+      branch_filter: body.branch_filter,
+    });
+
+    return NextResponse.json({ success: true, id });
+  } catch (error) {
+    console.error("Error saving notification settings:", error);
+    return NextResponse.json(
+      { error: "Failed to save settings" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 6. Create Test Endpoint (`app/api/notifications/test/route.ts`)
+
+```typescript
+import { sendSimpleSlackNotification } from "@/lib/notifications/slack";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const webhookUrl = body.webhook_url;
+
+    if (!webhookUrl) {
+      return NextResponse.json(
+        { error: "webhook_url is required" },
+        { status: 400 }
+      );
+    }
+
+    const result = await sendSimpleSlackNotification(webhookUrl, {
+      execution_id: 0,
+      run_id: "test-123",
+      status: "success",
+      branch: "main",
+      commit_sha: "abc1234567890",
+      passed: 42,
+      failed: 0,
+      skipped: 2,
+      flaky: 1,
+      duration_ms: 45000,
+      dashboard_url: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}`,
+    });
+
+    if (result.success) {
+      return NextResponse.json({ success: true, message: "Test notification sent" });
+    } else {
+      return NextResponse.json(
+        { success: false, error: result.error },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error("Error sending test notification:", error);
+    return NextResponse.json(
+      { error: "Failed to send test notification" },
+      { status: 500 }
+    );
+  }
+}
+```
+
+---
+
+## Environment Variables
+
+Add to `.env`:
+
+```bash
+# Required for notification links
+NEXT_PUBLIC_APP_URL=https://your-dashboard.vercel.app
+
+# Optional: Default Slack webhook (can also be configured via API)
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/xxx/yyy/zzz
+```
+
+---
+
+## Frontend Implementation (Optional Settings UI)
+
+### Create Settings Page (`app/settings/notifications/page.tsx`)
+
+```tsx
+"use client";
+
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Slack, Send, CheckCircle2 } from "lucide-react";
+
+export default function NotificationSettingsPage() {
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [notifyOnSuccess, setNotifyOnSuccess] = useState(false);
+  const [notifyOnFailure, setNotifyOnFailure] = useState(true);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      const response = await fetch("/api/notifications/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ webhook_url: webhookUrl }),
+      });
+
+      const data = await response.json();
+      setTestResult(data.success ? "success" : "error");
+    } catch {
+      setTestResult("error");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    await fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channel_type: "slack",
+        channel_config: { webhook_url: webhookUrl },
+        notify_on_success: notifyOnSuccess,
+        notify_on_failure: notifyOnFailure,
+        notify_on_flaky: true,
+      }),
+    });
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <h1 className="text-2xl font-bold mb-6">Notification Settings</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Slack className="h-5 w-5" />
+            Slack Integration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="webhook">Webhook URL</Label>
+            <Input
+              id="webhook"
+              type="url"
+              placeholder="https://hooks.slack.com/services/..."
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="success">Notify on success</Label>
+              <Switch
+                id="success"
+                checked={notifyOnSuccess}
+                onCheckedChange={setNotifyOnSuccess}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="failure">Notify on failure</Label>
+              <Switch
+                id="failure"
+                checked={notifyOnFailure}
+                onCheckedChange={setNotifyOnFailure}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={handleTest}
+              disabled={!webhookUrl || testing}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {testing ? "Sending..." : "Test"}
+            </Button>
+            <Button onClick={handleSave} disabled={!webhookUrl}>
+              Save Settings
+            </Button>
+          </div>
+
+          {testResult === "success" && (
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle2 className="h-4 w-4" />
+              Test notification sent successfully!
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+### Install Switch Component
+
+```bash
+npx shadcn@latest add switch label
+```
+
+---
+
+## API Specification
+
+### GET /api/notifications
+
+Get all notification settings.
+
+### POST /api/notifications
+
+Create notification setting.
+
+**Request:**
+```json
+{
+  "channel_type": "slack",
+  "channel_config": {
+    "webhook_url": "https://hooks.slack.com/services/..."
+  },
+  "notify_on_success": false,
+  "notify_on_failure": true,
+  "notify_on_flaky": true,
+  "branch_filter": ["main", "develop"]
+}
+```
+
+### POST /api/notifications/test
+
+Send test notification.
+
+**Request:**
+```json
+{
+  "webhook_url": "https://hooks.slack.com/services/..."
+}
+```
+
+---
+
+## Testing Checklist
+
+- [ ] Migration creates tables
+- [ ] Slack webhook sends successfully
+- [ ] Message formatting looks correct
+- [ ] Branch filter works
+- [ ] Status filter works (success/failure)
+- [ ] Test notification endpoint works
+- [ ] Settings save correctly
+- [ ] Notification log records sent/failed/skipped
+
+---
+
+## Files to Create/Modify
+
+### Create:
+- `scripts/006_slack_notifications.sql`
+- `lib/notifications/slack.ts`
+- `lib/notifications/trigger.ts`
+- `app/api/notifications/route.ts`
+- `app/api/notifications/test/route.ts`
+- `app/settings/notifications/page.tsx` (optional)
+
+### Modify:
+- `lib/types.ts` - Add notification types
+- `lib/db.ts` - Add notification functions
+- `.env` - Add NEXT_PUBLIC_APP_URL
+
+### Install:
+```bash
+npx shadcn@latest add switch label
+```
+
+---
+
+*Phase 10 Complete → Proceed to Phase 11: GitHub PR Comments*

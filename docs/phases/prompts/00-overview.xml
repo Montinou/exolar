@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  E2E Test Dashboard - Implementation Phases Overview
+  Master prompt defining the phased implementation roadmap
+
+  Usage: Use this prompt to understand the full implementation plan
+  and dependencies between phases before starting any phase.
+-->
+<implementation_prompt version="1.0">
+  <metadata>
+    <phase>00</phase>
+    <name>Implementation Phases Overview</name>
+    <type>planning</type>
+    <created>2025-12</created>
+  </metadata>
+
+  <context>
+    <project_description>
+      E2E Test Dashboard for monitoring Playwright test executions from GitHub Actions.
+      Displays real-time metrics, trend charts, and detailed test results with artifact
+      management via Cloudflare R2.
+    </project_description>
+
+    <technology_stack>
+      <framework>Next.js 16 with App Router and React Server Components</framework>
+      <database>Neon PostgreSQL (serverless) via @neondatabase/serverless</database>
+      <storage>Cloudflare R2 for test artifacts</storage>
+      <ui>shadcn/ui (new-york style) with TailwindCSS v4</ui>
+      <charts>Recharts</charts>
+      <auth>Stack Auth (@stackframe/stack)</auth>
+    </technology_stack>
+
+    <current_state>
+      <feature status="complete">Basic metrics display (pass rate, avg duration, critical failures, 24h runs)</feature>
+      <feature status="complete">Trend chart (7-day passed/failed visualization)</feature>
+      <feature status="complete">Executions table with status filtering</feature>
+      <feature status="complete">Branch filtering</feature>
+      <feature status="complete">Test detail modal with artifact downloads</feature>
+      <feature status="complete">Stack Auth integration</feature>
+    </current_state>
+
+    <key_directories>
+      <directory path="app/">Next.js App Router pages and API routes</directory>
+      <directory path="app/api/">API endpoints (executions, metrics, trends, artifacts)</directory>
+      <directory path="components/dashboard/">Dashboard-specific components</directory>
+      <directory path="components/ui/">shadcn/ui components</directory>
+      <directory path="lib/">Core utilities: db.ts, r2.ts, types.ts</directory>
+      <directory path="scripts/">SQL migration scripts for Neon</directory>
+    </key_directories>
+  </context>
+
+  <implementation_roadmap>
+    <phase_group name="Foundation" description="Core tracking and analytics capabilities">
+      <phase number="01" name="Test Signatures and Search" priority="high" complexity="low">
+        <description>Enable historical tracking of individual tests across runs with fuzzy search</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>MD5-hashed test signatures</deliverable>
+          <deliverable>Fuzzy search with PostgreSQL trigram</deliverable>
+          <deliverable>Test history API</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="02" name="Date Range Filter" priority="high" complexity="low">
+        <description>Filter all dashboard data by date range for historical analysis</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Date range picker with presets</deliverable>
+          <deliverable>URL-persisted filter state</deliverable>
+          <deliverable>All queries support date filtering</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="03" name="Flaky Test Detection" priority="high" complexity="medium">
+        <description>Identify and track tests that pass intermittently</description>
+        <dependencies>Phase 01 (requires test signatures)</dependencies>
+        <key_deliverables>
+          <deliverable>Flakiness tracking table</deliverable>
+          <deliverable>Flaky badge component</deliverable>
+          <deliverable>Flakiest tests card</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="04" name="Failure Rate Metrics" priority="high" complexity="low">
+        <description>Track reliability as core dashboard metric</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Failure rate in stats cards</deliverable>
+          <deliverable>Failure rate trend chart</deliverable>
+          <deliverable>Failure volume metric</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="05" name="Error Pattern Grouping" priority="high" complexity="medium">
+        <description>Cluster similar errors to identify systemic issues</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Error normalization algorithm</deliverable>
+          <deliverable>Error patterns table</deliverable>
+          <deliverable>Pattern resolution tracking</deliverable>
+        </key_deliverables>
+      </phase>
+    </phase_group>
+
+    <phase_group name="Analytics" description="Actionable insights views">
+      <phase number="06" name="Test Explorer - Slowest" priority="medium" complexity="low">
+        <description>Identify performance bottlenecks</description>
+        <dependencies>Phase 01</dependencies>
+        <key_deliverables>
+          <deliverable>Explorer page with tabs</deliverable>
+          <deliverable>Duration metrics (avg, min, max, p95)</deliverable>
+          <deliverable>Trend detection</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="07" name="Test Explorer - Flakiest" priority="medium" complexity="low">
+        <description>Detailed flakiness analysis in explorer</description>
+        <dependencies>Phase 03, Phase 06</dependencies>
+        <key_deliverables>
+          <deliverable>Flakiness rate visualization</deliverable>
+          <deliverable>Flakiness volume metric</deliverable>
+          <deliverable>Severity color coding</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="08" name="Test Explorer - Most Failing" priority="medium" complexity="low">
+        <description>Identify unreliable tests by failure rate</description>
+        <dependencies>Phase 04, Phase 06</dependencies>
+        <key_deliverables>
+          <deliverable>Failure rate by test</deliverable>
+          <deliverable>Severity badges</deliverable>
+          <deliverable>Link to error patterns</deliverable>
+        </key_deliverables>
+      </phase>
+    </phase_group>
+
+    <phase_group name="AI and Integration" description="Intelligent analysis and external connectivity">
+      <phase number="09" name="AI Failure Categorization" priority="high" complexity="medium">
+        <description>Auto-classify failures for triage priority</description>
+        <dependencies>Phase 05</dependencies>
+        <key_deliverables>
+          <deliverable>Heuristics-based categorization</deliverable>
+          <deliverable>Category badges with confidence</deliverable>
+          <deliverable>Category distribution chart</deliverable>
+        </key_deliverables>
+        <categories>
+          <category name="product_bug">Application defects</category>
+          <category name="automation_issue">Test code problems</category>
+          <category name="environment_issue">Infrastructure problems</category>
+          <category name="flaky">Non-deterministic tests</category>
+        </categories>
+      </phase>
+
+      <phase number="10" name="Slack Notifications" priority="medium" complexity="low">
+        <description>Alert team of test run completion</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Webhook-based integration</deliverable>
+          <deliverable>Configurable notification rules</deliverable>
+          <deliverable>Formatted Slack messages</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="11" name="GitHub PR Comments" priority="medium" complexity="low">
+        <description>Post test results to pull requests</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Octokit integration</deliverable>
+          <deliverable>Markdown formatted comments</deliverable>
+          <deliverable>Comment update on re-runs</deliverable>
+        </key_deliverables>
+      </phase>
+    </phase_group>
+
+    <phase_group name="Enhancement" description="Quality of life and visualization improvements">
+      <phase number="12" name="CSV Export" priority="low" complexity="low">
+        <description>Enable offline analysis and reporting</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Export endpoints for executions, results, flakiness</deliverable>
+          <deliverable>Query filter support</deliverable>
+          <deliverable>Dropdown export button</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="13" name="Real-Time Streaming" priority="medium" complexity="medium">
+        <description>Show live test results during execution</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>SSE implementation</deliverable>
+          <deliverable>useSSE hook with auto-reconnect</deliverable>
+          <deliverable>Live execution component</deliverable>
+        </key_deliverables>
+      </phase>
+
+      <phase number="14" name="Test Timeline Visualization" priority="medium" complexity="medium">
+        <description>Visual representation of test execution timing</description>
+        <dependencies>None</dependencies>
+        <key_deliverables>
+          <deliverable>Bar chart for durations</deliverable>
+          <deliverable>Gantt chart for parallelism</deliverable>
+          <deliverable>Status color coding</deliverable>
+        </key_deliverables>
+      </phase>
+    </phase_group>
+  </implementation_roadmap>
+
+  <dependency_graph>
+    <![CDATA[
+    Foundation (No Dependencies):
+    ├── Phase 01: Test Signatures ──┐
+    ├── Phase 02: Date Range Filter─┤
+    ├── Phase 04: Failure Rate      │
+    └── Phase 05: Error Patterns    │
+                                    │
+    Build on Foundation:            │
+    ├── Phase 03: Flaky Detection ──┤── requires Phase 01
+    ├── Phase 06: Explorer Slowest ─┤── requires Phase 01
+    ├── Phase 07: Explorer Flakiest ┤── requires Phase 03 + 06
+    ├── Phase 08: Explorer Failing ─┤── requires Phase 04 + 06
+    └── Phase 09: AI Categorization ┘── requires Phase 05
+
+    Independent Enhancements:
+    ├── Phase 10: Slack Notifications
+    ├── Phase 11: GitHub PR Comments
+    ├── Phase 12: CSV Export
+    ├── Phase 13: Real-Time Streaming
+    └── Phase 14: Test Timeline
+    ]]>
+  </dependency_graph>
+
+  <recommended_order>
+    <step order="1">Phase 01 - Foundation for test tracking</step>
+    <step order="2">Phase 02 - Enables filtering across all features</step>
+    <step order="3">Phase 04 - Core metric needed for Phase 08</step>
+    <step order="4">Phase 03 - Flakiness tracking (needs Phase 01)</step>
+    <step order="5">Phase 05 - Error patterns (needed by Phase 09)</step>
+    <step order="6">Phase 06 - Explorer foundation</step>
+    <step order="7">Phase 07 and 08 - Explorer tabs (parallel)</step>
+    <step order="8">Phase 09 - AI categorization (needs Phase 05)</step>
+    <step order="9">Phases 10-14 - Order flexible based on priority</step>
+  </recommended_order>
+
+  <estimation_guide>
+    <complexity level="low" hours="1-2">Single component or simple API</complexity>
+    <complexity level="medium" hours="2-4">Multiple components with database changes</complexity>
+    <complexity level="high" hours="4-8">Complex feature with multiple integrations</complexity>
+  </estimation_guide>
+
+  <implementation_guidelines>
+    <guideline category="database">
+      Use factory function pattern in lib/db.ts - call getSql() inside each function
+      to avoid module-level instantiation issues in serverless environments
+    </guideline>
+    <guideline category="api">
+      Use export const dynamic = "force-dynamic" in API routes for fresh data
+    </guideline>
+    <guideline category="ui">
+      Add new shadcn components via CLI: npx shadcn@latest add component-name
+    </guideline>
+    <guideline category="imports">
+      Use @/ prefix for imports (configured in tsconfig.json)
+    </guideline>
+  </implementation_guidelines>
+
+  <phase_document_structure>
+    <section name="Objective">Clear goals for the phase</section>
+    <section name="Prerequisites">Required phases or setup</section>
+    <section name="Database Changes">SQL migration scripts</section>
+    <section name="Backend Implementation">API routes and lib functions</section>
+    <section name="Frontend Implementation">UI components</section>
+    <section name="API Specification">Endpoint documentation</section>
+    <section name="Testing Checklist">Verification steps</section>
+    <section name="Files to Create/Modify">File manifest</section>
+    <section name="Rollback">Reversion procedures</section>
+  </phase_document_structure>
+</implementation_prompt>

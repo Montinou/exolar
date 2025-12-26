@@ -4,6 +4,7 @@ import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TrendChart } from "@/components/dashboard/trend-chart"
 import { ExecutionsTable } from "@/components/dashboard/executions-table"
 import { Filters } from "@/components/dashboard/filters"
+import { UserMenu } from "@/components/dashboard/user-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -61,9 +62,12 @@ export default async function DashboardPage({
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="container mx-auto px-4 py-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-balance">E2E Test Dashboard</h1>
-            <p className="text-muted-foreground text-pretty">Monitor Playwright test executions from GitHub Actions</p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight text-balance">E2E Test Dashboard</h1>
+              <p className="text-muted-foreground text-pretty">Monitor Playwright test executions from GitHub Actions</p>
+            </div>
+            <UserMenu />
           </div>
         </div>
       </div>

@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<prompt version="1.0">
+  <metadata>
+    <phase_number>11</phase_number>
+    <phase_name>github_pr_comments</phase_name>
+    <priority>medium</priority>
+    <complexity>low</complexity>
+    <dependencies>none</dependencies>
+    <estimated_files>7</estimated_files>
+  </metadata>
+
+  <context>
+    <project_stack>
+      <framework>Next.js 16 App Router</framework>
+      <database>Neon PostgreSQL via @neondatabase/serverless</database>
+      <ui>shadcn/ui + TailwindCSS v4</ui>
+      <auth>Stack Auth (@stackframe/stack)</auth>
+      <github_client>@octokit/rest</github_client>
+    </project_stack>
+    <prerequisites>
+      <item>GitHub repository access</item>
+      <item>GitHub token with PR comment permissions</item>
+      <item>Test execution metadata includes PR number</item>
+    </prerequisites>
+  </context>
+
+  <task>
+    <objective>
+      Post test results as comments on GitHub pull requests with automatic updates on re-runs.
+    </objective>
+    <goals>
+      <goal>Create GitHub App or use PAT for authentication</goal>
+      <goal>Post formatted test summaries to PRs</goal>
+      <goal>Update existing comments on re-runs instead of creating duplicates</goal>
+      <goal>Include links to detailed dashboard view</goal>
+    </goals>
+    <success_criteria>
+      <criterion>PR comments post successfully with formatted results</criterion>
+      <criterion>Existing comments update on re-runs</criterion>
+      <criterion>Dashboard links work correctly</criterion>
+      <criterion>Error handling for missing token</criterion>
+    </success_criteria>
+  </task>
+
+  <implementation>
+    <database_changes>
+      <migration file="scripts/007_github_integration.sql">
+        <![CDATA[
+-- Add GitHub PR metadata to executions
+ALTER TABLE test_executions ADD COLUMN IF NOT EXISTS pr_number INTEGER;
+ALTER TABLE test_executions ADD COLUMN IF NOT EXISTS pr_title TEXT;
+ALTER TABLE test_executions ADD COLUMN IF NOT EXISTS github_comment_id BIGINT;
+ALTER TABLE test_executions ADD COLUMN IF NOT EXISTS repository TEXT;
+
+-- Index for PR lookups
+CREATE INDEX IF NOT EXISTS idx_test_executions_pr ON test_executions(repository, pr_number);
+
+-- Store GitHub integration settings
+CREATE TABLE IF NOT EXISTS github_settings (
+  id SERIAL PRIMARY KEY,
+  repository TEXT NOT NULL UNIQUE,
+  token_encrypted TEXT,
+  comment_on_pr BOOLEAN DEFAULT true,
+  update_existing_comment BOOLEAN DEFAULT true,
+  comment_on_success BOOLEAN DEFAULT false,
+  comment_on_failure BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+        ]]>
+      </migration>
+    </database_changes>
+
+    <backend>
+      <types file="lib/types.ts" action="append">
+        <![CDATA[
+// GitHub PR info
+export interface GitHubPRInfo {
+  owner: string;
+  repo: string;
+  pr_number: number;
+  pr_title?: string;
+}
+
+// GitHub comment payload
+export interface GitHubCommentPayload {
+  execution: TestExecution;
+  dashboard_url: string;
+  flaky_count?: number;
+}
+        ]]>
+      </types>
+
+      <service file="lib/github/client.ts" action="create">
+        <![CDATA[
+import { Octokit } from "@octokit/rest";
+
+let octokitInstance: Octokit | null = null;
+
+export function getOctokit(): Octokit {
+  if (!octokitInstance) {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) {
+      throw new Error("GITHUB_TOKEN environment variable is required");
+    }
+    octokitInstance = new Octokit({ auth: token });
+  }
+  return octokitInstance;
+}
+
+export function parseRepository(repository: string): { owner: string; repo: string } {
+  const parts = repository.split("/");
+  if (parts.length !== 2) {
+    throw new Error(`Invalid repository format: ${repository}. Expected owner/repo`);
+  }
+  return { owner: parts[0], repo: parts[1] };
+}
+        ]]>
+      </service>
+
+      <service file="lib/github/comment-formatter.ts" action="create">
+        <![CDATA[
+import { TestExecution } from "../types";
+
+interface CommentData {
+  execution: TestExecution;
+  dashboard_url: string;
+  flaky_count?: number;
+}
+
+export function formatPRComment(data: CommentData): string {
+  const { execution, dashboard_url, flaky_count = 0 } = data;
+  const isSuccess = execution.status === "success";
+  const statusEmoji = isSuccess ? "✅" : "❌";
+  const statusText = isSuccess ? "Passed" : "Failed";
+
+  const totalTests = execution.passed + execution.failed + execution.skipped;
+  const passRate = totalTests > 0
+    ? ((execution.passed / totalTests) * 100).toFixed(1)
+    : "0";
+
+  const duration = execution.duration_ms
+    ? execution.duration_ms < 60000
+      ? `${(execution.duration_ms / 1000).toFixed(1)}s`
+      : `${(execution.duration_ms / 60000).toFixed(1)}m`
+    : "N/A";
+
+  let comment = `## ${statusEmoji} E2E Tests ${statusText}
+
+| Metric | Value |
+|--------|-------|
+| **Status** | ${statusText} |
+| **Pass Rate** | ${passRate}% |
+| **Duration** | ${duration} |
+
+### Results
+
+| Status | Count |
+|--------|-------|
+| ✅ Passed | ${execution.passed} |
+| ❌ Failed | ${execution.failed} |
+| ⏭️ Skipped | ${execution.skipped} |
+`;
+
+  if (flaky_count > 0) {
+    comment += `| ⚠️ Flaky | ${flaky_count} |\n`;
+  }
+
+  comment += `
+### Details
+
+- **Branch:** \`${execution.branch}\`
+- **Commit:** \`${execution.commit_sha.substring(0, 7)}\`
+- **Run ID:** \`${execution.run_id}\`
+
+[📊 View Full Report](${dashboard_url})
+
+---
+<sub>🤖 Generated by E2E Test Dashboard</sub>`;
+
+  return comment;
+}
+
+export const COMMENT_SIGNATURE = "<!-- e2e-test-dashboard-comment -->";
+
+export function formatPRCommentWithSignature(data: CommentData): string {
+  return `${COMMENT_SIGNATURE}\n${formatPRComment(data)}`;
+}
+        ]]>
+      </service>
+
+      <service file="lib/github/pr-comments.ts" action="create">
+        <![CDATA[
+import { getOctokit, parseRepository } from "./client";
+import { formatPRCommentWithSignature, COMMENT_SIGNATURE } from "./comment-formatter";
+import { TestExecution } from "../types";
+
+interface PostCommentOptions {
+  execution: TestExecution;
+  repository: string;
+  prNumber: number;
+  dashboardUrl: string;
+  flakyCount?: number;
+  updateExisting?: boolean;
+}
+
+export async function postPRComment(
+  options: PostCommentOptions
+): Promise<{ success: boolean; commentId?: number; error?: string }> {
+  const {
+    execution,
+    repository,
+    prNumber,
+    dashboardUrl,
+    flakyCount = 0,
+    updateExisting = true,
+  } = options;
+
+  try {
+    const octokit = getOctokit();
+    const { owner, repo } = parseRepository(repository);
+
+    const body = formatPRCommentWithSignature({
+      execution,
+      dashboard_url: dashboardUrl,
+      flaky_count: flakyCount,
+    });
+
+    if (updateExisting) {
+      const existingComment = await findExistingComment(owner, repo, prNumber);
+      if (existingComment) {
+        await octokit.issues.updateComment({
+          owner,
+          repo,
+          comment_id: existingComment.id,
+          body,
+        });
+        return { success: true, commentId: existingComment.id };
+      }
+    }
+
+    const response = await octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: prNumber,
+      body,
+    });
+
+    return { success: true, commentId: response.data.id };
+  } catch (error) {
+    console.error("Error posting PR comment:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+async function findExistingComment(
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<{ id: number } | null> {
+  try {
+    const octokit = getOctokit();
+
+    const { data: comments } = await octokit.issues.listComments({
+      owner,
+      repo,
+      issue_number: prNumber,
+      per_page: 100,
+    });
+
+    const existingComment = comments.find((comment) =>
+      comment.body?.includes(COMMENT_SIGNATURE)
+    );
+
+    return existingComment ? { id: existingComment.id } : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function deletePRComment(
+  repository: string,
+  commentId: number
+): Promise<boolean> {
+  try {
+    const octokit = getOctokit();
+    const { owner, repo } = parseRepository(repository);
+
+    await octokit.issues.deleteComment({
+      owner,
+      repo,
+      comment_id: commentId,
+    });
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+        ]]>
+      </service>
+
+      <database_functions file="lib/db.ts" action="append">
+        <![CDATA[
+// Update execution with PR info
+export async function updateExecutionPRInfo(
+  executionId: number,
+  prNumber: number,
+  prTitle?: string,
+  repository?: string,
+  commentId?: number
+): Promise<void> {
+  const sql = getSql();
+
+  await sql`
+    UPDATE test_executions
+    SET
+      pr_number = ${prNumber},
+      pr_title = ${prTitle || null},
+      repository = ${repository || null},
+      github_comment_id = ${commentId || null}
+    WHERE id = ${executionId}
+  `;
+}
+
+// Get execution by PR
+export async function getExecutionsByPR(
+  repository: string,
+  prNumber: number,
+  limit: number = 10
+): Promise<TestExecution[]> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT *
+    FROM test_executions
+    WHERE repository = ${repository}
+      AND pr_number = ${prNumber}
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `;
+
+  return results as TestExecution[];
+}
+        ]]>
+      </database_functions>
+
+      <api_route file="app/api/github/comment/route.ts" action="create">
+        <![CDATA[
+import { postPRComment } from "@/lib/github/pr-comments";
+import { getExecutionById, updateExecutionPRInfo } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      execution_id,
+      repository,
+      pr_number,
+      pr_title,
+      flaky_count = 0,
+    } = body;
+
+    if (!execution_id || !repository || !pr_number) {
+      return NextResponse.json(
+        { error: "execution_id, repository, and pr_number are required" },
+        { status: 400 }
+      );
+    }
+
+    const execution = await getExecutionById(execution_id);
+    if (!execution) {
+      return NextResponse.json(
+        { error: "Execution not found" },
+        { status: 404 }
+      );
+    }
+
+    const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL}/executions/${execution_id}`;
+
+    const result = await postPRComment({
+      execution,
+      repository,
+      prNumber: pr_number,
+      dashboardUrl,
+      flakyCount: flaky_count,
+      updateExisting: true,
+    });
+
+    if (result.success) {
+      await updateExecutionPRInfo(
+        execution_id,
+        pr_number,
+        pr_title,
+        repository,
+        result.commentId
+      );
+    }
+
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Error posting GitHub comment:", error);
+    return NextResponse.json(
+      { error: "Failed to post comment" },
+      { status: 500 }
+    );
+  }
+}
+        ]]>
+      </api_route>
+    </backend>
+
+    <github_actions_integration>
+      <workflow_step name="Post Test Results to PR">
+        <![CDATA[
+# .github/workflows/e2e-tests.yml
+- name: Post Test Results to PR
+  if: github.event_name == 'pull_request'
+  env:
+    DASHBOARD_API_URL: ${{ secrets.DASHBOARD_API_URL }}
+    DASHBOARD_API_KEY: ${{ secrets.DASHBOARD_API_KEY }}
+  run: |
+    curl -X POST "$DASHBOARD_API_URL/api/github/comment" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $DASHBOARD_API_KEY" \
+      -d '{
+        "execution_id": ${{ steps.upload_results.outputs.execution_id }},
+        "repository": "${{ github.repository }}",
+        "pr_number": ${{ github.event.pull_request.number }},
+        "pr_title": "${{ github.event.pull_request.title }}",
+        "flaky_count": ${{ steps.test.outputs.flaky_count || 0 }}
+      }'
+        ]]>
+      </workflow_step>
+    </github_actions_integration>
+
+    <api_specification>
+      <endpoint method="POST" path="/api/github/comment">
+        <description>Post or update PR comment</description>
+        <request_body>
+          <![CDATA[
+{
+  "execution_id": 123,
+  "repository": "owner/repo",
+  "pr_number": 456,
+  "pr_title": "Add new feature",
+  "flaky_count": 2
+}
+          ]]>
+        </request_body>
+        <response_success>
+          <![CDATA[
+{
+  "success": true,
+  "commentId": 789012345
+}
+          ]]>
+        </response_success>
+      </endpoint>
+    </api_specification>
+  </implementation>
+
+  <environment_variables>
+    <variable name="GITHUB_TOKEN" required="true">GitHub personal access token or app token</variable>
+    <variable name="NEXT_PUBLIC_APP_URL" required="true">Dashboard URL for links in comments</variable>
+  </environment_variables>
+
+  <files_manifest>
+    <create>
+      <file>scripts/007_github_integration.sql</file>
+      <file>lib/github/client.ts</file>
+      <file>lib/github/comment-formatter.ts</file>
+      <file>lib/github/pr-comments.ts</file>
+      <file>app/api/github/comment/route.ts</file>
+    </create>
+    <modify>
+      <file>lib/types.ts</file>
+      <file>lib/db.ts</file>
+    </modify>
+    <install>
+      <package>@octokit/rest</package>
+    </install>
+  </files_manifest>
+
+  <testing_checklist>
+    <item>Migration adds PR columns to test_executions</item>
+    <item>GitHub token authentication works</item>
+    <item>PR comment posts successfully</item>
+    <item>Comment format renders correctly in GitHub</item>
+    <item>Existing comments update instead of duplicate</item>
+    <item>Dashboard links work</item>
+    <item>Repository parsing handles owner/repo format</item>
+    <item>Error handling for missing token</item>
+  </testing_checklist>
+
+  <rollback>
+    <![CDATA[
+-- Rollback migration
+ALTER TABLE test_executions DROP COLUMN IF EXISTS pr_number;
+ALTER TABLE test_executions DROP COLUMN IF EXISTS pr_title;
+ALTER TABLE test_executions DROP COLUMN IF EXISTS github_comment_id;
+ALTER TABLE test_executions DROP COLUMN IF EXISTS repository;
+DROP INDEX IF EXISTS idx_test_executions_pr;
+DROP TABLE IF EXISTS github_settings;
+    ]]>
+  </rollback>
+
+  <next_phase>
+    <number>12</number>
+    <name>csv_export</name>
+    <description>Export test data to CSV for offline analysis</description>
+  </next_phase>
+</prompt>

@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 02: Date Range Filter
+  Enables filtering all dashboard data by date range for historical analysis
+
+  Usage: Execute this prompt to implement date range filtering
+  Prerequisites: Basic dashboard implementation complete
+-->
+<implementation_prompt version="1.0">
+  <metadata>
+    <phase>02</phase>
+    <name>Date Range Filter</name>
+    <priority>high</priority>
+    <complexity>low</complexity>
+    <estimated_hours>1-2</estimated_hours>
+    <dependencies>None</dependencies>
+  </metadata>
+
+  <context>
+    <project_stack>
+      <framework>Next.js 16 with App Router</framework>
+      <database>Neon PostgreSQL via @neondatabase/serverless</database>
+      <ui>shadcn/ui with TailwindCSS v4</ui>
+    </project_stack>
+
+    <prerequisites>
+      <prerequisite>Basic dashboard implementation complete</prerequisite>
+      <prerequisite>Filters component exists (components/dashboard/filters.tsx)</prerequisite>
+    </prerequisites>
+
+    <note>No database migrations required - filtering uses existing started_at columns</note>
+  </context>
+
+  <task>
+    <objective>
+      <goal priority="1">Add date range picker component to the dashboard</goal>
+      <goal priority="2">Update all API routes to accept date parameters</goal>
+      <goal priority="3">Filter executions, metrics, and trends by selected date range</goal>
+    </objective>
+
+    <success_criteria>
+      <criterion>Date picker opens and closes correctly</criterion>
+      <criterion>Quick select presets work (Today, 7d, 14d, 30d, 90d)</criterion>
+      <criterion>Custom date range selection works</criterion>
+      <criterion>Date range persists in URL parameters</criterion>
+      <criterion>Date range survives page refresh</criterion>
+      <criterion>Executions table filters by date</criterion>
+      <criterion>Metrics update based on date range</criterion>
+      <criterion>Trend chart updates based on date range</criterion>
+      <criterion>Clear button removes date filter</criterion>
+      <criterion>Combined filters work (date + status + branch)</criterion>
+    </success_criteria>
+  </task>
+
+  <implementation>
+    <backend>
+      <database_functions file="lib/db.ts">
+        <function name="getExecutions" action="update">
+          <![CDATA[
+export async function getExecutions(
+  limit: number = 50,
+  status?: string,
+  branch?: string,
+  dateFrom?: string,
+  dateTo?: string
+): Promise<TestExecution[]> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT * FROM test_executions
+    WHERE
+      (${status || null}::text IS NULL OR ${status} = 'all' OR status = ${status})
+      AND (${branch || null}::text IS NULL OR ${branch} = 'all' OR branch = ${branch})
+      AND (${dateFrom || null}::text IS NULL OR started_at >= ${dateFrom}::timestamptz)
+      AND (${dateTo || null}::text IS NULL OR started_at <= ${dateTo}::timestamptz)
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `;
+
+  return results as TestExecution[];
+}
+          ]]>
+        </function>
+
+        <function name="getDashboardMetrics" action="update">
+          <![CDATA[
+export async function getDashboardMetrics(
+  dateFrom?: string,
+  dateTo?: string
+): Promise<DashboardMetrics> {
+  const sql = getSql();
+
+  const result = await sql`
+    SELECT
+      COUNT(*) as total_executions,
+      COALESCE(
+        ROUND(
+          AVG(CASE WHEN status = 'success' THEN 100.0 ELSE 0 END)
+        , 1)
+      , 0) as pass_rate,
+      COALESCE(ROUND(AVG(duration_ms)), 0) as avg_duration_ms,
+      COUNT(*) FILTER (
+        WHERE status = 'failure'
+        AND started_at > NOW() - INTERVAL '7 days'
+      ) as critical_failures,
+      COUNT(*) FILTER (
+        WHERE started_at > NOW() - INTERVAL '24 hours'
+      ) as last_24h_executions
+    FROM test_executions
+    WHERE
+      (${dateFrom || null}::text IS NULL OR started_at >= ${dateFrom}::timestamptz)
+      AND (${dateTo || null}::text IS NULL OR started_at <= ${dateTo}::timestamptz)
+  `;
+
+  return result[0] as DashboardMetrics;
+}
+          ]]>
+        </function>
+
+        <function name="getTrendData" action="update">
+          <![CDATA[
+export async function getTrendData(
+  days: number = 7,
+  dateFrom?: string,
+  dateTo?: string
+): Promise<TrendData[]> {
+  const sql = getSql();
+
+  const results = await sql`
+    SELECT
+      DATE(tr.started_at) as date,
+      COUNT(*) FILTER (WHERE tr.status = 'passed') as passed,
+      COUNT(*) FILTER (WHERE tr.status = 'failed') as failed,
+      COUNT(*) as total
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.status != 'running'
+      AND (
+        CASE
+          WHEN ${dateFrom}::text IS NOT NULL AND ${dateTo}::text IS NOT NULL
+          THEN tr.started_at >= ${dateFrom}::timestamptz AND tr.started_at <= ${dateTo}::timestamptz
+          ELSE tr.started_at >= NOW() - (${days} || ' days')::interval
+        END
+      )
+    GROUP BY DATE(tr.started_at)
+    ORDER BY date ASC
+  `;
+
+  return results as TrendData[];
+}
+          ]]>
+        </function>
+      </database_functions>
+
+      <api_routes>
+        <route path="app/api/executions/route.ts" action="update">
+          <![CDATA[
+import { getExecutions, getBranches } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status") || undefined;
+    const branch = searchParams.get("branch") || undefined;
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+
+    const [executions, branches] = await Promise.all([
+      getExecutions(limit, status, branch, dateFrom, dateTo),
+      getBranches()
+    ]);
+
+    return NextResponse.json({ executions, branches });
+  } catch (error) {
+    console.error("Error fetching executions:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch executions" },
+      { status: 500 }
+    );
+  }
+}
+          ]]>
+        </route>
+
+        <route path="app/api/metrics/route.ts" action="update">
+          <![CDATA[
+import { getDashboardMetrics } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+
+    const metrics = await getDashboardMetrics(dateFrom, dateTo);
+
+    return NextResponse.json(metrics);
+  } catch (error) {
+    console.error("Error fetching metrics:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch metrics" },
+      { status: 500 }
+    );
+  }
+}
+          ]]>
+        </route>
+
+        <route path="app/api/trends/route.ts" action="update">
+          <![CDATA[
+import { getTrendData } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get("days") || "7");
+    const dateFrom = searchParams.get("dateFrom") || undefined;
+    const dateTo = searchParams.get("dateTo") || undefined;
+
+    const trends = await getTrendData(days, dateFrom, dateTo);
+
+    return NextResponse.json(trends);
+  } catch (error) {
+    console.error("Error fetching trends:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch trends" },
+      { status: 500 }
+    );
+  }
+}
+          ]]>
+        </route>
+      </api_routes>
+    </backend>
+
+    <frontend>
+      <install_commands>
+        <command>npx shadcn@latest add calendar popover</command>
+        <command>npm install date-fns react-day-picker</command>
+      </install_commands>
+
+      <components>
+        <component file="components/dashboard/date-range-picker.tsx">
+          <![CDATA[
+"use client";
+
+import * as React from "react";
+import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+interface DateRangePickerProps {
+  dateRange: DateRange | undefined;
+  onDateRangeChange: (range: DateRange | undefined) => void;
+  className?: string;
+}
+
+const presets = [
+  { label: "Today", value: "today", days: 0 },
+  { label: "Last 7 days", value: "7d", days: 7 },
+  { label: "Last 14 days", value: "14d", days: 14 },
+  { label: "Last 30 days", value: "30d", days: 30 },
+  { label: "Last 90 days", value: "90d", days: 90 },
+];
+
+export function DateRangePicker({
+  dateRange,
+  onDateRangeChange,
+  className,
+}: DateRangePickerProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  const handlePresetChange = (value: string) => {
+    const preset = presets.find((p) => p.value === value);
+    if (preset) {
+      const to = endOfDay(new Date());
+      const from = startOfDay(subDays(new Date(), preset.days));
+      onDateRangeChange({ from, to });
+    }
+  };
+
+  const handleClear = () => {
+    onDateRangeChange(undefined);
+  };
+
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              "justify-start text-left font-normal min-w-[240px]",
+              !dateRange && "text-muted-foreground"
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {dateRange?.from ? (
+              dateRange.to ? (
+                <>
+                  {format(dateRange.from, "MMM d, yyyy")} -{" "}
+                  {format(dateRange.to, "MMM d, yyyy")}
+                </>
+              ) : (
+                format(dateRange.from, "MMM d, yyyy")
+              )
+            ) : (
+              <span>All time</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <div className="flex">
+            <div className="border-r p-2 space-y-1">
+              <p className="text-sm font-medium px-2 py-1">Quick select</p>
+              {presets.map((preset) => (
+                <Button
+                  key={preset.value}
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    handlePresetChange(preset.value);
+                    setIsOpen(false);
+                  }}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+            <div className="p-2">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={onDateRangeChange}
+                numberOfMonths={2}
+              />
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {dateRange && (
+        <Button variant="ghost" size="sm" onClick={handleClear}>
+          Clear
+        </Button>
+      )}
+    </div>
+  );
+}
+          ]]>
+        </component>
+
+        <component file="components/dashboard/filters.tsx" action="update">
+          <![CDATA[
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useState } from "react";
+import { DateRange } from "react-day-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "./date-range-picker";
+
+interface FiltersProps {
+  branches: string[];
+}
+
+export function Filters({ branches }: FiltersProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const from = searchParams.get("dateFrom");
+    const to = searchParams.get("dateTo");
+    if (from && to) {
+      return { from: new Date(from), to: new Date(to) };
+    }
+    return undefined;
+  });
+
+  const currentStatus = searchParams.get("status") || "all";
+  const currentBranch = searchParams.get("branch") || "all";
+
+  const updateFilters = useCallback(
+    (key: string, value: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value && value !== "all") {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+      router.push(`?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
+
+  const handleDateRangeChange = useCallback(
+    (range: DateRange | undefined) => {
+      setDateRange(range);
+      const params = new URLSearchParams(searchParams.toString());
+
+      if (range?.from) {
+        params.set("dateFrom", range.from.toISOString());
+      } else {
+        params.delete("dateFrom");
+      }
+
+      if (range?.to) {
+        params.set("dateTo", range.to.toISOString());
+      } else {
+        params.delete("dateTo");
+      }
+
+      router.push(`?${params.toString()}`);
+    },
+    [router, searchParams]
+  );
+
+  const clearFilters = () => {
+    setDateRange(undefined);
+    router.push("/");
+  };
+
+  const hasFilters = currentStatus !== "all" || currentBranch !== "all" || dateRange;
+
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <DateRangePicker
+        dateRange={dateRange}
+        onDateRangeChange={handleDateRangeChange}
+      />
+
+      <Select
+        value={currentStatus}
+        onValueChange={(value) => updateFilters("status", value)}
+      >
+        <SelectTrigger className="w-[140px]">
+          <SelectValue placeholder="Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="success">Success</SelectItem>
+          <SelectItem value="failure">Failure</SelectItem>
+          <SelectItem value="running">Running</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={currentBranch}
+        onValueChange={(value) => updateFilters("branch", value)}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Branch" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Branches</SelectItem>
+          {branches.map((branch) => (
+            <SelectItem key={branch} value={branch}>
+              {branch}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {hasFilters && (
+        <Button variant="ghost" size="sm" onClick={clearFilters}>
+          Clear all
+        </Button>
+      )}
+    </div>
+  );
+}
+          ]]>
+        </component>
+      </components>
+
+      <page_integration file="app/page.tsx">
+        <![CDATA[
+// Parse date params from URL
+const searchParams = await props.searchParams;
+const dateFrom = searchParams?.dateFrom as string | undefined;
+const dateTo = searchParams?.dateTo as string | undefined;
+
+// Pass to API calls
+const [metrics, trends, executions, branches] = await Promise.all([
+  getDashboardMetrics(dateFrom, dateTo),
+  getTrendData(7, dateFrom, dateTo),
+  getExecutions(50, status, branch, dateFrom, dateTo),
+  getBranches(),
+]);
+        ]]>
+      </page_integration>
+    </frontend>
+
+    <api_specification>
+      <note>All endpoints now accept date range parameters</note>
+
+      <parameters>
+        <parameter name="dateFrom" type="string" format="ISO 8601">Start of date range</parameter>
+        <parameter name="dateTo" type="string" format="ISO 8601">End of date range</parameter>
+      </parameters>
+
+      <example_request>
+        GET /api/executions?dateFrom=2025-12-01T00:00:00Z&amp;dateTo=2025-12-25T23:59:59Z
+      </example_request>
+    </api_specification>
+  </implementation>
+
+  <files_manifest>
+    <create>
+      <file>components/dashboard/date-range-picker.tsx</file>
+    </create>
+    <modify>
+      <file>lib/db.ts</file>
+      <file>app/api/executions/route.ts</file>
+      <file>app/api/metrics/route.ts</file>
+      <file>app/api/trends/route.ts</file>
+      <file>components/dashboard/filters.tsx</file>
+      <file>app/page.tsx</file>
+    </modify>
+  </files_manifest>
+
+  <testing_checklist>
+    <test>Date picker opens and closes correctly</test>
+    <test>Quick select presets work (Today, 7d, 14d, 30d, 90d)</test>
+    <test>Custom date range selection works</test>
+    <test>Date range persists in URL parameters</test>
+    <test>Date range survives page refresh</test>
+    <test>Executions table filters by date</test>
+    <test>Metrics update based on date range</test>
+    <test>Trend chart updates based on date range</test>
+    <test>Clear button removes date filter</test>
+    <test>Combined filters work (date + status + branch)</test>
+  </testing_checklist>
+
+  <next_phase>
+    Phase 03: Flaky Test Detection - Automatically detect and track intermittently passing tests
+  </next_phase>
+</implementation_prompt>
