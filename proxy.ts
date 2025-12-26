@@ -14,7 +14,8 @@ export const config = {
      * - public folder
      * - auth routes (sign-in, sign-up, sign-out)
      * - api/auth routes (auth API handlers)
+     * - api/test-results (test data ingestion endpoint - uses API key auth)
      */
-    "/((?!_next/static|_next/image|favicon.ico|icon.*|apple-icon.*|auth|api/auth).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.*|apple-icon.*|auth|api/auth|api/test-results).*)",
   ],
 }

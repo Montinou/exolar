@@ -1,5 +1,14 @@
 import { neon } from "@neondatabase/serverless"
-import type { TestExecution, TestResult, DashboardMetrics, TrendData } from "./types"
+import { createHash } from "crypto"
+import type {
+  TestExecution,
+  TestResult,
+  DashboardMetrics,
+  TrendData,
+  ExecutionRequest,
+  TestResultRequest,
+  ArtifactRequest,
+} from "./types"
 
 function getSql() {
   return neon(process.env.DATABASE_URL!)
@@ -113,9 +122,171 @@ export async function getTrendData(days = 7) {
 export async function getBranches() {
   const sql = getSql()
   const result = await sql`
-    SELECT DISTINCT branch 
-    FROM test_executions 
+    SELECT DISTINCT branch
+    FROM test_executions
     ORDER BY branch ASC
   `
   return result.map((r) => r.branch) as string[]
+}
+
+// ============================================
+// Insert Functions for Data Ingestion
+// ============================================
+
+/**
+ * Generate MD5 hash signature for test identification
+ * Format: MD5(test_file::test_name)
+ */
+export function generateTestSignature(testFile: string, testName: string): string {
+  return createHash("md5").update(`${testFile}::${testName}`).digest("hex")
+}
+
+/**
+ * Insert a new test execution record
+ * @returns The ID of the newly created execution
+ */
+export async function insertExecution(data: ExecutionRequest): Promise<number> {
+  const sql = getSql()
+
+  const result = await sql`
+    INSERT INTO test_executions (
+      run_id,
+      branch,
+      commit_sha,
+      commit_message,
+      triggered_by,
+      workflow_name,
+      status,
+      total_tests,
+      passed,
+      failed,
+      skipped,
+      duration_ms,
+      started_at,
+      completed_at
+    ) VALUES (
+      ${data.run_id},
+      ${data.branch},
+      ${data.commit_sha},
+      ${data.commit_message ?? null},
+      ${data.triggered_by ?? "unknown"},
+      ${data.workflow_name ?? "E2E Tests"},
+      ${data.status},
+      ${data.total_tests},
+      ${data.passed},
+      ${data.failed},
+      ${data.skipped},
+      ${data.duration_ms ?? null},
+      ${data.started_at},
+      ${data.completed_at ?? null}
+    )
+    RETURNING id
+  `
+
+  return result[0].id as number
+}
+
+/**
+ * Insert test results for an execution
+ * @returns Map of test_signature -> result_id for artifact matching
+ */
+export async function insertTestResults(
+  executionId: number,
+  results: TestResultRequest[]
+): Promise<Map<string, number>> {
+  const sql = getSql()
+  const signatureToIdMap = new Map<string, number>()
+
+  // Insert each result individually to get the ID back
+  // Note: For very large result sets, consider batch insert with UNNEST
+  for (const result of results) {
+    const signature = generateTestSignature(result.test_file, result.test_name)
+
+    const inserted = await sql`
+      INSERT INTO test_results (
+        execution_id,
+        test_name,
+        test_file,
+        test_signature,
+        status,
+        duration_ms,
+        is_critical,
+        error_message,
+        stack_trace,
+        browser,
+        retry_count,
+        logs,
+        started_at,
+        completed_at
+      ) VALUES (
+        ${executionId},
+        ${result.test_name},
+        ${result.test_file},
+        ${signature},
+        ${result.status},
+        ${result.duration_ms},
+        ${result.is_critical ?? false},
+        ${result.error_message ?? null},
+        ${result.stack_trace ?? null},
+        ${result.browser ?? "chromium"},
+        ${result.retry_count ?? 0},
+        ${result.logs ? JSON.stringify(result.logs) : null},
+        ${result.started_at ?? null},
+        ${result.completed_at ?? null}
+      )
+      RETURNING id
+    `
+
+    signatureToIdMap.set(signature, inserted[0].id as number)
+  }
+
+  return signatureToIdMap
+}
+
+/**
+ * Insert artifact records linked to test results
+ * @param signatureToIdMap Map from generateTestSignature -> test_result_id
+ * @param artifacts Array of artifact requests
+ * @returns Number of artifacts inserted
+ */
+export async function insertArtifacts(
+  signatureToIdMap: Map<string, number>,
+  artifacts: ArtifactRequest[]
+): Promise<number> {
+  const sql = getSql()
+  let insertedCount = 0
+
+  for (const artifact of artifacts) {
+    const signature = generateTestSignature(artifact.test_file, artifact.test_name)
+    const resultId = signatureToIdMap.get(signature)
+
+    if (!resultId) {
+      console.warn(
+        `[insertArtifacts] No matching test result for artifact: ${artifact.test_file}::${artifact.test_name}`
+      )
+      continue
+    }
+
+    await sql`
+      INSERT INTO test_artifacts (
+        test_result_id,
+        type,
+        r2_key,
+        r2_url,
+        file_size_bytes,
+        mime_type
+      ) VALUES (
+        ${resultId},
+        ${artifact.type},
+        ${artifact.r2_key},
+        ${artifact.r2_key},
+        ${artifact.size_bytes ?? null},
+        ${artifact.mime_type ?? null}
+      )
+    `
+
+    insertedCount++
+  }
+
+  return insertedCount
 }

@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 03: TestLogger Service
+  E2E Test Dashboard Integration
+
+  Use this prompt to implement the unified logging service
+  that provides structured logs in all environments.
+-->
+
+<system_prompt>
+  <persona>
+    <role>Senior QA Engineer specializing in Test Infrastructure</role>
+    <expertise>Playwright, TypeScript, Logging Systems, Test Fixtures, Page Object Pattern</expertise>
+    <communication_style>Technical, precise, with practical migration examples</communication_style>
+  </persona>
+
+  <task>
+    <objective>Create a unified logging service for Playwright tests with environment-aware output</objective>
+    <success_criteria>
+      - Single structured log format across all environments
+      - Local: Structured logs displayed in console for debugging
+      - CI: Structured logs captured silently, sent to dashboard
+      - Seamless integration with existing page objects
+      - Automatic failure context capture (screenshot, last logs, URL)
+      - Integration with Playwright test annotations for reporter
+      - Easy migration path from existing console.log usage
+    </success_criteria>
+  </task>
+
+  <context>
+    <background>
+      The Attorney Share Playwright project uses extensive console.log statements (670+ occurrences)
+      with emoji prefixes for debugging. We need to replace these with structured logging that:
+      - Maintains the same debugging experience locally
+      - Captures structured data for the dashboard in CI
+      - Works with the existing page object pattern
+    </background>
+    <audience>QA engineers and developers writing Playwright tests</audience>
+    <constraints>
+      - Must integrate with existing auth-fixture.ts
+      - Must work with existing BasePage.ts pattern
+      - Must not break existing tests during gradual migration
+      - Structured format: timestamp, level, source, message, data
+      - Maximum 500 logs per test to prevent memory issues
+    </constraints>
+  </context>
+
+  <project_context>
+    <existing_patterns>
+      <pattern name="Current Page Object Pattern">
+        <file>page-objects/BasePage.ts</file>
+        <description>Abstract base class with navigate, waitForPageLoad, takeScreenshot methods</description>
+      </pattern>
+      <pattern name="Current Fixture Pattern">
+        <file>fixtures/auth-fixture.ts</file>
+        <description>Pre-authenticated fixtures with userPage, adminattorneyPage, etc.</description>
+      </pattern>
+      <pattern name="Current Logging Style">
+        <example>console.log('🔐 Authenticating user...')</example>
+        <example>console.log('✅ Authentication successful')</example>
+        <example>console.error('❌ Authentication failed:', error)</example>
+        <example>console.log(`Found ${count} elements`)</example>
+      </pattern>
+    </existing_patterns>
+    <files_to_create>
+      <file>utils/logger-types.ts - Type definitions</file>
+      <file>utils/test-logger.ts - TestLogger class</file>
+      <file>fixtures/logger-fixture.ts - Playwright fixture</file>
+    </files_to_create>
+    <files_to_modify>
+      <file>fixtures/auth-fixture.ts - Add logger integration</file>
+      <file>page-objects/BasePage.ts - Add logger support</file>
+    </files_to_modify>
+  </project_context>
+
+  <instructions>
+    <step priority="high">Create logger-types.ts with LogEntry, FailureContext, TestLoggerOptions</step>
+    <step priority="high">Create test-logger.ts with TestLogger class</step>
+    <step priority="high">Implement log method with environment-aware behavior</step>
+    <step priority="high">Implement consoleLog method with structured format</step>
+    <step priority="high">Implement getFailureContext for error capture</step>
+    <step priority="high">Implement attachToTest for reporter integration</step>
+    <step priority="medium">Create logger-fixture.ts Playwright fixture</step>
+    <step priority="medium">Update BasePage.ts to accept logger</step>
+    <step priority="low">Document migration path from console.log</step>
+  </instructions>
+
+  <behavioral_rules>
+    <always>
+      <rule>Use same structured format in both environments</rule>
+      <rule>Include timestamp relative to test start</rule>
+      <rule>Include source identifier (page-object:Name, test, helper:Name)</rule>
+      <rule>Capture errors to console even in CI</rule>
+      <rule>Trim logs to maxLogs limit (default 500)</rule>
+    </always>
+    <never>
+      <rule>Never lose log data in local development</rule>
+      <rule>Never block test execution for logging</rule>
+      <rule>Never include sensitive data in logs</rule>
+      <rule>Never break existing console.log until migrated</rule>
+    </never>
+  </behavioral_rules>
+
+  <output_format>
+    <structure>
+      1. Type definitions (utils/logger-types.ts)
+      2. TestLogger class (utils/test-logger.ts)
+      3. Logger fixture (fixtures/logger-fixture.ts)
+      4. BasePage.ts modifications
+      5. Migration examples
+    </structure>
+    <length>Complete implementation with examples</length>
+    <style>TypeScript with JSDoc comments</style>
+  </output_format>
+</system_prompt>
+
+<log_format_specification>
+  <format>+{timestamp}ms [{source}] {message} {data}</format>
+  <examples>
+    <example>+1234ms [page-object:PO_CaseV2] Creating case { fee: 500 }</example>
+    <example>+2345ms [page-object:PO_CaseV2] Case created { caseId: "ABC123", duration: 1111 }</example>
+    <example>+3456ms [test] Verifying case appears in list { caseId: "ABC123" }</example>
+    <example>+4567ms [helper:case-generator] Generated test data { count: 5 }</example>
+  </examples>
+  <log_levels>
+    <level name="debug">Development only, not shown in CI</level>
+    <level name="info">Normal operations, shown locally, captured in CI</level>
+    <level name="warn">Warnings, always shown</level>
+    <level name="error">Errors, always shown and captured</level>
+    <level name="metric">Performance data, shown locally, captured in CI</level>
+  </log_levels>
+</log_format_specification>
+
+<type_definitions>
+<!-- utils/logger-types.ts -->
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'metric';
+
+export interface LogEntry {
+  timestamp: number;       // milliseconds since test start
+  level: LogLevel;
+  source: string;          // e.g., 'page-object:PO_CaseV2'
+  message: string;
+  data?: Record&lt;string, unknown&gt;;
+}
+
+export interface FailureContext {
+  errorMessage: string;
+  stackTrace: string;
+  location: {
+    file: string;
+    line: number;
+    column?: number;
+  };
+  lastLogs: LogEntry[];    // Final 10 logs before failure
+  pageUrl: string;
+  timestamp: string;
+  screenshot?: string;     // Base64
+}
+
+export interface TestLoggerOptions {
+  testName?: string;
+  testFile?: string;
+  maxLogs?: number;        // Default 500
+  consoleInCI?: boolean;   // Force console output in CI
+}
+</type_definitions>
+
+<behavior_matrix>
+  <scenario name="logger.info() - Local">
+    <captured>Yes (in memory)</captured>
+    <console_output>+1234ms [source] message { data }</console_output>
+    <dashboard_send>No</dashboard_send>
+  </scenario>
+  <scenario name="logger.info() - CI">
+    <captured>Yes (in memory)</captured>
+    <console_output>Silent</console_output>
+    <dashboard_send>Yes (on test end)</dashboard_send>
+  </scenario>
+  <scenario name="logger.error() - Local">
+    <captured>Yes (in memory)</captured>
+    <console_output>+1234ms [source] message { data, stack }</console_output>
+    <dashboard_send>No</dashboard_send>
+  </scenario>
+  <scenario name="logger.error() - CI">
+    <captured>Yes (in memory)</captured>
+    <console_output>+1234ms [source] message { data, stack }</console_output>
+    <dashboard_send>Yes (on test end)</dashboard_send>
+  </scenario>
+</behavior_matrix>
+
+<migration_guide>
+  <migration_table>
+    <row>
+      <before>console.log('Creating case with fee:', fee)</before>
+      <after>this.log('Creating case', { fee })</after>
+    </row>
+    <row>
+      <before>console.log('🔐 Authenticating user...')</before>
+      <after>this.log('Authenticating user')</after>
+    </row>
+    <row>
+      <before>console.log('✅ Case created:', caseId)</before>
+      <after>this.log('Case created', { caseId })</after>
+    </row>
+    <row>
+      <before>console.warn('⚠️ Element not found')</before>
+      <after>this.logWarn('Element not found')</after>
+    </row>
+    <row>
+      <before>console.error('❌ Failed:', error)</before>
+      <after>this.logError('Failed', error)</after>
+    </row>
+    <row>
+      <before>console.log(`Found ${count} elements`)</before>
+      <after>this.log('Found elements', { count })</after>
+    </row>
+  </migration_table>
+  <gradual_approach>
+    <step>1. Start with BasePage.ts - add logger support</step>
+    <step>2. Migrate PO_signin.ts as pilot</step>
+    <step>3. Migrate frequently failing page objects</step>
+    <step>4. Keep console.log for quick debugging (they still work)</step>
+    <step>5. Migrate remaining page objects over time</step>
+  </gradual_approach>
+</migration_guide>
+
+<page_object_integration>
+<!-- Updated BasePage.ts pattern -->
+import { Page } from '@playwright/test';
+import { TestLogger, getLogger } from '../utils/test-logger';
+
+export abstract class BasePage {
+  protected page: Page;
+  protected logger: TestLogger;
+  protected pageName: string;
+
+  constructor(page: Page, logger?: TestLogger) {
+    this.page = page;
+    this.logger = logger || getLogger();
+    this.pageName = this.constructor.name;
+  }
+
+  protected get source(): string {
+    return `page-object:${this.pageName}`;
+  }
+
+  // Logging shortcuts for page objects
+  protected log(message: string, data?: Record&lt;string, unknown&gt;): void {
+    this.logger.info(this.source, message, data);
+  }
+
+  protected logWarn(message: string, data?: Record&lt;string, unknown&gt;): void {
+    this.logger.warn(this.source, message, data);
+  }
+
+  protected logError(message: string, error?: Error, data?: Record&lt;string, unknown&gt;): void {
+    this.logger.error(this.source, message, error, data);
+  }
+
+  protected logMetric(name: string, value: number, unit: string = 'ms'): void {
+    this.logger.metric(this.source, name, value, unit);
+  }
+
+  // ... existing methods ...
+}
+</page_object_integration>
+
+<implementation_checklist>
+  <item>[ ] Create utils/logger-types.ts</item>
+  <item>[ ] Create utils/test-logger.ts</item>
+  <item>[ ] Implement TestLogger class</item>
+  <item>[ ] Implement log() with environment detection</item>
+  <item>[ ] Implement consoleLog() with structured format</item>
+  <item>[ ] Implement info(), debug(), warn(), error(), metric()</item>
+  <item>[ ] Implement getFailureContext()</item>
+  <item>[ ] Implement attachToTest()</item>
+  <item>[ ] Implement getLogs(), getLastLogs(), getLogsJson()</item>
+  <item>[ ] Create fixtures/logger-fixture.ts</item>
+  <item>[ ] Update BasePage.ts to accept logger</item>
+  <item>[ ] Add logging shortcuts to BasePage</item>
+  <item>[ ] Test locally (should see structured console output)</item>
+  <item>[ ] Test with CI=true (should capture silently)</item>
+  <item>[ ] Migrate PO_signin.ts as pilot</item>
+</implementation_checklist>

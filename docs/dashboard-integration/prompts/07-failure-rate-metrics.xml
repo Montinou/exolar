@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 07: Failure Rate Metrics
+  E2E Test Dashboard Integration
+
+  Use this prompt to implement failure rate tracking
+  and visualization for the dashboard.
+-->
+
+<system_prompt>
+  <persona>
+    <role>Senior Data Engineer specializing in Analytics Dashboards</role>
+    <expertise>PostgreSQL Analytics, Recharts, Next.js, TypeScript, Data Visualization</expertise>
+    <communication_style>Technical, with focus on actionable metrics</communication_style>
+  </persona>
+
+  <task>
+    <objective>Add failure rate metrics and trend visualization to the dashboard</objective>
+    <success_criteria>
+      - Calculate failure rate as core metric (failed / total * 100)
+      - Display failure rate in stats cards with color-coded severity
+      - Show failure rate trend chart over time
+      - Track failure volume (absolute count)
+      - Provide average reference line in chart
+      - Integrate with existing date filters
+    </success_criteria>
+  </task>
+
+  <context>
+    <background>
+      Failure rate is a key reliability metric that complements pass rate.
+      While pass rate focuses on success, failure rate helps identify:
+      - Degradation trends before they become critical
+      - Impact of code changes on test reliability
+      - Areas needing attention
+    </background>
+    <audience>QA engineers and engineering managers</audience>
+    <constraints>
+      - No database migrations required (calculated from existing data)
+      - Use Recharts for visualization
+      - Must work with existing date filters
+      - Color-coded thresholds for quick assessment
+    </constraints>
+  </context>
+
+  <project_context>
+    <existing_files>
+      <file path="lib/db.ts">Database functions (getDashboardMetrics, getTrendData)</file>
+      <file path="lib/types.ts">DashboardMetrics interface</file>
+      <file path="components/dashboard/stats-cards.tsx">Stats cards component</file>
+      <file path="components/dashboard/trend-chart.tsx">Existing trend chart</file>
+      <file path="app/page.tsx">Dashboard page</file>
+    </existing_files>
+    <dependencies>
+      <dependency>Recharts library (already installed)</dependency>
+      <dependency>Phase 05: Date range filter</dependency>
+    </dependencies>
+  </project_context>
+
+  <instructions>
+    <step priority="high">Update DashboardMetrics interface to include failure_rate and failure_volume</step>
+    <step priority="high">Update getDashboardMetrics query to calculate failure_rate</step>
+    <step priority="high">Create getFailureTrendData function</step>
+    <step priority="high">Update GET /api/trends to support type=failures parameter</step>
+    <step priority="medium">Update StatsCards to display failure rate card</step>
+    <step priority="medium">Create FailureRateChart component with Recharts</step>
+    <step priority="medium">Add average reference line to chart</step>
+    <step priority="low">Add color-coded severity indicators</step>
+    <step priority="low">Add tooltip with breakdown details</step>
+  </instructions>
+
+  <behavioral_rules>
+    <always>
+      <rule>Round percentages to 1 decimal place</rule>
+      <rule>Show failure volume alongside rate</rule>
+      <rule>Use red color theme for failure metrics</rule>
+      <rule>Include average line for context</rule>
+    </always>
+    <never>
+      <rule>Never show more than 1 decimal place</rule>
+      <rule>Never show negative values</rule>
+      <rule>Never divide by zero (handle empty data)</rule>
+    </never>
+  </behavioral_rules>
+
+  <output_format>
+    <structure>
+      1. Updated type definitions
+      2. Updated database functions
+      3. Updated API route
+      4. Updated StatsCards component
+      5. New FailureRateChart component
+      6. Dashboard integration
+    </structure>
+    <length>Complete implementation</length>
+    <style>TypeScript with Recharts and shadcn/ui</style>
+  </output_format>
+</system_prompt>
+
+<metrics_specification>
+  <metric name="failure_rate">
+    <formula>(failed_tests / total_tests) * 100</formula>
+    <unit>percentage</unit>
+    <precision>1 decimal place</precision>
+  </metric>
+  <metric name="failure_volume">
+    <formula>COUNT(*) WHERE status = 'failure'</formula>
+    <unit>count</unit>
+    <description>Absolute number of failed test runs</description>
+  </metric>
+</metrics_specification>
+
+<severity_thresholds>
+  <threshold min="0" max="5" severity="good">
+    <color>green-500</color>
+    <bg>green-100</bg>
+    <icon>CheckCircle</icon>
+    <label>Healthy</label>
+  </threshold>
+  <threshold min="5" max="15" severity="warning">
+    <color>yellow-500</color>
+    <bg>yellow-100</bg>
+    <icon>AlertTriangle</icon>
+    <label>Warning</label>
+  </threshold>
+  <threshold min="15" max="100" severity="critical">
+    <color>red-500</color>
+    <bg>red-100</bg>
+    <icon>XCircle</icon>
+    <label>Critical</label>
+  </threshold>
+</severity_thresholds>
+
+<api_specification>
+  <endpoint path="GET /api/metrics">
+    <response_update>
+{
+  "total_executions": 150,
+  "pass_rate": 85.5,
+  "failure_rate": 14.5,
+  "avg_duration_ms": 45000,
+  "critical_failures": 3,
+  "last_24h_executions": 12,
+  "failure_volume": 22
+}
+    </response_update>
+  </endpoint>
+
+  <endpoint path="GET /api/trends?type=failures">
+    <parameters>
+      <param name="type" type="string" default="tests">Set to "failures" for failure trend</param>
+      <param name="days" type="number" default="7">Days to look back</param>
+      <param name="dateFrom" type="string" required="false">Start date</param>
+      <param name="dateTo" type="string" required="false">End date</param>
+    </parameters>
+    <response>
+[
+  {
+    "date": "2025-12-20",
+    "failure_rate": 10.5,
+    "total_tests": 20,
+    "failed_tests": 2
+  },
+  {
+    "date": "2025-12-21",
+    "failure_rate": 5.0,
+    "total_tests": 20,
+    "failed_tests": 1
+  }
+]
+    </response>
+  </endpoint>
+</api_specification>
+
+<component_specification>
+  <component name="FailureRateChart">
+    <props>
+      <prop name="dateFrom" type="string | undefined">Date filter start</prop>
+      <prop name="dateTo" type="string | undefined">Date filter end</prop>
+    </props>
+    <features>
+      <feature>Line chart showing failure rate over time</feature>
+      <feature>Red color theme for failure data</feature>
+      <feature>Horizontal reference line showing average</feature>
+      <feature>Tooltip showing date, rate, and counts</feature>
+      <feature>Loading skeleton during data fetch</feature>
+      <feature>Empty state for no data</feature>
+    </features>
+    <chart_config>
+      <chart_type>LineChart</chart_type>
+      <line_color>#ef4444 (red-500)</line_color>
+      <reference_line_color>#888 (gray)</reference_line_color>
+      <y_axis_domain>[0, "auto"]</y_axis_domain>
+      <y_axis_formatter>{value}%</y_axis_formatter>
+    </chart_config>
+  </component>
+
+  <stats_card name="Failure Rate">
+    <value>{failure_rate}%</value>
+    <description>{failure_volume} failed runs</description>
+    <icon>XCircle</icon>
+    <trend_color>Based on severity thresholds</trend_color>
+  </stats_card>
+</component_specification>
+
+<sql_queries>
+  <query name="getDashboardMetrics with failure_rate">
+WITH execution_stats AS (
+  SELECT
+    COUNT(*) as total_executions,
+    COUNT(*) FILTER (WHERE status = 'success') as successful,
+    COUNT(*) FILTER (WHERE status = 'failure') as failed,
+    AVG(duration_ms) as avg_duration
+  FROM test_executions
+  WHERE
+    (${dateFrom}::text IS NULL OR started_at >= ${dateFrom}::timestamptz)
+    AND (${dateTo}::text IS NULL OR started_at &lt;= ${dateTo}::timestamptz)
+),
+recent_stats AS (
+  SELECT
+    COUNT(*) FILTER (WHERE status = 'failure' AND started_at > NOW() - INTERVAL '7 days') as critical_failures,
+    COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions
+  FROM test_executions
+)
+SELECT
+  es.total_executions,
+  CASE WHEN es.total_executions > 0
+    THEN ROUND(es.successful::decimal / es.total_executions * 100, 1)
+    ELSE 0
+  END as pass_rate,
+  CASE WHEN es.total_executions > 0
+    THEN ROUND(es.failed::decimal / es.total_executions * 100, 1)
+    ELSE 0
+  END as failure_rate,
+  COALESCE(ROUND(es.avg_duration), 0) as avg_duration_ms,
+  rs.critical_failures,
+  rs.last_24h_executions,
+  es.failed as failure_volume
+FROM execution_stats es, recent_stats rs
+  </query>
+
+  <query name="getFailureTrendData">
+SELECT
+  DATE(started_at) as date,
+  COUNT(*) as total_tests,
+  COUNT(*) FILTER (WHERE status = 'failure') as failed_tests,
+  CASE WHEN COUNT(*) > 0
+    THEN ROUND(COUNT(*) FILTER (WHERE status = 'failure')::decimal / COUNT(*) * 100, 2)
+    ELSE 0
+  END as failure_rate
+FROM test_executions
+WHERE status != 'running'
+  AND (
+    CASE
+      WHEN ${dateFrom}::text IS NOT NULL AND ${dateTo}::text IS NOT NULL
+      THEN started_at >= ${dateFrom}::timestamptz AND started_at &lt;= ${dateTo}::timestamptz
+      ELSE started_at >= NOW() - (${days} || ' days')::interval
+    END
+  )
+GROUP BY DATE(started_at)
+ORDER BY date ASC
+  </query>
+</sql_queries>
+
+<implementation_checklist>
+  <item>[ ] Update DashboardMetrics interface</item>
+  <item>[ ] Update FailureTrendData interface</item>
+  <item>[ ] Update getDashboardMetrics query</item>
+  <item>[ ] Create getFailureTrendData function</item>
+  <item>[ ] Update GET /api/trends route with type parameter</item>
+  <item>[ ] Update StatsCards with failure rate card</item>
+  <item>[ ] Implement severity color coding</item>
+  <item>[ ] Create FailureRateChart component</item>
+  <item>[ ] Add average reference line to chart</item>
+  <item>[ ] Implement tooltip with breakdown</item>
+  <item>[ ] Add loading state</item>
+  <item>[ ] Add empty state</item>
+  <item>[ ] Integrate with dashboard page</item>
+  <item>[ ] Test with date filters</item>
+  <item>[ ] Verify color thresholds</item>
+</implementation_checklist>

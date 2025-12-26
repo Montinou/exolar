@@ -54,7 +54,7 @@ Optional (for artifact downloads):
 ### Database Access
 Use the factory function pattern in `lib/db.ts` - call `getSql()` inside each function to avoid module-level instantiation issues in serverless environments:
 ```typescript
-// ✅ Correct - factory pattern
+// Correct - factory pattern
 function getSql() {
   return neon(process.env.DATABASE_URL!)
 }
