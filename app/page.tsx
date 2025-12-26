@@ -12,6 +12,7 @@ import { ExecutionsTable } from "@/components/dashboard/executions-table"
 import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { SearchTests } from "@/components/dashboard/search-tests"
+import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -36,7 +37,12 @@ async function DashboardContent({
     <>
       <div className="space-y-6">
         <StatsCards metrics={metrics} />
-        <TrendChart data={trends} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <TrendChart data={trends} />
+          </div>
+          <FlakiestTestsCard />
+        </div>
         <div className="space-y-4">
           <Filters branches={branches} />
           <ExecutionsTable executions={executions} />
@@ -58,7 +64,12 @@ function DashboardSkeleton() {
           </Card>
         ))}
       </div>
-      <Skeleton className="h-[400px] w-full" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+        <Skeleton className="h-[300px] w-full" />
+      </div>
       <Skeleton className="h-[500px] w-full" />
     </div>
   )

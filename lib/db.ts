@@ -11,6 +11,8 @@ import type {
   TestSearchResult,
   TestHistoryItem,
   TestStatistics,
+  TestFlakinessHistory,
+  FlakinessSummary,
 } from "./types"
 
 function getSql() {
@@ -262,6 +264,8 @@ export async function insertTestResults(
   // Note: For very large result sets, consider batch insert with UNNEST
   for (const result of results) {
     const signature = generateTestSignature(result.test_file, result.test_name)
+    const retryCount = result.retry_count ?? 0
+    const flaky = isTestFlaky(retryCount, result.status)
 
     const inserted = await sql`
       INSERT INTO test_results (
@@ -272,6 +276,7 @@ export async function insertTestResults(
         status,
         duration_ms,
         is_critical,
+        is_flaky,
         error_message,
         stack_trace,
         browser,
@@ -287,10 +292,11 @@ export async function insertTestResults(
         ${result.status},
         ${result.duration_ms},
         ${result.is_critical ?? false},
+        ${flaky},
         ${result.error_message ?? null},
         ${result.stack_trace ?? null},
         ${result.browser ?? "chromium"},
-        ${result.retry_count ?? 0},
+        ${retryCount},
         ${result.logs ? JSON.stringify(result.logs) : null},
         ${result.started_at ?? null},
         ${result.completed_at ?? null}
@@ -299,6 +305,16 @@ export async function insertTestResults(
     `
 
     signatureToIdMap.set(signature, inserted[0].id as number)
+
+    // Update flakiness history for this test
+    await updateFlakinessHistory(
+      signature,
+      result.test_name,
+      result.test_file,
+      result.status,
+      retryCount,
+      result.duration_ms
+    )
   }
 
   return signatureToIdMap
@@ -452,4 +468,152 @@ export async function getTestStatistics(signature: string): Promise<TestStatisti
     flaky_rate: Number(result[0].flaky_rate) || 0,
     last_failure: result[0].last_failure,
   }
+}
+
+// ============================================
+// Flakiness Detection Functions (Phase 06)
+// ============================================
+
+/**
+ * Check if a test result is flaky based on retry count and status
+ * A test is flaky if it passed after at least one retry
+ */
+export function isTestFlaky(retryCount: number, status: string): boolean {
+  return retryCount > 0 && status === "passed"
+}
+
+/**
+ * Get the flakiest tests ordered by flakiness rate
+ * @param limit Maximum number of tests to return
+ * @param minRuns Minimum runs required to be considered (default 5)
+ */
+export async function getFlakiestTests(
+  limit: number = 10,
+  minRuns: number = 5
+): Promise<TestFlakinessHistory[]> {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT *
+    FROM test_flakiness_history
+    WHERE total_runs >= ${minRuns}
+      AND flaky_runs > 0
+    ORDER BY flakiness_rate DESC, flaky_runs DESC
+    LIMIT ${limit}
+  `
+
+  return results as TestFlakinessHistory[]
+}
+
+/**
+ * Get flakiness summary for the dashboard
+ * Includes total flaky tests, average flakiness rate, and top flaky tests
+ */
+export async function getFlakinessSummary(): Promise<FlakinessSummary> {
+  const sql = getSql()
+
+  const summaryResult = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE flaky_runs > 0) as total_flaky_tests,
+      COALESCE(AVG(flakiness_rate) FILTER (WHERE flaky_runs > 0), 0) as avg_flakiness_rate
+    FROM test_flakiness_history
+    WHERE total_runs >= 5
+  `
+
+  const topFlaky = await getFlakiestTests(5)
+
+  return {
+    total_flaky_tests: Number(summaryResult[0].total_flaky_tests),
+    avg_flakiness_rate: Number(summaryResult[0].avg_flakiness_rate),
+    most_flaky_tests: topFlaky,
+  }
+}
+
+/**
+ * Update flakiness history after inserting a new test result
+ * Called automatically during data ingestion
+ */
+export async function updateFlakinessHistory(
+  testSignature: string,
+  testName: string,
+  testFile: string,
+  status: string,
+  retryCount: number,
+  durationMs: number
+): Promise<void> {
+  const sql = getSql()
+  const isFlaky = isTestFlaky(retryCount, status)
+
+  await sql`
+    INSERT INTO test_flakiness_history (
+      test_signature,
+      test_name,
+      test_file,
+      total_runs,
+      flaky_runs,
+      passed_runs,
+      failed_runs,
+      flakiness_rate,
+      avg_duration_ms,
+      last_flaky_at,
+      last_passed_at,
+      last_failed_at,
+      first_seen_at,
+      updated_at
+    ) VALUES (
+      ${testSignature},
+      ${testName},
+      ${testFile},
+      1,
+      ${isFlaky ? 1 : 0},
+      ${status === "passed" ? 1 : 0},
+      ${status === "failed" ? 1 : 0},
+      ${isFlaky ? 100 : 0},
+      ${durationMs},
+      ${isFlaky ? sql`NOW()` : null},
+      ${status === "passed" ? sql`NOW()` : null},
+      ${status === "failed" ? sql`NOW()` : null},
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (test_signature) DO UPDATE SET
+      total_runs = test_flakiness_history.total_runs + 1,
+      flaky_runs = test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0},
+      passed_runs = test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0},
+      failed_runs = test_flakiness_history.failed_runs + ${status === "failed" ? 1 : 0},
+      flakiness_rate = CASE
+        WHEN test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0} > 0
+        THEN ROUND(
+          (test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0})::decimal
+          / (test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0}) * 100, 2
+        )
+        ELSE 0
+      END,
+      avg_duration_ms = ROUND(
+        (test_flakiness_history.avg_duration_ms * test_flakiness_history.total_runs + ${durationMs})
+        / (test_flakiness_history.total_runs + 1)
+      ),
+      last_flaky_at = CASE WHEN ${isFlaky} THEN NOW() ELSE test_flakiness_history.last_flaky_at END,
+      last_passed_at = CASE WHEN ${status} = 'passed' THEN NOW() ELSE test_flakiness_history.last_passed_at END,
+      last_failed_at = CASE WHEN ${status} = 'failed' THEN NOW() ELSE test_flakiness_history.last_failed_at END,
+      updated_at = NOW()
+  `
+}
+
+/**
+ * Get flakiness data for a specific test by signature
+ */
+export async function getTestFlakiness(
+  signature: string
+): Promise<TestFlakinessHistory | null> {
+  const sql = getSql()
+
+  const result = await sql`
+    SELECT *
+    FROM test_flakiness_history
+    WHERE test_signature = ${signature}
+    LIMIT 1
+  `
+
+  return result.length > 0 ? (result[0] as TestFlakinessHistory) : null
 }

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { AlertCircle, CheckCircle2, Clock, FileVideo, Download } from "lucide-react"
 import type { TestExecution, TestResult } from "@/lib/types"
 import { Button } from "@/components/ui/button"
+import { FlakyBadge } from "./flaky-badge"
 
 interface TestDetailModalProps {
   executionId: number
@@ -109,6 +110,12 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
                               Critical
                             </Badge>
                           )}
+                          {(test.is_flaky || (test.retry_count > 0 && test.status === "passed")) && (
+                            <FlakyBadge
+                              flakinessRate={test.retry_count > 0 ? 100 : undefined}
+                              showTooltip={false}
+                            />
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground">{test.test_file}</p>
                         <p className="text-xs text-muted-foreground">
@@ -166,10 +173,17 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
                     <div className="flex items-center gap-2">
                       {getStatusIcon(test.status)}
                       <h4 className="font-semibold text-sm">{test.test_name}</h4>
+                      {(test.is_flaky || test.retry_count > 0) && (
+                        <FlakyBadge
+                          flakinessRate={test.retry_count > 0 ? 100 : undefined}
+                          showTooltip={false}
+                        />
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">{test.test_file}</p>
                     <p className="text-xs text-muted-foreground">
                       Duration: {formatDuration(test.duration_ms)} • Browser: {test.browser}
+                      {test.retry_count > 0 && ` • Retries: ${test.retry_count}`}
                     </p>
                   </div>
                 ))

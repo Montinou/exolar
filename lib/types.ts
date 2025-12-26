@@ -44,6 +44,7 @@ export interface TestResult {
   status: "passed" | "failed" | "skipped" | "timedout"
   duration_ms: number
   is_critical: boolean
+  is_flaky?: boolean
   error_message: string | null
   stack_trace: string | null
   browser: string
@@ -206,4 +207,46 @@ export interface TestHistoryResponse {
   test_file: string
   statistics: TestStatistics
   history: TestHistoryItem[]
+}
+
+// ============================================
+// Flakiness Tracking Types (Phase 06)
+// ============================================
+
+/**
+ * Historical flakiness data for a specific test
+ */
+export interface TestFlakinessHistory {
+  id: number
+  test_signature: string
+  test_name: string
+  test_file: string
+  total_runs: number
+  flaky_runs: number
+  passed_runs: number
+  failed_runs: number
+  flakiness_rate: number
+  avg_duration_ms: number
+  last_flaky_at: string | null
+  last_passed_at: string | null
+  last_failed_at: string | null
+  first_seen_at: string
+  updated_at: string
+}
+
+/**
+ * Summary of flakiness across all tests
+ */
+export interface FlakinessSummary {
+  total_flaky_tests: number
+  avg_flakiness_rate: number
+  most_flaky_tests: TestFlakinessHistory[]
+}
+
+/**
+ * Response from flakiness API endpoint
+ */
+export interface FlakinessResponse {
+  summary: FlakinessSummary
+  tests: TestFlakinessHistory[]
 }
