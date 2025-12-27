@@ -8,6 +8,7 @@ import {
 } from "@/lib/db"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TrendChart } from "@/components/dashboard/trend-chart"
+import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { ExecutionsTable } from "@/components/dashboard/executions-table"
 import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
@@ -37,11 +38,14 @@ async function DashboardContent({
     <>
       <div className="space-y-6">
         <StatsCards metrics={metrics} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <TrendChart data={trends} />
+          <FailureRateChart dateFrom={params.from} dateTo={params.to} />
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <TrendChart data={trends} />
+          <div className="lg:col-span-3">
+            <FlakiestTestsCard />
           </div>
-          <FlakiestTestsCard />
         </div>
         <div className="space-y-4">
           <Filters branches={branches} />

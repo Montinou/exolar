@@ -74,9 +74,11 @@ export interface TestArtifact {
 export interface DashboardMetrics {
   total_executions: number
   pass_rate: number
+  failure_rate: number
   avg_duration_ms: number
   critical_failures: number
   last_24h_executions: number
+  failure_volume: number
 }
 
 export interface TrendData {
@@ -84,6 +86,13 @@ export interface TrendData {
   passed: number
   failed: number
   total: number
+}
+
+export interface FailureTrendData {
+  date: string
+  failure_rate: number
+  total_tests: number
+  failed_tests: number
 }
 
 // ============================================

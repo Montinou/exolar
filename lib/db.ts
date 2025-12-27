@@ -5,6 +5,7 @@ import type {
   TestResult,
   DashboardMetrics,
   TrendData,
+  FailureTrendData,
   ExecutionRequest,
   TestResultRequest,
   ArtifactRequest,
@@ -111,9 +112,15 @@ export async function getDashboardMetrics(dateRange?: DateRangeFilter) {
     SELECT
       COUNT(*) as total_executions,
       ROUND(AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END), 2) as pass_rate,
+      CASE
+        WHEN COUNT(*) > 0
+        THEN ROUND(COUNT(*) FILTER (WHERE status = 'failure')::decimal / COUNT(*) * 100, 1)
+        ELSE 0
+      END as failure_rate,
       ROUND(AVG(duration_ms)) as avg_duration_ms,
       COUNT(*) FILTER (WHERE status = 'failure' AND started_at > NOW() - INTERVAL '24 hours') as last_24h_failures,
-      COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions
+      COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions,
+      COUNT(*) FILTER (WHERE status = 'failure') as failure_volume
     FROM test_executions
     ${sql.unsafe(whereClause)}
   `
@@ -145,9 +152,11 @@ export async function getDashboardMetrics(dateRange?: DateRangeFilter) {
   return {
     total_executions: Number(metrics[0].total_executions),
     pass_rate: Number(metrics[0].pass_rate),
+    failure_rate: Number(metrics[0].failure_rate),
     avg_duration_ms: Number(metrics[0].avg_duration_ms),
     critical_failures: Number(criticalFailures[0].critical_failures),
     last_24h_executions: Number(metrics[0].last_24h_executions),
+    failure_volume: Number(metrics[0].failure_volume),
   } as DashboardMetrics
 }
 
@@ -180,6 +189,44 @@ export async function getTrendData(days = 7, dateRange?: DateRangeFilter) {
   `
 
   return result as TrendData[]
+}
+
+export async function getFailureTrendData(
+  days = 7,
+  dateRange?: DateRangeFilter
+): Promise<FailureTrendData[]> {
+  const sql = getSql()
+  const conditions = ["status != 'running'"]
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  } else {
+    conditions.push(`started_at > NOW() - INTERVAL '${days} days'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  const result = await sql`
+    SELECT
+      DATE(started_at) as date,
+      COUNT(*) as total_tests,
+      COUNT(*) FILTER (WHERE status = 'failure') as failed_tests,
+      CASE
+        WHEN COUNT(*) > 0
+        THEN ROUND(COUNT(*) FILTER (WHERE status = 'failure')::decimal / COUNT(*) * 100, 2)
+        ELSE 0
+      END as failure_rate
+    FROM test_executions
+    ${sql.unsafe(whereClause)}
+    GROUP BY DATE(started_at)
+    ORDER BY date ASC
+  `
+
+  return result as FailureTrendData[]
 }
 
 export async function getBranches() {

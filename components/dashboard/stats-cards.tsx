@@ -11,9 +11,16 @@ export function StatsCards({ metrics }: StatsCardsProps) {
     {
       label: "Pass Rate",
       value: `${metrics.pass_rate.toFixed(1)}%`,
-      description: "Last 7 days average",
+      description: `${metrics.total_executions} total runs`,
       icon: CheckCircle2,
       trend: metrics.pass_rate >= 90 ? "positive" : metrics.pass_rate >= 75 ? "neutral" : "negative",
+    },
+    {
+      label: "Failure Rate",
+      value: `${metrics.failure_rate.toFixed(1)}%`,
+      description: `${metrics.failure_volume} failed runs`,
+      icon: XCircle,
+      trend: metrics.failure_rate <= 5 ? "positive" : metrics.failure_rate <= 15 ? "neutral" : "negative",
     },
     {
       label: "Avg Duration",
@@ -28,13 +35,6 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       description: "Last 7 days",
       icon: AlertTriangle,
       trend: metrics.critical_failures === 0 ? "positive" : metrics.critical_failures <= 3 ? "neutral" : "negative",
-    },
-    {
-      label: "Last 24h Runs",
-      value: metrics.last_24h_executions.toString(),
-      description: `${metrics.total_executions} total runs`,
-      icon: XCircle,
-      trend: "neutral",
     },
   ]
 
