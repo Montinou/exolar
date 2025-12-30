@@ -140,6 +140,18 @@ export interface TestResultRequest {
 /**
  * Artifact reference (already uploaded to R2)
  */
+// Incoming artifact request from reporter (base64 data)
+export interface ArtifactUploadRequest {
+  test_name: string
+  test_file: string
+  type: "screenshot" | "trace" | "video"
+  filename: string
+  data: string // base64 encoded file data
+  mime_type?: string
+  size_bytes?: number
+}
+
+// Artifact for database insertion (after R2 upload)
 export interface ArtifactRequest {
   test_name: string
   test_file: string

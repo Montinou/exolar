@@ -47,13 +47,14 @@ export const testResultSchema = z.object({
   logs: z.array(logEntrySchema).optional(),
 })
 
-// Artifact request schema
+// Artifact request schema - accepts base64 data for upload
 export const artifactSchema = z.object({
   test_name: z.string().min(1, "test_name is required"),
   test_file: z.string().min(1, "test_file is required"),
   type: z.enum(["screenshot", "trace", "video"]),
   filename: z.string().min(1, "filename is required"),
-  r2_key: z.string().min(1, "r2_key is required"),
+  // Accept base64 data for upload (r2_key will be generated after upload)
+  data: z.string().min(1, "data is required"),
   mime_type: z.string().optional(),
   size_bytes: z.number().int().min(0).optional(),
 })
