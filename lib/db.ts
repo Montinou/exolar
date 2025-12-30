@@ -345,8 +345,8 @@ export async function insertTestResults(
         ${result.browser ?? "chromium"},
         ${retryCount},
         ${result.logs ? JSON.stringify(result.logs) : null},
-        ${result.started_at ?? null},
-        ${result.completed_at ?? null}
+        ${result.started_at || new Date().toISOString()},
+        ${result.completed_at || null}
       )
       RETURNING id
     `
