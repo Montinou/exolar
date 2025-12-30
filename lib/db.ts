@@ -29,7 +29,8 @@ export async function getExecutions(
   limit = 50,
   status?: string,
   branch?: string,
-  dateRange?: DateRangeFilter
+  dateRange?: DateRangeFilter,
+  suite?: string
 ) {
   const sql = getSql()
   const conditions = []
@@ -40,6 +41,10 @@ export async function getExecutions(
 
   if (branch) {
     conditions.push(`branch = '${branch}'`)
+  }
+
+  if (suite) {
+    conditions.push(`suite = '${suite}'`)
   }
 
   if (dateRange?.from) {
@@ -239,6 +244,17 @@ export async function getBranches() {
   return result.map((r) => r.branch) as string[]
 }
 
+export async function getSuites() {
+  const sql = getSql()
+  const result = await sql`
+    SELECT DISTINCT suite
+    FROM test_executions
+    WHERE suite IS NOT NULL
+    ORDER BY suite ASC
+  `
+  return result.map((r) => r.suite) as string[]
+}
+
 // ============================================
 // Insert Functions for Data Ingestion
 // ============================================
@@ -266,6 +282,7 @@ export async function insertExecution(data: ExecutionRequest): Promise<number> {
       commit_message,
       triggered_by,
       workflow_name,
+      suite,
       status,
       total_tests,
       passed,
@@ -281,6 +298,7 @@ export async function insertExecution(data: ExecutionRequest): Promise<number> {
       ${data.commit_message ?? null},
       ${data.triggered_by ?? "unknown"},
       ${data.workflow_name ?? "E2E Tests"},
+      ${data.suite ?? null},
       ${data.status},
       ${data.total_tests},
       ${data.passed},

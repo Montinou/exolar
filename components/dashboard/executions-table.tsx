@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ChevronRight, GitBranch, GitCommit } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ChevronRight, GitBranch, GitCommit, TestTube } from "lucide-react"
 import type { TestExecution } from "@/lib/types"
 import { TestDetailModal } from "./test-detail-modal"
 
@@ -57,6 +58,8 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                 <TableRow>
                   <TableHead>Run ID</TableHead>
                   <TableHead>Branch</TableHead>
+                  <TableHead>Suite</TableHead>
+                  <TableHead>Commit</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Tests</TableHead>
                   <TableHead>Duration</TableHead>
@@ -67,7 +70,7 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
               <TableBody>
                 {executions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                       No test executions found. Run your Playwright tests to see results here.
                     </TableCell>
                   </TableRow>
@@ -85,6 +88,34 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                           <GitBranch className="h-3 w-3 text-muted-foreground" />
                           <span className="font-medium">{execution.branch}</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {execution.suite ? (
+                          <Badge variant="outline" className="font-normal">
+                            <TestTube className="h-3 w-3 mr-1" />
+                            {execution.suite}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        {execution.commit_message ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate block text-sm text-muted-foreground">
+                                  {execution.commit_message}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[400px]">
+                                <p>{execution.commit_message}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>{getStatusBadge(execution.status)}</TableCell>
                       <TableCell>

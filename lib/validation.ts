@@ -21,6 +21,7 @@ export const executionSchema = z.object({
   commit_message: z.string().optional(),
   triggered_by: z.string().optional(),
   workflow_name: z.string().optional(),
+  suite: z.string().optional(),
   status: z.enum(["success", "failure", "running"]),
   total_tests: z.number().int().min(0),
   passed: z.number().int().min(0),

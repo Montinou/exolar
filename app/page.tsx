@@ -4,6 +4,7 @@ import {
   getTrendData,
   getExecutions,
   getBranches,
+  getSuites,
   type DateRangeFilter,
 } from "@/lib/db"
 import { StatsCards } from "@/components/dashboard/stats-cards"
@@ -20,18 +21,19 @@ import { Card, CardContent } from "@/components/ui/card"
 async function DashboardContent({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string; from?: string; to?: string }>
+  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string }>
 }) {
   const params = await searchParams
 
   const dateRange: DateRangeFilter | undefined =
     params.from || params.to ? { from: params.from, to: params.to } : undefined
 
-  const [metrics, trends, executions, branches] = await Promise.all([
+  const [metrics, trends, executions, branches, suites] = await Promise.all([
     getDashboardMetrics(dateRange),
     getTrendData(7, dateRange),
-    getExecutions(50, params.status, params.branch, dateRange),
+    getExecutions(50, params.status, params.branch, dateRange, params.suite),
     getBranches(),
+    getSuites(),
   ])
 
   return (
@@ -48,7 +50,7 @@ async function DashboardContent({
           </div>
         </div>
         <div className="space-y-4">
-          <Filters branches={branches} />
+          <Filters branches={branches} suites={suites} />
           <ExecutionsTable executions={executions} />
         </div>
       </div>
@@ -82,7 +84,7 @@ function DashboardSkeleton() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string; from?: string; to?: string }>
+  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

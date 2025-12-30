@@ -10,14 +10,16 @@ import { X } from "lucide-react"
 
 interface FiltersProps {
   branches: string[]
+  suites: string[]
 }
 
-export function Filters({ branches }: FiltersProps) {
+export function Filters({ branches, suites }: FiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
   const currentStatus = searchParams.get("status")
   const currentBranch = searchParams.get("branch")
+  const currentSuite = searchParams.get("suite")
   const currentFrom = searchParams.get("from")
   const currentTo = searchParams.get("to")
 
@@ -58,7 +60,7 @@ export function Filters({ branches }: FiltersProps) {
     router.push("/")
   }
 
-  const hasFilters = currentStatus || currentBranch || currentFrom || currentTo
+  const hasFilters = currentStatus || currentBranch || currentSuite || currentFrom || currentTo
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -76,6 +78,23 @@ export function Filters({ branches }: FiltersProps) {
           <SelectItem value="success">Success</SelectItem>
           <SelectItem value="failure">Failure</SelectItem>
           <SelectItem value="running">Running</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={currentSuite || "all"}
+        onValueChange={(value) => updateFilter("suite", value === "all" ? null : value)}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Suite" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Suites</SelectItem>
+          {suites.map((suite) => (
+            <SelectItem key={suite} value={suite}>
+              {suite}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 

@@ -24,6 +24,7 @@ export interface TestExecution {
   commit_message: string | null
   triggered_by: string
   workflow_name: string
+  suite: string | null
   status: "success" | "failure" | "running"
   total_tests: number
   passed: number
@@ -109,6 +110,7 @@ export interface ExecutionRequest {
   commit_message?: string
   triggered_by?: string
   workflow_name?: string
+  suite?: string
   status: "success" | "failure" | "running"
   total_tests: number
   passed: number
