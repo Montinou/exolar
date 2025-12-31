@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-E2E Test Dashboard for monitoring Playwright test executions from GitHub Actions. Displays real-time metrics, trend charts, and detailed test results with artifact management via Cloudflare R2.
+Multi-tenant E2E Test Dashboard for monitoring Playwright test executions from GitHub Actions. Features organization-level data isolation with RLS, real-time metrics, trend charts, and artifact management via Cloudflare R2.
 
 ## Commands
 
@@ -27,14 +27,34 @@ npm run start    # Start production server
 
 ### Key Directories
 - `app/` - Next.js App Router pages and API routes
-- `app/api/` - API endpoints (executions, metrics, trends, artifacts)
+- `app/api/` - API endpoints (executions, metrics, trends, artifacts, organizations)
+- `app/admin/` - Admin pages (users, invites, organizations)
 - `components/dashboard/` - Dashboard-specific components
 - `components/ui/` - shadcn/ui components
-- `lib/` - Core utilities: `db.ts` (database queries), `r2.ts` (R2 integration), `types.ts`
+- `lib/` - Core utilities:
+  - `db.ts` - Database queries with org filtering
+  - `db-orgs.ts` - Organization management functions
+  - `db-users.ts` - User management with org assignment
+  - `session-context.ts` - Session and auth context
+  - `r2.ts` - R2 integration
+  - `types.ts` - TypeScript types
 - `scripts/` - SQL migration scripts for Neon
 
 ### Database Schema
-Three tables: `test_executions` (workflow runs), `test_results` (individual tests), `test_artifacts` (R2 file references). See `scripts/001_create_test_tables.sql`.
+
+**Core Tables:**
+- `test_executions` - Workflow runs (with `organization_id`)
+- `test_results` - Individual tests (linked via `execution_id`)
+- `test_artifacts` - R2 file references
+- `test_flakiness_history` - Flaky test tracking (with `organization_id`)
+
+**Multi-Tenancy Tables:**
+- `organizations` - Org definitions (id, name, slug)
+- `organization_members` - User-org membership (with role: owner/admin/viewer)
+- `dashboard_users` - Users (with `default_org_id`)
+- `invites` - Pending invites (with `org_id`)
+
+See `scripts/009_add_organizations.sql` for full schema.
 
 ### Data Flow
 1. GitHub Actions runs Playwright tests and inserts results into Neon
@@ -49,20 +69,28 @@ Required:
 Optional (for artifact downloads):
 - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`
 
-## Code Patterns
-
 ### Database Access
-Use the factory function pattern in `lib/db.ts` - call `getSql()` inside each function to avoid module-level instantiation issues in serverless environments:
-```typescript
-// Correct - factory pattern
-function getSql() {
-  return neon(process.env.DATABASE_URL!)
-}
+All queries use organization filtering via `getQueriesForOrg()`:
 
-export async function getExecutions() {
-  const sql = getSql()  // Create instance inside function
-  return sql`SELECT * FROM test_executions`
-}
+```typescript
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
+
+// In API route or Server Component:
+const context = await getSessionContext()
+if (!context) return unauthorized()
+
+const db = getQueriesForOrg(context.organizationId)
+const executions = await db.getExecutions()  // Auto-filtered by org
+```
+
+For CI/CD ingestion (API key auth), use service account context:
+```typescript
+import { setServiceAccountContext, getQueriesForOrg } from "@/lib/db"
+
+await setServiceAccountContext()  // Bypass RLS
+const db = getQueriesForOrg(orgId)
+await db.insertExecution(execution)
 ```
 
 ### API Routes
@@ -167,3 +195,17 @@ This project monitors Playwright test results but doesn't have its own test suit
 - Use environment variables for all sensitive configuration
 - Validate external input at API boundaries
 - Generate signed URLs for R2 artifact access (short expiration times)
+- All data queries are org-filtered via `getQueriesForOrg()`
+- RLS policies provide database-level protection
+- Use `requireOrgAdmin()` or `requireSystemAdmin()` for admin operations
+
+## Multi-Tenancy
+
+The dashboard supports multi-tenant data isolation:
+
+- **Organization-based filtering**: All queries filter by `organization_id`
+- **Session context**: `getSessionContext()` provides user + org info
+- **RLS protection**: Database-level policies prevent cross-org access
+- **Admin management**: `/admin/organizations` for org CRUD
+
+See `docs/MULTITENANCY_COMPLETED.md` for full implementation details.

@@ -1,26 +1,35 @@
 # E2E Test Dashboard
 
-A comprehensive dashboard for monitoring Playwright test executions from GitHub Actions with NeonDB and Cloudflare R2 integration.
+A comprehensive multi-tenant dashboard for monitoring Playwright test executions from GitHub Actions with NeonDB, Row-Level Security, and Cloudflare R2 integration.
 
 ## Features
 
+- **Multi-Tenancy**: Organization-level data isolation with RLS
 - **Real-time Metrics**: Pass rates, average duration, critical failures, and execution counts
 - **Trend Visualization**: 7-day trend charts showing test stability over time
 - **Detailed Test Results**: View individual test failures with error messages and stack traces
 - **Artifact Management**: Access test videos, traces, and screenshots stored in Cloudflare R2
 - **Smart Filtering**: Filter by status, branch, and date range
+- **Admin Panel**: Manage users, invites, and organizations
 - **Responsive Design**: Mobile-friendly interface with dark mode
 
 ## Getting Started
 
 ### 1. Database Setup
 
-Run the SQL scripts to create the necessary tables:
+Run the SQL scripts in order:
 
 ```bash
-# Execute these scripts in your Neon database console or use the v0 script runner
-scripts/001_create_test_tables.sql
-scripts/002_seed_sample_data.sql (optional - for testing)
+# Core tables
+psql $DATABASE_URL -f scripts/001_create_test_tables.sql
+psql $DATABASE_URL -f scripts/003_add_logs_and_signature.sql
+psql $DATABASE_URL -f scripts/005_flaky_test_detection.sql
+psql $DATABASE_URL -f scripts/007_create_user_tables.sql
+psql $DATABASE_URL -f scripts/008_add_ai_context.sql
+
+# Multi-tenancy (required)
+psql $DATABASE_URL -f scripts/009_add_organizations.sql
+psql $DATABASE_URL -f scripts/010_add_rls_policies.sql
 ```
 
 ### 2. Environment Variables
@@ -68,11 +77,27 @@ See the database schema in `scripts/001_create_test_tables.sql` for field defini
 
 ## API Endpoints
 
-- `GET /api/executions` - List test executions with filtering
+### Test Data (org-filtered)
+- `GET /api/executions` - List test executions
 - `GET /api/executions/[id]` - Get detailed execution results
-- `GET /api/metrics` - Dashboard metrics and statistics
+- `GET /api/metrics` - Dashboard metrics
 - `GET /api/trends` - Trend data for charts
+- `GET /api/search` - Search tests
+- `GET /api/flakiness` - Flaky test data
+- `GET /api/tests/[signature]` - Test history
 - `GET /api/artifacts/[id]/signed-url` - Generate R2 signed URLs
+- `POST /api/test-results` - Ingest test results (API key auth)
+
+### Organization Management
+- `GET/POST /api/organizations` - List/create organizations
+- `GET/PATCH/DELETE /api/organizations/[id]` - Single org operations
+- `GET/POST /api/organizations/[id]/members` - Manage members
+- `PATCH/DELETE /api/organizations/[id]/members/[userId]` - Update/remove member
+
+### Admin
+- `GET /api/admin/organizations` - List all orgs (admin only)
+- `GET/POST/DELETE /api/admin/users` - User management
+- `GET/POST/DELETE /api/admin/invites` - Invite management
 
 ## Development
 
