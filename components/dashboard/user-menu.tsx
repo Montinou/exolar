@@ -1,6 +1,6 @@
 "use client"
 
-import { UserButton } from "@neondatabase/neon-js/auth/react/ui"
+import { UserButton } from "@neondatabase/auth/react/ui"
 
 export function UserMenu() {
   return <UserButton />

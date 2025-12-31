@@ -13,6 +13,7 @@ import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { ExecutionsTable } from "@/components/dashboard/executions-table"
 import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
+import { AdminLink } from "@/components/dashboard/admin-link"
 import { SearchTests } from "@/components/dashboard/search-tests"
 import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -97,6 +98,7 @@ export default async function DashboardPage({
             </div>
             <div className="flex items-center gap-4">
               <SearchTests />
+              <AdminLink />
               <UserMenu />
             </div>
           </div>

@@ -1,3 +1,3 @@
-import { authApiHandler } from "@neondatabase/neon-js/auth/next"
+import { authApiHandler } from "@neondatabase/auth/next"
 
 export const { GET, POST } = authApiHandler()

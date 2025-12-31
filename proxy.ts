@@ -1,4 +1,4 @@
-import { neonAuthMiddleware } from "@neondatabase/neon-js/auth/next"
+import { neonAuthMiddleware } from "@neondatabase/auth/next"
 
 export default neonAuthMiddleware({
   loginUrl: "/auth/sign-in",

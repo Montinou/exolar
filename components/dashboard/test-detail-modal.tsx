@@ -75,14 +75,19 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span>Test Execution Details</span>
             <Badge variant={execution?.status === "success" ? "default" : "destructive"}>{execution?.status}</Badge>
           </DialogTitle>
-          <DialogDescription>
-            Run ID: {execution?.run_id} • Branch: {execution?.branch} • Commit: {execution?.commit_sha}
+          <DialogDescription className="space-y-1">
+            <div>Run ID: {execution?.run_id} • Branch: {execution?.branch} • Commit: {execution?.commit_sha?.substring(0, 7)}</div>
+            {execution?.commit_message && (
+              <div className="text-foreground/80 truncate max-w-full" title={execution.commit_message}>
+                {execution.commit_message}
+              </div>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -93,7 +98,7 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
             <TabsTrigger value="skipped">Skipped ({skippedTests.length})</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-4">
+          <ScrollArea className="flex-1 mt-4 h-0 min-h-0">
             <TabsContent value="failed" className="space-y-4 m-0">
               {failedTests.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No failed tests</p>
