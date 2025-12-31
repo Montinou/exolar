@@ -154,6 +154,63 @@ export const allTools = [
       },
     },
   },
+
+  // --- Batch 6: Flakiness and Artifacts Tools ---
+  {
+    name: "get_flaky_tests",
+    description:
+      "Get list of flaky tests sorted by flakiness rate. A test is flaky if it sometimes passes after retries.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max results", default: 10 },
+        min_runs: {
+          type: "number",
+          description: "Minimum runs to be considered (default 5)",
+          default: 5,
+        },
+      },
+    },
+  },
+  {
+    name: "get_flakiness_summary",
+    description:
+      "Get overall flakiness summary: total flaky tests, average flakiness rate, and total flaky runs.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "list_artifacts",
+    description:
+      "List artifacts (screenshots, videos, traces) for a specific test result.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        test_result_id: {
+          type: "number",
+          description: "Test result ID to get artifacts for",
+        },
+      },
+      required: ["test_result_id"],
+    },
+  },
+  {
+    name: "get_artifact_url",
+    description:
+      "Generate a signed URL to download an artifact (screenshot, video, trace). URL expires in 1 hour.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        artifact_id: {
+          type: "number",
+          description: "Artifact ID to get URL for",
+        },
+      },
+      required: ["artifact_id"],
+    },
+  },
 ]
 
 // ============================================
@@ -460,6 +517,167 @@ export async function handleToolCall(
                   organization: authContext.organizationSlug,
                   since: input.since || "all time",
                   distribution,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        }
+      }
+
+      // --- Batch 6: Flakiness and Artifacts Tools ---
+
+      case "get_flaky_tests": {
+        const input = z
+          .object({
+            limit: z.number().min(1).max(100).default(10),
+            min_runs: z.number().min(1).default(5),
+          })
+          .parse(args)
+
+        const flakyTests = await queries.getFlakiestTests(orgId, input.limit, input.min_runs)
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  organization: authContext.organizationSlug,
+                  count: (flakyTests as unknown[]).length,
+                  flaky_tests: flakyTests,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        }
+      }
+
+      case "get_flakiness_summary": {
+        const summary = await queries.getFlakinessSummary(orgId)
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  organization: authContext.organizationSlug,
+                  summary,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        }
+      }
+
+      case "list_artifacts": {
+        const input = z
+          .object({
+            test_result_id: z.number(),
+          })
+          .parse(args)
+
+        const artifacts = await queries.getArtifactsForTestResult(orgId, input.test_result_id)
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  organization: authContext.organizationSlug,
+                  test_result_id: input.test_result_id,
+                  count: (artifacts as unknown[]).length,
+                  artifacts,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        }
+      }
+
+      case "get_artifact_url": {
+        const input = z
+          .object({
+            artifact_id: z.number(),
+          })
+          .parse(args)
+
+        // First verify the artifact belongs to the user's org
+        const artifact = await queries.getArtifactById(orgId, input.artifact_id)
+
+        if (!artifact) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "Artifact not found or access denied" }),
+              },
+            ],
+            isError: true,
+          }
+        }
+
+        // Check if R2 is configured
+        const r2Configured = !!(
+          process.env.R2_ACCOUNT_ID &&
+          process.env.R2_ACCESS_KEY_ID &&
+          process.env.R2_SECRET_ACCESS_KEY &&
+          process.env.R2_BUCKET_NAME
+        )
+
+        if (!r2Configured) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  error: "R2 storage not configured",
+                  artifact_info: artifact,
+                }),
+              },
+            ],
+            isError: true,
+          }
+        }
+
+        // Generate signed URL (import dynamically to avoid errors when R2 not configured)
+        const { getSignedR2Url } = await import("./r2.js")
+        const r2Key = (artifact as { r2_key?: string }).r2_key
+
+        if (!r2Key) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "Artifact has no R2 key" }),
+              },
+            ],
+            isError: true,
+          }
+        }
+
+        const signedUrl = await getSignedR2Url(r2Key, 3600) // 1 hour expiry
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  organization: authContext.organizationSlug,
+                  artifact_id: input.artifact_id,
+                  type: (artifact as { type?: string }).type,
+                  signed_url: signedUrl,
+                  expires_in_seconds: 3600,
                 },
                 null,
                 2
