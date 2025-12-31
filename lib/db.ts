@@ -18,7 +18,7 @@ import type {
   SuiteResult,
 } from "./types"
 
-function getSql() {
+export function getSql() {
   return neon(process.env.DATABASE_URL!)
 }
 
@@ -28,6 +28,7 @@ export interface DateRangeFilter {
 }
 
 export async function getExecutions(
+  organizationId: number,
   limit = 50,
   status?: string,
   branch?: string,
@@ -35,7 +36,7 @@ export async function getExecutions(
   suite?: string
 ) {
   const sql = getSql()
-  const conditions = []
+  const conditions = [`organization_id = ${organizationId}`]
 
   if (status) {
     conditions.push(`status = '${status}'`)
@@ -57,7 +58,7 @@ export async function getExecutions(
     conditions.push(`started_at <= '${dateRange.to}'`)
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
 
   const result = await sql`
     SELECT * FROM test_executions
@@ -69,13 +70,13 @@ export async function getExecutions(
   return result as TestExecution[]
 }
 
-export async function getExecutionById(id: number) {
+export async function getExecutionById(organizationId: number, id: number) {
   const sql = getSql()
-  const result = await sql`SELECT * FROM test_executions WHERE id = ${id}`
+  const result = await sql`SELECT * FROM test_executions WHERE id = ${id} AND organization_id = ${organizationId}`
   return result[0] as TestExecution | undefined
 }
 
-export async function getTestResultsByExecutionId(executionId: number) {
+export async function getTestResultsByExecutionId(organizationId: number, executionId: number) {
   const sql = getSql()
   const results = await sql`
     SELECT tr.*, 
@@ -92,8 +93,10 @@ export async function getTestResultsByExecutionId(executionId: number) {
              )
            ) FILTER (WHERE ta.id IS NOT NULL) as artifacts
     FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
     LEFT JOIN test_artifacts ta ON ta.test_result_id = tr.id
     WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
     GROUP BY tr.id
     ORDER BY tr.started_at ASC
   `
@@ -101,9 +104,9 @@ export async function getTestResultsByExecutionId(executionId: number) {
   return results as TestResult[]
 }
 
-export async function getDashboardMetrics(dateRange?: DateRangeFilter) {
+export async function getDashboardMetrics(organizationId: number, dateRange?: DateRangeFilter) {
   const sql = getSql()
-  const conditions = ["completed_at IS NOT NULL"]
+  const conditions = ["completed_at IS NOT NULL", `organization_id = ${organizationId}`]
 
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
@@ -135,6 +138,7 @@ export async function getDashboardMetrics(dateRange?: DateRangeFilter) {
   const criticalConditions = [
     "tr.is_critical = true",
     "tr.status = 'failed'",
+    `te.organization_id = ${organizationId}`,
   ]
 
   if (dateRange?.from) {
@@ -167,9 +171,9 @@ export async function getDashboardMetrics(dateRange?: DateRangeFilter) {
   } as DashboardMetrics
 }
 
-export async function getTrendData(days = 7, dateRange?: DateRangeFilter) {
+export async function getTrendData(organizationId: number, days = 7, dateRange?: DateRangeFilter) {
   const sql = getSql()
-  const conditions = ["completed_at IS NOT NULL"]
+  const conditions = ["completed_at IS NOT NULL", `organization_id = ${organizationId}`]
 
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
@@ -199,11 +203,12 @@ export async function getTrendData(days = 7, dateRange?: DateRangeFilter) {
 }
 
 export async function getFailureTrendData(
+  organizationId: number,
   days = 7,
   dateRange?: DateRangeFilter
 ): Promise<FailureTrendData[]> {
   const sql = getSql()
-  const conditions = ["status != 'running'"]
+  const conditions = ["status != 'running'", `organization_id = ${organizationId}`]
 
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
@@ -236,22 +241,24 @@ export async function getFailureTrendData(
   return result as FailureTrendData[]
 }
 
-export async function getBranches() {
+export async function getBranches(organizationId: number) {
   const sql = getSql()
   const result = await sql`
     SELECT DISTINCT branch
     FROM test_executions
+    WHERE organization_id = ${organizationId}
     ORDER BY branch ASC
   `
   return result.map((r) => r.branch) as string[]
 }
 
-export async function getSuites() {
+export async function getSuites(organizationId: number) {
   const sql = getSql()
   const result = await sql`
     SELECT DISTINCT suite
     FROM test_executions
     WHERE suite IS NOT NULL
+      AND organization_id = ${organizationId}
     ORDER BY suite ASC
   `
   return result.map((r) => r.suite) as string[]
@@ -267,11 +274,12 @@ export async function getSuites() {
  * Each branch includes unique commit messages (max 3) and suite results (last 3 runs per suite)
  */
 export async function getExecutionsGroupedByBranch(
+  organizationId: number,
   dateRange?: DateRangeFilter,
   maxRunsPerSuite: number = 3
 ): Promise<BranchGroup[]> {
   const sql = getSql()
-  const conditions = []
+  const conditions = [`organization_id = ${organizationId}`]
 
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
@@ -384,15 +392,12 @@ export function generateTestSignature(testFile: string, testName: string): strin
   return createHash("md5").update(`${testFile}::${testName}`).digest("hex")
 }
 
-/**
- * Insert a new test execution record
- * @returns The ID of the newly created execution
- */
-export async function insertExecution(data: ExecutionRequest): Promise<number> {
+export async function insertExecution(organizationId: number, data: ExecutionRequest): Promise<number> {
   const sql = getSql()
 
   const result = await sql`
     INSERT INTO test_executions (
+      organization_id,
       run_id,
       branch,
       commit_sha,
@@ -409,6 +414,7 @@ export async function insertExecution(data: ExecutionRequest): Promise<number> {
       started_at,
       completed_at
     ) VALUES (
+      ${organizationId},
       ${data.run_id},
       ${data.branch},
       ${data.commit_sha},
@@ -431,11 +437,8 @@ export async function insertExecution(data: ExecutionRequest): Promise<number> {
   return result[0].id as number
 }
 
-/**
- * Insert test results for an execution
- * @returns Map of test_signature -> result_id for artifact matching
- */
 export async function insertTestResults(
+  organizationId: number,
   executionId: number,
   results: TestResultRequest[]
 ): Promise<Map<string, number>> {
@@ -492,6 +495,7 @@ export async function insertTestResults(
 
     // Update flakiness history for this test
     await updateFlakinessHistory(
+      organizationId,
       signature,
       result.test_name,
       result.test_file,
@@ -556,11 +560,7 @@ export async function insertArtifacts(
 // Search and History Functions (Phase 04)
 // ============================================
 
-/**
- * Search tests by name or file path
- * Uses ILIKE for case-insensitive partial matching
- */
-export async function searchTests(query: string, limit = 50): Promise<TestSearchResult[]> {
+export async function searchTests(organizationId: number, query: string, limit = 50): Promise<TestSearchResult[]> {
   const sql = getSql()
 
   if (!query || query.length < 2) {
@@ -571,25 +571,29 @@ export async function searchTests(query: string, limit = 50): Promise<TestSearch
 
   const results = await sql`
     SELECT
-      COALESCE(test_signature, MD5(test_file || '::' || test_name)) as test_signature,
-      test_name,
-      test_file,
+      COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) as test_signature,
+      tr.test_name,
+      tr.test_file,
       COUNT(*) as run_count,
-      MAX(started_at) as last_run,
+      MAX(tr.started_at) as last_run,
       (
         SELECT status FROM test_results tr2
-        WHERE tr2.test_name = test_results.test_name
-          AND tr2.test_file = test_results.test_file
-        ORDER BY started_at DESC LIMIT 1
+        JOIN test_executions te2 ON tr2.execution_id = te2.id
+        WHERE tr2.test_name = tr.test_name
+          AND tr2.test_file = tr.test_file
+          AND te2.organization_id = ${organizationId}
+        ORDER BY tr2.started_at DESC LIMIT 1
       ) as last_status,
       ROUND(
-        COUNT(*) FILTER (WHERE status = 'passed')::decimal
+        COUNT(*) FILTER (WHERE tr.status = 'passed')::decimal
         / NULLIF(COUNT(*), 0) * 100, 1
       ) as pass_rate
-    FROM test_results
-    WHERE test_name ILIKE ${searchPattern}
-       OR test_file ILIKE ${searchPattern}
-    GROUP BY test_name, test_file, test_signature
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE (tr.test_name ILIKE ${searchPattern}
+       OR tr.test_file ILIKE ${searchPattern})
+      AND te.organization_id = ${organizationId}
+    GROUP BY tr.test_name, tr.test_file, tr.test_signature
     ORDER BY run_count DESC
     LIMIT ${limit}
   `
@@ -597,11 +601,7 @@ export async function searchTests(query: string, limit = 50): Promise<TestSearch
   return results as TestSearchResult[]
 }
 
-/**
- * Get test history by signature
- * Returns recent runs for a specific test across all executions
- */
-export async function getTestHistory(signature: string, limit = 20): Promise<TestHistoryItem[]> {
+export async function getTestHistory(organizationId: number, signature: string, limit = 20): Promise<TestHistoryItem[]> {
   const sql = getSql()
 
   const results = await sql`
@@ -612,8 +612,9 @@ export async function getTestHistory(signature: string, limit = 20): Promise<Tes
       te.status as execution_status
     FROM test_results tr
     JOIN test_executions te ON tr.execution_id = te.id
-    WHERE tr.test_signature = ${signature}
-       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature}
+    WHERE (tr.test_signature = ${signature}
+       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature})
+      AND te.organization_id = ${organizationId}
     ORDER BY tr.started_at DESC
     LIMIT ${limit}
   `
@@ -621,28 +622,27 @@ export async function getTestHistory(signature: string, limit = 20): Promise<Tes
   return results as TestHistoryItem[]
 }
 
-/**
- * Get aggregated statistics for a specific test by signature
- */
-export async function getTestStatistics(signature: string): Promise<TestStatistics> {
+export async function getTestStatistics(organizationId: number, signature: string): Promise<TestStatistics> {
   const sql = getSql()
 
   const result = await sql`
     SELECT
       COUNT(*) as total_runs,
       ROUND(
-        COUNT(*) FILTER (WHERE status = 'passed')::decimal
+        COUNT(*) FILTER (WHERE tr.status = 'passed')::decimal
         / NULLIF(COUNT(*), 0) * 100, 1
       ) as pass_rate,
-      ROUND(AVG(duration_ms)) as avg_duration_ms,
+      ROUND(AVG(tr.duration_ms)) as avg_duration_ms,
       ROUND(
-        COUNT(*) FILTER (WHERE retry_count > 0 AND status = 'passed')::decimal
-        / NULLIF(COUNT(*) FILTER (WHERE status = 'passed'), 0) * 100, 1
+        COUNT(*) FILTER (WHERE tr.retry_count > 0 AND tr.status = 'passed')::decimal
+        / NULLIF(COUNT(*) FILTER (WHERE tr.status = 'passed'), 0) * 100, 1
       ) as flaky_rate,
-      MAX(started_at) FILTER (WHERE status = 'failed') as last_failure
-    FROM test_results
-    WHERE test_signature = ${signature}
-       OR MD5(test_file || '::' || test_name) = ${signature}
+      MAX(tr.started_at) FILTER (WHERE tr.status = 'failed') as last_failure
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE (tr.test_signature = ${signature}
+       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature})
+      AND te.organization_id = ${organizationId}
   `
 
   return {
@@ -658,11 +658,8 @@ export async function getTestStatistics(signature: string): Promise<TestStatisti
 // AI Context Analysis Functions
 // ============================================
 
-/**
- * Get failed tests with AI context for analysis
- * Supports filtering by error type, test file, or date range
- */
 export async function getFailuresWithAIContext(
+  organizationId: number,
   options: {
     errorType?: string
     testFile?: string
@@ -674,28 +671,21 @@ export async function getFailuresWithAIContext(
   const { errorType, testFile, limit = 50, since } = options
 
   const conditions = [
-    "ai_context IS NOT NULL",
-    "status IN ('failed', 'timedout')",
+    "tr.ai_context IS NOT NULL",
+    "tr.status IN ('failed', 'timedout')",
+    `te.organization_id = ${organizationId}`,
   ]
-  const params: (string | number)[] = []
-  let paramIndex = 1
 
   if (errorType) {
-    conditions.push(`ai_context->'error'->>'type' = $${paramIndex}`)
-    params.push(errorType)
-    paramIndex++
+    conditions.push(`tr.ai_context->'error'->>'type' = '${errorType.replace(/'/g, "''")}'`)
   }
 
   if (testFile) {
-    conditions.push(`test_file ILIKE $${paramIndex}`)
-    params.push(`%${testFile}%`)
-    paramIndex++
+    conditions.push(`tr.test_file ILIKE '%${testFile.replace(/'/g, "''")}%'`)
   }
 
   if (since) {
-    conditions.push(`created_at >= $${paramIndex}`)
-    params.push(since)
-    paramIndex++
+    conditions.push(`tr.created_at >= '${since}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
@@ -703,50 +693,46 @@ export async function getFailuresWithAIContext(
   // Build query with dynamic conditions
   const query = `
     SELECT
-      id, execution_id, test_name, test_file, test_signature,
-      status, duration_ms, is_critical, error_message, stack_trace,
-      browser, retry_count, ai_context, created_at
-    FROM test_results
+      tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+      tr.status, tr.duration_ms, tr.is_critical, tr.error_message, tr.stack_trace,
+      tr.browser, tr.retry_count, tr.ai_context, tr.created_at
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
     ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT $${paramIndex}
+    ORDER BY tr.created_at DESC
+    LIMIT ${limit}
   `
-
-  params.push(limit)
 
   const result = await sql.unsafe(query)
   return result as unknown as TestResult[]
 }
 
-/**
- * Get error type distribution for dashboard analytics
- * Returns count of failures grouped by error type from ai_context
- */
 export async function getErrorTypeDistribution(
+  organizationId: number,
   since?: string
 ): Promise<Array<{ error_type: string; count: number }>> {
   const sql = getSql()
 
   const conditions = [
-    "ai_context IS NOT NULL",
-    "status IN ('failed', 'timedout')",
+    "tr.ai_context IS NOT NULL",
+    "tr.status IN ('failed', 'timedout')",
+    `te.organization_id = ${organizationId}`,
   ]
-  const params: string[] = []
 
   if (since) {
-    conditions.push("created_at >= $1")
-    params.push(since)
+    conditions.push(`tr.created_at >= '${since}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
 
   const query = `
     SELECT
-      ai_context->'error'->>'type' as error_type,
+      tr.ai_context->'error'->>'type' as error_type,
       COUNT(*) as count
-    FROM test_results
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
     ${whereClause}
-    GROUP BY ai_context->'error'->>'type'
+    GROUP BY tr.ai_context->'error'->>'type'
     ORDER BY count DESC
   `
 
@@ -766,12 +752,8 @@ export function isTestFlaky(retryCount: number, status: string): boolean {
   return retryCount > 0 && status === "passed"
 }
 
-/**
- * Get the flakiest tests ordered by flakiness rate
- * @param limit Maximum number of tests to return
- * @param minRuns Minimum runs required to be considered (default 5)
- */
 export async function getFlakiestTests(
+  organizationId: number,
   limit: number = 10,
   minRuns: number = 5
 ): Promise<TestFlakinessHistory[]> {
@@ -782,6 +764,7 @@ export async function getFlakiestTests(
     FROM test_flakiness_history
     WHERE total_runs >= ${minRuns}
       AND flaky_runs > 0
+      AND organization_id = ${organizationId}
     ORDER BY flakiness_rate DESC, flaky_runs DESC
     LIMIT ${limit}
   `
@@ -789,11 +772,7 @@ export async function getFlakiestTests(
   return results as TestFlakinessHistory[]
 }
 
-/**
- * Get flakiness summary for the dashboard
- * Includes total flaky tests, average flakiness rate, and top flaky tests
- */
-export async function getFlakinessSummary(): Promise<FlakinessSummary> {
+export async function getFlakinessSummary(organizationId: number): Promise<FlakinessSummary> {
   const sql = getSql()
 
   const summaryResult = await sql`
@@ -802,9 +781,10 @@ export async function getFlakinessSummary(): Promise<FlakinessSummary> {
       COALESCE(AVG(flakiness_rate) FILTER (WHERE flaky_runs > 0), 0) as avg_flakiness_rate
     FROM test_flakiness_history
     WHERE total_runs >= 5
+      AND organization_id = ${organizationId}
   `
 
-  const topFlaky = await getFlakiestTests(5)
+  const topFlaky = await getFlakiestTests(organizationId, 5)
 
   return {
     total_flaky_tests: Number(summaryResult[0].total_flaky_tests),
@@ -813,11 +793,8 @@ export async function getFlakinessSummary(): Promise<FlakinessSummary> {
   }
 }
 
-/**
- * Update flakiness history after inserting a new test result
- * Called automatically during data ingestion
- */
 export async function updateFlakinessHistory(
+  organizationId: number,
   testSignature: string,
   testName: string,
   testFile: string,
@@ -830,6 +807,7 @@ export async function updateFlakinessHistory(
 
   await sql`
     INSERT INTO test_flakiness_history (
+      organization_id,
       test_signature,
       test_name,
       test_file,
@@ -845,6 +823,7 @@ export async function updateFlakinessHistory(
       first_seen_at,
       updated_at
     ) VALUES (
+      ${organizationId},
       ${testSignature},
       ${testName},
       ${testFile},
@@ -884,10 +863,8 @@ export async function updateFlakinessHistory(
   `
 }
 
-/**
- * Get flakiness data for a specific test by signature
- */
 export async function getTestFlakiness(
+  organizationId: number,
   signature: string
 ): Promise<TestFlakinessHistory | null> {
   const sql = getSql()
@@ -896,8 +873,78 @@ export async function getTestFlakiness(
     SELECT *
     FROM test_flakiness_history
     WHERE test_signature = ${signature}
+      AND organization_id = ${organizationId}
     LIMIT 1
   `
 
   return result.length > 0 ? (result[0] as TestFlakinessHistory) : null
+}
+
+// ============================================
+// Org-Bound Query Helper
+// ============================================
+
+/**
+ * Create org-bound query functions.
+ * Use this to avoid passing organizationId to every function.
+ *
+ * Usage in API routes:
+ *   const context = await getSessionContext()
+ *   const db = getQueriesForOrg(context.organizationId)
+ *   const executions = await db.getExecutions(50, "failed")
+ */
+export function getQueriesForOrg(organizationId: number) {
+  return {
+    // Execution queries
+    getExecutions: (limit?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string) =>
+      getExecutions(organizationId, limit, status, branch, dateRange, suite),
+    getExecutionById: (id: number) =>
+      getExecutionById(organizationId, id),
+    getTestResultsByExecutionId: (executionId: number) =>
+      getTestResultsByExecutionId(organizationId, executionId),
+    getExecutionsGroupedByBranch: (dateRange?: DateRangeFilter, maxRunsPerSuite?: number) =>
+      getExecutionsGroupedByBranch(organizationId, dateRange, maxRunsPerSuite),
+
+    // Metrics queries
+    getDashboardMetrics: (dateRange?: DateRangeFilter) =>
+      getDashboardMetrics(organizationId, dateRange),
+    getTrendData: (days?: number, dateRange?: DateRangeFilter) =>
+      getTrendData(organizationId, days, dateRange),
+    getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
+      getFailureTrendData(organizationId, days, dateRange),
+
+    // Helper queries
+    getBranches: () =>
+      getBranches(organizationId),
+    getSuites: () =>
+      getSuites(organizationId),
+
+    // Search and history queries
+    searchTests: (query: string, limit?: number) =>
+      searchTests(organizationId, query, limit),
+    getTestHistory: (signature: string, limit?: number) =>
+      getTestHistory(organizationId, signature, limit),
+    getTestStatistics: (signature: string) =>
+      getTestStatistics(organizationId, signature),
+
+    // AI context queries
+    getFailuresWithAIContext: (options?: { errorType?: string; testFile?: string; limit?: number; since?: string }) =>
+      getFailuresWithAIContext(organizationId, options),
+    getErrorTypeDistribution: (since?: string) =>
+      getErrorTypeDistribution(organizationId, since),
+
+    // Flakiness queries
+    getFlakiestTests: (limit?: number, minRuns?: number) =>
+      getFlakiestTests(organizationId, limit, minRuns),
+    getFlakinessSummary: () =>
+      getFlakinessSummary(organizationId),
+    getTestFlakiness: (signature: string) =>
+      getTestFlakiness(organizationId, signature),
+
+    // Insert functions
+    insertExecution: (data: ExecutionRequest) =>
+      insertExecution(organizationId, data),
+    insertTestResults: (executionId: number, results: TestResultRequest[]) =>
+      insertTestResults(organizationId, executionId, results),
+  }
 }

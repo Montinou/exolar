@@ -1,10 +1,6 @@
 import "server-only"
 import { authServer } from "./auth/server"
-import { neon } from "@neondatabase/serverless"
-
-function getSql() {
-  return neon(process.env.DATABASE_URL!)
-}
+import { getSql } from "./db"
 
 /**
  * Session context containing user and organization information.
