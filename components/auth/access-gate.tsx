@@ -114,11 +114,13 @@ function LoginPrompt() {
             Sign in to access the E2E Test Dashboard
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center">
-          <p className="text-sm text-muted-foreground mb-4">
-            Use the sign-in button in the top right corner to authenticate with your email.
-          </p>
-          <p className="text-xs text-muted-foreground">
+        <CardContent className="space-y-4">
+          <div className="flex justify-center">
+            <Button asChild>
+              <a href="/auth/sign-in">Sign In with Email</a>
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
             Only invited users can access this dashboard.
           </p>
         </CardContent>
