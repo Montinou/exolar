@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2 } from "lucide-react"
+import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building } from "lucide-react"
+import Link from "next/link"
 import type { DashboardUser, Invite } from "@/lib/db-users"
 
 export default function AdminPage() {
@@ -199,7 +200,15 @@ export default function AdminPage() {
                 <p className="text-sm text-muted-foreground">Manage users and invites</p>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-4">
+              <Link href="/admin/organizations">
+                <Button variant="outline">
+                  <Building className="h-4 w-4 mr-2" />
+                  Organizations
+                </Button>
+              </Link>
+              <UserMenu />
+            </div>
           </div>
         </div>
       </div>
