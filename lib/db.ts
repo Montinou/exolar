@@ -714,8 +714,8 @@ export async function getFailuresWithAIContext(
 
   params.push(limit)
 
-  const result = await sql.unsafe(query, params)
-  return result as TestResult[]
+  const result = await sql.unsafe(query)
+  return result as unknown as TestResult[]
 }
 
 /**
@@ -750,8 +750,8 @@ export async function getErrorTypeDistribution(
     ORDER BY count DESC
   `
 
-  const result = params.length > 0 ? await sql.unsafe(query, params) : await sql.unsafe(query)
-  return result as Array<{ error_type: string; count: number }>
+  const result = await sql.unsafe(query)
+  return result as unknown as Array<{ error_type: string; count: number }>
 }
 
 // ============================================

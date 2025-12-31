@@ -91,7 +91,7 @@ export async function deleteUser(userId: number): Promise<boolean> {
   const result = await sql`
     DELETE FROM dashboard_users WHERE id = ${userId}
   `
-  return result.count > 0
+  return result.length > 0
 }
 
 // ============================================
@@ -154,7 +154,7 @@ export async function markInviteAsUsed(email: string): Promise<boolean> {
     SET used = true
     WHERE email = ${email.toLowerCase()}
   `
-  return result.count > 0
+  return result.length > 0
 }
 
 /**
@@ -165,7 +165,7 @@ export async function deleteInvite(inviteId: number): Promise<boolean> {
   const result = await sql`
     DELETE FROM invites WHERE id = ${inviteId}
   `
-  return result.count > 0
+  return result.length > 0
 }
 
 // ============================================

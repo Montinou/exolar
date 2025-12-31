@@ -140,7 +140,7 @@ const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true'
 - **Storage**: Cloudflare R2 (S3 compatible)
 - **UI**: shadcn/ui + TailwindCSS v4
 - **Charts**: Recharts
-- **Auth**: neon auth
+- **Auth**: Neon Auth (`@neondatabase/auth`)
 
 ### Playwright Integration (attorney_share_mvp_web)
 

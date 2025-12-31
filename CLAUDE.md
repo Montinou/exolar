@@ -23,7 +23,7 @@ npm run start    # Start production server
 - **Storage**: Cloudflare R2 for test artifacts (videos, traces, screenshots)
 - **UI**: shadcn/ui (new-york style) with TailwindCSS v4
 - **Charts**: Recharts
-- **Auth**: neon auth (`@stackframe/stack`)
+- **Auth**: Neon Auth (`@neondatabase/auth`)
 
 ### Key Directories
 - `app/` - Next.js App Router pages and API routes

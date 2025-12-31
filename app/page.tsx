@@ -109,6 +109,7 @@ export default async function DashboardPage({
 
       <div className="container mx-auto px-4 py-8">
         <Suspense fallback={<DashboardSkeleton />}>
+          {/* @ts-expect-error Async Server Component */}
           <DashboardContent searchParams={searchParams} />
         </Suspense>
       </div>
