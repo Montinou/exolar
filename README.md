@@ -99,6 +99,48 @@ See the database schema in `scripts/001_create_test_tables.sql` for field defini
 - `GET/POST/DELETE /api/admin/users` - User management
 - `GET/POST/DELETE /api/admin/invites` - Invite management
 
+### MCP (Model Context Protocol)
+- `GET /api/mcp` - Health check
+- `POST /api/mcp` - MCP JSON-RPC endpoint for Claude Code
+
+## MCP Integration (Claude Code)
+
+The dashboard includes a built-in MCP server that allows Claude Code to access your test data directly.
+
+### Setup for Users
+
+1. Log into the dashboard and go to **Settings > MCP Integration** (`/settings/mcp`)
+2. Copy the configuration shown on the page
+3. Add it to `~/.claude.json` or your project's `.claude.json`
+4. Replace `<your-token>` with your Neon Auth token
+5. Restart Claude Code
+
+### Available MCP Tools (12)
+
+| Tool | Description |
+|------|-------------|
+| `get_executions` | List test executions with filters |
+| `get_execution_details` | Get execution + all test results |
+| `search_tests` | Search tests by name or file |
+| `get_test_history` | History for a specific test |
+| `get_failed_tests` | Failed tests with AI context |
+| `get_dashboard_metrics` | Pass rate, failure counts, duration |
+| `get_trends` | Time-series pass/fail data |
+| `get_error_distribution` | Error type breakdown |
+| `get_flaky_tests` | Flaky tests list |
+| `get_flakiness_summary` | Overall flakiness metrics |
+| `list_branches` | Available branches |
+| `list_suites` | Available test suites |
+
+### MCP Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEON_AUTH_JWKS_URL` | Yes | Neon Auth JWKS endpoint for JWT validation |
+| `DATABASE_URL` | Yes | Already set from Neon integration |
+
+> **Note**: The MCP endpoint uses the same domain as the dashboard (`/api/mcp`), so no separate MCP server URL is needed.
+
 ## Development
 
 The dashboard automatically refreshes data on page load. For real-time updates, the system polls the API every 30 seconds when viewing execution details.
@@ -107,5 +149,6 @@ The dashboard automatically refreshes data on page load. For real-time updates, 
 
 1. Run database migrations in your Neon production database
 2. Add R2 credentials to Vercel environment variables
-3. Deploy to Vercel with the "Publish" button
-4. Configure your GitHub Actions to send data to the production database
+3. Set `NEON_AUTH_JWKS_URL` for MCP authentication
+4. Deploy to Vercel with the "Publish" button
+5. Configure your GitHub Actions to send data to the production database
