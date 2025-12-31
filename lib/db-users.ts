@@ -10,6 +10,7 @@ export interface DashboardUser {
   email: string
   role: "admin" | "viewer"
   invited_by: number | null
+  default_org_id: number | null
   created_at: string
   updated_at: string
 }
@@ -19,6 +20,7 @@ export interface Invite {
   email: string
   role: "admin" | "viewer"
   invited_by: number
+  organization_id: number | null
   used: boolean
   created_at: string
 }
@@ -55,12 +57,13 @@ export async function getAllUsers(): Promise<DashboardUser[]> {
 export async function createUser(
   email: string,
   role: "admin" | "viewer",
-  invitedBy?: number
+  invitedBy?: number,
+  defaultOrgId?: number
 ): Promise<DashboardUser> {
   const sql = getSql()
   const result = await sql`
-    INSERT INTO dashboard_users (email, role, invited_by)
-    VALUES (${email.toLowerCase()}, ${role}, ${invitedBy ?? null})
+    INSERT INTO dashboard_users (email, role, invited_by, default_org_id)
+    VALUES (${email.toLowerCase()}, ${role}, ${invitedBy ?? null}, ${defaultOrgId ?? null})
     RETURNING *
   `
   return result[0] as DashboardUser
@@ -145,7 +148,20 @@ export async function createInvite(
 }
 
 /**
- * Mark invite as used
+ * Mark invite as used by ID
+ */
+export async function markInviteAsUsedById(inviteId: number): Promise<boolean> {
+  const sql = getSql()
+  const result = await sql`
+    UPDATE invites
+    SET used = true
+    WHERE id = ${inviteId}
+  `
+  return (result as unknown as { count: number }).count > 0
+}
+
+/**
+ * Mark invite as used by email (legacy support)
  */
 export async function markInviteAsUsed(email: string): Promise<boolean> {
   const sql = getSql()
@@ -154,7 +170,7 @@ export async function markInviteAsUsed(email: string): Promise<boolean> {
     SET used = true
     WHERE email = ${email.toLowerCase()}
   `
-  return result.length > 0
+  return (result as unknown as { count: number }).count > 0
 }
 
 /**
@@ -169,13 +185,66 @@ export async function deleteInvite(inviteId: number): Promise<boolean> {
 }
 
 // ============================================
+// Organization Helpers
+// ============================================
+
+/**
+ * Get the default organization ID (Attorneyshare)
+ * Used as fallback when invite doesn't specify an org
+ */
+async function getDefaultOrgId(): Promise<number> {
+  const sql = getSql()
+  const result = await sql`
+    SELECT id FROM organizations WHERE slug = 'attorneyshare' LIMIT 1
+  `
+  return result.length > 0 ? (result[0].id as number) : 1
+}
+
+/**
+ * Create a user from an invite, assigning them to the appropriate organization
+ */
+async function createUserFromInvite(
+  email: string,
+  invite: Invite
+): Promise<DashboardUser> {
+  const sql = getSql()
+
+  // Determine which org to assign
+  // If invite has organization_id, use that; otherwise use default (Attorneyshare)
+  const orgId = invite.organization_id || (await getDefaultOrgId())
+
+  // Create the user with default_org_id
+  const userResult = await sql`
+    INSERT INTO dashboard_users (email, role, invited_by, default_org_id)
+    VALUES (${email.toLowerCase()}, ${invite.role}, ${invite.invited_by}, ${orgId})
+    RETURNING *
+  `
+
+  const user = userResult[0] as DashboardUser
+
+  // Add user to organization as member
+  // Map user role to org role: admin -> admin, viewer -> viewer
+  const orgRole = invite.role === "admin" ? "admin" : "viewer"
+  await sql`
+    INSERT INTO organization_members (organization_id, user_id, role)
+    VALUES (${orgId}, ${user.id}, ${orgRole})
+    ON CONFLICT (organization_id, user_id) DO NOTHING
+  `
+
+  // Mark invite as used
+  await markInviteAsUsedById(invite.id)
+
+  return user
+}
+
+// ============================================
 // Authorization Check
 // ============================================
 
 /**
  * Check if a user is authorized to access the dashboard
  * Returns the user if authorized, null otherwise
- * Also handles first-time login from invites
+ * Also handles first-time login from invites, assigning user to organization
  */
 export async function checkUserAccess(email: string): Promise<{
   authorized: boolean
@@ -191,10 +260,8 @@ export async function checkUserAccess(email: string): Promise<{
   // Check if there's a valid invite
   const invite = await getInviteByEmail(email)
   if (invite && !invite.used) {
-    // Create the user from invite
-    const newUser = await createUser(email, invite.role, invite.invited_by)
-    // Mark invite as used
-    await markInviteAsUsed(email)
+    // Create the user from invite (includes org assignment)
+    const newUser = await createUserFromInvite(email, invite)
     return { authorized: true, user: newUser, isNewUser: true }
   }
 
