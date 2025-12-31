@@ -3,6 +3,10 @@
  *
  * This is a hosted MCP server using Hono for HTTP transport.
  * It validates Neon Auth tokens and provides org-scoped access to test data.
+ *
+ * The server implements the MCP protocol over HTTP:
+ * - POST /mcp - JSON-RPC requests (tools/list, tools/call, etc.)
+ * - GET /mcp/sse - Server-Sent Events for streaming (future)
  */
 
 import { Hono } from "hono"
@@ -10,6 +14,8 @@ import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
 import { validateNeonAuthToken, type AuthContext } from "./auth/neon-auth.js"
 import { authMiddleware } from "./auth/middleware.js"
+import { handleMCPRequest } from "./server.js"
+import { allTools } from "./tools/index.js"
 
 // Re-export AuthContext type for external use
 export type { AuthContext }
@@ -32,6 +38,7 @@ app.get("/health", (c) => {
     status: "healthy",
     version: "2.0.0",
     transport: "http-sse",
+    tools: allTools.length,
     timestamp: new Date().toISOString(),
   })
 })
@@ -40,25 +47,17 @@ app.get("/health", (c) => {
 app.use("/mcp/*", authMiddleware)
 app.use("/mcp", authMiddleware)
 
-// MCP endpoint with SSE transport (POST for requests)
+// MCP endpoint - handles JSON-RPC requests
 app.post("/mcp", async (c) => {
   const authContext = c.get("authContext")
 
-  // Parse MCP request
+  // Parse MCP JSON-RPC request
   const body = await c.req.json()
 
-  // TODO: Batch 4 - Create org-scoped MCP server and handle request
-  // For now, return a placeholder response with auth info
-  return c.json({
-    jsonrpc: "2.0",
-    id: body.id,
-    result: {
-      message: "MCP server authenticated successfully. Full tool implementation in Batch 4.",
-      receivedMethod: body.method,
-      organization: authContext.organizationSlug,
-      user: authContext.email,
-    },
-  })
+  // Handle the MCP request with org context
+  const response = await handleMCPRequest(authContext, body)
+
+  return c.json(response)
 })
 
 // SSE endpoint for streaming responses
@@ -74,20 +73,25 @@ app.get("/mcp/sse", async (c) => {
       })
     }, 30000)
 
-    // Send initial connection confirmation with org info
+    // Send initial connection confirmation with capabilities
     await stream.writeSSE({
       event: "connected",
       data: JSON.stringify({
-        message: "SSE connection established",
-        version: "2.0.0",
-        organization: authContext.organizationSlug,
-        user: authContext.email,
+        jsonrpc: "2.0",
+        result: {
+          protocolVersion: "2024-11-05",
+          capabilities: { tools: {} },
+          serverInfo: {
+            name: "e2e-dashboard",
+            version: "2.0.0",
+          },
+          organization: authContext.organizationSlug,
+          user: authContext.email,
+        },
       }),
     })
 
-    // TODO: Batch 4 - Handle MCP messages over SSE
-
-    // Keep connection open (will be managed by MCP SDK in Batch 4)
+    // Keep connection open
     await new Promise<void>((resolve) => {
       stream.onAbort(() => {
         clearInterval(heartbeat)
@@ -109,5 +113,6 @@ serve({
 
 console.log(`🚀 MCP Server running on http://localhost:${port}`)
 console.log(`   Health check: http://localhost:${port}/health`)
+console.log(`   Tools available: ${allTools.length}`)
 
 export default app
