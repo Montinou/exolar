@@ -1,0 +1,1428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Server Implementation Plan for E2E Test Dashboard
+  Created: December 2025
+  Updated: For Hosted Architecture with Neon Native Auth
+
+  PRE-REQUISITE: Execute MULTITENANCY_IMPLEMENTATION.xml first!
+
+  This document provides a complete implementation guide for building a HOSTED
+  MCP (Model Context Protocol) server with OAuth authentication via Neon Auth
+  and per-organization data isolation.
+
+  Usage Instructions:
+  1. Complete MULTITENANCY_IMPLEMENTATION.xml first
+  2. Execute each batch sequentially
+  3. Each batch can be "one-shotted" to Claude
+  4. Deploy to Vercel for production
+-->
+
+<mcp_implementation_plan>
+  <metadata>
+    <project>e2e-test-dashboard-mcp</project>
+    <version>2.0.0</version>
+    <created>2025-12-31</created>
+    <architecture>Hosted MCP Server with Neon Native Auth + Per-Org Isolation</architecture>
+    <auth_system>Neon Native Auth (@neondatabase/auth)</auth_system>
+    <transport>HTTP with SSE (Server-Sent Events)</transport>
+    <deployment>Vercel Serverless</deployment>
+    <total_batches>8</total_batches>
+  </metadata>
+
+  <prerequisites>
+    <prerequisite>MULTITENANCY_IMPLEMENTATION.xml completed</prerequisite>
+    <prerequisite>Organizations and org_id columns in place</prerequisite>
+    <prerequisite>Neon Auth configured and working</prerequisite>
+  </prerequisites>
+
+  <architecture_overview>
+    <diagram><![CDATA[
+┌─────────────────────┐     ┌──────────────────────┐
+│   Claude Code       │     │   Dashboard UI       │
+│   (User's machine)  │     │   (Next.js app)      │
+└─────────┬───────────┘     └──────────┬───────────┘
+          │ HTTP/SSE                    │
+          │ + Neon Auth Token           │ Neon Auth
+          ▼                             ▼
+┌─────────────────────────────────────────────────┐
+│      Hosted MCP Server (Vercel Serverless)      │
+│  ┌─────────────────┐  ┌─────────────────┐      │
+│  │ Neon Auth       │  │ Organization    │      │
+│  │ Token Validator │  │ Filter Layer    │      │
+│  └─────────────────┘  └─────────────────┘      │
+└─────────────────────┬───────────────────────────┘
+                      │
+                      ▼
+          ┌───────────────────────┐
+          │   Neon PostgreSQL     │
+          │   (with org_id RLS)   │
+          └───────────────────────┘
+    ]]></diagram>
+
+    <user_flow>
+      <step>1. User logs into Dashboard (Neon Auth)</step>
+      <step>2. User navigates to Settings > MCP Integration</step>
+      <step>3. Dashboard generates config with user's auth token</step>
+      <step>4. User copies config to their .claude.json</step>
+      <step>5. Claude Code connects to hosted MCP server</step>
+      <step>6. MCP server validates Neon Auth token</step>
+      <step>7. MCP server extracts org_id, filters all queries</step>
+      <step>8. User sees only their organization's test data</step>
+    </user_flow>
+  </architecture_overview>
+
+  <!-- ============================================================
+       BATCH 1: HTTP/SSE TRANSPORT SETUP
+       Dependencies: Multi-tenancy complete
+       Estimated effort: 45 minutes
+       ============================================================ -->
+
+  <batch id="1" name="HTTP/SSE Transport Setup">
+    <description>Create MCP server with HTTP transport using Hono (lightweight, Vercel-friendly)</description>
+
+    <files_to_create>
+      <file path="mcp-server/package.json">
+        <purpose>NPM package with MCP SDK, Hono, and Neon Auth</purpose>
+        <content_spec><![CDATA[
+{
+  "name": "e2e-dashboard-mcp",
+  "version": "2.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@neondatabase/serverless": "^1.0.2",
+    "@aws-sdk/client-s3": "^3.958.0",
+    "@aws-sdk/s3-request-presigner": "^3.958.0",
+    "hono": "^4.0.0",
+    "zod": "^3.25.0",
+    "jose": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "tsx": "^4.0.0"
+  }
+}
+        ]]></content_spec>
+      </file>
+
+      <file path="mcp-server/tsconfig.json">
+        <purpose>TypeScript configuration</purpose>
+        <content_spec><![CDATA[
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+        ]]></content_spec>
+      </file>
+
+      <file path="mcp-server/src/index.ts">
+        <purpose>HTTP server entry point with SSE transport</purpose>
+        <pseudocode><![CDATA[
+import { Hono } from "hono"
+import { cors } from "hono/cors"
+import { streamSSE } from "hono/streaming"
+import { createMCPServer } from "./server.js"
+import { validateNeonAuthToken, type AuthContext } from "./auth/neon-auth.js"
+
+const app = new Hono()
+
+// Enable CORS for Claude Code clients
+app.use("*", cors({
+  origin: "*",
+  allowHeaders: ["Authorization", "Content-Type"],
+  allowMethods: ["GET", "POST", "OPTIONS"]
+}))
+
+// Health check endpoint
+app.get("/health", (c) => {
+  return c.json({
+    status: "healthy",
+    version: "2.0.0",
+    transport: "http-sse"
+  })
+})
+
+// MCP endpoint with SSE transport
+app.post("/mcp", async (c) => {
+  // 1. Validate Neon Auth token from Authorization header
+  const authHeader = c.req.header("Authorization")
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json({ error: "Missing or invalid Authorization header" }, 401)
+  }
+
+  const token = authHeader.slice(7)
+  const authContext = await validateNeonAuthToken(token)
+
+  if (!authContext) {
+    return c.json({ error: "Invalid or expired token" }, 401)
+  }
+
+  // 2. Parse MCP request
+  const body = await c.req.json()
+
+  // 3. Create org-scoped MCP server and handle request
+  const mcpServer = createMCPServer(authContext)
+  const response = await mcpServer.handleRequest(body)
+
+  return c.json(response)
+})
+
+// SSE endpoint for streaming responses
+app.get("/mcp/sse", async (c) => {
+  const authHeader = c.req.header("Authorization")
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json({ error: "Unauthorized" }, 401)
+  }
+
+  const token = authHeader.slice(7)
+  const authContext = await validateNeonAuthToken(token)
+
+  if (!authContext) {
+    return c.json({ error: "Invalid token" }, 401)
+  }
+
+  return streamSSE(c, async (stream) => {
+    const mcpServer = createMCPServer(authContext)
+
+    // Keep connection alive and handle MCP messages
+    await mcpServer.handleSSEConnection(stream)
+  })
+})
+
+// For local development
+const port = process.env.PORT || 3001
+console.log(`MCP Server running on port ${port}`)
+
+export default app
+        ]]></pseudocode>
+      </file>
+
+      <file path="mcp-server/vercel.json">
+        <purpose>Vercel deployment configuration</purpose>
+        <content_spec><![CDATA[
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/index.ts"
+    }
+  ]
+}
+        ]]></content_spec>
+      </file>
+    </files_to_create>
+
+    <verification_steps>
+      <step order="1">npm install in mcp-server directory</step>
+      <step order="2">npm run dev to start server locally</step>
+      <step order="3">Test health check: curl http://localhost:3001/health</step>
+      <step order="4">Verify CORS headers present</step>
+    </verification_steps>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 2: NEON AUTH TOKEN VALIDATION
+       Dependencies: Batch 1
+       Estimated effort: 30 minutes
+       ============================================================ -->
+
+  <batch id="2" name="Neon Auth Token Validation">
+    <description>Implement Neon Auth token validation and user/org context extraction</description>
+
+    <neon_auth_info>
+      <note>Neon Auth tokens are JWTs signed by Neon's auth service</note>
+      <note>Token contains user email which maps to dashboard_users</note>
+      <note>We look up org membership from our database</note>
+    </neon_auth_info>
+
+    <files_to_create>
+      <file path="mcp-server/src/auth/neon-auth.ts">
+        <purpose>Neon Auth token validation and context extraction</purpose>
+        <pseudocode><![CDATA[
+import * as jose from "jose"
+import { getSql } from "../db/connection.js"
+
+export interface AuthContext {
+  userId: number
+  email: string
+  organizationId: number
+  organizationSlug: string
+  orgRole: "owner" | "admin" | "viewer"
+  userRole: "admin" | "viewer"  // System-wide role
+}
+
+// Neon Auth JWKS endpoint (get from Neon dashboard)
+const NEON_AUTH_JWKS_URL = process.env.NEON_AUTH_JWKS_URL || "https://auth.neon.tech/.well-known/jwks.json"
+
+let jwks: jose.JWTVerifyGetKey | null = null
+
+async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
+  if (!jwks) {
+    jwks = jose.createRemoteJWKSet(new URL(NEON_AUTH_JWKS_URL))
+  }
+  return jwks
+}
+
+/**
+ * Validate Neon Auth token and return user/org context
+ */
+export async function validateNeonAuthToken(token: string): Promise<AuthContext | null> {
+  try {
+    // 1. Verify JWT signature with Neon's JWKS
+    const jwks = await getJWKS()
+    const { payload } = await jose.jwtVerify(token, jwks, {
+      // Add any additional verification options
+      // issuer: "https://auth.neon.tech"
+    })
+
+    // 2. Extract email from token
+    const email = payload.email as string
+    if (!email) {
+      console.error("Token missing email claim")
+      return null
+    }
+
+    // 3. Look up user and org membership in our database
+    const sql = getSql()
+
+    const [userInfo] = await sql`
+      SELECT
+        u.id as user_id,
+        u.email,
+        u.role as user_role,
+        u.default_org_id,
+        o.id as organization_id,
+        o.slug as organization_slug,
+        om.role as org_role
+      FROM dashboard_users u
+      LEFT JOIN organizations o ON o.id = u.default_org_id
+      LEFT JOIN organization_members om ON om.user_id = u.id AND om.organization_id = o.id
+      WHERE u.email = ${email}
+    `
+
+    if (!userInfo) {
+      console.error(`User not found for email: ${email}`)
+      return null
+    }
+
+    if (!userInfo.organization_id) {
+      console.error(`User ${email} has no organization assigned`)
+      return null
+    }
+
+    return {
+      userId: userInfo.user_id,
+      email: userInfo.email,
+      organizationId: userInfo.organization_id,
+      organizationSlug: userInfo.organization_slug,
+      orgRole: userInfo.org_role || "viewer",
+      userRole: userInfo.user_role
+    }
+  } catch (error) {
+    console.error("Token validation failed:", error)
+    return null
+  }
+}
+
+/**
+ * Validate token and require org admin access
+ */
+export async function requireOrgAdmin(token: string): Promise<AuthContext | null> {
+  const context = await validateNeonAuthToken(token)
+  if (!context) return null
+
+  if (context.orgRole !== "owner" && context.orgRole !== "admin") {
+    return null
+  }
+
+  return context
+}
+        ]]></pseudocode>
+      </file>
+
+      <file path="mcp-server/src/auth/middleware.ts">
+        <purpose>Hono middleware for auth context injection</purpose>
+        <pseudocode><![CDATA[
+import { Context, Next } from "hono"
+import { validateNeonAuthToken, type AuthContext } from "./neon-auth.js"
+
+// Extend Hono context type
+declare module "hono" {
+  interface ContextVariableMap {
+    authContext: AuthContext
+  }
+}
+
+/**
+ * Middleware to validate auth and inject context
+ */
+export async function authMiddleware(c: Context, next: Next) {
+  const authHeader = c.req.header("Authorization")
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return c.json({
+      error: "Authorization required",
+      message: "Include 'Authorization: Bearer <token>' header"
+    }, 401)
+  }
+
+  const token = authHeader.slice(7)
+  const authContext = await validateNeonAuthToken(token)
+
+  if (!authContext) {
+    return c.json({
+      error: "Invalid or expired token",
+      message: "Please re-authenticate via the dashboard"
+    }, 401)
+  }
+
+  // Inject auth context for handlers
+  c.set("authContext", authContext)
+
+  await next()
+}
+        ]]></pseudocode>
+      </file>
+    </files_to_create>
+
+    <environment_variables>
+      <var name="NEON_AUTH_JWKS_URL">Neon Auth JWKS endpoint for token verification</var>
+      <var name="DATABASE_URL">Neon PostgreSQL connection string</var>
+    </environment_variables>
+
+    <verification_steps>
+      <step order="1">Get a valid Neon Auth token from dashboard</step>
+      <step order="2">Test token validation: curl -H "Authorization: Bearer TOKEN" localhost:3001/health</step>
+      <step order="3">Verify user lookup returns correct org_id</step>
+      <step order="4">Test with invalid token returns 401</step>
+    </verification_steps>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 3: ORG-FILTERED DATABASE QUERIES
+       Dependencies: Batch 1, 2, Multi-tenancy
+       Estimated effort: 30 minutes
+       ============================================================ -->
+
+  <batch id="3" name="Org-Filtered Database Queries">
+    <description>Database connection and query utilities with automatic org filtering</description>
+
+    <files_to_create>
+      <file path="mcp-server/src/db/connection.ts">
+        <purpose>Database connection singleton</purpose>
+        <pseudocode><![CDATA[
+import { neon, NeonQueryFunction } from "@neondatabase/serverless"
+
+let sql: NeonQueryFunction<false, false> | null = null
+
+export function getSql(): NeonQueryFunction<false, false> {
+  if (!sql) {
+    const connectionString = process.env.DATABASE_URL
+    if (!connectionString) {
+      throw new Error("DATABASE_URL environment variable required")
+    }
+    sql = neon(connectionString)
+  }
+  return sql
+}
+        ]]></pseudocode>
+      </file>
+
+      <file path="mcp-server/src/db/queries.ts">
+        <purpose>Org-scoped query functions for MCP tools</purpose>
+        <pseudocode><![CDATA[
+import { getSql } from "./connection.js"
+
+// All query functions take organizationId as first parameter
+// This ensures data isolation at the query level
+
+export async function getExecutions(
+  organizationId: number,
+  limit = 50,
+  status?: string,
+  branch?: string,
+  suite?: string,
+  from?: string,
+  to?: string
+) {
+  const sql = getSql()
+
+  // Build dynamic WHERE with org filter ALWAYS present
+  const conditions = [`organization_id = ${organizationId}`]
+
+  if (status) conditions.push(`status = '${status}'`)
+  if (branch) conditions.push(`branch = '${branch}'`)
+  if (suite) conditions.push(`suite = '${suite}'`)
+  if (from) conditions.push(`started_at >= '${from}'`)
+  if (to) conditions.push(`started_at <= '${to}'`)
+
+  return sql.unsafe(`
+    SELECT
+      id, run_id, branch, commit_sha, commit_message,
+      workflow_name, suite, status,
+      total_tests, passed, failed, skipped,
+      duration_ms, started_at, completed_at
+    FROM test_executions
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `)
+}
+
+export async function getExecutionById(
+  organizationId: number,
+  executionId: number
+) {
+  const sql = getSql()
+
+  // Org filter ensures user can't access other org's data
+  const [execution] = await sql`
+    SELECT * FROM test_executions
+    WHERE id = ${executionId}
+      AND organization_id = ${organizationId}
+  `
+
+  return execution || null
+}
+
+export async function getTestResultsByExecutionId(
+  organizationId: number,
+  executionId: number
+) {
+  const sql = getSql()
+
+  // Join through execution to verify org ownership
+  return sql`
+    SELECT
+      tr.*,
+      COALESCE(
+        json_agg(
+          json_build_object(
+            'id', ta.id,
+            'type', ta.type,
+            'r2_key', ta.r2_key,
+            'file_size_bytes', ta.file_size_bytes
+          )
+        ) FILTER (WHERE ta.id IS NOT NULL),
+        '[]'
+      ) as artifacts
+    FROM test_results tr
+    JOIN test_executions te ON te.id = tr.execution_id
+    LEFT JOIN test_artifacts ta ON ta.test_result_id = tr.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+    GROUP BY tr.id
+    ORDER BY tr.started_at
+  `
+}
+
+export async function searchTests(
+  organizationId: number,
+  query: string,
+  limit = 20
+) {
+  const sql = getSql()
+  const pattern = `%${query}%`
+
+  return sql`
+    SELECT
+      tr.test_signature,
+      tr.test_name,
+      tr.test_file,
+      COUNT(*) as run_count,
+      MAX(tr.started_at) as last_run,
+      ROUND(100.0 * COUNT(*) FILTER (WHERE tr.status = 'passed') / COUNT(*), 1) as pass_rate
+    FROM test_results tr
+    JOIN test_executions te ON te.id = tr.execution_id
+    WHERE te.organization_id = ${organizationId}
+      AND (tr.test_name ILIKE ${pattern} OR tr.test_file ILIKE ${pattern})
+    GROUP BY tr.test_signature, tr.test_name, tr.test_file
+    ORDER BY run_count DESC
+    LIMIT ${limit}
+  `
+}
+
+export async function getFailedTests(
+  organizationId: number,
+  executionId?: number,
+  errorType?: string,
+  limit = 20
+) {
+  const sql = getSql()
+
+  const conditions = [
+    `te.organization_id = ${organizationId}`,
+    `tr.status = 'failed'`
+  ]
+
+  if (executionId) {
+    conditions.push(`tr.execution_id = ${executionId}`)
+  }
+  if (errorType) {
+    conditions.push(`tr.ai_context->'error'->>'type' ILIKE '%${errorType}%'`)
+  }
+
+  return sql.unsafe(`
+    SELECT
+      tr.id,
+      tr.test_name,
+      tr.test_file,
+      tr.error_message,
+      tr.stack_trace,
+      tr.is_critical,
+      tr.ai_context,
+      te.branch,
+      te.commit_sha,
+      te.run_id
+    FROM test_results tr
+    JOIN test_executions te ON te.id = tr.execution_id
+    WHERE ${conditions.join(" AND ")}
+    ORDER BY tr.started_at DESC
+    LIMIT ${limit}
+  `)
+}
+
+export async function getDashboardMetrics(
+  organizationId: number,
+  from?: string,
+  to?: string
+) {
+  const sql = getSql()
+
+  const conditions = [`organization_id = ${organizationId}`]
+  if (from) conditions.push(`started_at >= '${from}'`)
+  if (to) conditions.push(`started_at <= '${to}'`)
+
+  const [metrics] = await sql.unsafe(`
+    SELECT
+      COUNT(*) as total_executions,
+      COUNT(*) FILTER (WHERE status = 'success') as successful_runs,
+      COUNT(*) FILTER (WHERE status = 'failure') as failed_runs,
+      SUM(total_tests) as total_tests_run,
+      SUM(passed) as total_passed,
+      SUM(failed) as total_failed,
+      ROUND(AVG(duration_ms)) as avg_duration_ms
+    FROM test_executions
+    WHERE ${conditions.join(" AND ")}
+  `)
+
+  return metrics
+}
+
+export async function getFlakiestTests(
+  organizationId: number,
+  limit = 10,
+  minRuns = 5
+) {
+  const sql = getSql()
+
+  return sql`
+    SELECT *
+    FROM test_flakiness_history
+    WHERE organization_id = ${organizationId}
+      AND total_runs >= ${minRuns}
+      AND flaky_runs > 0
+    ORDER BY flakiness_rate DESC
+    LIMIT ${limit}
+  `
+}
+
+// ... Additional query functions follow same pattern
+        ]]></pseudocode>
+      </file>
+    </files_to_create>
+
+    <verification_steps>
+      <step order="1">Test getExecutions with valid org_id returns data</step>
+      <step order="2">Test getExecutions with wrong org_id returns empty</step>
+      <step order="3">Verify all queries include org filter</step>
+    </verification_steps>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 4: CORE MCP TOOLS
+       Dependencies: Batch 1, 2, 3
+       Estimated effort: 45 minutes
+       ============================================================ -->
+
+  <batch id="4" name="Core MCP Tools">
+    <description>Implement the primary query tools for test execution data</description>
+
+    <tools>
+      <tool name="get_executions">
+        <description>List test executions with optional filters</description>
+        <input_schema><![CDATA[
+{
+  "type": "object",
+  "properties": {
+    "limit": { "type": "number", "default": 20, "maximum": 100 },
+    "status": { "enum": ["success", "failure", "running"] },
+    "branch": { "type": "string" },
+    "suite": { "type": "string" },
+    "from": { "type": "string", "format": "date-time" },
+    "to": { "type": "string", "format": "date-time" }
+  }
+}
+        ]]></input_schema>
+      </tool>
+
+      <tool name="get_execution_details">
+        <description>Get detailed info about a specific execution including all test results</description>
+        <input_schema><![CDATA[
+{
+  "type": "object",
+  "properties": {
+    "execution_id": { "type": "number" }
+  },
+  "required": ["execution_id"]
+}
+        ]]></input_schema>
+      </tool>
+
+      <tool name="search_tests">
+        <description>Search for tests by name or file path</description>
+        <input_schema><![CDATA[
+{
+  "type": "object",
+  "properties": {
+    "query": { "type": "string", "minLength": 2 },
+    "limit": { "type": "number", "default": 20 }
+  },
+  "required": ["query"]
+}
+        ]]></input_schema>
+      </tool>
+
+      <tool name="get_test_history">
+        <description>Get execution history for a specific test</description>
+        <input_schema><![CDATA[
+{
+  "type": "object",
+  "properties": {
+    "test_signature": { "type": "string" },
+    "test_name": { "type": "string" },
+    "limit": { "type": "number", "default": 20 }
+  }
+}
+        ]]></input_schema>
+      </tool>
+    </tools>
+
+    <files_to_create>
+      <file path="mcp-server/src/server.ts">
+        <purpose>MCP Server class with tool registration</purpose>
+        <pseudocode><![CDATA[
+import { Server } from "@modelcontextprotocol/sdk/server/index.js"
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema
+} from "@modelcontextprotocol/sdk/types.js"
+import { type AuthContext } from "./auth/neon-auth.js"
+import { handleToolCall, allTools } from "./tools/index.js"
+import { resources, readResource } from "./resources/index.js"
+
+/**
+ * Create an MCP server bound to a specific user's auth context.
+ * All tool calls automatically filter by the user's organization.
+ */
+export function createMCPServer(authContext: AuthContext) {
+  const server = new Server(
+    {
+      name: "e2e-dashboard",
+      version: "2.0.0"
+    },
+    {
+      capabilities: {
+        tools: {},
+        resources: {}
+      }
+    }
+  )
+
+  // List available tools
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: allTools }
+  })
+
+  // Handle tool calls with auth context
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params
+
+    // Pass auth context to tool handler - org filtering happens there
+    return handleToolCall(name, args || {}, authContext)
+  })
+
+  // List resources
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return { resources }
+  })
+
+  // Read resources with org context
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    return readResource(request.params.uri, authContext)
+  })
+
+  return {
+    handleRequest: async (body: any) => {
+      // Handle JSON-RPC style request
+      return server.handleRequest(body)
+    },
+    handleSSEConnection: async (stream: any) => {
+      // Handle SSE streaming connection
+      // Implementation depends on MCP SDK streaming support
+    }
+  }
+}
+        ]]></pseudocode>
+      </file>
+
+      <file path="mcp-server/src/tools/index.ts">
+        <purpose>Tool registry and dispatcher</purpose>
+        <pseudocode><![CDATA[
+import { type AuthContext } from "../auth/neon-auth.js"
+import * as queries from "../db/queries.js"
+import { z } from "zod"
+
+// Tool definitions for MCP
+export const allTools = [
+  {
+    name: "get_executions",
+    description: "List test executions with optional filters. Returns workflow runs with pass/fail counts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max results (1-100)", default: 20 },
+        status: { type: "string", enum: ["success", "failure", "running"] },
+        branch: { type: "string", description: "Filter by branch name" },
+        suite: { type: "string", description: "Filter by test suite" },
+        from: { type: "string", description: "Start date (ISO 8601)" },
+        to: { type: "string", description: "End date (ISO 8601)" }
+      }
+    }
+  },
+  {
+    name: "get_execution_details",
+    description: "Get detailed info about a specific test execution including all test results and artifacts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        execution_id: { type: "number", description: "Execution ID" }
+      },
+      required: ["execution_id"]
+    }
+  },
+  {
+    name: "search_tests",
+    description: "Search for tests by name or file path. Returns aggregated stats.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", minLength: 2, description: "Search term" },
+        limit: { type: "number", default: 20 }
+      },
+      required: ["query"]
+    }
+  },
+  {
+    name: "get_test_history",
+    description: "Get execution history for a specific test across all runs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        test_signature: { type: "string", description: "Test signature (MD5 of file::name)" },
+        test_name: { type: "string", description: "Alternative: search by test name" },
+        limit: { type: "number", default: 20 }
+      }
+    }
+  }
+  // ... more tools defined in subsequent batches
+]
+
+/**
+ * Handle tool calls with automatic org scoping
+ */
+export async function handleToolCall(
+  name: string,
+  args: Record<string, unknown>,
+  authContext: AuthContext
+) {
+  const orgId = authContext.organizationId
+
+  try {
+    switch (name) {
+      case "get_executions": {
+        const input = z.object({
+          limit: z.number().min(1).max(100).default(20),
+          status: z.enum(["success", "failure", "running"]).optional(),
+          branch: z.string().optional(),
+          suite: z.string().optional(),
+          from: z.string().optional(),
+          to: z.string().optional()
+        }).parse(args)
+
+        const executions = await queries.getExecutions(
+          orgId,
+          input.limit,
+          input.status,
+          input.branch,
+          input.suite,
+          input.from,
+          input.to
+        )
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              organization: authContext.organizationSlug,
+              count: executions.length,
+              executions
+            }, null, 2)
+          }]
+        }
+      }
+
+      case "get_execution_details": {
+        const input = z.object({
+          execution_id: z.number()
+        }).parse(args)
+
+        const execution = await queries.getExecutionById(orgId, input.execution_id)
+
+        if (!execution) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({ error: "Execution not found or access denied" })
+            }],
+            isError: true
+          }
+        }
+
+        const results = await queries.getTestResultsByExecutionId(orgId, input.execution_id)
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              execution,
+              test_results: results,
+              summary: {
+                total: results.length,
+                passed: results.filter(r => r.status === "passed").length,
+                failed: results.filter(r => r.status === "failed").length
+              }
+            }, null, 2)
+          }]
+        }
+      }
+
+      case "search_tests": {
+        const input = z.object({
+          query: z.string().min(2),
+          limit: z.number().min(1).max(100).default(20)
+        }).parse(args)
+
+        const tests = await queries.searchTests(orgId, input.query, input.limit)
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              query: input.query,
+              count: tests.length,
+              tests
+            }, null, 2)
+          }]
+        }
+      }
+
+      // ... more tool handlers
+
+      default:
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({ error: `Unknown tool: ${name}` })
+          }],
+          isError: true
+        }
+    }
+  } catch (error) {
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          error: "Tool execution failed",
+          message: error instanceof Error ? error.message : String(error)
+        })
+      }],
+      isError: true
+    }
+  }
+}
+        ]]></pseudocode>
+      </file>
+    </files_to_create>
+
+    <verification_steps>
+      <step order="1">Test get_executions returns org-filtered data</step>
+      <step order="2">Test get_execution_details with valid ID</step>
+      <step order="3">Test get_execution_details with wrong org's ID returns error</step>
+      <step order="4">Test search_tests works</step>
+    </verification_steps>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 5: ANALYSIS AND METRICS TOOLS
+       Dependencies: Batch 4
+       Estimated effort: 30 minutes
+       ============================================================ -->
+
+  <batch id="5" name="Analysis and Metrics Tools">
+    <description>Add failure analysis, metrics, and trend tools</description>
+
+    <tools_to_add>
+      <tool name="get_failed_tests">Returns failed tests with AI context</tool>
+      <tool name="analyze_failure">Deep analysis of single failure</tool>
+      <tool name="get_dashboard_metrics">Pass rate, failure counts, etc.</tool>
+      <tool name="get_trends">Time-series data</tool>
+      <tool name="get_error_distribution">Error type breakdown</tool>
+    </tools_to_add>
+
+    <implementation_note>Follow same pattern as Batch 4 - all queries use authContext.organizationId</implementation_note>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 6: FLAKINESS AND ARTIFACTS
+       Dependencies: Batch 4
+       Estimated effort: 30 minutes
+       ============================================================ -->
+
+  <batch id="6" name="Flakiness and Artifacts">
+    <description>Flaky test detection and artifact URL generation</description>
+
+    <tools_to_add>
+      <tool name="get_flaky_tests">List flaky tests with stats</tool>
+      <tool name="get_flakiness_summary">Overall flakiness metrics</tool>
+      <tool name="list_artifacts">List artifacts for a test result</tool>
+      <tool name="get_artifact_url">Generate signed R2 URL</tool>
+    </tools_to_add>
+
+    <artifact_security_note>
+      Verify artifact belongs to user's org before generating signed URL:
+      JOIN through test_result -> execution -> organization_id
+    </artifact_security_note>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 7: DASHBOARD MCP SETTINGS PAGE
+       Dependencies: All previous batches
+       Estimated effort: 45 minutes
+       ============================================================ -->
+
+  <batch id="7" name="Dashboard MCP Settings Page">
+    <description>Create UI in dashboard for users to get their MCP configuration</description>
+
+    <files_to_create>
+      <file path="app/settings/mcp/page.tsx">
+        <purpose>MCP integration settings page</purpose>
+        <pseudocode><![CDATA[
+"use client"
+
+import { useState, useEffect } from "react"
+import { useNeonAuthUI } from "@neondatabase/auth/react/ui"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Copy, Check, RefreshCw, ExternalLink } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+
+export default function MCPSettingsPage() {
+  const { session, getAccessToken } = useNeonAuthUI()
+  const [token, setToken] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
+
+  const MCP_SERVER_URL = process.env.NEXT_PUBLIC_MCP_SERVER_URL || "https://e2e-dashboard-mcp.vercel.app"
+
+  useEffect(() => {
+    async function fetchToken() {
+      if (session) {
+        const accessToken = await getAccessToken()
+        setToken(accessToken)
+      }
+    }
+    fetchToken()
+  }, [session])
+
+  const config = {
+    mcpServers: {
+      "e2e-dashboard": {
+        url: `${MCP_SERVER_URL}/mcp`,
+        transport: "sse",
+        headers: {
+          Authorization: `Bearer ${token || "<your-token>"}`
+        }
+      }
+    }
+  }
+
+  const configString = JSON.stringify(config, null, 2)
+
+  async function copyConfig() {
+    await navigator.clipboard.writeText(configString)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function testConnection() {
+    setTesting(true)
+    setTestResult(null)
+
+    try {
+      const res = await fetch(`${MCP_SERVER_URL}/health`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      setTestResult(res.ok ? "success" : "error")
+    } catch {
+      setTestResult("error")
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  return (
+    <div className="container mx-auto py-8 max-w-3xl">
+      <h1 className="text-2xl font-bold mb-2">MCP Integration</h1>
+      <p className="text-muted-foreground mb-6">
+        Connect Claude Code to access your test data directly
+      </p>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Your Configuration</CardTitle>
+          <CardDescription>
+            Add this to your ~/.claude.json or project .claude.json file
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="relative">
+            <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+              {configString}
+            </pre>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="absolute top-2 right-2"
+              onClick={copyConfig}
+            >
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+
+          <div className="mt-4 flex gap-4">
+            <Button onClick={testConnection} disabled={testing}>
+              {testing ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Test Connection
+            </Button>
+
+            {testResult === "success" && (
+              <Alert className="flex-1 border-green-500 bg-green-50">
+                <AlertDescription className="text-green-700">
+                  Connection successful! MCP server is reachable.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {testResult === "error" && (
+              <Alert className="flex-1 border-red-500 bg-red-50">
+                <AlertDescription className="text-red-700">
+                  Connection failed. Check your network and try again.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Available Tools</CardTitle>
+          <CardDescription>
+            These tools will be available in Claude Code after setup
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <ToolItem
+              name="get_executions"
+              description="List test executions with filters"
+            />
+            <ToolItem
+              name="get_execution_details"
+              description="Get detailed test results for an execution"
+            />
+            <ToolItem
+              name="search_tests"
+              description="Search tests by name or file"
+            />
+            <ToolItem
+              name="get_failed_tests"
+              description="List failed tests with AI context"
+            />
+            <ToolItem
+              name="analyze_failure"
+              description="Deep analysis of a test failure"
+            />
+            <ToolItem
+              name="get_dashboard_metrics"
+              description="Pass rate, failure counts, trends"
+            />
+            <ToolItem
+              name="get_flaky_tests"
+              description="Identify flaky tests"
+            />
+            <ToolItem
+              name="get_artifact_url"
+              description="Get signed URL for test artifacts"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Setup Guide</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Step number={1} title="Copy Configuration">
+            Click the copy button above to copy your MCP configuration
+          </Step>
+          <Step number={2} title="Add to Claude Code">
+            Open or create ~/.claude.json and paste the configuration
+          </Step>
+          <Step number={3} title="Restart Claude Code">
+            Restart Claude Code to load the new MCP server
+          </Step>
+          <Step number={4} title="Start Using">
+            Ask Claude to "get recent test failures" or "search for login tests"
+          </Step>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ToolItem({ name, description }: { name: string; description: string }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+      <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded">
+        {name}
+      </code>
+      <span className="text-sm text-muted-foreground">{description}</span>
+    </div>
+  )
+}
+
+function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+        {number}
+      </div>
+      <div>
+        <h4 className="font-medium">{title}</h4>
+        <p className="text-sm text-muted-foreground">{children}</p>
+      </div>
+    </div>
+  )
+}
+        ]]></pseudocode>
+      </file>
+    </files_to_create>
+
+    <navigation_update>
+      Add "MCP Integration" link to settings navigation
+    </navigation_update>
+
+    <verification_steps>
+      <step order="1">Access /settings/mcp as logged-in user</step>
+      <step order="2">Verify config shows user's token</step>
+      <step order="3">Test "Test Connection" button</step>
+      <step order="4">Copy config and verify it's valid JSON</step>
+    </verification_steps>
+  </batch>
+
+  <!-- ============================================================
+       BATCH 8: DEPLOYMENT AND DOCUMENTATION
+       Dependencies: All previous batches
+       Estimated effort: 30 minutes
+       ============================================================ -->
+
+  <batch id="8" name="Deployment and Documentation">
+    <description>Deploy MCP server to Vercel and create user documentation</description>
+
+    <deployment_steps>
+      <step>1. Create new Vercel project for mcp-server</step>
+      <step>2. Configure environment variables:
+        - DATABASE_URL
+        - NEON_AUTH_JWKS_URL
+        - R2_* variables (optional, for artifacts)
+      </step>
+      <step>3. Deploy and note the URL</step>
+      <step>4. Update NEXT_PUBLIC_MCP_SERVER_URL in dashboard</step>
+    </deployment_steps>
+
+    <files_to_create>
+      <file path="mcp-server/README.md">
+        <purpose>MCP server documentation</purpose>
+        <content_spec><![CDATA[
+# E2E Dashboard MCP Server
+
+Hosted MCP server with Neon Auth authentication for the E2E Test Dashboard.
+
+## Features
+- Per-organization data isolation
+- Neon Auth token validation
+- 12 tools for test data access
+- R2 artifact URL signing
+
+## Setup for Users
+
+1. Log into the E2E Dashboard
+2. Go to Settings > MCP Integration
+3. Copy your configuration
+4. Add to ~/.claude.json
+5. Restart Claude Code
+
+## Available Tools
+- get_executions, get_execution_details
+- search_tests, get_test_history
+- get_failed_tests, analyze_failure
+- get_dashboard_metrics, get_trends
+- get_flaky_tests, get_flakiness_summary
+- list_artifacts, get_artifact_url
+
+## Environment Variables
+- DATABASE_URL - Neon PostgreSQL connection
+- NEON_AUTH_JWKS_URL - Neon Auth JWKS endpoint
+- R2_* - Cloudflare R2 credentials (optional)
+        ]]></content_spec>
+      </file>
+    </files_to_create>
+
+    <resources_to_implement>
+      <resource uri="e2e-dashboard://schema">Database schema documentation</resource>
+      <resource uri="e2e-dashboard://branches">Available branches</resource>
+      <resource uri="e2e-dashboard://suites">Available test suites</resource>
+    </resources_to_implement>
+  </batch>
+
+  <!-- ============================================================
+       QUICK REFERENCE
+       ============================================================ -->
+
+  <quick_reference>
+    <all_tools>
+      <group name="Query">
+        <tool>get_executions</tool>
+        <tool>get_execution_details</tool>
+        <tool>search_tests</tool>
+        <tool>get_test_history</tool>
+      </group>
+      <group name="Analysis">
+        <tool>get_failed_tests</tool>
+        <tool>analyze_failure</tool>
+        <tool>get_error_distribution</tool>
+      </group>
+      <group name="Metrics">
+        <tool>get_dashboard_metrics</tool>
+        <tool>get_trends</tool>
+      </group>
+      <group name="Flakiness">
+        <tool>get_flaky_tests</tool>
+        <tool>get_flakiness_summary</tool>
+      </group>
+      <group name="Artifacts">
+        <tool>list_artifacts</tool>
+        <tool>get_artifact_url</tool>
+      </group>
+    </all_tools>
+
+    <environment_variables>
+      <required>
+        <var>DATABASE_URL</var>
+        <var>NEON_AUTH_JWKS_URL</var>
+      </required>
+      <optional>
+        <var>R2_ACCOUNT_ID</var>
+        <var>R2_ACCESS_KEY_ID</var>
+        <var>R2_SECRET_ACCESS_KEY</var>
+        <var>R2_BUCKET_NAME</var>
+      </optional>
+    </environment_variables>
+
+    <user_config_template><![CDATA[
+{
+  "mcpServers": {
+    "e2e-dashboard": {
+      "url": "https://e2e-dashboard-mcp.vercel.app/mcp",
+      "transport": "sse",
+      "headers": {
+        "Authorization": "Bearer <your-neon-auth-token>"
+      }
+    }
+  }
+}
+    ]]></user_config_template>
+
+    <execution_order>
+      <step>0. Complete MULTITENANCY_IMPLEMENTATION.xml first!</step>
+      <step>1. HTTP/SSE Transport Setup</step>
+      <step>2. Neon Auth Token Validation</step>
+      <step>3. Org-Filtered Database Queries</step>
+      <step>4. Core MCP Tools</step>
+      <step>5. Analysis and Metrics Tools</step>
+      <step>6. Flakiness and Artifacts</step>
+      <step>7. Dashboard MCP Settings Page</step>
+      <step>8. Deployment and Documentation</step>
+    </execution_order>
+  </quick_reference>
+
+</mcp_implementation_plan>

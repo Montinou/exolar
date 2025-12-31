@@ -15,7 +15,7 @@ The dashboard already has:
 - ✅ Executions table with status filtering
 - ✅ Branch filtering
 - ✅ Test detail modal with artifact downloads
-- ✅ Stack Auth integration
+- ✅ neon auth integration
 
 ---
 

@@ -27,7 +27,7 @@
       <storage>Cloudflare R2 for test artifacts</storage>
       <ui>shadcn/ui (new-york style) with TailwindCSS v4</ui>
       <charts>Recharts</charts>
-      <auth>Stack Auth (@stackframe/stack)</auth>
+      <auth>neon auth (@stackframe/stack)</auth>
     </technology_stack>
 
     <current_state>
@@ -36,7 +36,7 @@
       <feature status="complete">Executions table with status filtering</feature>
       <feature status="complete">Branch filtering</feature>
       <feature status="complete">Test detail modal with artifact downloads</feature>
-      <feature status="complete">Stack Auth integration</feature>
+      <feature status="complete">neon auth integration</feature>
     </current_state>
 
     <key_directories>

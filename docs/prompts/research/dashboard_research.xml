@@ -36,7 +36,7 @@
     <technology>Cloudflare R2 for artifacts (videos, traces, screenshots)</technology>
     <technology>shadcn/ui with TailwindCSS v4</technology>
     <technology>Recharts for visualizations</technology>
-    <technology>Stack Auth for authentication</technology>
+    <technology>neon auth for authentication</technology>
   </current_stack>
 
   <existing_currents_research>

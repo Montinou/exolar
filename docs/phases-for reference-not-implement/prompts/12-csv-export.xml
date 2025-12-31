@@ -14,7 +14,7 @@
       <framework>Next.js 16 App Router</framework>
       <database>Neon PostgreSQL via @neondatabase/serverless</database>
       <ui>shadcn/ui + TailwindCSS v4</ui>
-      <auth>Stack Auth (@stackframe/stack)</auth>
+      <auth>neon auth (@stackframe/stack)</auth>
     </project_stack>
     <prerequisites>
       <item>Basic dashboard implementation complete</item>
