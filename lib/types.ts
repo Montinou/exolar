@@ -12,6 +12,47 @@ export interface LogEntry {
   message: string
 }
 
+/**
+ * AI failure context for LLM-powered troubleshooting
+ * Captures structured failure data for AI analysis
+ */
+export interface AIFailureContext {
+  test_id: string
+  timestamp: string
+  file: string
+  suite: string[]
+  test: string
+  error: {
+    message: string
+    type: string
+    location: string
+  }
+  steps: string[]
+  last_step: string
+  duration_ms: number
+  retries: number
+  last_api?: {
+    method: string
+    url: string
+    status: number
+    operation?: string
+  }
+  page_url?: string
+  browser?: string
+  logs?: Array<{
+    timestamp: number
+    level: string
+    source: string
+    message: string
+    data?: Record<string, unknown>
+  }>
+  execution?: {
+    run_id: string
+    branch: string
+    commit_sha: string
+  }
+}
+
 // ============================================
 // Database Entity Types (Read)
 // ============================================
@@ -51,6 +92,7 @@ export interface TestResult {
   browser: string
   retry_count: number
   logs: LogEntry[] | null
+  ai_context?: AIFailureContext | null
   started_at: string
   completed_at: string | null
   created_at: string
@@ -163,6 +205,7 @@ export interface TestResultRequest {
   started_at?: string
   completed_at?: string
   logs?: LogEntry[]
+  ai_context?: AIFailureContext
 }
 
 /**

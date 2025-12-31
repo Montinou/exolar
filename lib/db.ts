@@ -464,6 +464,7 @@ export async function insertTestResults(
         browser,
         retry_count,
         logs,
+        ai_context,
         started_at,
         completed_at
       ) VALUES (
@@ -480,6 +481,7 @@ export async function insertTestResults(
         ${result.browser ?? "chromium"},
         ${retryCount},
         ${result.logs ? JSON.stringify(result.logs) : null},
+        ${result.ai_context ? JSON.stringify(result.ai_context) : null},
         ${result.started_at || new Date().toISOString()},
         ${result.completed_at || null}
       )
@@ -650,6 +652,106 @@ export async function getTestStatistics(signature: string): Promise<TestStatisti
     flaky_rate: Number(result[0].flaky_rate) || 0,
     last_failure: result[0].last_failure,
   }
+}
+
+// ============================================
+// AI Context Analysis Functions
+// ============================================
+
+/**
+ * Get failed tests with AI context for analysis
+ * Supports filtering by error type, test file, or date range
+ */
+export async function getFailuresWithAIContext(
+  options: {
+    errorType?: string
+    testFile?: string
+    limit?: number
+    since?: string
+  } = {}
+): Promise<TestResult[]> {
+  const sql = getSql()
+  const { errorType, testFile, limit = 50, since } = options
+
+  const conditions = [
+    "ai_context IS NOT NULL",
+    "status IN ('failed', 'timedout')",
+  ]
+  const params: (string | number)[] = []
+  let paramIndex = 1
+
+  if (errorType) {
+    conditions.push(`ai_context->'error'->>'type' = $${paramIndex}`)
+    params.push(errorType)
+    paramIndex++
+  }
+
+  if (testFile) {
+    conditions.push(`test_file ILIKE $${paramIndex}`)
+    params.push(`%${testFile}%`)
+    paramIndex++
+  }
+
+  if (since) {
+    conditions.push(`created_at >= $${paramIndex}`)
+    params.push(since)
+    paramIndex++
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  // Build query with dynamic conditions
+  const query = `
+    SELECT
+      id, execution_id, test_name, test_file, test_signature,
+      status, duration_ms, is_critical, error_message, stack_trace,
+      browser, retry_count, ai_context, created_at
+    FROM test_results
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT $${paramIndex}
+  `
+
+  params.push(limit)
+
+  const result = await sql.unsafe(query, params)
+  return result as TestResult[]
+}
+
+/**
+ * Get error type distribution for dashboard analytics
+ * Returns count of failures grouped by error type from ai_context
+ */
+export async function getErrorTypeDistribution(
+  since?: string
+): Promise<Array<{ error_type: string; count: number }>> {
+  const sql = getSql()
+
+  const conditions = [
+    "ai_context IS NOT NULL",
+    "status IN ('failed', 'timedout')",
+  ]
+  const params: string[] = []
+
+  if (since) {
+    conditions.push("created_at >= $1")
+    params.push(since)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  const query = `
+    SELECT
+      ai_context->'error'->>'type' as error_type,
+      COUNT(*) as count
+    FROM test_results
+    ${whereClause}
+    GROUP BY ai_context->'error'->>'type'
+    ORDER BY count DESC
+  `
+
+  const result = params.length > 0 ? await sql.unsafe(query, params) : await sql.unsafe(query)
+  return result as Array<{ error_type: string; count: number }>
 }
 
 // ============================================

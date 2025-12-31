@@ -13,6 +13,60 @@ export const logEntrySchema = z.object({
   message: z.string(),
 })
 
+// ============================================
+// AI Context Validation Schemas
+// ============================================
+
+// AI Context error schema
+const aiContextErrorSchema = z.object({
+  message: z.string(),
+  type: z.string(),
+  location: z.string(),
+})
+
+// AI Context last API call schema
+const aiContextApiSchema = z.object({
+  method: z.string(),
+  url: z.string(),
+  status: z.number(),
+  operation: z.string().optional(),
+}).optional()
+
+// AI Context log entry schema (more permissive than main log schema)
+const aiContextLogSchema = z.object({
+  timestamp: z.number(),
+  level: z.string(),
+  source: z.string(),
+  message: z.string(),
+  data: z.record(z.unknown()).optional(),
+})
+
+// AI Context execution schema
+const aiContextExecutionSchema = z.object({
+  run_id: z.string(),
+  branch: z.string(),
+  commit_sha: z.string(),
+}).optional()
+
+// Complete AI Context schema (optional at top level since only failed tests have it)
+export const aiContextSchema = z.object({
+  test_id: z.string(),
+  timestamp: z.string(),
+  file: z.string(),
+  suite: z.array(z.string()),
+  test: z.string(),
+  error: aiContextErrorSchema,
+  steps: z.array(z.string()),
+  last_step: z.string(),
+  duration_ms: z.number(),
+  retries: z.number(),
+  last_api: aiContextApiSchema,
+  page_url: z.string().optional(),
+  browser: z.string().optional(),
+  logs: z.array(aiContextLogSchema).optional(),
+  execution: aiContextExecutionSchema,
+}).optional()
+
 // Execution request schema
 export const executionSchema = z.object({
   run_id: z.string().min(1, "run_id is required"),
@@ -46,6 +100,7 @@ export const testResultSchema = z.object({
   started_at: z.string().datetime().optional(),
   completed_at: z.string().datetime().optional(),
   logs: z.array(logEntrySchema).optional(),
+  ai_context: aiContextSchema,
 })
 
 // Artifact request schema - accepts base64 data for upload
