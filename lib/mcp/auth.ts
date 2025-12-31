@@ -1,14 +1,13 @@
 /**
- * Neon Auth Token Validation for MCP Server
+ * MCP Auth - Token Validation for MCP Server
  *
- * Validates JWT tokens issued by Neon Auth and extracts user/org context.
- * Uses JWKS for signature verification.
+ * Validates JWT tokens from Neon Auth and extracts user/org context.
  */
 
 import * as jose from "jose"
-import { getSql } from "../db/connection.js"
+import { getSql } from "@/lib/db"
 
-export interface AuthContext {
+export interface MCPAuthContext {
   userId: number
   email: string
   organizationId: number
@@ -17,7 +16,7 @@ export interface AuthContext {
   userRole: "admin" | "viewer"
 }
 
-// Neon Auth JWKS endpoint - get from Neon dashboard
+// Neon Auth JWKS endpoint
 const NEON_AUTH_JWKS_URL =
   process.env.NEON_AUTH_JWKS_URL || "https://auth.neon.tech/.well-known/jwks.json"
 
@@ -31,23 +30,34 @@ async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
 }
 
 /**
- * Validate Neon Auth token and return user/org context.
- * Returns null if token is invalid or user not found.
+ * Validate a Neon Auth token from the Authorization header.
+ * Returns the auth context or null if invalid.
  */
-export async function validateNeonAuthToken(token: string): Promise<AuthContext | null> {
+export async function validateMCPToken(
+  authHeader: string | null
+): Promise<MCPAuthContext | null> {
+  if (!authHeader?.startsWith("Bearer ")) {
+    return null
+  }
+
+  const token = authHeader.slice(7)
+  if (!token) {
+    return null
+  }
+
   try {
-    // 1. Verify JWT signature with Neon's JWKS
+    // Verify JWT signature with Neon's JWKS
     const keySet = await getJWKS()
     const { payload } = await jose.jwtVerify(token, keySet)
 
-    // 2. Extract email from token
+    // Extract email from token
     const email = payload.email as string
     if (!email) {
-      console.error("[neon-auth] Token missing email claim")
+      console.error("[mcp-auth] Token missing email claim")
       return null
     }
 
-    // 3. Look up user and org membership in our database
+    // Look up user and org membership in database
     const sql = getSql()
 
     const result = await sql`
@@ -66,14 +76,14 @@ export async function validateNeonAuthToken(token: string): Promise<AuthContext 
     `
 
     if (!result || result.length === 0) {
-      console.error(`[neon-auth] User not found for email: ${email}`)
+      console.error(`[mcp-auth] User not found for email: ${email}`)
       return null
     }
 
     const userInfo = result[0]
 
     if (!userInfo.organization_id) {
-      console.error(`[neon-auth] User ${email} has no organization assigned`)
+      console.error(`[mcp-auth] User ${email} has no organization assigned`)
       return null
     }
 
@@ -86,23 +96,7 @@ export async function validateNeonAuthToken(token: string): Promise<AuthContext 
       userRole: userInfo.user_role as "admin" | "viewer",
     }
   } catch (error) {
-    console.error("[neon-auth] Token validation failed:", error)
+    console.error("[mcp-auth] Token validation failed:", error)
     return null
   }
-}
-
-/**
- * Validate token and require org admin access.
- * Returns null if not authorized.
- */
-export async function requireOrgAdmin(token: string): Promise<AuthContext | null> {
-  const context = await validateNeonAuthToken(token)
-  if (!context) return null
-
-  if (context.orgRole !== "owner" && context.orgRole !== "admin") {
-    console.error(`[neon-auth] User ${context.email} is not an org admin`)
-    return null
-  }
-
-  return context
 }

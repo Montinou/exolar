@@ -17,15 +17,23 @@ export default function MCPSettingsPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
 
-  const MCP_SERVER_URL =
-    process.env.NEXT_PUBLIC_MCP_SERVER_URL || "https://e2e-dashboard-mcp.vercel.app"
+  // MCP endpoint is now on the same domain
+  const MCP_ENDPOINT = "/api/mcp"
 
-  // Note: The token should be copied from the dashboard after authentication
+  // For Claude Code config, we need the full URL
+  // Users will get this from window.location when copying
+  const getFullUrl = () => {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}${MCP_ENDPOINT}`
+    }
+    return `https://your-domain.vercel.app${MCP_ENDPOINT}`
+  }
+
   // Users will need to replace <your-token> with their actual Neon Auth token
   const config = {
     mcpServers: {
       "e2e-dashboard": {
-        url: `${MCP_SERVER_URL}/mcp`,
+        url: getFullUrl(),
         transport: "sse",
         headers: {
           Authorization: "Bearer <your-token>",
@@ -47,7 +55,7 @@ export default function MCPSettingsPage() {
     setTestResult(null)
 
     try {
-      const res = await fetch(`${MCP_SERVER_URL}/health`)
+      const res = await fetch(MCP_ENDPOINT)
       setTestResult(res.ok ? "success" : "error")
     } catch {
       setTestResult("error")
