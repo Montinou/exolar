@@ -14,6 +14,8 @@ import type {
   TestStatistics,
   TestFlakinessHistory,
   FlakinessSummary,
+  BranchGroup,
+  SuiteResult,
 } from "./types"
 
 function getSql() {
@@ -253,6 +255,121 @@ export async function getSuites() {
     ORDER BY suite ASC
   `
   return result.map((r) => r.suite) as string[]
+}
+
+// ============================================
+// Branch Accordion View Functions
+// ============================================
+
+/**
+ * Group executions by branch for the accordion view
+ * Returns branches sorted by most recent activity
+ * Each branch includes unique commit messages (max 3) and suite results (last 3 runs per suite)
+ */
+export async function getExecutionsGroupedByBranch(
+  dateRange?: DateRangeFilter,
+  maxRunsPerSuite: number = 3
+): Promise<BranchGroup[]> {
+  const sql = getSql()
+  const conditions = []
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  } else {
+    conditions.push(`started_at > NOW() - INTERVAL '7 days'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
+
+  // Get all executions within the date range
+  const executions = await sql`
+    SELECT id, branch, suite, status, commit_message, started_at
+    FROM test_executions
+    ${sql.unsafe(whereClause)}
+    ORDER BY started_at DESC
+  `
+
+  // Group by branch
+  const branchMap = new Map<string, {
+    commitMessages: Set<string>
+    lastActivity: string
+    suiteMap: Map<string, Array<{ executionId: number; status: string; startedAt: string }>>
+  }>()
+
+  for (const exec of executions) {
+    const branch = exec.branch as string
+    const suite = (exec.suite as string) || "default"
+    const commitMessage = exec.commit_message as string | null
+    const status = exec.status as string
+    const startedAt = exec.started_at as string
+    const executionId = exec.id as number
+
+    if (!branchMap.has(branch)) {
+      branchMap.set(branch, {
+        commitMessages: new Set(),
+        lastActivity: startedAt,
+        suiteMap: new Map(),
+      })
+    }
+
+    const branchData = branchMap.get(branch)!
+
+    // Add commit message (filter out merge commits, max 3 unique)
+    if (commitMessage && !commitMessage.startsWith("Merge") && branchData.commitMessages.size < 3) {
+      branchData.commitMessages.add(commitMessage)
+    }
+
+    // Add suite result
+    if (!branchData.suiteMap.has(suite)) {
+      branchData.suiteMap.set(suite, [])
+    }
+
+    const suiteResults = branchData.suiteMap.get(suite)!
+    if (suiteResults.length < maxRunsPerSuite) {
+      suiteResults.push({
+        executionId,
+        status,
+        startedAt,
+      })
+    }
+  }
+
+  // Convert to BranchGroup array
+  const result: BranchGroup[] = []
+
+  for (const [branch, data] of branchMap) {
+    const suiteResults: SuiteResult[] = []
+
+    for (const [suite, results] of data.suiteMap) {
+      suiteResults.push({
+        suite,
+        results: results.map((r) => ({
+          executionId: r.executionId,
+          status: r.status as "success" | "failure" | "running",
+          startedAt: r.startedAt,
+        })),
+      })
+    }
+
+    // Sort suites alphabetically
+    suiteResults.sort((a, b) => a.suite.localeCompare(b.suite))
+
+    result.push({
+      branch,
+      commitMessages: Array.from(data.commitMessages),
+      lastActivity: data.lastActivity,
+      suiteResults,
+    })
+  }
+
+  // Sort by last activity (most recent first)
+  result.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
+
+  return result
 }
 
 // ============================================

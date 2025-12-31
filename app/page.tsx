@@ -3,6 +3,7 @@ import {
   getDashboardMetrics,
   getTrendData,
   getExecutions,
+  getExecutionsGroupedByBranch,
   getBranches,
   getSuites,
   type DateRangeFilter,
@@ -10,7 +11,7 @@ import {
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TrendChart } from "@/components/dashboard/trend-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
-import { ExecutionsTable } from "@/components/dashboard/executions-table"
+import { ExecutionsView } from "@/components/dashboard/executions-view"
 import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { AdminLink } from "@/components/dashboard/admin-link"
@@ -29,10 +30,11 @@ async function DashboardContent({
   const dateRange: DateRangeFilter | undefined =
     params.from || params.to ? { from: params.from, to: params.to } : undefined
 
-  const [metrics, trends, executions, branches, suites] = await Promise.all([
+  const [metrics, trends, executions, branchGroups, branches, suites] = await Promise.all([
     getDashboardMetrics(dateRange),
     getTrendData(7, dateRange),
     getExecutions(50, params.status, params.branch, dateRange, params.suite),
+    getExecutionsGroupedByBranch(dateRange),
     getBranches(),
     getSuites(),
   ])
@@ -52,7 +54,7 @@ async function DashboardContent({
         </div>
         <div className="space-y-4">
           <Filters branches={branches} suites={suites} />
-          <ExecutionsTable executions={executions} />
+          <ExecutionsView executions={executions} branchGroups={branchGroups} />
         </div>
       </div>
     </>

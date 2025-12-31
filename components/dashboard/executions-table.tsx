@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ChevronRight, GitBranch, GitCommit, TestTube } from "lucide-react"
@@ -76,7 +75,11 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                   </TableRow>
                 ) : (
                   executions.map((execution) => (
-                    <TableRow key={execution.id} className="cursor-pointer hover:bg-muted/50">
+                    <TableRow
+                      key={execution.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedExecutionId(execution.id)}
+                    >
                       <TableCell className="font-mono text-xs">
                         <div className="flex items-center gap-2">
                           <GitCommit className="h-3 w-3 text-muted-foreground" />
@@ -131,9 +134,7 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                         {formatDate(execution.started_at)}
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedExecutionId(execution.id)}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </TableCell>
                     </TableRow>
                   ))

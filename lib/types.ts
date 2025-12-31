@@ -97,6 +97,32 @@ export interface FailureTrendData {
 }
 
 // ============================================
+// Branch Accordion View Types
+// ============================================
+
+/**
+ * Suite execution result for accordion view
+ */
+export interface SuiteResult {
+  suite: string
+  results: Array<{
+    executionId: number
+    status: "success" | "failure" | "running"
+    startedAt: string
+  }>
+}
+
+/**
+ * Branch group for accordion view
+ */
+export interface BranchGroup {
+  branch: string
+  commitMessages: string[]
+  lastActivity: string
+  suiteResults: SuiteResult[]
+}
+
+// ============================================
 // Request Types for POST /api/test-results
 // ============================================
 
