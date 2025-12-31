@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server"
-import { getTrendData, getFailureTrendData, type DateRangeFilter } from "@/lib/db"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   try {
+    const context = await getSessionContext()
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const db = getQueriesForOrg(context.organizationId)
+
     const { searchParams } = new URL(request.url)
     const days = Number(searchParams.get("days")) || 7
     const fromDate = searchParams.get("from") || undefined
@@ -15,11 +23,11 @@ export async function GET(request: Request) {
       fromDate || toDate ? { from: fromDate, to: toDate } : undefined
 
     if (type === "failures") {
-      const failureTrends = await getFailureTrendData(days, dateRange)
+      const failureTrends = await db.getFailureTrendData(days, dateRange)
       return NextResponse.json(failureTrends)
     }
 
-    const trends = await getTrendData(days, dateRange)
+    const trends = await db.getTrendData(days, dateRange)
     return NextResponse.json(trends)
   } catch (error) {
     console.error("[v0] Error fetching trends:", error)

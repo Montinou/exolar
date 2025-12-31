@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server"
-import { getExecutionById, getTestResultsByExecutionId } from "@/lib/db"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const context = await getSessionContext()
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const db = getQueriesForOrg(context.organizationId)
+
     const { id } = await params
     const executionId = Number(id)
 
@@ -13,8 +21,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const [execution, testResults] = await Promise.all([
-      getExecutionById(executionId),
-      getTestResultsByExecutionId(executionId),
+      db.getExecutionById(executionId),
+      db.getTestResultsByExecutionId(executionId),
     ])
 
     if (!execution) {

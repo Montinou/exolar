@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server"
 import { validateApiKey } from "@/lib/auth"
 import { validateIngestRequest } from "@/lib/validation"
-import { insertExecution, insertTestResults, insertArtifacts, generateTestSignature } from "@/lib/db"
+import { getQueriesForOrg, insertArtifacts, generateTestSignature } from "@/lib/db"
 import { uploadToR2, generateArtifactKey, isR2Configured } from "@/lib/r2"
 import type { IngestResponse, ArtifactRequest } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
+
+// Attorneyshare org ID (interim solution until Batch 5 adds org-aware API keys)
+const DEFAULT_ORG_ID = 1
 
 /**
  * Get MIME type based on artifact type and filename
@@ -95,11 +98,14 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
   const { execution, results, artifacts } = validation.data
 
   try {
+    // Use org-bound queries (interim: Attorneyshare org until Batch 5)
+    const db = getQueriesForOrg(DEFAULT_ORG_ID)
+
     // 4. Insert execution record
-    const executionId = await insertExecution(execution)
+    const executionId = await db.insertExecution(execution)
 
     // 5. Insert test results
-    const signatureToIdMap = await insertTestResults(executionId, results)
+    const signatureToIdMap = await db.insertTestResults(executionId, results)
 
     // 6. Upload artifacts to R2 and insert records (if any)
     let artifactsCount = 0

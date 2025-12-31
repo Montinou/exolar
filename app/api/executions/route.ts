@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server"
-import { getExecutions, getBranches, getSuites, type DateRangeFilter } from "@/lib/db"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request) {
   try {
+    const context = await getSessionContext()
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const db = getQueriesForOrg(context.organizationId)
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status") || undefined
     const branch = searchParams.get("branch") || undefined
@@ -17,9 +25,9 @@ export async function GET(request: Request) {
       fromDate || toDate ? { from: fromDate, to: toDate } : undefined
 
     const [executions, branches, suites] = await Promise.all([
-      getExecutions(limit, status, branch, dateRange, suite),
-      getBranches(),
-      getSuites(),
+      db.getExecutions(limit, status, branch, dateRange, suite),
+      db.getBranches(),
+      db.getSuites(),
     ])
 
     return NextResponse.json({ executions, branches, suites })

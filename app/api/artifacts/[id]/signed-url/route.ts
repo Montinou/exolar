@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server"
-import { neon } from "@neondatabase/serverless"
+import { getSessionContext } from "@/lib/session-context"
+import { getSql } from "@/lib/db"
 import { getSignedR2Url, isR2Configured } from "@/lib/r2"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const sql = neon(process.env.DATABASE_URL!)
+    const context = await getSessionContext()
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const sql = getSql()
 
     const { id } = await params
     const artifactId = Number(id)
@@ -26,7 +32,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       )
     }
 
-    const result = await sql`SELECT * FROM test_artifacts WHERE id = ${artifactId}`
+    // Verify artifact belongs to user's organization via JOIN to test_executions
+    const result = await sql`
+      SELECT ta.*
+      FROM test_artifacts ta
+      JOIN test_results tr ON ta.test_result_id = tr.id
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE ta.id = ${artifactId}
+        AND te.organization_id = ${context.organizationId}
+    `
 
     if (result.length === 0) {
       return NextResponse.json({ error: "Artifact not found" }, { status: 404 })

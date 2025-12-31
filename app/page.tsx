@@ -1,13 +1,7 @@
 import { Suspense } from "react"
-import {
-  getDashboardMetrics,
-  getTrendData,
-  getExecutions,
-  getExecutionsGroupedByBranch,
-  getBranches,
-  getSuites,
-  type DateRangeFilter,
-} from "@/lib/db"
+import { redirect } from "next/navigation"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TrendChart } from "@/components/dashboard/trend-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
@@ -25,18 +19,24 @@ async function DashboardContent({
 }: {
   searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string }>
 }) {
+  const context = await getSessionContext()
+  if (!context) {
+    redirect("/auth/signin")
+  }
+
+  const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
 
   const dateRange: DateRangeFilter | undefined =
     params.from || params.to ? { from: params.from, to: params.to } : undefined
 
   const [metrics, trends, executions, branchGroups, branches, suites] = await Promise.all([
-    getDashboardMetrics(dateRange),
-    getTrendData(7, dateRange),
-    getExecutions(50, params.status, params.branch, dateRange, params.suite),
-    getExecutionsGroupedByBranch(dateRange),
-    getBranches(),
-    getSuites(),
+    db.getDashboardMetrics(dateRange),
+    db.getTrendData(7, dateRange),
+    db.getExecutions(50, params.status, params.branch, dateRange, params.suite),
+    db.getExecutionsGroupedByBranch(dateRange),
+    db.getBranches(),
+    db.getSuites(),
   ])
 
   return (

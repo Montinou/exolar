@@ -1,5 +1,6 @@
-import { getTestHistory, getTestStatistics } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
@@ -8,13 +9,20 @@ export async function GET(
   { params }: { params: Promise<{ signature: string }> }
 ) {
   try {
+    const context = await getSessionContext()
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const db = getQueriesForOrg(context.organizationId)
+
     const { signature } = await params
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100)
 
     const [history, statistics] = await Promise.all([
-      getTestHistory(signature, limit),
-      getTestStatistics(signature),
+      db.getTestHistory(signature, limit),
+      db.getTestStatistics(signature),
     ])
 
     if (history.length === 0) {
