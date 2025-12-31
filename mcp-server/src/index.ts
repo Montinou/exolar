@@ -8,16 +8,11 @@
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { streamSSE } from "hono/streaming"
+import { validateNeonAuthToken, type AuthContext } from "./auth/neon-auth.js"
+import { authMiddleware } from "./auth/middleware.js"
 
-// Types for auth context (full implementation in Batch 2)
-export interface AuthContext {
-  userId: number
-  email: string
-  organizationId: number
-  organizationSlug: string
-  orgRole: "owner" | "admin" | "viewer"
-  userRole: "admin" | "viewer"
-}
+// Re-export AuthContext type for external use
+export type { AuthContext }
 
 const app = new Hono()
 
@@ -31,7 +26,7 @@ app.use(
   })
 )
 
-// Health check endpoint
+// Health check endpoint (no auth required)
 app.get("/health", (c) => {
   return c.json({
     status: "healthy",
@@ -41,50 +36,34 @@ app.get("/health", (c) => {
   })
 })
 
+// Apply auth middleware to MCP routes
+app.use("/mcp/*", authMiddleware)
+app.use("/mcp", authMiddleware)
+
 // MCP endpoint with SSE transport (POST for requests)
 app.post("/mcp", async (c) => {
-  // 1. Validate Authorization header
-  const authHeader = c.req.header("Authorization")
-  if (!authHeader?.startsWith("Bearer ")) {
-    return c.json({ error: "Missing or invalid Authorization header" }, 401)
-  }
+  const authContext = c.get("authContext")
 
-  const token = authHeader.slice(7)
-
-  // TODO: Batch 2 - Implement validateNeonAuthToken(token)
-  // For now, just check token exists
-  if (!token) {
-    return c.json({ error: "Invalid or expired token" }, 401)
-  }
-
-  // 2. Parse MCP request
+  // Parse MCP request
   const body = await c.req.json()
 
   // TODO: Batch 4 - Create org-scoped MCP server and handle request
-  // For now, return a placeholder response
+  // For now, return a placeholder response with auth info
   return c.json({
     jsonrpc: "2.0",
     id: body.id,
     result: {
-      message: "MCP server is running. Full implementation coming in Batch 4.",
+      message: "MCP server authenticated successfully. Full tool implementation in Batch 4.",
       receivedMethod: body.method,
+      organization: authContext.organizationSlug,
+      user: authContext.email,
     },
   })
 })
 
 // SSE endpoint for streaming responses
 app.get("/mcp/sse", async (c) => {
-  const authHeader = c.req.header("Authorization")
-  if (!authHeader?.startsWith("Bearer ")) {
-    return c.json({ error: "Unauthorized" }, 401)
-  }
-
-  const token = authHeader.slice(7)
-
-  // TODO: Batch 2 - Implement validateNeonAuthToken(token)
-  if (!token) {
-    return c.json({ error: "Invalid token" }, 401)
-  }
+  const authContext = c.get("authContext")
 
   return streamSSE(c, async (stream) => {
     // Keep connection alive with heartbeat
@@ -95,12 +74,14 @@ app.get("/mcp/sse", async (c) => {
       })
     }, 30000)
 
-    // Send initial connection confirmation
+    // Send initial connection confirmation with org info
     await stream.writeSSE({
       event: "connected",
       data: JSON.stringify({
         message: "SSE connection established",
         version: "2.0.0",
+        organization: authContext.organizationSlug,
+        user: authContext.email,
       }),
     })
 
