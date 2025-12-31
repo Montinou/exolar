@@ -1,0 +1,405 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<implementation_phase>
+  <metadata>
+    <phase_number>4</phase_number>
+    <title>Test Logger Rollout - Add Logging to All Test Files</title>
+    <estimated_time>2-3 hours</estimated_time>
+    <complexity>Medium (repetitive but straightforward)</complexity>
+    <dependencies>Phases 1-3 (recommended for full value)</dependencies>
+  </metadata>
+
+  <objective>
+    Add structured logging via TestLogger to all 62 test files that currently
+    lack logging. This enables comprehensive failure context capture and
+    AI-assisted troubleshooting across the entire test suite.
+  </objective>
+
+  <current_state>
+    <total_test_files>67</total_test_files>
+    <files_with_logging>5 (7%)</files_with_logging>
+    <files_without_logging>62 (93%)</files_without_logging>
+
+    <files_already_have_logging>
+      <file>tests/waterfall-negotiation/waterfall-attorney-workflows.spec.ts</file>
+      <file>tests/waterfall-negotiation/waterfall-cm-attorney-workflows.spec.ts</file>
+      <file>tests/waterfall-negotiation/waterfall-admin-attorney-workflows.spec.ts</file>
+      <file>tests/waterfall-negotiation/waterfall-cm-admin-workflows.spec.ts</file>
+      <file>tests/waterfall-expiration/waterfall-expiration-setup.spec.ts</file>
+    </files_already_have_logging>
+  </current_state>
+
+  <logging_pattern>
+    <description>
+      Standard pattern to apply to all test files. Keep it minimal but meaningful.
+    </description>
+
+    <import_statement>
+      <![CDATA[
+import { getLogger } from '../../utils/test-logger'
+      ]]>
+    </import_statement>
+
+    <test_template>
+      <![CDATA[
+test('test name', async ({ page, ...fixtures }) => {
+  const logger = getLogger()
+  const source = 'test:{category}'  // e.g., 'test:signin', 'test:marketplace'
+
+  logger.info(source, 'Starting test: {test name}')
+
+  await test.step('Step description', async () => {
+    logger.info(source, 'Executing: {step description}')
+    // test code
+  })
+
+  // Log important data context
+  logger.info(source, 'Created case', { caseId: 'abc123' })
+
+  // Log on completion
+  logger.info(source, 'Test completed successfully')
+})
+      ]]>
+    </test_template>
+
+    <source_naming_convention>
+      <pattern>test:{category}</pattern>
+      <examples>
+        <example category="signin">test:signin</example>
+        <example category="marketplace">test:marketplace</example>
+        <example category="negotiations">test:negotiations</example>
+        <example category="my-tasks">test:my-tasks</example>
+        <example category="referral-settings">test:referral-settings</example>
+      </examples>
+    </source_naming_convention>
+
+    <what_to_log>
+      <log_this>Test start and end</log_this>
+      <log_this>Major test steps (navigation, form submission, assertions)</log_this>
+      <log_this>Important IDs (caseId, userId, proposalId)</log_this>
+      <log_this>User context (who is logged in, what role)</log_this>
+      <log_this>API operations (GraphQL mutations, important queries)</log_this>
+      <skip_this>Every small UI interaction</skip_this>
+      <skip_this>Obvious steps (clicking buttons without context)</skip_this>
+      <skip_this>Playwright internal operations</skip_this>
+    </what_to_log>
+  </logging_pattern>
+
+  <rollout_batches>
+    <description>
+      Files organized by directory/category for systematic rollout.
+      Each batch can be done independently.
+    </description>
+
+    <batch number="1" priority="high" files="8">
+      <name>Core Authentication &amp; Navigation</name>
+      <estimated_time>15 minutes</estimated_time>
+      <files>
+        <file>tests/signin/signin.spec.ts</file>
+        <file>tests/signin/signin-invalid-credentials.spec.ts</file>
+        <file>tests/signin/signin-remember-me.spec.ts</file>
+        <file>tests/landing-page/landing-page.spec.ts</file>
+        <file>tests/landing-page/landing-page-navigation.spec.ts</file>
+        <file>tests/header/header-navigation.spec.ts</file>
+        <file>tests/header/header-user-menu.spec.ts</file>
+        <file>tests/header/header-notifications.spec.ts</file>
+      </files>
+      <logging_focus>Authentication flows, navigation events</logging_focus>
+    </batch>
+
+    <batch number="2" priority="high" files="10">
+      <name>Marketplace &amp; Search</name>
+      <estimated_time>20 minutes</estimated_time>
+      <files>
+        <file>tests/marketplace-v2/marketplace-search.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-filters.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-case-card.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-pagination.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-saved-searches.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-browse.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-sort.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-empty-state.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-case-details.spec.ts</file>
+        <file>tests/marketplace-v2/marketplace-load-more.spec.ts</file>
+      </files>
+      <logging_focus>Search queries, filter selections, case IDs viewed</logging_focus>
+    </batch>
+
+    <batch number="3" priority="high" files="12">
+      <name>Negotiations &amp; Proposals</name>
+      <estimated_time>25 minutes</estimated_time>
+      <files>
+        <file>tests/negotiation/invite-to-case-Att-Att.spec.ts</file>
+        <file>tests/negotiation/invite-to-case-CM-Att.spec.ts</file>
+        <file>tests/negotiation/negotiations-proposal-workflow.spec.ts</file>
+        <file>tests/negotiation/negotiations-counter-offer.spec.ts</file>
+        <file>tests/negotiation/negotiations-accept-decline.spec.ts</file>
+        <file>tests/negotiation/negotiations-chat.spec.ts</file>
+        <file>tests/negotiation/negotiations-timeline.spec.ts</file>
+        <file>tests/negotiation/negotiations-bulk-actions.spec.ts</file>
+        <file>tests/negotiation/negotiations-filters.spec.ts</file>
+        <file>tests/negotiation/negotiations-sorting.spec.ts</file>
+        <file>tests/negotiation/negotiations-pagination.spec.ts</file>
+        <file>tests/negotiation/negotiations-status-updates.spec.ts</file>
+      </files>
+      <logging_focus>Proposal IDs, negotiation states, fee amounts, user roles</logging_focus>
+    </batch>
+
+    <batch number="4" priority="medium" files="8">
+      <name>My Tasks &amp; Dashboard</name>
+      <estimated_time>15 minutes</estimated_time>
+      <files>
+        <file>tests/my-tasks/my-tasks-overview.spec.ts</file>
+        <file>tests/my-tasks/my-tasks-filters.spec.ts</file>
+        <file>tests/my-tasks/my-tasks-actions.spec.ts</file>
+        <file>tests/my-tasks/my-tasks-pagination.spec.ts</file>
+        <file>tests/my-tasks/my-tasks-empty-states.spec.ts</file>
+        <file>tests/my-tasks/inbound-outbound-tabs.spec.ts</file>
+        <file>tests/my-tasks/need-action-tab.spec.ts</file>
+        <file>tests/my-tasks/matched-tab.spec.ts</file>
+      </files>
+      <logging_focus>Task counts, filter states, tab switches</logging_focus>
+    </batch>
+
+    <batch number="5" priority="medium" files="6">
+      <name>Case Management</name>
+      <estimated_time>15 minutes</estimated_time>
+      <files>
+        <file>tests/case/case-create.spec.ts</file>
+        <file>tests/case/case-edit.spec.ts</file>
+        <file>tests/case/case-details.spec.ts</file>
+        <file>tests/case/case-status-changes.spec.ts</file>
+        <file>tests/case/case-documents.spec.ts</file>
+        <file>tests/case/case-delete.spec.ts</file>
+      </files>
+      <logging_focus>Case IDs, status transitions, document uploads</logging_focus>
+    </batch>
+
+    <batch number="6" priority="medium" files="5">
+      <name>Referral Network</name>
+      <estimated_time>10 minutes</estimated_time>
+      <files>
+        <file>tests/my-referral-network/basic-tests.spec.ts</file>
+        <file>tests/my-referral-network/attorney-profile.spec.ts</file>
+        <file>tests/my-referral-network/firm-profile.spec.ts</file>
+        <file>tests/my-referral-network/connections.spec.ts</file>
+        <file>tests/my-referral-network/search-attorneys.spec.ts</file>
+      </files>
+      <logging_focus>Attorney IDs, firm IDs, connection actions</logging_focus>
+    </batch>
+
+    <batch number="7" priority="medium" files="4">
+      <name>Settings &amp; Profile</name>
+      <estimated_time>10 minutes</estimated_time>
+      <files>
+        <file>tests/referral-settings/referral-settings.spec.ts</file>
+        <file>tests/referral-settings/notification-preferences.spec.ts</file>
+        <file>tests/profile/profile-edit.spec.ts</file>
+        <file>tests/profile/profile-view.spec.ts</file>
+      </files>
+      <logging_focus>Settings changes, profile updates</logging_focus>
+    </batch>
+
+    <batch number="8" priority="low" files="5">
+      <name>Lead Score &amp; Analytics</name>
+      <estimated_time>10 minutes</estimated_time>
+      <files>
+        <file>tests/lead-score/tooltip-interactions.spec.ts</file>
+        <file>tests/lead-score/score-calculations.spec.ts</file>
+        <file>tests/lead-score/score-display.spec.ts</file>
+        <file>tests/analytics/analytics-dashboard.spec.ts</file>
+        <file>tests/analytics/analytics-export.spec.ts</file>
+      </files>
+      <logging_focus>Score values, calculation inputs</logging_focus>
+    </batch>
+
+    <batch number="9" priority="low" files="4">
+      <name>Payments &amp; Billing</name>
+      <estimated_time>10 minutes</estimated_time>
+      <files>
+        <file>tests/firm-payments/payment-history.spec.ts</file>
+        <file>tests/firm-payments/payment-methods.spec.ts</file>
+        <file>tests/firm-payments/billing-info.spec.ts</file>
+        <file>tests/firm-payments/invoices.spec.ts</file>
+      </files>
+      <logging_focus>Payment IDs, amounts, status changes</logging_focus>
+    </batch>
+
+    <batch number="10" priority="low" files="4">
+      <name>Notifications &amp; Misc</name>
+      <estimated_time>10 minutes</estimated_time>
+      <files>
+        <file>tests/notification-center/notification-list.spec.ts</file>
+        <file>tests/notification-center/notification-actions.spec.ts</file>
+        <file>tests/notification-center/notification-filters.spec.ts</file>
+        <file>tests/integrations/integrations-list.spec.ts</file>
+      </files>
+      <logging_focus>Notification IDs, read/unread status</logging_focus>
+    </batch>
+  </rollout_batches>
+
+  <implementation_example>
+    <before_file>tests/signin/signin.spec.ts</before_file>
+    <before_code>
+      <![CDATA[
+import { test, expect } from '@playwright/test'
+import { SigninPage } from '../../page-objects/SigninPage'
+
+test.describe('Sign In', () => {
+  test('should sign in with valid credentials', async ({ page }) => {
+    const signinPage = new SigninPage(page)
+
+    await signinPage.goto()
+    await signinPage.login('user@example.com', 'password123')
+
+    await expect(page).toHaveURL(/\/dashboard/)
+  })
+})
+      ]]>
+    </before_code>
+
+    <after_code>
+      <![CDATA[
+import { test, expect } from '@playwright/test'
+import { SigninPage } from '../../page-objects/SigninPage'
+import { getLogger } from '../../utils/test-logger'
+
+test.describe('Sign In', () => {
+  test('should sign in with valid credentials', async ({ page }) => {
+    const logger = getLogger()
+    const source = 'test:signin'
+
+    logger.info(source, 'Starting sign in test')
+
+    const signinPage = new SigninPage(page)
+
+    await test.step('Navigate to signin page', async () => {
+      logger.info(source, 'Navigating to signin page')
+      await signinPage.goto()
+    })
+
+    await test.step('Enter credentials and submit', async () => {
+      logger.info(source, 'Entering credentials', { email: 'user@example.com' })
+      await signinPage.login('user@example.com', 'password123')
+    })
+
+    await test.step('Verify redirect to dashboard', async () => {
+      logger.info(source, 'Verifying dashboard redirect')
+      await expect(page).toHaveURL(/\/dashboard/)
+      logger.info(source, 'Sign in completed successfully')
+    })
+  })
+})
+      ]]>
+    </after_code>
+  </implementation_example>
+
+  <minimal_logging_example>
+    <description>
+      For simpler tests, minimal logging is acceptable. Focus on test start/end
+      and any important data context.
+    </description>
+    <code>
+      <![CDATA[
+import { test, expect } from '@playwright/test'
+import { getLogger } from '../../utils/test-logger'
+
+test('should display case details', async ({ page }) => {
+  const logger = getLogger()
+  const source = 'test:case'
+
+  logger.info(source, 'Test: display case details')
+
+  // Test code here...
+  const caseId = await page.locator('[data-testid="case-id"]').textContent()
+  logger.info(source, 'Viewing case', { caseId })
+
+  // Assertions...
+
+  logger.info(source, 'Test completed')
+})
+      ]]>
+    </code>
+  </minimal_logging_example>
+
+  <automation_script>
+    <description>
+      Optional: Script to add basic logging boilerplate to files.
+      Review output manually before committing.
+    </description>
+    <script>
+      <![CDATA[
+#!/bin/bash
+# add-logger-import.sh
+# Adds logger import to test files that don't have it
+
+cd attorney_share_mvp_web/automation/playwright/tests
+
+for file in $(find . -name "*.spec.ts" -type f); do
+  # Check if already has logger import
+  if ! grep -q "import.*getLogger" "$file"; then
+    echo "Adding logger import to: $file"
+
+    # Add import after first import statement
+    sed -i '' "1a\\
+import { getLogger } from '../../utils/test-logger'
+" "$file"
+  fi
+done
+
+echo "Done. Review changes with: git diff"
+      ]]>
+    </script>
+  </automation_script>
+
+  <verification>
+    <verify_import>
+      <![CDATA[
+# Count files with logger import
+grep -r "import.*getLogger" tests/ | wc -l
+# Should be 67 (all test files)
+      ]]>
+    </verify_import>
+
+    <verify_usage>
+      <![CDATA[
+# Count files using logger.info
+grep -r "logger.info" tests/ | wc -l
+# Should have multiple occurrences per file
+      ]]>
+    </verify_usage>
+
+    <run_tests>
+      <![CDATA[
+# Run a batch and verify logging works
+FRONTEND_URL=https://app.attorneyshare.info \
+BACKEND_URL=https://api.attorneyshare.info \
+npx playwright test tests/signin/ --reporter=list
+
+# Check for logger output in console
+      ]]>
+    </run_tests>
+  </verification>
+
+  <success_criteria>
+    <criterion>All 67 test files import getLogger</criterion>
+    <criterion>All test files have at least test start/end logging</criterion>
+    <criterion>Important data context (IDs, states) is logged</criterion>
+    <criterion>All tests still pass after adding logging</criterion>
+    <criterion>No duplicate or excessive logging</criterion>
+  </success_criteria>
+
+  <notes>
+    <note>
+      This is the most time-consuming phase but adds the most value.
+      Consider doing high-priority batches (1-3) first for immediate impact.
+    </note>
+    <note>
+      Logging should enhance debugging, not clutter output.
+      When in doubt, log less.
+    </note>
+    <note>
+      Page Objects already have logging shortcuts via BasePage.
+      Focus on test-level context (what test is doing, why).
+    </note>
+  </notes>
+</implementation_phase>

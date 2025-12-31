@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<implementation_phase>
+  <metadata>
+    <phase_number>2</phase_number>
+    <title>Local JSON Export on Failure</title>
+    <estimated_time>30 minutes</estimated_time>
+    <complexity>Low</complexity>
+    <dependencies>Phase 1 (recommended but not required)</dependencies>
+  </metadata>
+
+  <objective>
+    Enhance the existing dashboard-reporter.ts to export structured failure context
+    as local JSON files for immediate Claude Code consumption. This adds ~30 lines
+    to the existing reporter with zero impact on test execution.
+  </objective>
+
+  <context>
+    <current_reporter_location>
+      attorney_share_mvp_web/automation/playwright/reporters/dashboard-reporter.ts
+    </current_reporter_location>
+
+    <current_capabilities>
+      <capability>Captures test results with logs, errors, artifacts</capability>
+      <capability>Sends payload to dashboard API on completion</capability>
+      <capability>Handles failed test artifact collection</capability>
+      <capability>Reads logs from test annotations</capability>
+    </current_capabilities>
+
+    <data_already_available>
+      <data>Test name, file, status, duration</data>
+      <data>Error message and stack trace</data>
+      <data>Structured logs from TestLogger</data>
+      <data>Browser, retry count, timestamps</data>
+      <data>Artifacts (screenshots, traces, videos)</data>
+      <data>GitHub context (branch, commit, workflow)</data>
+    </data_already_available>
+  </context>
+
+  <output_specification>
+    <output_directory>automation/playwright/ai-failures/</output_directory>
+    <filename_pattern>{testId}.json</filename_pattern>
+    <testId_format>sanitized(test_file::test_name)</testId_format>
+
+    <json_structure>
+      <![CDATA[
+{
+  "test_id": "negotiations/invite-to-case-Att-Att.spec.ts::should complete flow",
+  "timestamp": "2024-01-15T14:30:45.123Z",
+  "file": "automation/playwright/tests/negotiations/invite-to-case-Att-Att.spec.ts",
+  "suite": ["negotiations", "invite-to-case-Att-Att"],
+  "test": "should complete full attorney-to-attorney invite flow",
+  "error": {
+    "message": "Timeout 30000ms exceeded waiting for selector '[data-testid=\"accept-button\"]'",
+    "type": "TimeoutError",
+    "location": "invite-to-case-Att-Att.spec.ts:142:15"
+  },
+  "steps": [
+    "Login as attorney1",
+    "Navigate to case page",
+    "Click invite button",
+    "Select attorney from list",
+    "Waiting for accept button"
+  ],
+  "last_step": "Waiting for accept button",
+  "duration_ms": 45230,
+  "retries": 0,
+  "last_api": {
+    "method": "POST",
+    "url": "/graphql",
+    "status": 200,
+    "operation": "InviteAttorneyToCase"
+  },
+  "page_url": "https://app.attorneyshare.info/case/abc123",
+  "browser": "chromium",
+  "logs": [
+    { "timestamp": 1234, "level": "info", "source": "test:invite", "message": "Starting invite flow" },
+    { "timestamp": 5678, "level": "error", "source": "test:invite", "message": "Accept button not found" }
+  ],
+  "execution": {
+    "run_id": "12345678",
+    "branch": "feature/ENG-123",
+    "commit_sha": "abc123def"
+  }
+}
+      ]]>
+    </json_structure>
+  </output_specification>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Add Helper Function to Build AI Context</title>
+      <file_path>attorney_share_mvp_web/automation/playwright/reporters/dashboard-reporter.ts</file_path>
+      <action>add_function</action>
+      <location>After imports, before class definition</location>
+      <code>
+        <![CDATA[
+import * as fs from 'fs'
+import * as path from 'path'
+
+// Add this interface near other interfaces
+interface AIFailureContext {
+  test_id: string
+  timestamp: string
+  file: string
+  suite: string[]
+  test: string
+  error: {
+    message: string
+    type: string
+    location: string
+  }
+  steps: string[]
+  last_step: string
+  duration_ms: number
+  retries: number
+  last_api?: {
+    method: string
+    url: string
+    status: number
+    operation?: string
+  }
+  page_url?: string
+  browser?: string
+  logs?: LogEntry[]
+  execution?: {
+    run_id: string
+    branch: string
+    commit_sha: string
+  }
+}
+
+// Add this helper function
+function buildAIContext(
+  test: TestCase,
+  result: TestResult,
+  logs: LogEntry[],
+  execution: ExecutionPayload
+): AIFailureContext {
+  const testFile = path.relative(process.cwd(), test.location.file)
+  const testId = `${testFile}::${test.title}`
+
+  // Parse error type from message or stack
+  const errorMessage = result.error?.message || 'Unknown error'
+  const errorStack = result.error?.stack || ''
+  const errorType = parseErrorType(errorMessage, errorStack)
+  const errorLocation = parseErrorLocation(errorStack, testFile)
+
+  // Extract test steps from Playwright's result.steps
+  const steps = result.steps
+    .filter(s => s.category === 'test.step')
+    .map(s => s.title)
+    .slice(-10) // Last 10 steps
+
+  const lastStep = steps[steps.length - 1] || 'Unknown'
+
+  // Extract last API call from logs or annotations
+  const lastApi = extractLastApiCall(logs, result.attachments)
+
+  // Extract page URL from logs
+  const pageUrl = extractPageUrl(logs)
+
+  return {
+    test_id: testId,
+    timestamp: new Date().toISOString(),
+    file: testFile,
+    suite: test.titlePath().slice(0, -1), // All but test name
+    test: test.title,
+    error: {
+      message: errorMessage,
+      type: errorType,
+      location: errorLocation
+    },
+    steps,
+    last_step: lastStep,
+    duration_ms: result.duration,
+    retries: result.retry,
+    last_api: lastApi,
+    page_url: pageUrl,
+    browser: test.parent.project()?.use?.defaultBrowserType || 'chromium',
+    logs: logs.slice(-20), // Last 20 logs for context
+    execution: {
+      run_id: execution.run_id,
+      branch: execution.branch,
+      commit_sha: execution.commit_sha
+    }
+  }
+}
+
+function parseErrorType(message: string, stack: string): string {
+  // Common Playwright error types
+  if (message.includes('Timeout') || message.includes('exceeded')) return 'TimeoutError'
+  if (message.includes('strict mode violation')) return 'StrictModeError'
+  if (message.includes('expect(')) return 'AssertionError'
+  if (message.includes('navigation')) return 'NavigationError'
+  if (message.includes('net::')) return 'NetworkError'
+  if (stack.includes('AssertionError')) return 'AssertionError'
+  return 'Error'
+}
+
+function parseErrorLocation(stack: string, testFile: string): string {
+  // Find first line in stack that matches test file
+  const lines = stack.split('\n')
+  for (const line of lines) {
+    if (line.includes(testFile)) {
+      const match = line.match(/:(\d+):(\d+)/)
+      if (match) {
+        return `${testFile}:${match[1]}:${match[2]}`
+      }
+    }
+  }
+  return testFile
+}
+
+function extractLastApiCall(logs: LogEntry[], attachments: any[]): AIFailureContext['last_api'] | undefined {
+  // Look for API logs (logged via logger.api())
+  const apiLogs = logs.filter(l => l.source?.includes('api') || l.message?.includes('/graphql'))
+  if (apiLogs.length > 0) {
+    const lastApi = apiLogs[apiLogs.length - 1]
+    return {
+      method: lastApi.data?.method || 'POST',
+      url: lastApi.data?.url || '/graphql',
+      status: lastApi.data?.status || 200,
+      operation: lastApi.data?.operation
+    }
+  }
+
+  // Fallback: check annotations for last-api
+  const apiAnnotation = attachments?.find(a => a.name === 'last-api')
+  if (apiAnnotation?.body) {
+    try {
+      return JSON.parse(apiAnnotation.body.toString())
+    } catch { /* ignore */ }
+  }
+
+  return undefined
+}
+
+function extractPageUrl(logs: LogEntry[]): string | undefined {
+  // Look for navigation logs
+  const navLogs = logs.filter(l =>
+    l.source?.includes('navigation') ||
+    l.message?.includes('Navigate') ||
+    l.data?.url
+  )
+  if (navLogs.length > 0) {
+    return navLogs[navLogs.length - 1].data?.url as string
+  }
+  return undefined
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="2">
+      <title>Add Local JSON Export in onTestEnd</title>
+      <file_path>attorney_share_mvp_web/automation/playwright/reporters/dashboard-reporter.ts</file_path>
+      <action>modify_method</action>
+      <method>onTestEnd</method>
+      <location>After collecting test result data, before pushing to results array</location>
+      <code>
+        <![CDATA[
+// Add this after line ~220 (after status check for failed/timedout)
+// Inside onTestEnd method, after determining test has failed:
+
+if (status === 'failed' || status === 'timedout') {
+  // Build AI context for failed test
+  const aiContext = buildAIContext(test, result, logs, this.execution)
+
+  // Export local JSON file for Claude Code
+  this.exportLocalJson(aiContext)
+
+  // Store in result for dashboard API
+  testResult.ai_context = aiContext
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="3">
+      <title>Add exportLocalJson Method</title>
+      <file_path>attorney_share_mvp_web/automation/playwright/reporters/dashboard-reporter.ts</file_path>
+      <action>add_method</action>
+      <location>Inside DashboardReporter class</location>
+      <code>
+        <![CDATA[
+private exportLocalJson(aiContext: AIFailureContext): void {
+  try {
+    // Create ai-failures directory if it doesn't exist
+    const outputDir = path.join(process.cwd(), 'automation', 'playwright', 'ai-failures')
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true })
+    }
+
+    // Sanitize testId for filename (replace special chars)
+    const safeTestId = aiContext.test_id
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .slice(0, 200) // Limit filename length
+
+    const filename = `${safeTestId}.json`
+    const filepath = path.join(outputDir, filename)
+
+    // Write JSON file
+    fs.writeFileSync(filepath, JSON.stringify(aiContext, null, 2))
+
+    // Log for visibility (only locally)
+    if (!process.env.CI) {
+      console.log(`[AI-Context] Exported: ${filepath}`)
+    }
+  } catch (error) {
+    // Never fail test execution due to JSON export
+    console.error('[AI-Context] Failed to export:', error)
+  }
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="4">
+      <title>Update TestResultPayload Interface</title>
+      <file_path>attorney_share_mvp_web/automation/playwright/reporters/dashboard-reporter.ts</file_path>
+      <action>modify_interface</action>
+      <code>
+        <![CDATA[
+// Add to TestResultPayload interface:
+interface TestResultPayload {
+  // ... existing fields ...
+  ai_context?: AIFailureContext  // Add this line
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="5">
+      <title>Add .gitignore Entry</title>
+      <file_path>attorney_share_mvp_web/automation/playwright/.gitignore</file_path>
+      <action>append</action>
+      <code>
+        <![CDATA[
+# AI failure context files (generated, not committed)
+ai-failures/
+        ]]>
+      </code>
+    </step>
+  </implementation_steps>
+
+  <testing>
+    <test_locally>
+      <![CDATA[
+# Run a test that will fail (or modify one temporarily)
+cd attorney_share_mvp_web
+FRONTEND_URL=https://app.attorneyshare.info \
+BACKEND_URL=https://api.attorneyshare.info \
+npx playwright test automation/playwright/tests/signin/signin.spec.ts --reporter=./automation/playwright/reporters/dashboard-reporter.ts
+
+# Check for generated files
+ls -la automation/playwright/ai-failures/
+
+# Inspect a generated file
+cat automation/playwright/ai-failures/*.json | jq .
+      ]]>
+    </test_locally>
+
+    <verify_output>
+      <check>JSON file created in ai-failures/ directory</check>
+      <check>JSON contains error.message, error.type, error.location</check>
+      <check>JSON contains steps array with test steps</check>
+      <check>JSON contains execution context (branch, commit)</check>
+      <check>Test execution not affected by JSON export</check>
+    </verify_output>
+  </testing>
+
+  <rollback>
+    <![CDATA[
+# To rollback, simply revert the changes to dashboard-reporter.ts
+git checkout automation/playwright/reporters/dashboard-reporter.ts
+
+# Remove generated files
+rm -rf automation/playwright/ai-failures/
+    ]]>
+  </rollback>
+
+  <success_criteria>
+    <criterion>Failed tests generate JSON files in ai-failures/</criterion>
+    <criterion>JSON structure matches specification</criterion>
+    <criterion>Passed tests do NOT generate JSON files</criterion>
+    <criterion>Test execution speed not affected</criterion>
+    <criterion>Errors in JSON export are caught and logged, not thrown</criterion>
+  </success_criteria>
+
+  <next_phase>
+    Proceed to Phase 3 to update the E2E Test Dashboard to receive and store
+    the ai_context field in the database.
+  </next_phase>
+</implementation_phase>

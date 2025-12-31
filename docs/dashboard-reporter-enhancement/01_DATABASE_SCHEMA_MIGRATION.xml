@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<implementation_phase>
+  <metadata>
+    <phase_number>1</phase_number>
+    <title>Database Schema Migration - Add ai_context JSONB Column</title>
+    <estimated_time>15 minutes</estimated_time>
+    <complexity>Low</complexity>
+    <dependencies>None</dependencies>
+  </metadata>
+
+  <objective>
+    Add a JSONB column named `ai_context` to the `test_results` table to store structured
+    failure context that enables AI-powered troubleshooting and queryable failure analysis.
+  </objective>
+
+  <context>
+    <current_state>
+      The `test_results` table already has a JSONB `logs` column (added in migration 003).
+      This establishes a pattern for JSONB column addition that we follow here.
+    </current_state>
+
+    <target_table>test_results</target_table>
+    <column_name>ai_context</column_name>
+    <column_type>JSONB</column_type>
+    <default_value>NULL</default_value>
+
+    <existing_migrations>
+      <migration file="001_create_test_tables.sql">Initial schema</migration>
+      <migration file="003_add_logs_column.sql">Added logs JSONB + test_signature</migration>
+      <migration file="005_add_flakiness_detection.sql">Added is_flaky + history table</migration>
+      <migration file="006_add_suite_column.sql">Added suite to test_executions</migration>
+    </existing_migrations>
+  </context>
+
+  <ai_context_schema>
+    <description>
+      The ai_context column stores a structured JSON object optimized for AI consumption.
+      Only populated for failed/timedout tests. NULL for passed/skipped tests.
+    </description>
+
+    <json_structure>
+      <![CDATA[
+{
+  "test_id": "string",           // Format: {file}::{test_name}
+  "timestamp": "ISO-8601",       // When failure occurred
+  "file": "string",              // Relative path to test file
+  "suite": ["string"],           // Describe block hierarchy
+  "test": "string",              // Test title
+  "error": {
+    "message": "string",         // Error message
+    "type": "string",            // TimeoutError, AssertionError, etc.
+    "location": "string"         // file:line:column from stack
+  },
+  "steps": ["string"],           // Last N test steps (from Playwright)
+  "last_step": "string",         // Step where it failed
+  "duration_ms": "number",       // Test duration
+  "retries": "number",           // Retry count
+  "last_api": {                  // Last API call (if available)
+    "method": "string",
+    "url": "string",
+    "status": "number"
+  },
+  "page_url": "string",          // URL at failure time
+  "browser": "string"            // Browser name
+}
+      ]]>
+    </json_structure>
+  </ai_context_schema>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Create Migration File</title>
+      <file_path>e2e-test-dashboard/scripts/008_add_ai_context.sql</file_path>
+      <action>create</action>
+      <content>
+        <![CDATA[
+-- Migration 008: Add ai_context JSONB column for AI-friendly failure analysis
+-- This column stores structured failure context optimized for Claude Code consumption
+-- Only populated for failed/timedout tests
+
+DO $$
+BEGIN
+    -- Add ai_context column if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'test_results'
+        AND column_name = 'ai_context'
+    ) THEN
+        ALTER TABLE test_results
+        ADD COLUMN ai_context JSONB DEFAULT NULL;
+
+        RAISE NOTICE 'Added ai_context column to test_results table';
+    ELSE
+        RAISE NOTICE 'ai_context column already exists';
+    END IF;
+
+    -- Create GIN index for JSONB queries (only on failed tests for efficiency)
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE indexname = 'idx_test_results_ai_context'
+    ) THEN
+        CREATE INDEX idx_test_results_ai_context
+        ON test_results USING GIN (ai_context)
+        WHERE ai_context IS NOT NULL
+        AND status IN ('failed', 'timedout');
+
+        RAISE NOTICE 'Created GIN index on ai_context column';
+    ELSE
+        RAISE NOTICE 'ai_context index already exists';
+    END IF;
+
+    -- Create index for error type queries
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE indexname = 'idx_test_results_ai_context_error_type'
+    ) THEN
+        CREATE INDEX idx_test_results_ai_context_error_type
+        ON test_results ((ai_context->>'error'->>'type'))
+        WHERE ai_context IS NOT NULL;
+
+        RAISE NOTICE 'Created error type index';
+    ELSE
+        RAISE NOTICE 'Error type index already exists';
+    END IF;
+END $$;
+
+-- Add comment for documentation
+COMMENT ON COLUMN test_results.ai_context IS
+'Structured failure context for AI troubleshooting. Contains error details, test steps,
+page state, and API info. Only populated for failed/timedout tests.';
+        ]]>
+      </content>
+    </step>
+
+    <step number="2">
+      <title>Run Migration</title>
+      <commands>
+        <![CDATA[
+cd /Users/agustinmontoya/Attorneyshare/e2e-test-dashboard
+
+# Run migration against Neon database
+# Replace with your actual database connection method
+psql $DATABASE_URL -f scripts/008_add_ai_context.sql
+
+# Or if using a migration runner
+# npm run db:migrate
+        ]]>
+      </commands>
+    </step>
+
+    <step number="3">
+      <title>Verify Migration</title>
+      <commands>
+        <![CDATA[
+-- Verify column exists
+SELECT column_name, data_type, column_default
+FROM information_schema.columns
+WHERE table_name = 'test_results'
+AND column_name = 'ai_context';
+
+-- Verify indexes exist
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'test_results'
+AND indexname LIKE '%ai_context%';
+        ]]>
+      </commands>
+    </step>
+  </implementation_steps>
+
+  <example_queries>
+    <description>Once the column is populated, these queries become possible:</description>
+
+    <query name="Find all timeout errors">
+      <![CDATA[
+SELECT test_name, test_file, ai_context->'error'->>'message' as error
+FROM test_results
+WHERE ai_context->'error'->>'type' = 'TimeoutError'
+ORDER BY created_at DESC
+LIMIT 20;
+      ]]>
+    </query>
+
+    <query name="Find tests that failed on specific step">
+      <![CDATA[
+SELECT test_name, ai_context->>'last_step' as failed_step
+FROM test_results
+WHERE ai_context->>'last_step' LIKE '%click%'
+AND status = 'failed';
+      ]]>
+    </query>
+
+    <query name="Find GraphQL errors">
+      <![CDATA[
+SELECT test_name, ai_context->'last_api' as api_info
+FROM test_results
+WHERE ai_context->'last_api'->>'url' LIKE '%graphql%'
+AND (ai_context->'last_api'->>'status')::int >= 400;
+      ]]>
+    </query>
+  </example_queries>
+
+  <rollback>
+    <![CDATA[
+-- If needed, rollback with:
+DROP INDEX IF EXISTS idx_test_results_ai_context;
+DROP INDEX IF EXISTS idx_test_results_ai_context_error_type;
+ALTER TABLE test_results DROP COLUMN IF EXISTS ai_context;
+    ]]>
+  </rollback>
+
+  <success_criteria>
+    <criterion>Column `ai_context` exists in test_results table</criterion>
+    <criterion>Column type is JSONB with NULL default</criterion>
+    <criterion>GIN index exists for efficient JSONB queries</criterion>
+    <criterion>Existing test_results records unaffected (ai_context = NULL)</criterion>
+  </success_criteria>
+
+  <next_phase>
+    After this migration, proceed to Phase 2 to update the dashboard-reporter
+    to populate this column and export local JSON files.
+  </next_phase>
+</implementation_phase>

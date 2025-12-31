@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<implementation_phase>
+  <metadata>
+    <phase_number>3</phase_number>
+    <title>Dashboard Integration - Types, Validation, and Database</title>
+    <estimated_time>45 minutes</estimated_time>
+    <complexity>Medium</complexity>
+    <dependencies>Phase 1 (database migration must be complete)</dependencies>
+  </metadata>
+
+  <objective>
+    Update the E2E Test Dashboard to receive, validate, and store the ai_context
+    field from the dashboard reporter. This enables queryable failure analysis
+    and AI-powered troubleshooting from the dashboard.
+  </objective>
+
+  <files_to_modify>
+    <file>e2e-test-dashboard/lib/types.ts</file>
+    <file>e2e-test-dashboard/lib/validation.ts</file>
+    <file>e2e-test-dashboard/lib/db.ts</file>
+    <file>e2e-test-dashboard/app/api/test-results/route.ts</file>
+  </files_to_modify>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Add AIContext Type Definition</title>
+      <file_path>e2e-test-dashboard/lib/types.ts</file_path>
+      <action>add_interface</action>
+      <location>Near other interface definitions</location>
+      <code>
+        <![CDATA[
+// Add this interface for AI failure context
+export interface AIFailureContext {
+  test_id: string
+  timestamp: string
+  file: string
+  suite: string[]
+  test: string
+  error: {
+    message: string
+    type: string
+    location: string
+  }
+  steps: string[]
+  last_step: string
+  duration_ms: number
+  retries: number
+  last_api?: {
+    method: string
+    url: string
+    status: number
+    operation?: string
+  }
+  page_url?: string
+  browser?: string
+  logs?: Array<{
+    timestamp: number
+    level: string
+    source: string
+    message: string
+    data?: Record<string, unknown>
+  }>
+  execution?: {
+    run_id: string
+    branch: string
+    commit_sha: string
+  }
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="2">
+      <title>Update TestResult Interface</title>
+      <file_path>e2e-test-dashboard/lib/types.ts</file_path>
+      <action>modify_interface</action>
+      <interface>TestResult</interface>
+      <code>
+        <![CDATA[
+// Add ai_context field to TestResult interface
+export interface TestResult {
+  id: number
+  execution_id: number
+  test_name: string
+  test_file: string
+  test_signature?: string
+  status: 'passed' | 'failed' | 'skipped' | 'timedout'
+  duration_ms: number
+  is_critical?: boolean
+  is_flaky?: boolean
+  error_message?: string
+  stack_trace?: string
+  browser?: string
+  retry_count?: number
+  logs?: LogEntry[]
+  ai_context?: AIFailureContext  // ADD THIS LINE
+  started_at?: string
+  completed_at?: string
+  created_at: string
+  artifacts?: TestArtifact[]
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="3">
+      <title>Update TestResultRequest Interface</title>
+      <file_path>e2e-test-dashboard/lib/types.ts</file_path>
+      <action>modify_interface</action>
+      <interface>TestResultRequest</interface>
+      <code>
+        <![CDATA[
+// Add ai_context to request interface (for incoming API data)
+export interface TestResultRequest {
+  test_name: string
+  test_file: string
+  status: 'passed' | 'failed' | 'skipped' | 'timedout'
+  duration_ms: number
+  is_critical?: boolean
+  error_message?: string
+  stack_trace?: string
+  browser?: string
+  retry_count?: number
+  logs?: LogEntry[]
+  ai_context?: AIFailureContext  // ADD THIS LINE
+  started_at?: string
+  completed_at?: string
+}
+        ]]>
+      </code>
+    </step>
+
+    <step number="4">
+      <title>Add Zod Validation Schema for AIContext</title>
+      <file_path>e2e-test-dashboard/lib/validation.ts</file_path>
+      <action>add_schema</action>
+      <location>Before testResultSchema</location>
+      <code>
+        <![CDATA[
+// Add AIContext validation schema
+const aiContextErrorSchema = z.object({
+  message: z.string(),
+  type: z.string(),
+  location: z.string()
+})
+
+const aiContextApiSchema = z.object({
+  method: z.string(),
+  url: z.string(),
+  status: z.number(),
+  operation: z.string().optional()
+}).optional()
+
+const aiContextLogSchema = z.object({
+  timestamp: z.number(),
+  level: z.string(),
+  source: z.string(),
+  message: z.string(),
+  data: z.record(z.unknown()).optional()
+})
+
+const aiContextExecutionSchema = z.object({
+  run_id: z.string(),
+  branch: z.string(),
+  commit_sha: z.string()
+}).optional()
+
+export const aiContextSchema = z.object({
+  test_id: z.string(),
+  timestamp: z.string(),
+  file: z.string(),
+  suite: z.array(z.string()),
+  test: z.string(),
+  error: aiContextErrorSchema,
+  steps: z.array(z.string()),
+  last_step: z.string(),
+  duration_ms: z.number(),
+  retries: z.number(),
+  last_api: aiContextApiSchema,
+  page_url: z.string().optional(),
+  browser: z.string().optional(),
+  logs: z.array(aiContextLogSchema).optional(),
+  execution: aiContextExecutionSchema
+}).optional()  // Optional because only failed tests have it
+        ]]>
+      </code>
+    </step>
+
+    <step number="5">
+      <title>Update testResultSchema to Include ai_context</title>
+      <file_path>e2e-test-dashboard/lib/validation.ts</file_path>
+      <action>modify_schema</action>
+      <schema>testResultSchema</schema>
+      <code>
+        <![CDATA[
+// Update testResultSchema to include ai_context
+export const testResultSchema = z.object({
+  test_name: z.string().min(1),
+  test_file: z.string().min(1),
+  status: z.enum(['passed', 'failed', 'skipped', 'timedout']),
+  duration_ms: z.number().int().min(0),
+  is_critical: z.boolean().optional(),
+  error_message: z.string().optional(),
+  stack_trace: z.string().optional(),
+  browser: z.string().optional(),
+  retry_count: z.number().int().min(0).optional(),
+  logs: z.array(logEntrySchema).optional(),
+  ai_context: aiContextSchema,  // ADD THIS LINE
+  started_at: z.string().datetime().optional(),
+  completed_at: z.string().datetime().optional()
+})
+        ]]>
+      </code>
+    </step>
+
+    <step number="6">
+      <title>Update insertTestResults Function</title>
+      <file_path>e2e-test-dashboard/lib/db.ts</file_path>
+      <action>modify_function</action>
+      <function>insertTestResults</function>
+      <code>
+        <![CDATA[
+// Update the INSERT query to include ai_context
+// Find the INSERT INTO test_results statement and add ai_context column
+
+// BEFORE (approximately line 460-480):
+const insertQuery = `
+  INSERT INTO test_results (
+    execution_id, test_name, test_file, test_signature, status,
+    duration_ms, is_critical, is_flaky, error_message, stack_trace,
+    browser, retry_count, logs, started_at, completed_at
+  ) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10,
+    $11, $12, $13, $14, $15
+  ) RETURNING id
+`
+
+// AFTER:
+const insertQuery = `
+  INSERT INTO test_results (
+    execution_id, test_name, test_file, test_signature, status,
+    duration_ms, is_critical, is_flaky, error_message, stack_trace,
+    browser, retry_count, logs, ai_context, started_at, completed_at
+  ) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9, $10,
+    $11, $12, $13, $14, $15, $16
+  ) RETURNING id
+`
+
+// Update the values array to include ai_context (add after logs)
+const values = [
+  executionId,
+  result.test_name,
+  result.test_file,
+  testSignature,
+  result.status,
+  result.duration_ms,
+  result.is_critical || false,
+  isFlaky,
+  result.error_message || null,
+  result.stack_trace || null,
+  result.browser || null,
+  result.retry_count || 0,
+  result.logs ? JSON.stringify(result.logs) : null,
+  result.ai_context ? JSON.stringify(result.ai_context) : null,  // ADD THIS
+  result.started_at || null,
+  result.completed_at || null
+]
+        ]]>
+      </code>
+    </step>
+
+    <step number="7">
+      <title>Update getTestResultsByExecutionId to Return ai_context</title>
+      <file_path>e2e-test-dashboard/lib/db.ts</file_path>
+      <action>modify_function</action>
+      <function>getTestResultsByExecutionId</function>
+      <code>
+        <![CDATA[
+// Update the SELECT query to include ai_context
+// Find the SELECT statement and add ai_context to the column list
+
+// BEFORE:
+const query = `
+  SELECT
+    tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+    tr.status, tr.duration_ms, tr.is_critical, tr.is_flaky,
+    tr.error_message, tr.stack_trace, tr.browser, tr.retry_count,
+    tr.logs, tr.started_at, tr.completed_at, tr.created_at,
+    ...
+`
+
+// AFTER:
+const query = `
+  SELECT
+    tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+    tr.status, tr.duration_ms, tr.is_critical, tr.is_flaky,
+    tr.error_message, tr.stack_trace, tr.browser, tr.retry_count,
+    tr.logs, tr.ai_context, tr.started_at, tr.completed_at, tr.created_at,
+    ...
+`
+        ]]>
+      </code>
+    </step>
+
+    <step number="8">
+      <title>Add Query Function for AI Context Analysis</title>
+      <file_path>e2e-test-dashboard/lib/db.ts</file_path>
+      <action>add_function</action>
+      <location>After getTestStatistics function</location>
+      <code>
+        <![CDATA[
+/**
+ * Get failed tests with AI context for analysis
+ * Supports filtering by error type, test file, or date range
+ */
+export async function getFailuresWithAIContext(
+  options: {
+    errorType?: string
+    testFile?: string
+    limit?: number
+    since?: string
+  } = {}
+): Promise<TestResult[]> {
+  const { errorType, testFile, limit = 50, since } = options
+
+  let query = `
+    SELECT
+      id, execution_id, test_name, test_file, test_signature,
+      status, duration_ms, is_critical, error_message, stack_trace,
+      browser, retry_count, ai_context, created_at
+    FROM test_results
+    WHERE ai_context IS NOT NULL
+    AND status IN ('failed', 'timedout')
+  `
+
+  const values: any[] = []
+  let paramIndex = 1
+
+  if (errorType) {
+    query += ` AND ai_context->'error'->>'type' = $${paramIndex}`
+    values.push(errorType)
+    paramIndex++
+  }
+
+  if (testFile) {
+    query += ` AND test_file ILIKE $${paramIndex}`
+    values.push(`%${testFile}%`)
+    paramIndex++
+  }
+
+  if (since) {
+    query += ` AND created_at >= $${paramIndex}`
+    values.push(since)
+    paramIndex++
+  }
+
+  query += ` ORDER BY created_at DESC LIMIT $${paramIndex}`
+  values.push(limit)
+
+  const result = await pool.query(query, values)
+  return result.rows
+}
+
+/**
+ * Get error type distribution for dashboard analytics
+ */
+export async function getErrorTypeDistribution(
+  since?: string
+): Promise<Array<{ error_type: string; count: number }>> {
+  let query = `
+    SELECT
+      ai_context->'error'->>'type' as error_type,
+      COUNT(*) as count
+    FROM test_results
+    WHERE ai_context IS NOT NULL
+    AND status IN ('failed', 'timedout')
+  `
+
+  const values: any[] = []
+
+  if (since) {
+    query += ` AND created_at >= $1`
+    values.push(since)
+  }
+
+  query += `
+    GROUP BY ai_context->'error'->>'type'
+    ORDER BY count DESC
+  `
+
+  const result = await pool.query(query, values)
+  return result.rows
+}
+        ]]>
+      </code>
+    </step>
+  </implementation_steps>
+
+  <testing>
+    <test_api>
+      <![CDATA[
+# Test the API endpoint with ai_context
+curl -X POST https://your-dashboard.vercel.app/api/test-results \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{
+    "execution": {
+      "run_id": "test-123",
+      "branch": "test-branch",
+      "commit_sha": "abc123",
+      "status": "failure",
+      "total_tests": 1,
+      "passed": 0,
+      "failed": 1,
+      "skipped": 0,
+      "started_at": "2024-01-15T14:30:00Z"
+    },
+    "results": [{
+      "test_name": "test with ai context",
+      "test_file": "test.spec.ts",
+      "status": "failed",
+      "duration_ms": 5000,
+      "error_message": "Timeout exceeded",
+      "ai_context": {
+        "test_id": "test.spec.ts::test with ai context",
+        "timestamp": "2024-01-15T14:30:05Z",
+        "file": "test.spec.ts",
+        "suite": ["test"],
+        "test": "test with ai context",
+        "error": {
+          "message": "Timeout exceeded",
+          "type": "TimeoutError",
+          "location": "test.spec.ts:10:5"
+        },
+        "steps": ["Navigate", "Click"],
+        "last_step": "Click",
+        "duration_ms": 5000,
+        "retries": 0
+      }
+    }],
+    "artifacts": []
+  }'
+      ]]>
+    </test_api>
+
+    <verify_database>
+      <![CDATA[
+-- Verify ai_context was stored
+SELECT
+  test_name,
+  ai_context->'error'->>'type' as error_type,
+  ai_context->'error'->>'message' as error_message
+FROM test_results
+WHERE ai_context IS NOT NULL
+ORDER BY created_at DESC
+LIMIT 5;
+      ]]>
+    </verify_database>
+
+    <verify_queries>
+      <![CDATA[
+-- Test getFailuresWithAIContext equivalent
+SELECT * FROM test_results
+WHERE ai_context IS NOT NULL
+AND ai_context->'error'->>'type' = 'TimeoutError'
+ORDER BY created_at DESC
+LIMIT 10;
+
+-- Test getErrorTypeDistribution equivalent
+SELECT
+  ai_context->'error'->>'type' as error_type,
+  COUNT(*)
+FROM test_results
+WHERE ai_context IS NOT NULL
+GROUP BY ai_context->'error'->>'type'
+ORDER BY count DESC;
+      ]]>
+    </verify_queries>
+  </testing>
+
+  <success_criteria>
+    <criterion>API accepts requests with ai_context field</criterion>
+    <criterion>ai_context stored as JSONB in database</criterion>
+    <criterion>TypeScript types compile without errors</criterion>
+    <criterion>Zod validation passes for valid ai_context</criterion>
+    <criterion>Query functions return ai_context in results</criterion>
+    <criterion>Existing requests without ai_context still work</criterion>
+  </success_criteria>
+
+  <next_phase>
+    Proceed to Phase 4 to roll out logging to all test files that
+    currently lack structured logging.
+  </next_phase>
+</implementation_phase>

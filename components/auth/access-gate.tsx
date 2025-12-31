@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
-import { useSession } from "@neondatabase/auth/react"
+import { authClient } from "@/lib/auth/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -22,7 +22,7 @@ interface AccessGateProps {
 }
 
 export function AccessGate({ children }: AccessGateProps) {
-  const session = useSession()
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [accessState, setAccessState] = useState<{
     loading: boolean
     authorized: boolean
@@ -36,11 +36,11 @@ export function AccessGate({ children }: AccessGateProps) {
 
   useEffect(() => {
     async function checkAccess() {
-      // Wait for session to load
-      if (session.isPending) return
+      // First check session status
+      const sessionResult = await authClient.getSession()
+      setSessionLoading(false)
 
-      // If not logged in, we still need to check with server
-      // (could be server-side session)
+      // Then check access with server
       try {
         const response = await fetch("/api/auth/check-access")
         const data: AccessCheckResponse = await response.json()
@@ -63,10 +63,10 @@ export function AccessGate({ children }: AccessGateProps) {
     }
 
     checkAccess()
-  }, [session.data, session.isPending])
+  }, [])
 
   // Show loading skeleton while checking
-  if (accessState.loading || session.isPending) {
+  if (accessState.loading || sessionLoading) {
     return <AccessLoadingSkeleton />
   }
 
