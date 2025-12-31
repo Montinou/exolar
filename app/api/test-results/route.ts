@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { validateApiKey } from "@/lib/auth"
 import { validateIngestRequest } from "@/lib/validation"
-import { getQueriesForOrg, insertArtifacts, generateTestSignature } from "@/lib/db"
+import { getQueriesForOrg, insertArtifacts, generateTestSignature, setServiceAccountContext } from "@/lib/db"
 import { uploadToR2, generateArtifactKey, isR2Configured } from "@/lib/r2"
 import type { IngestResponse, ArtifactRequest } from "@/lib/types"
 
@@ -98,7 +98,10 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
   const { execution, results, artifacts } = validation.data
 
   try {
-    // Use org-bound queries (interim: Attorneyshare org until Batch 5)
+    // Set service account context for RLS bypass (this route uses API key auth, not user sessions)
+    await setServiceAccountContext()
+
+    // Use org-bound queries (interim: Attorneyshare org until full org-aware API keys)
     const db = getQueriesForOrg(DEFAULT_ORG_ID)
 
     // 4. Insert execution record
