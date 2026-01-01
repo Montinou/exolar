@@ -1,0 +1,105 @@
+"use client"
+
+import { useState } from "react"
+import { Input } from "@/components/ui/input"
+import { Loader2, CheckCircle, AlertCircle } from "lucide-react"
+
+type FormStatus = "idle" | "loading" | "success" | "error"
+
+export function WishlistForm() {
+  const [email, setEmail] = useState("")
+  const [name, setName] = useState("")
+  const [status, setStatus] = useState<FormStatus>("idle")
+  const [message, setMessage] = useState("")
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    // Basic client-side validation
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setStatus("error")
+      setMessage("Please enter a valid email address")
+      return
+    }
+
+    setStatus("loading")
+    setMessage("")
+
+    try {
+      const response = await fetch("/api/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name: name || undefined }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setStatus("success")
+        setMessage("You're on the list!")
+        setEmail("")
+        setName("")
+      } else {
+        setStatus("error")
+        setMessage(data.error || "Something went wrong")
+      }
+    } catch {
+      setStatus("error")
+      setMessage("Failed to connect. Please try again.")
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
+          type="email"
+          placeholder="Enter your email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          disabled={status === "loading"}
+          className="bg-white/5 border-white/10 placeholder:text-white/40 text-white focus-visible:ring-[var(--safety-amber)]/50 focus-visible:border-[var(--safety-amber)]"
+        />
+        <Input
+          type="text"
+          placeholder="Name (optional)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={status === "loading"}
+          className="bg-white/5 border-white/10 placeholder:text-white/40 text-white focus-visible:ring-[var(--safety-amber)]/50 focus-visible:border-[var(--safety-amber)] sm:max-w-[150px]"
+        />
+        <button
+          type="submit"
+          disabled={status === "loading"}
+          className="btn-amber flex items-center justify-center gap-2 whitespace-nowrap"
+        >
+          {status === "loading" ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Joining...
+            </>
+          ) : (
+            "Join Wishlist"
+          )}
+        </button>
+      </div>
+
+      {message && (
+        <div
+          className={`flex items-center gap-2 text-sm ${
+            status === "success"
+              ? "text-green-400"
+              : status === "error"
+                ? "text-red-400"
+                : ""
+          }`}
+        >
+          {status === "success" && <CheckCircle className="w-4 h-4" />}
+          {status === "error" && <AlertCircle className="w-4 h-4" />}
+          {message}
+        </div>
+      )}
+    </form>
+  )
+}

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { ArrowRight, Sparkles } from "lucide-react"
+import { WishlistForm } from "./WishlistForm"
 
 export function Hero() {
   return (
@@ -64,6 +65,14 @@ export function Hero() {
             >
               Read MCP Docs
             </Link>
+          </div>
+
+          {/* Wishlist Form */}
+          <div className="pt-8 max-w-lg mx-auto">
+            <p className="text-sm text-muted-foreground mb-3">
+              Get early access updates
+            </p>
+            <WishlistForm />
           </div>
         </div>
 

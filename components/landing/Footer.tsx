@@ -1,5 +1,8 @@
+"use client"
+
 import Link from "next/link"
 import { Github, BookOpen } from "lucide-react"
+import { WishlistForm } from "./WishlistForm"
 
 export function Footer() {
   return (
@@ -11,6 +14,23 @@ export function Footer() {
       }}
     >
       <div className="container mx-auto px-4">
+        {/* Wishlist Section */}
+        <div className="max-w-lg mx-auto mb-12 text-center">
+          <p
+            className="text-lg font-medium mb-2"
+            style={{ color: "oklch(0.7 0 0)" }}
+          >
+            Stay in the loop
+          </p>
+          <p
+            className="text-sm mb-4"
+            style={{ color: "oklch(0.5 0 0)" }}
+          >
+            Get notified about updates and new features
+          </p>
+          <WishlistForm />
+        </div>
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Tagline */}
           <div className="text-center md:text-left">
