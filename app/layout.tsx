@@ -40,7 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <NeonAuthUIProvider authClient={authClient} emailOTP>
+        <NeonAuthUIProvider authClient={authClient} emailOTP signUp={false}>
           {children}
         </NeonAuthUIProvider>
         <Analytics />

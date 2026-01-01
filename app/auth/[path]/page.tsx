@@ -3,9 +3,9 @@ import { AuthView } from "@neondatabase/auth/react/ui"
 export const dynamicParams = false
 
 export function generateStaticParams() {
+  // No sign-up - invite only access
   return [
     { path: "sign-in" },
-    { path: "sign-up" },
     { path: "sign-out" },
     { path: "email-otp" },
     { path: "forgot-password" },
