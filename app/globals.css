@@ -75,6 +75,19 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* Deep Space Theme */
+:root {
+  --deep-void: oklch(0.08 0.02 260);
+  --deep-void-light: oklch(0.12 0.025 260);
+  --safety-amber: oklch(0.78 0.18 75);
+  --safety-amber-foreground: oklch(0.15 0.05 75);
+  --electric-indigo: oklch(0.55 0.23 270);
+  --electric-indigo-foreground: oklch(0.98 0 0);
+  --glass-bg: oklch(0.12 0.02 260 / 0.5);
+  --glass-border: oklch(1 0 0 / 0.1);
+  --grid-color: oklch(1 0 0 / 0.03);
+}
+
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
@@ -122,5 +135,76 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Glass Panel */
+  .glass-panel {
+    @apply backdrop-blur-xl border rounded-xl;
+    background: var(--glass-bg);
+    border-color: var(--glass-border);
+  }
+
+  /* Holographic border effect */
+  .holographic-border {
+    @apply relative overflow-hidden rounded-xl;
+    background: linear-gradient(
+      135deg,
+      oklch(0.55 0.23 270 / 0.3),
+      oklch(0.78 0.18 75 / 0.2),
+      oklch(0.55 0.23 270 / 0.3)
+    );
+    padding: 1px;
+  }
+
+  .holographic-border > * {
+    @apply rounded-xl;
+    background: var(--deep-void);
+  }
+
+  /* Grid pattern background */
+  .grid-pattern {
+    background-image:
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Dot matrix pattern */
+  .dot-pattern {
+    background-image: radial-gradient(var(--grid-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  /* Glow effects */
+  .glow-amber {
+    box-shadow: 0 0 20px oklch(0.78 0.18 75 / 0.4);
+  }
+
+  .glow-indigo {
+    box-shadow: 0 0 20px oklch(0.55 0.23 270 / 0.4);
+  }
+
+  /* Deep Space button variants */
+  .btn-amber {
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-300;
+    background: linear-gradient(135deg, oklch(0.78 0.18 75), oklch(0.7 0.16 60));
+    color: oklch(0.15 0.05 75);
+  }
+
+  .btn-amber:hover {
+    @apply glow-amber;
+    transform: translateY(-2px);
+  }
+
+  .btn-glass {
+    @apply px-6 py-3 rounded-lg font-semibold transition-all duration-300 glass-panel;
+    color: oklch(0.85 0 0);
+  }
+
+  .btn-glass:hover {
+    background: oklch(0.15 0.025 260 / 0.7);
+    transform: translateY(-2px);
   }
 }

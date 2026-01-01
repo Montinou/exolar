@@ -4,7 +4,6 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
 import { authClient } from "@/lib/auth/client"
-import { ProtectedLayout } from "@/components/auth/protected-layout"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -42,7 +41,7 @@ export default function RootLayout({
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
         <NeonAuthUIProvider authClient={authClient} emailOTP>
-          <ProtectedLayout>{children}</ProtectedLayout>
+          {children}
         </NeonAuthUIProvider>
         <Analytics />
       </body>

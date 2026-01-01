@@ -1,0 +1,98 @@
+<v0_prompt>
+  <context>
+    <project_info>
+      <name>E2E Test Dashboard</name>
+      <current_tech>Next.js 16, Neon Postgres, MCP (Model Context Protocol)</current_tech>
+      <user_goal>
+        Create a "Seamless Integration" experience for users to connect the dashboard to their AI agents (Claude, Cursor, Local LLMs).
+        Target date: Dec 2025 (Best Practices).
+      </user_goal>
+    </project_info>
+  </context>
+
+  <requirements>
+    <requirement>
+      <name>1. Persistent Secure Authentication</name>
+      <description>Move away from ephemeral JWTs. Agents need long-lived, revocable credentials.</description>
+      <tasks>
+        - **Schema**: Create `api_keys` table (id, key_hash, user_id, org_id, label, last_used_at).
+        - **Logic**: Update `lib/mcp/auth.ts` to validate `sk_live_...` keys alongside JWTs.
+        - **UI**: "Developer Settings" section to managing keys.
+      </tasks>
+    </requirement>
+
+    <requirement>
+      <name>2. Standardized SSE Transport</name>
+      <description>Ensure robust compatibility with the official MCP SDKs used by Claude Desktop and Cursor.</description>
+      <tasks>
+        - Implement `GET /api/mcp` as a proper SSE Stream (Server-Sent Events).
+        - Implement `POST /api/mcp?sessionId=...` for JSON-RPC message handling.
+        - Ensure strict compliance with JSON-RPC 2.0 over SSE.
+      </tasks>
+    </requirement>
+
+    <requirement>
+      <name>3. "AI-First" Installation Flows</name>
+      <description>
+        Instead of just manual docs, provide methods for *Agents* to install themselves.
+      </description>
+      <features>
+        <feature name="Manual Install">
+          Clean UI with Copy-Paste JSON for `claude_desktop_config.json`.
+        </feature>
+        <feature name="Magic Terminal Install">
+          A one-line curl command: `npx @e2e-dashboard/install --key sk_...` (or similar shell script) that auto-edits the valid config files.
+          *For MVP*: Just provide the command string to run a local helper script if we build one, or stick to the "AI Install" below.
+        </feature>
+        <feature name="AI Auto-Install">
+          **Crucial for "Seamlessness"**: A "Copy Instructions for Agent" button.
+          Content: "You are an AI assistant. I want to connect my local environment to the E2E Dashboard MCP server. Please edit my `claude_desktop_config.json` to include this server configuration: [JSON]..."
+          This allows the user to just tell their existing local agent to do the setup.
+        </feature>
+      </features>
+    </requirement>
+
+    <requirement>
+      <name>4. The "Connect" Experience</name>
+      <description>A premium, dedicated page: `app/connect/page.tsx`.</description>
+      <details>
+        - **Hero Section**: "Connect your AI Workforce".
+        - **Tabs**: "Claude Desktop", "Cursor", "Windsurf", "Custom".
+        - **Dynamic Config**: The JSON snippet updates in real-time as you select/generate an API Key.
+        - **Status Badge**: Real-time "Waiting for connection..." -> "Connected!" indicator (using SSE connection state).
+      </details>
+    </requirement>
+  </requirements>
+
+  <implementation_plan>
+    <step id="1">
+      <title>Backend Foundation</title>
+      <instructions>
+        - Create `api_keys` table.
+        - Update `lib/mcp/auth.ts` to support API Keys.
+        - Create `app/api/mcp/sse.ts` (or equivalent) to handle the connection lifecycle.
+      </instructions>
+    </step>
+    <step id="2">
+      <title>The "Connect" Page UI</title>
+      <instructions>
+        - Build `app/connect/page.tsx`.
+        - Use Shadcn Tabs and Cards.
+        - Implement "Generate Key" and "Revoke Key" UI.
+        - Create the "Copy Prompt for AI" feature (The "AI Install" flow).
+      </instructions>
+    </step>
+    <step id="3">
+      <title>Verification</title>
+      <instructions>
+        - Verify manual connection via Claude Desktop.
+        - Verify "AI Install" by pasting the prompt into a local agent (if available) or simulating it.
+      </instructions>
+    </step>
+  </implementation_plan>
+
+  <style_guide>
+    - **Aesthetic**: Premium, dark mode, "Glassmorphism" accents.
+    - **Copy**: Empowering, developer-focused. "Give your AI access to real-time test data."
+  </style_guide>
+</v0_prompt>
