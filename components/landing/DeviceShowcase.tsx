@@ -1,18 +1,80 @@
 "use client"
 
+import { useState } from "react"
 import Image from "next/image"
+import { cn } from "@/lib/utils"
+import { Smartphone, Monitor, Tablet, Terminal, CheckCircle } from "lucide-react"
+
+const devices = [
+  {
+    id: "mobile",
+    name: "Mobile App",
+    description: "Monitor test runs and get push notifications for failures on the go.",
+    icon: Smartphone,
+    image: "/assets/mobile-mockup.png",
+    width: 600,
+    height: 800,
+  },
+  {
+    id: "desktop",
+    name: "Desktop HQ",
+    description: "Full command center with deep trace analysis and AI debugging tools.",
+    icon: Monitor,
+    image: "/assets/desktop-mockup.png",
+    width: 800,
+    height: 600,
+  },
+  {
+    id: "tablet",
+    name: "Analytics",
+    description: "Touch-optimized dashboards for tracking trends and flake rates.",
+    icon: Tablet,
+    image: "/assets/tablet-mockup.png",
+    width: 800,
+    height: 600,
+  },
+  {
+    id: "cli",
+    name: "CLI & API",
+    description: "Direct MCP integration for your terminal and IDE agents.",
+    icon: Terminal,
+    image: "/assets/cli-mockup.png",
+    width: 800,
+    height: 600,
+  },
+]
 
 export function DeviceShowcase() {
+  const [activeDevice, setActiveDevice] = useState(devices[1]) // Default to Desktop
+  const [isTransitioning, setIsTransitioning] = useState(false)
+
+  const handleDeviceChange = (device: typeof activeDevice) => {
+    if (device.id === activeDevice.id) return
+    setIsTransitioning(true)
+    setTimeout(() => {
+      setActiveDevice(device)
+      setIsTransitioning(false)
+    }, 300)
+  }
+
   return (
-    <section className="py-24 overflow-hidden">
-      <div className="container mx-auto px-4">
-        {/* Section header */}
-        <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+    <section className="py-32 overflow-hidden relative">
+      {/* Background Glow */}
+      <div 
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-3xl opacity-20 pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, var(--electric-indigo), transparent 70%)"
+        }}
+      />
+
+      <div className="container mx-auto px-4 relative z-10">
+        {/* Header */}
+        <div className="text-center max-w-3xl mx-auto mb-20 space-y-4">
           <h2
-            className="text-3xl md:text-4xl font-bold"
-            style={{ color: "oklch(0.95 0 0)" }}
+            className="text-4xl md:text-5xl font-bold"
+            style={{ color: "oklch(0.98 0 0)" }}
           >
-            Monitor From{" "}
+            Your Test Suite,{" "}
             <span
               style={{
                 background: "linear-gradient(135deg, var(--safety-amber), var(--electric-indigo))",
@@ -20,59 +82,96 @@ export function DeviceShowcase() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              Anywhere
+              Omnipresent
             </span>
           </h2>
-          <p style={{ color: "oklch(0.6 0 0)" }}>
-            Stay connected to your E2E suite. Whether you're at your desk or on the go.
+          <p className="text-xl" style={{ color: "oklch(0.7 0 0)" }}>
+            Access your E2E infrastructure from any device, anywhere.
           </p>
         </div>
 
-        {/* Device Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
-          {/* Mobile Mockup */}
-          <div className="relative group perspective-1000">
-            <div
-              className="absolute inset-0 blur-3xl opacity-20 transition-opacity duration-1000 group-hover:opacity-40"
-              style={{ background: "var(--electric-indigo)" }}
-            />
-            <div className="relative transform transition-transform duration-700 hover:scale-[1.02] hover:rotate-y-6">
-              <Image
-                src="/assets/mobile-mockup.png"
-                alt="Mobile Dashboard App"
-                width={600}
-                height={800}
-                className="rounded-[2rem] shadow-2xl mx-auto"
-                style={{
-                  boxShadow: "0 20px 50px -10px oklch(0 0 0 / 0.5)",
-                }}
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+          {/* Navigation Controls */}
+          <div className="lg:col-span-4 space-y-4">
+            {devices.map((device) => (
+              <button
+                key={device.id}
+                onClick={() => handleDeviceChange(device)}
+                className={cn(
+                  "w-full text-left p-6 rounded-xl transition-all duration-300 border group",
+                  activeDevice.id === device.id
+                    ? "glass-panel shadow-lg scale-105"
+                    : "border-transparent hover:bg-white/5 opacity-60 hover:opacity-100"
+                )}
+                style={
+                  activeDevice.id === device.id
+                    ? { borderColor: "var(--electric-indigo)" }
+                    : {}
+                }
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className={cn(
+                      "p-3 rounded-lg transition-colors",
+                       activeDevice.id === device.id ? "bg-[var(--electric-indigo)] text-white" : "bg-white/10"
+                    )}
+                  >
+                    <device.icon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg" style={{ color: "oklch(0.95 0 0)" }}>
+                      {device.name}
+                    </h3>
+                    <p className="text-sm mt-1" style={{ color: "oklch(0.6 0 0)" }}>
+                      {device.description}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
 
-          {/* Desktop Mockup */}
-          <div className="relative group perspective-1000">
-             <div
-              className="absolute inset-0 blur-3xl opacity-20 transition-opacity duration-1000 group-hover:opacity-40"
-              style={{ background: "var(--safety-amber)" }}
-            />
-            <div className="relative transform transition-transform duration-700 hover:scale-[1.02] hover:-rotate-y-3">
-              <Image
-                src="/assets/desktop-mockup.png"
-                alt="Desktop Dashboard View"
-                width={800}
-                height={600}
-                className="rounded-xl shadow-2xl"
-                style={{
-                  boxShadow: "0 20px 50px -10px oklch(0 0 0 / 0.5)",
-                }}
-              />
-            </div>
-             <div className="mt-8 space-y-4 text-center lg:text-left">
-              <h3 className="text-xl font-semibold" style={{ color: "oklch(0.9 0 0)" }}>Command Center Ready</h3>
-              <p style={{ color: "oklch(0.6 0 0)" }}>
-                Full detailed traces, AI analysis logs, and historical trends at your fingertips.
-              </p>
+          {/* Image Display Area */}
+          <div className="lg:col-span-8 relative h-[600px] flex items-center justify-center">
+            <div
+              className={cn(
+                "relative transition-all duration-500 transform",
+                isTransitioning ? "opacity-0 scale-95 translate-y-8" : "opacity-100 scale-100 translate-y-0"
+              )}
+            >
+              <div className="relative group">
+                {/* CSS Mask for Seamless Blending */}
+                <div 
+                   className="absolute inset-0 z-20 pointer-events-none"
+                   style={{
+                     background: "radial-gradient(circle at center, transparent 30%, var(--deep-void) 100%)",
+                     opacity: 0.8
+                   }}
+                />
+                
+                {/* Image */}
+                <Image
+                  src={activeDevice.image}
+                  alt={activeDevice.name}
+                  width={activeDevice.width}
+                  height={activeDevice.height}
+                  className="rounded-xl shadow-2xl relative z-10"
+                  style={{
+                    boxShadow: "0 0 100px -20px var(--electric-indigo)",
+                    maskImage: "linear-gradient(to bottom, black 80%, transparent 100%)"
+                  }}
+                />
+
+                {/* Status Badge */}
+                <div className="absolute -top-6 -right-6 z-30 animate-bounce">
+                  <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-2 shadow-xl">
+                    <CheckCircle className="w-4 h-4 text-[var(--safety-amber)]" />
+                    <span className="text-xs font-mono font-bold text-[var(--safety-amber)]">
+                      LATEST BUILD: PASS
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
