@@ -20,9 +20,13 @@ function MCPAuthContent() {
         if (res.ok) {
           setStatus("ready")
         } else {
+          // Store the port in sessionStorage before redirecting to login
+          // so we can return to this page after auth
+          if (callbackPort) {
+            sessionStorage.setItem("mcp_callback_port", callbackPort)
+          }
           // Redirect to login
-          const currentUrl = window.location.href
-          window.location.href = `/api/auth/signin?callbackUrl=${encodeURIComponent(currentUrl)}`
+          window.location.href = `/api/auth/signin`
         }
       } catch {
         setError("Failed to check authentication status")
@@ -30,7 +34,7 @@ function MCPAuthContent() {
       }
     }
     checkAuth()
-  }, [])
+  }, [callbackPort])
 
   async function authorizeAndRedirect() {
     if (!callbackPort) {

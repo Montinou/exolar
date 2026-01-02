@@ -65,6 +65,17 @@ export function AccessGate({ children }: AccessGateProps) {
     checkAccess()
   }, [])
 
+  // Check for pending MCP callback after successful auth
+  useEffect(() => {
+    if (accessState.authorized && typeof window !== "undefined") {
+      const mcpPort = sessionStorage.getItem("mcp_callback_port")
+      if (mcpPort) {
+        sessionStorage.removeItem("mcp_callback_port")
+        window.location.href = `/auth/mcp?port=${mcpPort}`
+      }
+    }
+  }, [accessState.authorized])
+
   // Show loading skeleton while checking
   if (accessState.loading || sessionLoading) {
     return <AccessLoadingSkeleton />
