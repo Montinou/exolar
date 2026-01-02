@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Check, Loader2, Terminal } from "lucide-react"
 
-export default function MCPAuthPage() {
+function MCPAuthContent() {
   const searchParams = useSearchParams()
   const callbackPort = searchParams.get("port")
   const [status, setStatus] = useState<"loading" | "ready" | "authorizing" | "success" | "error">("loading")
@@ -141,5 +141,36 @@ export default function MCPAuthPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Terminal className="h-6 w-6 text-primary" />
+          </div>
+          <CardTitle>Authorize Claude Code</CardTitle>
+          <CardDescription>
+            Grant Claude Code access to your Aestra data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default function MCPAuthPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <MCPAuthContent />
+    </Suspense>
   )
 }
