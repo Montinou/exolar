@@ -25,8 +25,8 @@ function MCPAuthContent() {
           if (callbackPort) {
             sessionStorage.setItem("mcp_callback_port", callbackPort)
           }
-          // Redirect to login
-          window.location.href = `/api/auth/signin`
+          // Redirect to login (Neon Auth uses /auth/sign-in)
+          window.location.href = `/auth/sign-in`
         }
       } catch {
         setError("Failed to check authentication status")
