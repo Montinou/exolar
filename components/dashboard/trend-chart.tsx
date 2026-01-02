@@ -34,7 +34,7 @@ export function TrendChart({ data }: TrendChartProps) {
               color: "hsl(var(--chart-2))",
             },
           }}
-          className="h-[300px]"
+          className="h-[200px] sm:h-[300px]"
         >
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>

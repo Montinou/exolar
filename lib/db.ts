@@ -894,6 +894,70 @@ export async function getTestFlakiness(
 }
 
 // ============================================
+// Dashboard Analytics Queries
+// ============================================
+
+export interface SlowestTest {
+  test_signature: string
+  test_name: string
+  test_file: string
+  avg_duration_ms: number
+  run_count: number
+}
+
+export async function getSlowestTests(
+  organizationId: number,
+  limit: number = 5,
+  minRuns: number = 3
+): Promise<SlowestTest[]> {
+  const sql = getSql()
+
+  const result = await sql`
+    SELECT
+      COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) as test_signature,
+      tr.test_name,
+      tr.test_file,
+      ROUND(AVG(tr.duration_ms)) as avg_duration_ms,
+      COUNT(*) as run_count
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND te.started_at > NOW() - INTERVAL '7 days'
+    GROUP BY tr.test_signature, tr.test_name, tr.test_file
+    HAVING COUNT(*) >= ${minRuns}
+    ORDER BY avg_duration_ms DESC
+    LIMIT ${limit}
+  `
+
+  return result as SlowestTest[]
+}
+
+export interface SuitePassRate {
+  suite: string
+  total_runs: number
+  pass_rate: number
+}
+
+export async function getSuitePassRates(organizationId: number): Promise<SuitePassRate[]> {
+  const sql = getSql()
+
+  const result = await sql`
+    SELECT
+      suite,
+      COUNT(*) as total_runs,
+      ROUND(COUNT(*) FILTER (WHERE status = 'success')::decimal / COUNT(*) * 100, 1) as pass_rate
+    FROM test_executions
+    WHERE organization_id = ${organizationId}
+      AND suite IS NOT NULL
+      AND started_at > NOW() - INTERVAL '7 days'
+    GROUP BY suite
+    ORDER BY pass_rate ASC
+  `
+
+  return result as SuitePassRate[]
+}
+
+// ============================================
 // Org-Bound Query Helper
 // ============================================
 
@@ -953,6 +1017,12 @@ export function getQueriesForOrg(organizationId: number) {
       getFlakinessSummary(organizationId),
     getTestFlakiness: (signature: string) =>
       getTestFlakiness(organizationId, signature),
+
+    // Dashboard analytics queries
+    getSlowestTests: (limit?: number, minRuns?: number) =>
+      getSlowestTests(organizationId, limit, minRuns),
+    getSuitePassRates: () =>
+      getSuitePassRates(organizationId),
 
     // Insert functions
     insertExecution: (data: ExecutionRequest) =>

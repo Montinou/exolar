@@ -67,7 +67,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[200px] flex items-center justify-center">
+          <div className="h-[150px] sm:h-[200px] flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         </CardContent>
@@ -85,7 +85,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+          <div className="h-[150px] sm:h-[200px] flex items-center justify-center text-muted-foreground text-sm">
             No data available for selected period
           </div>
         </CardContent>
@@ -107,8 +107,9 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={formattedData}>
+        <div className="h-[150px] sm:h-[200px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={formattedData}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
               dataKey="date"
@@ -158,8 +159,9 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
               dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6 }}
             />
-          </LineChart>
-        </ResponsiveContainer>
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   )

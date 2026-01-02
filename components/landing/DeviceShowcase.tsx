@@ -60,8 +60,8 @@ export function DeviceShowcase() {
   return (
     <section className="py-32 overflow-hidden relative">
       {/* Background Glow */}
-      <div 
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-3xl opacity-20 pointer-events-none"
+      <div
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] lg:w-[800px] lg:h-[800px] rounded-full blur-3xl opacity-20 pointer-events-none"
         style={{
           background: "radial-gradient(circle, var(--electric-indigo), transparent 70%)"
         }}
@@ -132,30 +132,31 @@ export function DeviceShowcase() {
           </div>
 
           {/* Image Display Area */}
-          <div className="lg:col-span-8 relative h-[600px] flex items-center justify-center">
+          <div className="lg:col-span-8 relative h-[350px] sm:h-[450px] md:h-[500px] lg:h-[600px] flex items-center justify-center">
             <div
               className={cn(
                 "relative transition-all duration-500 transform",
                 isTransitioning ? "opacity-0 scale-95 translate-y-8" : "opacity-100 scale-100 translate-y-0"
               )}
             >
-              <div className="relative group">
+              <div className="relative group max-w-[85vw] sm:max-w-[400px] md:max-w-[500px] lg:max-w-none">
                 {/* CSS Mask for Seamless Blending */}
-                <div 
+                <div
                    className="absolute inset-0 z-20 pointer-events-none"
                    style={{
                      background: "radial-gradient(circle at center, transparent 30%, var(--deep-void) 100%)",
                      opacity: 0.8
                    }}
                 />
-                
+
                 {/* Image */}
                 <Image
                   src={activeDevice.image}
                   alt={activeDevice.name}
                   width={activeDevice.width}
                   height={activeDevice.height}
-                  className="rounded-xl shadow-2xl relative z-10"
+                  className="rounded-xl shadow-2xl relative z-10 w-full h-auto"
+                  sizes="(max-width: 640px) 85vw, (max-width: 768px) 400px, (max-width: 1024px) 500px, 800px"
                   style={{
                     boxShadow: "0 0 100px -20px var(--electric-indigo)",
                     maskImage: "linear-gradient(to bottom, black 80%, transparent 100%)"
@@ -163,11 +164,11 @@ export function DeviceShowcase() {
                 />
 
                 {/* Status Badge */}
-                <div className="absolute -top-6 -right-6 z-30 animate-bounce">
-                  <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-2 shadow-xl">
-                    <CheckCircle className="w-4 h-4 text-[var(--safety-amber)]" />
-                    <span className="text-xs font-mono font-bold text-[var(--safety-amber)]">
-                      LATEST BUILD: PASS
+                <div className="absolute -top-3 -right-2 sm:-top-6 sm:-right-6 z-30 animate-bounce">
+                  <div className="glass-panel px-2 py-1 sm:px-4 sm:py-2 rounded-full flex items-center gap-1 sm:gap-2 shadow-xl">
+                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-[var(--safety-amber)]" />
+                    <span className="text-[10px] sm:text-xs font-mono font-bold text-[var(--safety-amber)]">
+                      <span className="hidden sm:inline">LATEST BUILD: </span>PASS
                     </span>
                   </div>
                 </div>

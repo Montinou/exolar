@@ -59,7 +59,7 @@ export function WishlistForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={status === "loading"}
-          className="bg-white/5 border-white/10 placeholder:text-white/40 text-white focus-visible:ring-[var(--safety-amber)]/50 focus-visible:border-[var(--safety-amber)]"
+          className="min-h-[44px] bg-white/5 border-white/10 placeholder:text-white/40 text-white focus-visible:ring-[var(--safety-amber)]/50 focus-visible:border-[var(--safety-amber)]"
         />
         <Input
           type="text"
@@ -67,12 +67,12 @@ export function WishlistForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={status === "loading"}
-          className="bg-white/5 border-white/10 placeholder:text-white/40 text-white focus-visible:ring-[var(--safety-amber)]/50 focus-visible:border-[var(--safety-amber)] sm:max-w-[150px]"
+          className="min-h-[44px] bg-white/5 border-white/10 placeholder:text-white/40 text-white focus-visible:ring-[var(--safety-amber)]/50 focus-visible:border-[var(--safety-amber)] sm:max-w-[150px]"
         />
         <button
           type="submit"
           disabled={status === "loading"}
-          className="btn-amber flex items-center justify-center gap-2 whitespace-nowrap"
+          className="btn-amber min-h-[44px] flex items-center justify-center gap-2 whitespace-nowrap"
         >
           {status === "loading" ? (
             <>

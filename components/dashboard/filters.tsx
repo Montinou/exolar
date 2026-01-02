@@ -63,14 +63,14 @@ export function Filters({ branches, suites }: FiltersProps) {
   const hasFilters = currentStatus || currentBranch || currentSuite || currentFrom || currentTo
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <DateRangePicker value={dateRange} onChange={updateDateRange} />
+    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+      <DateRangePicker value={dateRange} onChange={updateDateRange} className="w-full sm:w-auto" />
 
       <Select
         value={currentStatus || "all"}
         onValueChange={(value) => updateFilter("status", value === "all" ? null : value)}
       >
-        <SelectTrigger className="w-[150px]">
+        <SelectTrigger className="w-full sm:w-[150px]">
           <SelectValue placeholder="Status" />
         </SelectTrigger>
         <SelectContent>
@@ -85,7 +85,7 @@ export function Filters({ branches, suites }: FiltersProps) {
         value={currentSuite || "all"}
         onValueChange={(value) => updateFilter("suite", value === "all" ? null : value)}
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-full sm:w-[180px]">
           <SelectValue placeholder="Suite" />
         </SelectTrigger>
         <SelectContent>
@@ -102,7 +102,7 @@ export function Filters({ branches, suites }: FiltersProps) {
         value={currentBranch || "all"}
         onValueChange={(value) => updateFilter("branch", value === "all" ? null : value)}
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-full sm:w-[180px]">
           <SelectValue placeholder="Branch" />
         </SelectTrigger>
         <SelectContent>
@@ -116,7 +116,7 @@ export function Filters({ branches, suites }: FiltersProps) {
       </Select>
 
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
+        <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full sm:w-auto">
           <X className="h-4 w-4 mr-1" />
           Clear
         </Button>

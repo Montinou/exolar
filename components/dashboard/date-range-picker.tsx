@@ -59,36 +59,38 @@ export function DateRangePicker({
         <Button
           variant="outline"
           className={cn(
-            "w-[280px] justify-start text-left font-normal",
+            "justify-start text-left font-normal",
             !value && "text-muted-foreground",
             className
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {value?.from ? (
-            value.to ? (
-              <>
-                {format(value.from, "LLL dd, y")} -{" "}
-                {format(value.to, "LLL dd, y")}
-              </>
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+          <span className="truncate">
+            {value?.from ? (
+              value.to ? (
+                <>
+                  {format(value.from, "LLL dd, y")} -{" "}
+                  {format(value.to, "LLL dd, y")}
+                </>
+              ) : (
+                format(value.from, "LLL dd, y")
+              )
             ) : (
-              format(value.from, "LLL dd, y")
-            )
-          ) : (
-            <span>Pick a date range</span>
-          )}
+              "Pick a date range"
+            )}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex">
-          <div className="flex flex-col gap-1 border-r p-3">
-            <p className="text-sm font-medium mb-2">Quick select</p>
+        <div className="flex flex-col sm:flex-row">
+          <div className="flex flex-row sm:flex-col gap-1 border-b sm:border-b-0 sm:border-r p-3 overflow-x-auto sm:overflow-x-visible">
+            <p className="text-sm font-medium mb-2 hidden sm:block">Quick select</p>
             {presets.map((preset) => (
               <Button
                 key={preset.days}
                 variant="ghost"
                 size="sm"
-                className="justify-start"
+                className="justify-start whitespace-nowrap"
                 onClick={() => handlePresetClick(preset.days)}
               >
                 {preset.label}
@@ -98,14 +100,14 @@ export function DateRangePicker({
               <Button
                 variant="ghost"
                 size="sm"
-                className="justify-start text-muted-foreground mt-2"
+                className="justify-start text-muted-foreground sm:mt-2"
                 onClick={handleClear}
               >
                 Clear
               </Button>
             )}
           </div>
-          <div className="p-3">
+          <div className="p-3 overflow-x-auto">
             <Calendar
               mode="range"
               defaultMonth={value?.from}
@@ -113,6 +115,7 @@ export function DateRangePicker({
               onSelect={handleSelect}
               numberOfMonths={2}
               disabled={{ after: new Date() }}
+              className="[&_.rdp-months]:flex-col [&_.rdp-months]:sm:flex-row"
             />
           </div>
         </div>
