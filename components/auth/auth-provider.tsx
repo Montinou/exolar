@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { NeonAuthUIProvider } from "@neondatabase/auth/react/ui"
 import { authClient } from "@/lib/auth/client"
 
@@ -11,6 +11,20 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter()
+  const pathname = usePathname()
+
+  const handleSessionChange = async () => {
+    router.refresh()
+
+    // Check if user just signed in (has active session)
+    const { data } = await authClient.getSession()
+    if (data?.session) {
+      // Only redirect if on auth pages (sign-in flow completed)
+      if (pathname?.startsWith("/auth")) {
+        router.push("/dashboard")
+      }
+    }
+  }
 
   return (
     <NeonAuthUIProvider
@@ -19,10 +33,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       signUp={false}
       navigate={(path) => router.push(path)}
       replace={(path) => router.replace(path)}
-      onSessionChange={() => {
-        router.refresh()
-        router.push("/dashboard")
-      }}
+      onSessionChange={handleSessionChange}
     >
       {children}
     </NeonAuthUIProvider>
