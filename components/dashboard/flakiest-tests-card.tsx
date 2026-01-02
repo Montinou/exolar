@@ -91,7 +91,8 @@ export function FlakiestTestsCard() {
     )
   }
 
-  if (!data || data.tests.length === 0) {
+  const tests = data?.tests || []
+  if (!data || tests.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -124,7 +125,7 @@ export function FlakiestTestsCard() {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {data.tests.map((test) => (
+          {tests.map((test) => (
             <div
               key={test.test_signature}
               className="flex items-start justify-between gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
