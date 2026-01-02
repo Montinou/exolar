@@ -46,11 +46,13 @@ export function SuitePassRatesCard() {
   }, [])
 
   // Format suite names for display
-  const formattedData = suites.map((item) => ({
-    ...item,
-    displayName:
-      item.suite.length > 25 ? item.suite.slice(0, 25) + "..." : item.suite,
-  }))
+  const formattedData = Array.isArray(suites)
+    ? suites.map((item) => ({
+        ...item,
+        displayName:
+          item.suite.length > 25 ? item.suite.slice(0, 25) + "..." : item.suite,
+      }))
+    : []
 
   if (loading) {
     return (

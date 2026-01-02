@@ -84,7 +84,7 @@ export function SlowestTestsCard() {
     )
   }
 
-  if (tests.length === 0) {
+  if (!Array.isArray(tests) || tests.length === 0) {
     return (
       <Card>
         <CardHeader>

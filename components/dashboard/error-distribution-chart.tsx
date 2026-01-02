@@ -39,17 +39,19 @@ export function ErrorDistributionChart() {
   }, [])
 
   // Format error type for display
-  const formattedData = data
-    .filter((item) => item.error_type)
-    .slice(0, 6)
-    .map((item) => ({
-      ...item,
-      // Truncate long error types
-      displayType:
-        item.error_type.length > 20
-          ? item.error_type.slice(0, 20) + "..."
-          : item.error_type,
-    }))
+  const formattedData = Array.isArray(data)
+    ? data
+        .filter((item) => item.error_type)
+        .slice(0, 6)
+        .map((item) => ({
+          ...item,
+          // Truncate long error types
+          displayType:
+            item.error_type.length > 20
+              ? item.error_type.slice(0, 20) + "..."
+              : item.error_type,
+        }))
+    : []
 
   if (loading) {
     return (
