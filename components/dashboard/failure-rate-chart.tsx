@@ -129,7 +129,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
                   return (
                     <div className="bg-popover border rounded-lg p-3 shadow-lg">
                       <p className="font-medium">{tooltipData.date}</p>
-                      <p className="text-red-500 font-semibold">
+                      <p className="font-semibold" style={{ color: "var(--status-error)" }}>
                         Failure Rate: {Number(tooltipData.failure_rate).toFixed(1)}%
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -143,7 +143,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
             />
             <ReferenceLine
               y={avgFailureRate}
-              stroke="#888"
+              stroke="var(--chart-neutral)"
               strokeDasharray="3 3"
               label={{
                 value: "Avg",
@@ -154,9 +154,9 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
             <Line
               type="monotone"
               dataKey="failure_rate"
-              stroke="#ef4444"
+              stroke="var(--status-error)"
               strokeWidth={2}
-              dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
+              dot={{ fill: "var(--status-error)", strokeWidth: 2, r: 4 }}
               activeDot={{ r: 6 }}
             />
             </LineChart>

@@ -4,43 +4,9 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Aestra Dark Theme - Single Source of Truth */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
+  /* Base colors (dark mode default) */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.145 0 0);
@@ -60,32 +26,80 @@
   --border: oklch(0.269 0 0);
   --input: oklch(0.269 0 0);
   --ring: oklch(0.439 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --radius: 0.625rem;
+
+  /* Sidebar */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.75 0.15 195);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-}
 
-/* Deep Space Theme */
-:root {
+  /* Aestra Brand Colors */
   --deep-void: oklch(0.08 0.02 260);
   --deep-void-light: oklch(0.12 0.025 260);
+
+  /* Primary Accent: Cyan/Teal (matches logo) */
+  --aestra-cyan: oklch(0.75 0.15 195);
+  --aestra-cyan-light: oklch(0.85 0.12 195);
+  --aestra-cyan-dark: oklch(0.55 0.18 195);
+  --aestra-cyan-foreground: oklch(0.1 0.02 195);
+
+  /* Secondary Accent: Amber/Gold (matches logo) */
   --safety-amber: oklch(0.78 0.18 75);
+  --safety-amber-light: oklch(0.88 0.15 75);
+  --safety-amber-dark: oklch(0.65 0.20 75);
   --safety-amber-foreground: oklch(0.15 0.05 75);
-  --electric-indigo: oklch(0.55 0.23 270);
-  --electric-indigo-foreground: oklch(0.98 0 0);
+
+  /* Tertiary: Purple (for special effects) */
+  --aestra-purple: oklch(0.55 0.23 280);
+  --aestra-purple-light: oklch(0.70 0.20 280);
+
+  /* Glass Effects */
   --glass-bg: oklch(0.12 0.02 260 / 0.5);
   --glass-border: oklch(1 0 0 / 0.1);
   --grid-color: oklch(1 0 0 / 0.03);
+
+  /* Semantic Status Colors */
+  --status-success: oklch(0.72 0.19 145);
+  --status-success-light: oklch(0.72 0.19 145 / 0.1);
+  --status-success-foreground: oklch(0.35 0.10 145);
+
+  --status-error: oklch(0.65 0.22 25);
+  --status-error-light: oklch(0.65 0.22 25 / 0.1);
+  --status-error-foreground: oklch(0.95 0.05 25);
+
+  --status-warning: oklch(0.78 0.18 75);
+  --status-warning-light: oklch(0.78 0.18 75 / 0.1);
+  --status-warning-foreground: oklch(0.35 0.10 75);
+
+  --status-info: oklch(0.70 0.15 230);
+  --status-info-light: oklch(0.70 0.15 230 / 0.1);
+  --status-info-foreground: oklch(0.95 0.03 230);
+
+  /* HTTP Method Colors */
+  --method-get: oklch(0.70 0.15 230);
+  --method-get-bg: oklch(0.70 0.15 230 / 0.1);
+  --method-post: oklch(0.72 0.19 145);
+  --method-post-bg: oklch(0.72 0.19 145 / 0.1);
+  --method-put: oklch(0.78 0.18 75);
+  --method-put-bg: oklch(0.78 0.18 75 / 0.1);
+  --method-delete: oklch(0.65 0.22 25);
+  --method-delete-bg: oklch(0.65 0.22 25 / 0.1);
+
+  /* Chart Colors (semantic) */
+  --chart-passed: var(--status-success);
+  --chart-failed: var(--status-error);
+  --chart-flaky: var(--status-warning);
+  --chart-neutral: oklch(0.5 0 0);
+  --chart-1: oklch(0.75 0.15 195);
+  --chart-2: oklch(0.78 0.18 75);
+  --chart-3: oklch(0.72 0.19 145);
+  --chart-4: oklch(0.55 0.23 280);
+  --chart-5: oklch(0.65 0.22 25);
 }
 
 @theme inline {
@@ -127,6 +141,25 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Aestra Brand Colors */
+  --color-aestra-cyan: var(--aestra-cyan);
+  --color-aestra-cyan-light: var(--aestra-cyan-light);
+  --color-aestra-cyan-dark: var(--aestra-cyan-dark);
+  --color-safety-amber: var(--safety-amber);
+  --color-safety-amber-light: var(--safety-amber-light);
+  --color-aestra-purple: var(--aestra-purple);
+
+  /* Status Colors */
+  --color-status-success: var(--status-success);
+  --color-status-error: var(--status-error);
+  --color-status-warning: var(--status-warning);
+  --color-status-info: var(--status-info);
+
+  /* Chart Colors */
+  --color-chart-passed: var(--chart-passed);
+  --color-chart-failed: var(--chart-failed);
+  --color-chart-flaky: var(--chart-flaky);
 }
 
 @layer base {
@@ -151,9 +184,9 @@
     @apply relative overflow-hidden rounded-xl;
     background: linear-gradient(
       135deg,
-      oklch(0.55 0.23 270 / 0.3),
+      oklch(0.75 0.15 195 / 0.3),
       oklch(0.78 0.18 75 / 0.2),
-      oklch(0.55 0.23 270 / 0.3)
+      oklch(0.75 0.15 195 / 0.3)
     );
     padding: 1px;
   }
@@ -182,8 +215,12 @@
     box-shadow: 0 0 20px oklch(0.78 0.18 75 / 0.4);
   }
 
-  .glow-indigo {
-    box-shadow: 0 0 20px oklch(0.55 0.23 270 / 0.4);
+  .glow-cyan {
+    box-shadow: 0 0 20px oklch(0.75 0.15 195 / 0.4);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px oklch(0.55 0.23 280 / 0.4);
   }
 
   /* Deep Space button variants */

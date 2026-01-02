@@ -20,9 +20,9 @@ interface SuitePassRate {
 }
 
 function getBarColor(passRate: number): string {
-  if (passRate >= 90) return "#22c55e" // green-500
-  if (passRate >= 75) return "#eab308" // yellow-500
-  return "#ef4444" // red-500
+  if (passRate >= 90) return "var(--status-success)"
+  if (passRate >= 75) return "var(--status-warning)"
+  return "var(--status-error)"
 }
 
 export function SuitePassRatesCard() {

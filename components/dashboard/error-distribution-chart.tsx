@@ -129,7 +129,7 @@ export function ErrorDistributionChart() {
                       <p className="font-medium text-sm">
                         {tooltipData.error_type}
                       </p>
-                      <p className="text-red-500 font-semibold">
+                      <p className="font-semibold" style={{ color: "var(--status-error)" }}>
                         {tooltipData.count} failures
                       </p>
                     </div>
@@ -142,7 +142,7 @@ export function ErrorDistributionChart() {
               {formattedData.map((_, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={index === 0 ? "#ef4444" : "#f87171"}
+                  fill={index === 0 ? "var(--status-error)" : "var(--status-error-light)"}
                 />
               ))}
             </Bar>

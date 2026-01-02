@@ -31,12 +31,12 @@ export function FlakyBadge({
   // 60-100%: red (high)
   const getBadgeClasses = () => {
     if (flakinessRate >= 60) {
-      return "bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20"
+      return "bg-[var(--status-error-light)] text-[var(--status-error)] border-[var(--status-error)]/20 hover:bg-[var(--status-error)]/20"
     }
     if (flakinessRate >= 30) {
-      return "bg-orange-500/10 text-orange-600 border-orange-500/20 hover:bg-orange-500/20"
+      return "bg-[var(--status-warning-light)] text-[var(--status-warning)] border-[var(--status-warning)]/20 hover:bg-[var(--status-warning)]/20"
     }
-    return "bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20"
+    return "bg-[var(--status-warning-light)] text-[var(--status-warning)] border-[var(--status-warning)]/20 hover:bg-[var(--status-warning)]/20"
   }
 
   const getLabel = () => {

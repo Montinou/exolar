@@ -1,42 +1,15 @@
 "use client"
 
-import { useState } from "react"
-import { Check, Copy } from "lucide-react"
 import Link from "next/link"
+import { CodeBlock } from "@/components/docs/code-block"
+import { TableOfContents, TOCItem } from "@/components/docs/table-of-contents"
 
-function CodeBlock({ code, title }: { code: string; title?: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div className="relative group">
-      {title && (
-        <div className="px-4 py-2 bg-muted/50 border-b border-border rounded-t-lg text-xs text-muted-foreground font-mono">
-          {title}
-        </div>
-      )}
-      <pre className={`p-4 bg-muted text-sm overflow-x-auto ${title ? "rounded-b-lg" : "rounded-lg"}`}>
-        <code>{code}</code>
-      </pre>
-      <button
-        onClick={handleCopy}
-        className="absolute top-2 right-2 p-2 rounded-md bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
-        aria-label="Copy code"
-      >
-        {copied ? (
-          <Check className="w-4 h-4 text-green-500" />
-        ) : (
-          <Copy className="w-4 h-4 text-muted-foreground" />
-        )}
-      </button>
-    </div>
-  )
-}
+const tocItems: TOCItem[] = [
+  { id: "quick-start", text: "Quick Start" },
+  { id: "configuration", text: "Configuration" },
+  { id: "playwright-config", text: "Playwright Configuration" },
+  { id: "troubleshooting", text: "Troubleshooting" },
+]
 
 const basicExample = `name: Playwright Tests
 
@@ -93,26 +66,87 @@ const fullExample = `- name: Upload to Aestra
     upload-artifacts: true
     artifact-types: "video,screenshot,trace"`
 
+const inputReference = [
+  { name: "api-key", required: "Yes", default: "-", desc: "API key from the dashboard" },
+  { name: "results-path", required: "No", default: "./test-results", desc: "Path to Playwright test results" },
+  { name: "report-path", required: "No", default: "./playwright-report", desc: "Path to Playwright HTML report" },
+  { name: "suite-name", required: "No", default: "default", desc: "Name for grouping test runs" },
+  { name: "upload-artifacts", required: "No", default: "true", desc: "Upload videos, screenshots, traces" },
+]
+
+function InputTable() {
+  return (
+    <div>
+      {/* Mobile: Card layout */}
+      <div className="sm:hidden space-y-3">
+        {inputReference.map((input) => (
+          <div key={input.name} className="p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2 mb-2">
+              <code className="text-primary text-sm">{input.name}</code>
+              {input.required === "Yes" && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-500">Required</span>
+              )}
+            </div>
+            {input.default !== "-" && (
+              <p className="text-xs text-muted-foreground mb-1">
+                Default: <code className="px-1 py-0.5 rounded bg-muted">{input.default}</code>
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground">{input.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: Table layout */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-3 px-4 font-semibold">Input</th>
+              <th className="text-left py-3 px-4 font-semibold">Required</th>
+              <th className="text-left py-3 px-4 font-semibold">Default</th>
+              <th className="text-left py-3 px-4 font-semibold">Description</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {inputReference.map((input) => (
+              <tr key={input.name}>
+                <td className="py-3 px-4"><code className="text-primary">{input.name}</code></td>
+                <td className="py-3 px-4">{input.required}</td>
+                <td className="py-3 px-4">{input.default}</td>
+                <td className="py-3 px-4 text-muted-foreground">{input.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function GitHubActionDocsPage() {
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
+      {/* Mobile TOC */}
+      <TableOfContents items={tocItems} />
+
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-4xl font-bold tracking-tight">GitHub Action</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">GitHub Action</h1>
+        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Automatically upload your Playwright test results to Aestra
           from GitHub Actions. Track test history, detect flaky tests, and analyze failures.
         </p>
       </div>
 
       {/* Quick Start */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Quick Start</h2>
+      <section id="quick-start" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Quick Start</h2>
 
         <div className="space-y-4">
-          <div className="p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
               Get your API Key
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -121,20 +155,20 @@ export default function GitHubActionDocsPage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
               Add the secret to GitHub
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground">
               In your GitHub repository, go to <strong>Settings &rarr; Secrets and variables &rarr; Actions</strong>.
               Create a new secret named <code className="px-1 py-0.5 rounded bg-muted">AESTRA_API_KEY</code> with your API key.
             </p>
           </div>
 
-          <div className="p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">3</span>
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">3</span>
               Add to your workflow
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
@@ -146,62 +180,19 @@ export default function GitHubActionDocsPage() {
       </section>
 
       {/* Configuration */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Configuration</h2>
+      <section id="configuration" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Configuration</h2>
 
-        <h3 className="font-semibold text-lg">All Options</h3>
+        <h3 className="font-semibold text-base sm:text-lg">All Options</h3>
         <CodeBlock code={fullExample} />
 
-        <h3 className="font-semibold text-lg mt-8">Input Reference</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left py-3 px-4 font-semibold">Input</th>
-                <th className="text-left py-3 px-4 font-semibold">Required</th>
-                <th className="text-left py-3 px-4 font-semibold">Default</th>
-                <th className="text-left py-3 px-4 font-semibold">Description</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              <tr>
-                <td className="py-3 px-4"><code className="text-primary">api-key</code></td>
-                <td className="py-3 px-4">Yes</td>
-                <td className="py-3 px-4">-</td>
-                <td className="py-3 px-4 text-muted-foreground">API key from the dashboard</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4"><code className="text-primary">results-path</code></td>
-                <td className="py-3 px-4">No</td>
-                <td className="py-3 px-4">./test-results</td>
-                <td className="py-3 px-4 text-muted-foreground">Path to Playwright test results</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4"><code className="text-primary">report-path</code></td>
-                <td className="py-3 px-4">No</td>
-                <td className="py-3 px-4">./playwright-report</td>
-                <td className="py-3 px-4 text-muted-foreground">Path to Playwright HTML report</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4"><code className="text-primary">suite-name</code></td>
-                <td className="py-3 px-4">No</td>
-                <td className="py-3 px-4">default</td>
-                <td className="py-3 px-4 text-muted-foreground">Name for grouping test runs</td>
-              </tr>
-              <tr>
-                <td className="py-3 px-4"><code className="text-primary">upload-artifacts</code></td>
-                <td className="py-3 px-4">No</td>
-                <td className="py-3 px-4">true</td>
-                <td className="py-3 px-4 text-muted-foreground">Upload videos, screenshots, traces</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <h3 className="font-semibold text-base sm:text-lg mt-6 sm:mt-8">Input Reference</h3>
+        <InputTable />
       </section>
 
       {/* Playwright Config */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Playwright Configuration</h2>
+      <section id="playwright-config" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Playwright Configuration</h2>
         <p className="text-muted-foreground">
           Make sure your Playwright config outputs test results in JSON format:
         </p>
@@ -225,22 +216,22 @@ export default defineConfig({
       </section>
 
       {/* Troubleshooting */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Troubleshooting</h2>
-        <div className="space-y-4">
-          <div className="p-4 rounded-lg border border-border">
+      <section id="troubleshooting" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Troubleshooting</h2>
+        <div className="space-y-3 sm:space-y-4">
+          <div className="p-3 sm:p-4 rounded-lg border border-border">
             <h3 className="font-semibold mb-2">No test results uploaded</h3>
             <p className="text-sm text-muted-foreground">
               Make sure your Playwright config includes the JSON reporter and the <code className="px-1 py-0.5 rounded bg-muted">results-path</code> matches your output directory.
             </p>
           </div>
-          <div className="p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-lg border border-border">
             <h3 className="font-semibold mb-2">Authentication failed</h3>
             <p className="text-sm text-muted-foreground">
               Verify your API key is correct and the secret is properly configured in GitHub.
             </p>
           </div>
-          <div className="p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-lg border border-border">
             <h3 className="font-semibold mb-2">Action not running on failure</h3>
             <p className="text-sm text-muted-foreground">
               Add <code className="px-1 py-0.5 rounded bg-muted">if: always()</code> to ensure the action runs even when tests fail.

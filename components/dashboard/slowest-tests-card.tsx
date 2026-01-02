@@ -49,7 +49,7 @@ export function SlowestTestsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-500" />
+            <Clock className="h-5 w-5 text-[var(--status-warning)]" />
             Slowest Tests
           </CardTitle>
         </CardHeader>
@@ -69,7 +69,7 @@ export function SlowestTestsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-500" />
+            <Clock className="h-5 w-5 text-[var(--status-warning)]" />
             Slowest Tests
           </CardTitle>
         </CardHeader>
@@ -89,7 +89,7 @@ export function SlowestTestsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-500" />
+            <Clock className="h-5 w-5 text-[var(--status-warning)]" />
             Slowest Tests
           </CardTitle>
         </CardHeader>
@@ -109,7 +109,7 @@ export function SlowestTestsCard() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-orange-500" />
+            <Clock className="h-5 w-5 text-[var(--status-warning)]" />
             Slowest Tests
           </span>
           <Badge variant="secondary">Last 7 days</Badge>

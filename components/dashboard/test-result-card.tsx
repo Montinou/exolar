@@ -14,9 +14,9 @@ import { FlakyBadge } from "./flaky-badge"
 // ============================================
 
 function getStatusIcon(status: string) {
-  if (status === "passed") return <CheckCircle2 className="h-4 w-4 text-green-500" />
-  if (status === "failed") return <AlertCircle className="h-4 w-4 text-red-500" />
-  return <Clock className="h-4 w-4 text-yellow-500" />
+  if (status === "passed") return <CheckCircle2 className="h-4 w-4" style={{ color: "var(--status-success)" }} />
+  if (status === "failed") return <AlertCircle className="h-4 w-4" style={{ color: "var(--status-error)" }} />
+  return <Clock className="h-4 w-4" style={{ color: "var(--status-warning)" }} />
 }
 
 function formatDuration(ms: number) {
@@ -31,26 +31,26 @@ function getErrorTypeVariant(errorType: string): "default" | "destructive" | "ou
 }
 
 function getStatusColor(status: number): string {
-  if (status >= 200 && status < 300) return "text-green-500"
-  if (status >= 400 && status < 500) return "text-orange-500"
-  if (status >= 500) return "text-red-500"
+  if (status >= 200 && status < 300) return "text-[var(--status-success)]"
+  if (status >= 400 && status < 500) return "text-[var(--status-warning)]"
+  if (status >= 500) return "text-[var(--status-error)]"
   return "text-muted-foreground"
 }
 
 function getMethodColor(method: string): string {
   const m = method.toUpperCase()
-  if (m === "GET") return "bg-blue-500/10 text-blue-600"
-  if (m === "POST") return "bg-green-500/10 text-green-600"
-  if (m === "PUT" || m === "PATCH") return "bg-yellow-500/10 text-yellow-600"
-  if (m === "DELETE") return "bg-red-500/10 text-red-600"
+  if (m === "GET") return "bg-[var(--method-get-bg)] text-[var(--method-get)]"
+  if (m === "POST") return "bg-[var(--method-post-bg)] text-[var(--method-post)]"
+  if (m === "PUT" || m === "PATCH") return "bg-[var(--method-put-bg)] text-[var(--method-put)]"
+  if (m === "DELETE") return "bg-[var(--method-delete-bg)] text-[var(--method-delete)]"
   return "bg-muted text-muted-foreground"
 }
 
 function getLogLevelColor(level: string): string {
   switch (level.toLowerCase()) {
-    case "error": return "text-red-500"
-    case "warn": return "text-yellow-500"
-    case "info": return "text-blue-500"
+    case "error": return "text-[var(--status-error)]"
+    case "warn": return "text-[var(--status-warning)]"
+    case "info": return "text-[var(--status-info)]"
     case "debug": return "text-muted-foreground"
     default: return "text-foreground"
   }

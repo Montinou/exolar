@@ -95,9 +95,9 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                   {/* Test Results */}
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex gap-2">
-                      <span className="text-green-600 dark:text-green-400">{execution.passed} passed</span>
+                      <span style={{ color: "var(--status-success)" }}>{execution.passed} passed</span>
                       {execution.failed > 0 && (
-                        <span className="text-red-600 dark:text-red-400">{execution.failed} failed</span>
+                        <span style={{ color: "var(--status-error)" }}>{execution.failed} failed</span>
                       )}
                     </div>
                     <span className="text-muted-foreground">{formatDuration(execution.duration_ms)}</span>
@@ -186,9 +186,9 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                       <TableCell>{getStatusBadge(execution.status)}</TableCell>
                       <TableCell>
                         <div className="flex gap-2 text-sm">
-                          <span className="text-green-600 dark:text-green-400">{execution.passed} passed</span>
+                          <span style={{ color: "var(--status-success)" }}>{execution.passed} passed</span>
                           {execution.failed > 0 && (
-                            <span className="text-red-600 dark:text-red-400">{execution.failed} failed</span>
+                            <span style={{ color: "var(--status-error)" }}>{execution.failed} failed</span>
                           )}
                         </div>
                       </TableCell>

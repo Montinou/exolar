@@ -29,26 +29,26 @@ const quickLinks = [
 
 export default function DocsPage() {
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-4xl font-bold tracking-tight">Documentation</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Documentation</h1>
+        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Learn how to set up Aestra, integrate with your CI/CD pipeline,
           and connect your AI coding assistant for intelligent test analysis.
         </p>
       </div>
 
       {/* Quick Start */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Quick Start</h2>
+      <section className="space-y-4 sm:space-y-6">
+        <h2 className="text-xl sm:text-2xl font-semibold">Quick Start</h2>
         <div className="grid gap-4">
-          <div className="p-6 rounded-lg border border-border bg-card">
-            <h3 className="font-semibold mb-4">1. Set up the GitHub Action</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+            <h3 className="font-semibold mb-3 sm:mb-4">1. Set up the GitHub Action</h3>
+            <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
               First, <Link href="/settings/api-keys" className="text-primary hover:underline">create an API key</Link>, then add the GitHub Action to your repository:
             </p>
-            <pre className="p-4 rounded-md bg-muted text-sm overflow-x-auto">
+            <pre className="p-3 sm:p-4 rounded-md bg-muted text-xs sm:text-sm overflow-x-auto">
               <code>{`# .github/workflows/playwright.yml
 - name: Upload to Aestra
   uses: Montinou/e2e-test-dashboard-action@v1
@@ -57,12 +57,12 @@ export default function DocsPage() {
             </pre>
           </div>
 
-          <div className="p-6 rounded-lg border border-border bg-card">
-            <h3 className="font-semibold mb-4">2. Connect Claude Code (Optional)</h3>
-            <p className="text-sm text-muted-foreground mb-4">
+          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+            <h3 className="font-semibold mb-3 sm:mb-4">2. Connect Claude Code (Optional)</h3>
+            <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
               Install the MCP server to give your AI coding assistant direct access to test results.
             </p>
-            <pre className="p-4 rounded-md bg-muted text-sm overflow-x-auto">
+            <pre className="p-3 sm:p-4 rounded-md bg-muted text-xs sm:text-sm overflow-x-auto">
               <code>{`# Authenticate
 npx e2e-test-dashboard-mcp --login
 
@@ -74,16 +74,16 @@ claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`
       </section>
 
       {/* Quick Links */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Explore</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+      <section className="space-y-4 sm:space-y-6">
+        <h2 className="text-xl sm:text-2xl font-semibold">Explore</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="group p-6 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-card/80 transition-colors"
+              className="group p-4 sm:p-6 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-card/80 transition-colors"
             >
-              <link.icon className="h-8 w-8 mb-4 text-primary" />
+              <link.icon className="h-6 w-6 sm:h-8 sm:w-8 mb-3 sm:mb-4 text-primary" />
               <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors flex items-center gap-2">
                 {link.title}
                 <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
@@ -95,10 +95,10 @@ claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`
       </section>
 
       {/* Features Overview */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Features</h2>
+      <section className="space-y-4 sm:space-y-6">
+        <h2 className="text-xl sm:text-2xl font-semibold">Features</h2>
         <div className="prose prose-neutral dark:prose-invert max-w-none">
-          <ul className="space-y-2 text-muted-foreground">
+          <ul className="space-y-2 text-muted-foreground text-sm sm:text-base">
             <li><strong className="text-foreground">Real-time Dashboard</strong> - View test results, trends, and metrics</li>
             <li><strong className="text-foreground">Flaky Test Detection</strong> - Automatically identify and track flaky tests</li>
             <li><strong className="text-foreground">AI-Powered Analysis</strong> - Get intelligent insights about test failures</li>

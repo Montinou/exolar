@@ -1,41 +1,16 @@
 "use client"
 
-import { useState } from "react"
-import { Check, Copy } from "lucide-react"
+import { CodeBlock } from "@/components/docs/code-block"
+import { TableOfContents, TOCItem } from "@/components/docs/table-of-contents"
 
-function CodeBlock({ code, title }: { code: string; title?: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div className="relative group">
-      {title && (
-        <div className="px-4 py-2 bg-muted/50 border-b border-border rounded-t-lg text-xs text-muted-foreground font-mono">
-          {title}
-        </div>
-      )}
-      <pre className={`p-4 bg-muted text-sm overflow-x-auto ${title ? "rounded-b-lg" : "rounded-lg"}`}>
-        <code>{code}</code>
-      </pre>
-      <button
-        onClick={handleCopy}
-        className="absolute top-2 right-2 p-2 rounded-md bg-background/80 opacity-0 group-hover:opacity-100 transition-opacity"
-        aria-label="Copy code"
-      >
-        {copied ? (
-          <Check className="w-4 h-4 text-green-500" />
-        ) : (
-          <Copy className="w-4 h-4 text-muted-foreground" />
-        )}
-      </button>
-    </div>
-  )
-}
+const tocItems: TOCItem[] = [
+  { id: "authentication", text: "Authentication" },
+  { id: "base-url", text: "Base URL" },
+  { id: "endpoints", text: "Endpoints" },
+  { id: "examples", text: "Examples" },
+  { id: "rate-limits", text: "Rate Limits" },
+  { id: "error-handling", text: "Error Handling" },
+]
 
 const endpoints = [
   {
@@ -90,21 +65,71 @@ const endpoints = [
   },
 ]
 
+function ParamsTable({ params }: { params: { name: string; type: string; desc: string }[] }) {
+  if (params.length === 0) return null
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold mb-2">Parameters</h4>
+
+      {/* Mobile: Card layout */}
+      <div className="sm:hidden space-y-2">
+        {params.map((param) => (
+          <div key={param.name} className="p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center gap-2 mb-1">
+              <code className="text-primary text-sm">{param.name}</code>
+              <span className="text-xs text-muted-foreground">({param.type})</span>
+            </div>
+            <p className="text-sm text-muted-foreground">{param.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: Table layout */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left py-2 px-3 font-medium">Name</th>
+              <th className="text-left py-2 px-3 font-medium">Type</th>
+              <th className="text-left py-2 px-3 font-medium">Description</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {params.map((param) => (
+              <tr key={param.name}>
+                <td className="py-2 px-3">
+                  <code className="text-primary">{param.name}</code>
+                </td>
+                <td className="py-2 px-3 text-muted-foreground">{param.type}</td>
+                <td className="py-2 px-3 text-muted-foreground">{param.desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function APIDocsPage() {
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
+      {/* Mobile TOC */}
+      <TableOfContents items={tocItems} />
+
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-4xl font-bold tracking-tight">API Reference</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">API Reference</h1>
+        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Direct REST API access for custom integrations. All endpoints require authentication
           via API key or session token.
         </p>
       </div>
 
       {/* Authentication */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Authentication</h2>
+      <section id="authentication" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Authentication</h2>
         <p className="text-muted-foreground">
           Include your API key in the <code className="px-1 py-0.5 rounded bg-muted">Authorization</code> header:
         </p>
@@ -118,8 +143,8 @@ export default function APIDocsPage() {
       </section>
 
       {/* Base URL */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Base URL</h2>
+      <section id="base-url" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Base URL</h2>
         <CodeBlock code="https://your-dashboard.vercel.app/api" />
         <p className="text-sm text-muted-foreground">
           Replace with your actual dashboard URL.
@@ -127,13 +152,13 @@ export default function APIDocsPage() {
       </section>
 
       {/* Endpoints */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Endpoints</h2>
+      <section id="endpoints" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Endpoints</h2>
 
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           {endpoints.map((endpoint) => (
-            <div key={endpoint.path} className="p-6 rounded-lg border border-border">
-              <div className="flex items-center gap-3 mb-4">
+            <div key={endpoint.path} className="p-4 sm:p-6 rounded-lg border border-border">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <span
                   className={`px-2 py-1 rounded text-xs font-mono font-semibold ${
                     endpoint.method === "GET"
@@ -143,48 +168,22 @@ export default function APIDocsPage() {
                 >
                   {endpoint.method}
                 </span>
-                <code className="text-sm font-mono">{endpoint.path}</code>
+                <code className="text-xs sm:text-sm font-mono break-all">{endpoint.path}</code>
               </div>
 
-              <p className="text-muted-foreground mb-4">{endpoint.description}</p>
+              <p className="text-muted-foreground mb-4 text-sm sm:text-base">{endpoint.description}</p>
 
-              {endpoint.params.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-2">Parameters</h4>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 px-3 font-medium">Name</th>
-                          <th className="text-left py-2 px-3 font-medium">Type</th>
-                          <th className="text-left py-2 px-3 font-medium">Description</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {endpoint.params.map((param) => (
-                          <tr key={param.name}>
-                            <td className="py-2 px-3">
-                              <code className="text-primary">{param.name}</code>
-                            </td>
-                            <td className="py-2 px-3 text-muted-foreground">{param.type}</td>
-                            <td className="py-2 px-3 text-muted-foreground">{param.desc}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              <ParamsTable params={endpoint.params} />
             </div>
           ))}
         </div>
       </section>
 
       {/* Examples */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Examples</h2>
+      <section id="examples" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Examples</h2>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <div>
             <h3 className="font-semibold mb-3">Get recent executions</h3>
             <CodeBlock
@@ -220,12 +219,12 @@ export default function APIDocsPage() {
       </section>
 
       {/* Rate Limits */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Rate Limits</h2>
+      <section id="rate-limits" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Rate Limits</h2>
         <p className="text-muted-foreground">
           API requests are rate limited to ensure fair usage:
         </p>
-        <ul className="space-y-2 text-muted-foreground">
+        <ul className="space-y-2 text-muted-foreground text-sm sm:text-base">
           <li>• <strong className="text-foreground">100 requests/minute</strong> for read endpoints</li>
           <li>• <strong className="text-foreground">10 requests/minute</strong> for write endpoints</li>
           <li>• Rate limit headers are included in responses</li>
@@ -233,8 +232,8 @@ export default function APIDocsPage() {
       </section>
 
       {/* Errors */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Error Handling</h2>
+      <section id="error-handling" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Error Handling</h2>
         <p className="text-muted-foreground mb-4">
           Errors return appropriate HTTP status codes with JSON error details:
         </p>

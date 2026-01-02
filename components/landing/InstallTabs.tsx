@@ -92,7 +92,7 @@ export function InstallTabs() {
                 <div className="flex items-center gap-3">
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-                    style={{ background: "var(--electric-indigo)", color: "white" }}
+                    style={{ background: "var(--aestra-cyan)", color: "white" }}
                   >
                     1
                   </span>
@@ -107,7 +107,7 @@ export function InstallTabs() {
                 <div className="flex items-center gap-3">
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-                    style={{ background: "var(--electric-indigo)", color: "white" }}
+                    style={{ background: "var(--aestra-cyan)", color: "white" }}
                   >
                     2
                   </span>

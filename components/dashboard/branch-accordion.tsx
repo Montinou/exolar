@@ -18,11 +18,11 @@ export function BranchAccordion({ branchGroups }: BranchAccordionProps) {
   const getStatusIcon = (status: "success" | "failure" | "running") => {
     switch (status) {
       case "success":
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />
+        return <CheckCircle2 className="h-4 w-4" style={{ color: "var(--status-success)" }} />
       case "failure":
-        return <XCircle className="h-4 w-4 text-red-500" />
+        return <XCircle className="h-4 w-4" style={{ color: "var(--status-error)" }} />
       case "running":
-        return <Loader2 className="h-4 w-4 text-yellow-500 animate-spin" />
+        return <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--status-warning)" }} />
     }
   }
 

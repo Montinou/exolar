@@ -56,7 +56,7 @@ export function FlakiestTestsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-[var(--status-warning)]" />
             Flakiest Tests
           </CardTitle>
         </CardHeader>
@@ -76,7 +76,7 @@ export function FlakiestTestsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-[var(--status-warning)]" />
             Flakiest Tests
           </CardTitle>
         </CardHeader>
@@ -97,7 +97,7 @@ export function FlakiestTestsCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-[var(--status-warning)]" />
             Flakiest Tests
           </CardTitle>
         </CardHeader>
@@ -117,7 +117,7 @@ export function FlakiestTestsCard() {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <AlertTriangle className="h-5 w-5 text-[var(--status-warning)]" />
             Flakiest Tests
           </span>
           <Badge variant="secondary">{data.summary.total_flaky_tests} flaky</Badge>

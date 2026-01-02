@@ -48,13 +48,14 @@ export function StatsCards({ metrics }: StatsCardsProps) {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">{stat.label}</span>
                 <Icon
-                  className={`h-4 w-4 ${
-                    stat.trend === "positive"
-                      ? "text-green-500"
+                  className="h-4 w-4"
+                  style={{
+                    color: stat.trend === "positive"
+                      ? "var(--status-success)"
                       : stat.trend === "negative"
-                        ? "text-red-500"
-                        : "text-muted-foreground"
-                  }`}
+                        ? "var(--status-error)"
+                        : undefined
+                  }}
                 />
               </div>
               <div className="space-y-1">

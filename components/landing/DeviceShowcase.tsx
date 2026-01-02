@@ -55,7 +55,7 @@ export function DeviceShowcase() {
     setTimeout(() => {
       setActiveDevice(device)
       setIsTransitioning(false)
-    }, 300)
+    }, 350)
   }
 
   return (
@@ -64,7 +64,7 @@ export function DeviceShowcase() {
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] lg:w-[800px] lg:h-[800px] rounded-full blur-3xl opacity-20 pointer-events-none"
         style={{
-          background: "radial-gradient(circle, var(--electric-indigo), transparent 70%)"
+          background: "radial-gradient(circle, var(--aestra-cyan), transparent 70%)"
         }}
       />
 
@@ -78,7 +78,7 @@ export function DeviceShowcase() {
             Your Test Suite,{" "}
             <span
               style={{
-                background: "linear-gradient(135deg, var(--safety-amber), var(--electric-indigo))",
+                background: "linear-gradient(135deg, var(--safety-amber), var(--aestra-cyan))",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
               }}
@@ -105,7 +105,7 @@ export function DeviceShowcase() {
                     value={device.id}
                     className={cn(
                       "flex-1 min-w-[calc(50%-4px)] flex items-center justify-center gap-2 py-3 px-4 rounded-lg",
-                      "data-[state=active]:bg-[var(--electric-indigo)] data-[state=active]:text-white",
+                      "data-[state=active]:bg-[var(--aestra-cyan)] data-[state=active]:text-white",
                       "data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/60"
                     )}
                   >
@@ -135,7 +135,7 @@ export function DeviceShowcase() {
                 )}
                 style={
                   activeDevice.id === device.id
-                    ? { borderColor: "var(--electric-indigo)" }
+                    ? { borderColor: "var(--aestra-cyan)" }
                     : {}
                 }
               >
@@ -143,7 +143,7 @@ export function DeviceShowcase() {
                   <div
                     className={cn(
                       "p-3 rounded-lg transition-colors",
-                       activeDevice.id === device.id ? "bg-[var(--electric-indigo)] text-white" : "bg-white/10"
+                       activeDevice.id === device.id ? "bg-[var(--aestra-cyan)] text-white" : "bg-white/10"
                     )}
                   >
                     <device.icon className="w-6 h-6" />
@@ -165,7 +165,7 @@ export function DeviceShowcase() {
           <div className="lg:col-span-8 relative h-[350px] sm:h-[450px] md:h-[500px] lg:h-[600px] flex items-center justify-center">
             <div
               className={cn(
-                "relative transition-all duration-500 transform",
+                "relative transition-all duration-300 transform",
                 isTransitioning ? "opacity-0 scale-95 translate-y-8" : "opacity-100 scale-100 translate-y-0"
               )}
             >
@@ -188,7 +188,7 @@ export function DeviceShowcase() {
                   className="rounded-xl shadow-2xl relative z-10 w-full h-auto"
                   sizes="(max-width: 640px) 85vw, (max-width: 768px) 400px, (max-width: 1024px) 500px, 800px"
                   style={{
-                    boxShadow: "0 0 100px -20px var(--electric-indigo)",
+                    boxShadow: "0 0 100px -20px var(--aestra-cyan)",
                     maskImage: "linear-gradient(to bottom, black 80%, transparent 100%)"
                   }}
                 />

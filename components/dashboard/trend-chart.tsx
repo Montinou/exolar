@@ -27,11 +27,11 @@ export function TrendChart({ data }: TrendChartProps) {
           config={{
             Passed: {
               label: "Passed",
-              color: "hsl(var(--chart-1))",
+              color: "var(--chart-passed)",
             },
             Failed: {
               label: "Failed",
-              color: "hsl(var(--chart-2))",
+              color: "var(--chart-failed)",
             },
           }}
           className="h-[200px] sm:h-[300px]"

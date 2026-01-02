@@ -7,8 +7,8 @@ const features = [
     icon: Clock,
     title: "History Retention",
     description: "Keep test execution history for as long as you need. Analyze trends over weeks or months.",
-    iconColor: "var(--electric-indigo)",
-    bgColor: "oklch(0.55 0.23 270 / 0.15)",
+    iconColor: "var(--aestra-cyan)",
+    bgColor: "oklch(0.75 0.15 195 / 0.15)",
   },
   {
     icon: AlertTriangle,

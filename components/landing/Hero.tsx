@@ -11,7 +11,7 @@ export function Hero() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: `radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.55 0.23 270 / 0.15), transparent)`,
+          background: `radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.75 0.15 195 / 0.15), transparent)`,
         }}
       />
 
@@ -32,7 +32,7 @@ export function Hero() {
             Test Results, Ready for the{" "}
             <span
               style={{
-                background: "linear-gradient(135deg, var(--safety-amber), var(--electric-indigo))",
+                background: "linear-gradient(135deg, var(--safety-amber), var(--aestra-cyan))",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -82,7 +82,7 @@ export function Hero() {
               <div className="flex items-center gap-3">
                 <div
                   className="w-3 h-3 rounded-full"
-                  style={{ background: "var(--electric-indigo)" }}
+                  style={{ background: "var(--aestra-cyan)" }}
                 />
                 <span className="font-mono text-sm text-muted-foreground">playwright-trace.json</span>
               </div>
@@ -108,7 +108,7 @@ export function Hero() {
                 <div
                   className="w-24 h-1 rounded-full animate-pulse"
                   style={{
-                    background: "linear-gradient(90deg, var(--electric-indigo), var(--safety-amber))",
+                    background: "linear-gradient(90deg, var(--aestra-cyan), var(--safety-amber))",
                     boxShadow: "0 0 20px oklch(0.6 0.2 260 / 0.5)",
                   }}
                 />
@@ -135,7 +135,7 @@ export function Hero() {
                   <span style={{ color: "var(--safety-amber)" }}>&gt;</span> Analyzing failures...
                 </div>
                 <div>
-                  <span style={{ color: "var(--electric-indigo)" }}>i</span> Found flaky test pattern
+                  <span style={{ color: "var(--aestra-cyan)" }}>i</span> Found flaky test pattern
                 </div>
                 <div>
                   <span style={{ color: "oklch(0.65 0.15 140)" }}>+</span> Suggested fix: add wait
