@@ -35,7 +35,7 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
       const response = await fetch(`/api/executions/${executionId}`)
       const data = await response.json()
       setExecution(data.execution)
-      setTestResults(data.testResults)
+      setTestResults(data.testResults || [])
     } catch (error) {
       console.error("[v0] Error fetching execution details:", error)
     } finally {

@@ -42,7 +42,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
       }
       const data = await response.json()
       setExecution(data.execution)
-      setTestResults(data.testResults)
+      setTestResults(data.testResults || [])
     } catch (err) {
       console.error("Failed to load execution:", err)
       setError("Failed to load execution")
