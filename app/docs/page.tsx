@@ -46,14 +46,14 @@ export default function DocsPage() {
           <div className="p-6 rounded-lg border border-border bg-card">
             <h3 className="font-semibold mb-4">1. Set up the GitHub Action</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add the GitHub Action to your repository to automatically upload Playwright test results.
+              First, <Link href="/settings/api-keys" className="text-primary hover:underline">create an API key</Link>, then add the GitHub Action to your repository:
             </p>
             <pre className="p-4 rounded-md bg-muted text-sm overflow-x-auto">
               <code>{`# .github/workflows/playwright.yml
-- name: Upload to E2E Dashboard
+- name: Upload to Aestra
   uses: Montinou/e2e-test-dashboard-action@v1
   with:
-    api-key: \${{ secrets.E2E_DASHBOARD_API_KEY }}`}</code>
+    api-key: \${{ secrets.AESTRA_API_KEY }}`}</code>
             </pre>
           </div>
 

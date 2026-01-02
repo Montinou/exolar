@@ -3,12 +3,13 @@ import { validateApiKey } from "@/lib/auth"
 import { validateIngestRequest } from "@/lib/validation"
 import { getQueriesForOrg, insertArtifacts, generateTestSignature, setServiceAccountContext } from "@/lib/db"
 import { uploadToR2, generateArtifactKey, isR2Configured } from "@/lib/r2"
+import { validateOrgApiKey, isAestraApiKey } from "@/lib/api-keys"
 import type { IngestResponse, ArtifactRequest } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
-// Attorneyshare org ID (interim solution until Batch 5 adds org-aware API keys)
-const DEFAULT_ORG_ID = 1
+// Fallback org ID for legacy API key (DASHBOARD_API_KEY env var)
+const LEGACY_ORG_ID = 1
 
 /**
  * Get MIME type based on artifact type and filename
@@ -47,7 +48,9 @@ function getMimeType(type: string, filename: string): string {
  * POST /api/test-results
  *
  * Receives test execution data from Playwright custom reporter.
- * Requires Bearer token authentication via DASHBOARD_API_KEY.
+ * Supports two authentication methods:
+ *   1. Organization API key (aestra_...) - data goes to the org owning the key
+ *   2. Legacy DASHBOARD_API_KEY env var - data goes to LEGACY_ORG_ID
  *
  * Request body:
  * {
@@ -66,9 +69,26 @@ function getMimeType(type: string, filename: string): string {
  * }
  */
 export async function POST(request: Request): Promise<NextResponse<IngestResponse>> {
-  // 1. Validate API key
+  // 1. Validate API key - try org key first, then legacy
   const authHeader = request.headers.get("authorization")
-  if (!validateApiKey(authHeader)) {
+  let organizationId: number
+
+  // Check if it's an aestra_ prefixed org API key
+  if (isAestraApiKey(authHeader)) {
+    const validatedKey = await validateOrgApiKey(authHeader)
+    if (!validatedKey) {
+      return NextResponse.json(
+        { success: false, error: "Invalid or expired API key" },
+        { status: 401 }
+      )
+    }
+    organizationId = validatedKey.organizationId
+    console.log(`[POST /api/test-results] Authenticated with org API key "${validatedKey.name}" for org ${organizationId}`)
+  } else if (validateApiKey(authHeader)) {
+    // Legacy DASHBOARD_API_KEY authentication
+    organizationId = LEGACY_ORG_ID
+    console.log(`[POST /api/test-results] Authenticated with legacy API key for org ${organizationId}`)
+  } else {
     return NextResponse.json(
       { success: false, error: "Unauthorized" },
       { status: 401 }
@@ -101,8 +121,8 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
     // Set service account context for RLS bypass (this route uses API key auth, not user sessions)
     await setServiceAccountContext()
 
-    // Use org-bound queries (interim: Attorneyshare org until full org-aware API keys)
-    const db = getQueriesForOrg(DEFAULT_ORG_ID)
+    // Use org-bound queries with the authenticated organization
+    const db = getQueriesForOrg(organizationId)
 
     // 4. Insert execution record
     const executionId = await db.insertExecution(execution)

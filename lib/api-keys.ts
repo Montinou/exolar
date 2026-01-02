@@ -6,7 +6,7 @@
  */
 
 import crypto from "crypto"
-import { getSql } from "./db"
+import { getApiKeyByHash, updateApiKeyLastUsed } from "./db"
 
 const API_KEY_PREFIX = "aestra_"
 
@@ -65,25 +65,13 @@ export async function validateOrgApiKey(
   }
 
   const hash = hashApiKey(key)
-  const sql = getSql()
 
   // Look up the key by hash
-  const result = await sql`
-    SELECT
-      id,
-      organization_id,
-      name,
-      revoked_at,
-      expires_at
-    FROM organization_api_keys
-    WHERE key_hash = ${hash}
-  `
+  const apiKey = await getApiKeyByHash(hash)
 
-  if (result.length === 0) {
+  if (!apiKey) {
     return null
   }
-
-  const apiKey = result[0]
 
   // Check if revoked
   if (apiKey.revoked_at) {
@@ -96,18 +84,14 @@ export async function validateOrgApiKey(
   }
 
   // Update last_used_at (fire and forget, don't await)
-  sql`
-    UPDATE organization_api_keys
-    SET last_used_at = NOW()
-    WHERE id = ${apiKey.id}
-  `.catch(() => {
+  updateApiKeyLastUsed(apiKey.id).catch(() => {
     // Ignore errors on usage tracking
   })
 
   return {
-    id: apiKey.id as number,
-    organizationId: apiKey.organization_id as number,
-    name: apiKey.name as string,
+    id: apiKey.id,
+    organizationId: apiKey.organization_id,
+    name: apiKey.name,
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Check, Copy } from "lucide-react"
+import Link from "next/link"
 
 function CodeBlock({ code, title }: { code: string; title?: string }) {
   const [copied, setCopied] = useState(false)
@@ -65,19 +66,19 @@ jobs:
       - name: Run Playwright tests
         run: npx playwright test
 
-      - name: Upload to E2E Dashboard
+      - name: Upload to Aestra
         if: always()
         uses: Montinou/e2e-test-dashboard-action@v1
         with:
-          api-key: \${{ secrets.E2E_DASHBOARD_API_KEY }}
+          api-key: \${{ secrets.AESTRA_API_KEY }}
           results-path: ./test-results`
 
-const fullExample = `- name: Upload to E2E Dashboard
+const fullExample = `- name: Upload to Aestra
   if: always()
   uses: Montinou/e2e-test-dashboard-action@v1
   with:
     # Required
-    api-key: \${{ secrets.E2E_DASHBOARD_API_KEY }}
+    api-key: \${{ secrets.AESTRA_API_KEY }}
 
     # Optional - customize paths
     results-path: ./test-results
@@ -99,7 +100,7 @@ export default function GitHubActionDocsPage() {
       <div className="space-y-4">
         <h1 className="text-4xl font-bold tracking-tight">GitHub Action</h1>
         <p className="text-lg text-muted-foreground max-w-2xl">
-          Automatically upload your Playwright test results to the E2E Test Dashboard
+          Automatically upload your Playwright test results to Aestra
           from GitHub Actions. Track test history, detect flaky tests, and analyze failures.
         </p>
       </div>
@@ -115,8 +116,8 @@ export default function GitHubActionDocsPage() {
               Get your API Key
             </h3>
             <p className="text-sm text-muted-foreground">
-              Go to <strong>Settings &rarr; API Keys</strong> in the dashboard and create a new API key.
-              Copy the key - you&apos;ll need it for the next step.
+              Go to <Link href="/settings/api-keys" className="text-primary hover:underline">Settings &rarr; API Keys</Link> in the dashboard and create a new API key.
+              Copy the key (it starts with <code className="px-1 py-0.5 rounded bg-muted">aestra_</code>) - you&apos;ll need it for the next step.
             </p>
           </div>
 
@@ -127,7 +128,7 @@ export default function GitHubActionDocsPage() {
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
               In your GitHub repository, go to <strong>Settings &rarr; Secrets and variables &rarr; Actions</strong>.
-              Create a new secret named <code className="px-1 py-0.5 rounded bg-muted">E2E_DASHBOARD_API_KEY</code> with your API key.
+              Create a new secret named <code className="px-1 py-0.5 rounded bg-muted">AESTRA_API_KEY</code> with your API key.
             </p>
           </div>
 
