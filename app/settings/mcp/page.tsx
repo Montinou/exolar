@@ -9,45 +9,28 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Copy, Check, RefreshCw, ArrowLeft } from "lucide-react"
+import { Copy, Check, RefreshCw, ArrowLeft, Terminal } from "lucide-react"
 import Link from "next/link"
 
 export default function MCPSettingsPage() {
-  const [copied, setCopied] = useState(false)
+  const [copiedInstall, setCopiedInstall] = useState(false)
+  const [copiedAdd, setCopiedAdd] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
 
-  // MCP endpoint is now on the same domain
-  const MCP_ENDPOINT = "/api/mcp"
+  const installCommand = "npx e2e-test-dashboard-mcp --login"
+  const addCommand = "claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp"
 
-  // For Claude Code config, we need the full URL
-  // Users will get this from window.location when copying
-  const getFullUrl = () => {
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}${MCP_ENDPOINT}`
-    }
-    return `https://your-domain.vercel.app${MCP_ENDPOINT}`
+  async function copyInstallCommand() {
+    await navigator.clipboard.writeText(installCommand)
+    setCopiedInstall(true)
+    setTimeout(() => setCopiedInstall(false), 2000)
   }
 
-  // Users will need to replace <your-token> with their actual Neon Auth token
-  const config = {
-    mcpServers: {
-      "e2e-dashboard": {
-        url: getFullUrl(),
-        transport: "sse",
-        headers: {
-          Authorization: "Bearer <your-token>",
-        },
-      },
-    },
-  }
-
-  const configString = JSON.stringify(config, null, 2)
-
-  async function copyConfig() {
-    await navigator.clipboard.writeText(configString)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  async function copyAddCommand() {
+    await navigator.clipboard.writeText(addCommand)
+    setCopiedAdd(true)
+    setTimeout(() => setCopiedAdd(false), 2000)
   }
 
   async function testConnection() {
@@ -55,7 +38,7 @@ export default function MCPSettingsPage() {
     setTestResult(null)
 
     try {
-      const res = await fetch(MCP_ENDPOINT)
+      const res = await fetch("/api/mcp")
       setTestResult(res.ok ? "success" : "error")
     } catch {
       setTestResult("error")
@@ -75,8 +58,8 @@ export default function MCPSettingsPage() {
     { name: "get_error_distribution", description: "Breakdown of error types" },
     { name: "get_flaky_tests", description: "Identify flaky tests" },
     { name: "get_flakiness_summary", description: "Overall flakiness metrics" },
-    { name: "list_artifacts", description: "List artifacts for a test result" },
-    { name: "get_artifact_url", description: "Get signed URL for test artifacts" },
+    { name: "list_branches", description: "Branches with test runs in last 30 days" },
+    { name: "list_suites", description: "Test suites with recent runs" },
   ]
 
   return (
@@ -98,32 +81,87 @@ export default function MCPSettingsPage() {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Your Configuration</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Terminal className="h-5 w-5" />
+            Quick Setup
+          </CardTitle>
           <CardDescription>
-            Add this to your ~/.claude.json or project .claude.json file.
-            Replace &lt;your-token&gt; with your Neon Auth token.
+            Install and connect in 2 simple steps
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <h4 className="font-medium mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
+              Authenticate
+            </h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Run this command to open your browser and log in:
+            </p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto font-mono">
+                {installCommand}
+              </pre>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="absolute top-2 right-2"
+                onClick={copyInstallCommand}
+              >
+                {copiedInstall ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-medium mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
+              Add to Claude Code
+            </h4>
+            <p className="text-sm text-muted-foreground mb-3">
+              Then add the MCP server to Claude Code:
+            </p>
+            <div className="relative">
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto font-mono whitespace-pre-wrap">
+                {addCommand}
+              </pre>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="absolute top-2 right-2"
+                onClick={copyAddCommand}
+              >
+                {copiedAdd ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <p className="text-sm text-muted-foreground">
+              That&apos;s it! After authentication, Claude Code will have access to your test data.
+              Your credentials are stored securely in <code className="bg-muted px-1 rounded">~/.e2e-dashboard-mcp/config.json</code>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Test Connection</CardTitle>
+          <CardDescription>
+            Verify that the MCP server is reachable
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto font-mono">
-              {configString}
-            </pre>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="absolute top-2 right-2"
-              onClick={copyConfig}
-            >
-              {copied ? (
-                <Check className="h-4 w-4" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-4 items-center">
+          <div className="flex flex-wrap gap-4 items-center">
             <Button onClick={testConnection} disabled={testing}>
               {testing && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
               Test Connection
@@ -172,50 +210,29 @@ export default function MCPSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Setup Guide</CardTitle>
+          <CardTitle>Other Commands</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Step number={1} title="Copy Configuration">
-            Click the copy button above to copy your MCP configuration
-          </Step>
-          <Step number={2} title="Add to Claude Code">
-            Open or create ~/.claude.json and paste the configuration
-          </Step>
-          <Step number={3} title="Get Your Token">
-            Use your browser&apos;s developer tools to find your Neon Auth token
-            from the Authorization header
-          </Step>
-          <Step number={4} title="Restart Claude Code">
-            Restart Claude Code to load the new MCP server
-          </Step>
-          <Step number={5} title="Start Using">
-            Ask Claude to &quot;get recent test failures&quot; or &quot;search for login
-            tests&quot;
-          </Step>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <code className="text-sm font-mono">npx e2e-test-dashboard-mcp --status</code>
+              <p className="text-xs text-muted-foreground mt-1">Check authentication status</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <code className="text-sm font-mono">npx e2e-test-dashboard-mcp --logout</code>
+              <p className="text-xs text-muted-foreground mt-1">Clear stored credentials</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div>
+              <code className="text-sm font-mono">npx e2e-test-dashboard-mcp --help</code>
+              <p className="text-xs text-muted-foreground mt-1">Show all available options</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
-    </div>
-  )
-}
-
-function Step({
-  number,
-  title,
-  children,
-}: {
-  number: number
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="flex gap-4">
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-        {number}
-      </div>
-      <div>
-        <h4 className="font-medium">{title}</h4>
-        <p className="text-sm text-muted-foreground">{children}</p>
-      </div>
     </div>
   )
 }

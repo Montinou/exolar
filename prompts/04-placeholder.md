@@ -1,33 +1,32 @@
-# Generic Empty State Placeholder
+# Deep Space Empty State
 
 ## Purpose
-Visual for empty states, loading states, or "no data" scenarios throughout the dashboard. Displayed when a user views a section with no test results yet, or while data is loading. Should communicate "awaiting content" with a sense of potential and possibility—not emptiness or error. The calm before data arrives.
+"No Data" / "Loading" visualization.
 
 ## Technical Specifications
 - **Dimensions**: 800 x 600 px
-- **Background**: Solid #0D0F14 (Deep Void) for easy removal
-- **Format**: PNG (for transparency after background removal)
-- **Style**: Atmospheric, cosmic particles, ambient, serene anticipation
+- **Background**: Solid #050508 (Void Black)
+- **Format**: PNG
+- **Style**: Atmospheric, quiet, ambient
 
 ## Image Generation Prompt
 
 ```
-An atmospheric abstract scene on a solid dark background color #0D0F14. The composition suggests "the moment before data materializes." At the center-bottom third of the image, a soft diffused glow of amber #E5A832 with very low opacity spreads upward like dawn approaching the horizon—potential energy gathering. Scattered throughout the upper two-thirds, approximately 15-20 tiny particles: some are small dots of electric indigo #6366F1, others are slightly larger soft circles of violet #7C3AED, and a few bright white #FFFFFF pinpoints. The particles are distributed with intentional asymmetry, denser toward the center, sparser at edges, as if they're beginning to coalesce but haven't formed yet. Three or four particles have subtle motion trails—short gradient streaks suggesting movement toward center. The overall mood is quiet anticipation, like stars forming from cosmic dust. Extremely minimal, no complex shapes, just particles and soft gradients. The composition has significant negative space. The solid #0D0F14 background is completely flat with no texture.
+A serene, deep-space ambient visualization on a solid void black background #050508.
+The scene depicts a calm "waiting state" of the universe.
+In the center, a very subtle, faint ring of Nebula Gold #FFB700 dust particles is slowly drifting.
+The particles are tiny, sharply focused points of light, like distant stars.
+A soft, vertical gradient of Event Violet #8B5CF6 light washes up from the bottom edge, fading into the blackness before reaching the center, suggesting depth.
+There is no central object—just the space where an object *could* be.
+The feeling is one of potential energy, silence, and vastness.
+"The calm before the test run."
+Minimalist, high resolution, no distinct shapes, just atmosphere and dust.
 ```
 
 ## Style Notes
-- **Narrative**: This image tells a story—data is coming, intelligence is forming, but not yet
-- **Particle Behavior**: Particles drift toward center, suggesting eventual convergence (echoing logo concept)
-- **Color Hierarchy**: Amber glow is the brightest element, drawing eye to lower-center
-- **Motion Implied**: Trail effects on some particles create subtle dynamism without animation
-- **Breathing Room**: At least 40% of the image should be empty space
-
-## What to Avoid
-- No loading spinners or progress indicators (those are UI elements)
-- No sad/empty imagery (broken things, empty boxes)
-- No complex illustrations or characters
-- No text or messages
-- No busy or cluttered compositions
+- **Subtlety**: This image will sit behind text saying "No results found," so it cannot be too busy.
+- **Contrast**: Keep it low contrast so it doesn't fight for attention.
+- **Avoid**: Planets, distinct suns, spaceships, heavy nebular clouds.
 
 ## Consistency Reference
-This visualization is the "before" state that contrasts with the logo's "convergence complete" state. The scattered particles eventually become the focused orbital paths around the amber core. Users should subconsciously feel that data will arrive and organize itself. The color palette (amber, indigo, violet, white) directly matches the main brand colors.
+Reinforces the "Deep Space" theme without distracting from the UI.

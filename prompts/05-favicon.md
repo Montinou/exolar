@@ -1,39 +1,32 @@
-# Favicon
+# Star Favicon
 
 ## Purpose
-Browser tab icon. Must be crystal clear and instantly recognizable at tiny sizes (16x16 in most browsers). This is often the first visual touchpoint—users see it in their bookmarks, browser tabs alongside competitor products, and pinned tabs. Derived from the main logo but radically simplified for extreme legibility.
+Browser tab icon.
 
 ## Technical Specifications
-- **Dimensions**: 64 x 64 px (will be scaled down to 16x16, 32x32 by browsers)
-- **Background**: Solid #0D0F14 (Deep Void) for easy removal
-- **Format**: PNG (for transparency after background removal)
-- **Style**: Ultra-minimal, bold shapes, maximum contrast
+- **Dimensions**: 64 x 64 px
+- **Background**: Solid #050508 (Void Black)
+- **Format**: PNG
+- **Style**: High contrast, bold, simplified
 
 ## Image Generation Prompt
 
 ```
-An extremely simplified geometric icon on a solid dark background color #0D0F14. The design has only two elements: a bold amber #E5A832 circle in the center, perfectly round with crisp edges, taking up approximately 60% of the canvas. Around the amber circle, a single curved arc in electric indigo #6366F1, thick and bold, sweeping around the right side of the circle from roughly 2 o'clock to 7 o'clock position like a partial orbital ring. The indigo arc has consistent thickness and clean terminations. The amber circle is solid with no gradient. Maximum contrast between the bright amber, the indigo arc, and the dark background. No fine details, no additional elements, no white accents at this scale. Designed for extreme reduction—must be recognizable at 16 pixels. Vector-style with perfectly smooth curves and edges. The solid #0D0F14 background is completely flat.
+An extreme simplification of the Aestra symbol for use as a 16x16px favicon, rendered here at 64x64px.
+Background: Solid void black #050508.
+Subject: A single, bold, geometric "prism" shape.
+It consists of a central white #FFFFFF vertical stripe (thick enough to be seen at 16px).
+Flanked closely by two solid triangles: Left is Quasar Cyan #00E5FF, Right is Nebula Gold #FFB700.
+The shapes act as a solid block of color with no gradients, no transparency effects, and no fine lines.
+The separation between the white stripe and the colored triangles is razor sharp.
+The overall silhouette is a hexagon or a stout "A" shape.
+Maximum contrast. No subtle glows.
 ```
 
 ## Style Notes
-- **Radical Simplification**: Only 2 elements (amber core + indigo arc) vs. full logo's 4+ elements
-- **Amber Dominance**: At small sizes, the warm amber is the primary recognition point
-- **Single Orbit**: One arc instead of three—complexity that works at 512px fails at 16px
-- **No White**: The thin white calibration line from the main logo is too fine for favicon
-- **Bold Proportions**: Arc thickness is exaggerated compared to main logo for visibility
-
-## What to Avoid
-- No thin lines or delicate details (invisible at 16px)
-- No gradients (become muddy at small sizes)
-- No multiple colors beyond the two primary (amber + indigo)
-- No text or letters
-- No transparency effects or glows
+- **Readability**: This must work when 16 pixels tall.
+- **Solid Color**: avoiding gradients here ensures visibility.
+- **Avoid**: Thin lines, text, transparency.
 
 ## Consistency Reference
-This is the "essence" of the main logo distilled to its minimum recognizable form. The amber sphere remains the central identity anchor. The single indigo arc references the full logo's orbital paths without trying to reproduce them. When users see this in a browser tab, they should immediately associate it with the full brand—even if they can't see all the details.
-
-## Size Testing Notes
-After generating, verify legibility by:
-1. Scaling to 32x32 - both elements should be distinct
-2. Scaling to 16x16 - amber circle must be clearly visible, arc provides shape context
-3. Comparing against white/light backgrounds (browser tab bars vary)
+The "distilled truth" of the main logo.

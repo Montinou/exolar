@@ -4,6 +4,7 @@ import { useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Smartphone, Monitor, Tablet, Terminal, CheckCircle } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const devices = [
   {
@@ -91,8 +92,37 @@ export function DeviceShowcase() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          {/* Navigation Controls */}
-          <div className="lg:col-span-4 space-y-4">
+          {/* Mobile Tabs Navigation */}
+          <div className="lg:hidden w-full">
+            <Tabs value={activeDevice.id} onValueChange={(value) => {
+              const device = devices.find(d => d.id === value)
+              if (device) handleDeviceChange(device)
+            }}>
+              <TabsList className="w-full h-auto flex-wrap gap-2 bg-white/5 p-2 rounded-xl">
+                {devices.map((device) => (
+                  <TabsTrigger
+                    key={device.id}
+                    value={device.id}
+                    className={cn(
+                      "flex-1 min-w-[calc(50%-4px)] flex items-center justify-center gap-2 py-3 px-4 rounded-lg",
+                      "data-[state=active]:bg-[var(--electric-indigo)] data-[state=active]:text-white",
+                      "data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/60"
+                    )}
+                  >
+                    <device.icon className="w-4 h-4" />
+                    <span className="text-xs font-medium">{device.name}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            {/* Active device description on mobile */}
+            <p className="text-sm text-center mt-4" style={{ color: "oklch(0.6 0 0)" }}>
+              {activeDevice.description}
+            </p>
+          </div>
+
+          {/* Desktop Navigation Controls */}
+          <div className="hidden lg:block lg:col-span-4 space-y-4">
             {devices.map((device) => (
               <button
                 key={device.id}

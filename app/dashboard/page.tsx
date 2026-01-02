@@ -96,8 +96,8 @@ export default async function DashboardPage({
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-balance">E2E Test Dashboard</h1>
-              <p className="text-muted-foreground text-pretty">Monitor Playwright test executions from GitHub Actions</p>
+              <h1 className="text-3xl font-bold tracking-tight text-balance">Aestra</h1>
+              <p className="text-muted-foreground text-pretty">Test Results, Illuminated by Intelligence</p>
             </div>
             <div className="flex items-center gap-4">
               <SearchTests />
@@ -110,7 +110,7 @@ export default async function DashboardPage({
 
       <div className="container mx-auto px-4 py-8">
         <Suspense fallback={<DashboardSkeleton />}>
-          {/* @ts-expect-error Async Server Component */}
+
           <DashboardContent searchParams={searchParams} />
         </Suspense>
       </div>

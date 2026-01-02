@@ -53,7 +53,7 @@ export function Footer() {
           {/* Links */}
           <div className="flex items-center gap-6">
             <Link
-              href="https://github.com"
+              href="https://github.com/Montinou/e2e-test-dashboard"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm transition-colors hover:opacity-80"
@@ -63,14 +63,12 @@ export function Footer() {
               <span>GitHub</span>
             </Link>
             <Link
-              href="https://modelcontextprotocol.io"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/docs"
               className="flex items-center gap-2 text-sm transition-colors hover:opacity-80"
               style={{ color: "oklch(0.6 0 0)" }}
             >
               <BookOpen className="w-4 h-4" />
-              <span>MCP Docs</span>
+              <span>Docs</span>
             </Link>
             <Link
               href="/dashboard"

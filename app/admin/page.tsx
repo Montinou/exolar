@@ -190,7 +190,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
                 <ArrowLeft className="h-5 w-5" />
@@ -200,11 +200,11 @@ export default function AdminPage() {
                 <p className="text-sm text-muted-foreground">Manage users and invites</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <Link href="/admin/organizations">
-                <Button variant="outline">
-                  <Building className="h-4 w-4 mr-2" />
-                  Organizations
+                <Button variant="outline" size="sm" className="sm:size-default">
+                  <Building className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Organizations</span>
                 </Button>
               </Link>
               <UserMenu />
@@ -226,7 +226,7 @@ export default function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleInvite} className="flex gap-4 items-end">
+            <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 md:items-end">
               <div className="flex-1 space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <Input
@@ -238,22 +238,24 @@ export default function AdminPage() {
                   required
                 />
               </div>
-              <div className="w-40 space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "admin" | "viewer")}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex gap-4 items-end">
+                <div className="flex-1 md:w-40 space-y-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "admin" | "viewer")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
+                  Invite
+                </Button>
               </div>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
-                Invite
-              </Button>
             </form>
             {error && <p className="text-sm text-destructive mt-2">{error}</p>}
           </CardContent>
@@ -279,8 +281,8 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
-                    <TableHead>Invited At</TableHead>
-                    <TableHead className="w-[100px]">Actions</TableHead>
+                    <TableHead className="hidden sm:table-cell">Invited At</TableHead>
+                    <TableHead className="w-[80px] sm:w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -288,13 +290,13 @@ export default function AdminPage() {
                     .filter((i) => !i.used)
                     .map((invite) => (
                       <TableRow key={invite.id}>
-                        <TableCell>{invite.email}</TableCell>
+                        <TableCell className="max-w-[150px] truncate sm:max-w-none">{invite.email}</TableCell>
                         <TableCell>
                           <Badge variant={invite.role === "admin" ? "default" : "secondary"}>
                             {invite.role}
                           </Badge>
                         </TableCell>
-                        <TableCell>{new Date(invite.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -329,20 +331,20 @@ export default function AdminPage() {
                 <TableRow>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="w-[150px]">Actions</TableHead>
+                  <TableHead className="hidden sm:table-cell">Joined</TableHead>
+                  <TableHead className="w-[80px] sm:w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell className="max-w-[150px] truncate sm:max-w-none">{user.email}</TableCell>
                     <TableCell>
                       <Select
                         value={user.role}
                         onValueChange={(v) => handleUpdateRole(user.id, v as "admin" | "viewer")}
                       >
-                        <SelectTrigger className="w-28">
+                        <SelectTrigger className="w-24 sm:w-28">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -351,7 +353,7 @@ export default function AdminPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{new Date(user.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"

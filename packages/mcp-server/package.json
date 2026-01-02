@@ -1,0 +1,46 @@
+{
+  "name": "e2e-test-dashboard-mcp",
+  "version": "1.0.2",
+  "description": "MCP server for E2E Test Dashboard - access test execution data from Claude Code",
+  "type": "module",
+  "bin": {
+    "e2e-test-dashboard-mcp": "./bin/server.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "claude",
+    "claude-code",
+    "e2e",
+    "testing",
+    "playwright",
+    "test-dashboard"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Montinou/e2e-test-dashboard"
+  },
+  "homepage": "https://www.npmjs.com/package/e2e-test-dashboard-mcp",
+  "license": "MIT",
+  "author": "lordmont"
+}

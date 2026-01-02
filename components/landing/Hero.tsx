@@ -58,12 +58,10 @@ export function Hero() {
               <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              href="https://modelcontextprotocol.io/introduction"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/docs"
               className="btn-glass"
             >
-              Read MCP Docs
+              View Documentation
             </Link>
           </div>
 

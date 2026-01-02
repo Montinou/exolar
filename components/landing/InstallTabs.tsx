@@ -4,21 +4,18 @@ import { useState } from "react"
 import { Check, Copy } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+const step1Command = `npx e2e-test-dashboard-mcp --login`
+
+const step2Command = `claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`
+
 const manualConfig = `{
   "mcpServers": {
     "e2e-dashboard": {
       "command": "npx",
-      "args": ["-y", "@e2e-dashboard/mcp-server"],
-      "env": {
-        "DATABASE_URL": "your-database-url"
-      }
+      "args": ["-y", "e2e-test-dashboard-mcp"]
     }
   }
 }`
-
-const aiPrompt = `Install the E2E Test Dashboard skill.
-Connect it to my Playwright test results database.
-Enable auto-triage for flaky test detection.`
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
   const [copied, setCopied] = useState(false)
@@ -68,42 +65,71 @@ export function InstallTabs() {
             Get Started in Seconds
           </h2>
           <p style={{ color: "oklch(0.6 0 0)" }}>
-            Choose your preferred installation method. Manual config or let AI do it for you.
+            Install the MCP server with two simple commands.
           </p>
         </div>
 
         {/* Tabs */}
         <div className="max-w-3xl mx-auto">
-          <Tabs defaultValue="manual" className="w-full">
+          <Tabs defaultValue="claude-code" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6 glass-panel p-1">
+              <TabsTrigger
+                value="claude-code"
+                className="data-[state=active]:bg-[oklch(0.15_0.02_260)] rounded-lg transition-all"
+              >
+                Claude Code
+              </TabsTrigger>
               <TabsTrigger
                 value="manual"
                 className="data-[state=active]:bg-[oklch(0.15_0.02_260)] rounded-lg transition-all"
               >
                 Manual Config
               </TabsTrigger>
-              <TabsTrigger
-                value="ai"
-                className="data-[state=active]:bg-[oklch(0.15_0.02_260)] rounded-lg transition-all"
-              >
-                AI Auto-Install
-              </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="claude-code" className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+                    style={{ background: "var(--electric-indigo)", color: "white" }}
+                  >
+                    1
+                  </span>
+                  <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
+                    Authenticate (opens browser to log in)
+                  </p>
+                </div>
+                <CodeBlock code={step1Command} language="bash" />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <span
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+                    style={{ background: "var(--electric-indigo)", color: "white" }}
+                  >
+                    2
+                  </span>
+                  <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
+                    Add to Claude Code
+                  </p>
+                </div>
+                <CodeBlock code={step2Command} language="bash" />
+              </div>
+
+              <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>
+                That&apos;s it! Claude Code now has access to your test data.
+              </p>
+            </TabsContent>
 
             <TabsContent value="manual" className="space-y-4">
               <p className="text-sm" style={{ color: "oklch(0.6 0 0)" }}>
                 Add this to your <code className="px-2 py-1 rounded glass-panel text-xs">claude_desktop_config.json</code>:
               </p>
               <CodeBlock code={manualConfig} language="json" />
-            </TabsContent>
-
-            <TabsContent value="ai" className="space-y-4">
-              <p className="text-sm" style={{ color: "oklch(0.6 0 0)" }}>
-                Simply tell Claude or Cursor:
-              </p>
-              <CodeBlock code={aiPrompt} language="text" />
               <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>
-                The AI will handle the configuration automatically.
+                Note: Run <code className="px-1 rounded glass-panel">npx e2e-test-dashboard-mcp --login</code> first to authenticate.
               </p>
             </TabsContent>
           </Tabs>

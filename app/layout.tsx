@@ -8,25 +8,12 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "E2E Test Dashboard",
-  description: "Monitor Playwright test executions from GitHub Actions",
+  title: "Aestra",
+  description: "The Intelligent Horizon for Agentic Testing",
   generator: "v0.app",
   icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    apple: "/apple-icon.png",
+    icon: "/branding/favicon.png",
+    apple: "/branding/logo-icon.png",
   },
 }
 

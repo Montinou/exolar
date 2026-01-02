@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Brand Assets Generator Prompt
-  Product: MCP Dashboard - E2E Test Dashboard
+  Product: Aestra (formerly MCP Dashboard)
   Target AI: Nano Banana Pro (solid backgrounds for seamless removal)
   Output: 6 separate markdown files with image generation prompts
 -->
@@ -37,7 +37,7 @@
     <objective>
       Generate 6 unique, highly detailed image generation prompts for brand assets.
       Each prompt must be crafted to produce cohesive, original visuals that embody
-      the MCP Dashboard brand identity while being completely distinct from existing
+      the Aestra brand identity while being completely distinct from existing
       tech logos and generic visual patterns.
     </objective>
     <success_criteria>
@@ -56,13 +56,15 @@
   <brand_identity>
 
     <product_info>
-      <name>MCP Dashboard</name>
-      <full_name>E2E Test Dashboard with MCP Integration</full_name>
-      <tagline>Test Results, Ready for the AI Age</tagline>
+      <name>Aestra</name>
+      <full_name>Aestra: The Intelligent Horizon</full_name>
+      <tagline>Test Results, Illuminated by Intelligence</tagline>
       <description>
-        The first E2E testing dashboard with native Model Context Protocol (MCP)
-        support. AI agents can directly access, analyze, and debug test results.
-        Built for engineering teams embracing the agentic future of software development.
+        Aestra is the first E2E testing dashboard with native Model Context Protocol (MCP)
+        support. It acts as a bridge between raw test data and actionable intelligence,
+        where AI agents actively participate in debugging and analysis.
+        The name evokes "Aether" (the medium of light) and "Astra" (stars/navigation),
+        suggesting a high-level, cosmic perspective on code quality.
       </description>
       <key_differentiator>
         AI-native testing infrastructure where autonomous agents participate
@@ -77,61 +79,52 @@
     </product_info>
 
     <visual_theme>
-      <primary_theme>Deep Space / Cosmic Intelligence</primary_theme>
-      <secondary_theme>Glassmorphism and Light Refraction</secondary_theme>
+      <primary_theme>Cosmic Intelligence / Event Horizon</primary_theme>
+      <secondary_theme>Refracted Light & Gravitational Lensing</secondary_theme>
       <mood>
-        <descriptor>Futuristic yet approachable</descriptor>
-        <descriptor>Intelligent and precise</descriptor>
-        <descriptor>Premium and professional</descriptor>
-        <descriptor>Dynamic and alive</descriptor>
+        <descriptor>Ethereal yet grounded</descriptor>
+        <descriptor>Omniscient and precise</descriptor>
+        <descriptor>Vast and limitless</descriptor>
+        <descriptor>Luminous and clarifying</descriptor>
       </mood>
       <visual_metaphors>
-        <metaphor concept="AI Intelligence">
-          Cosmic phenomena—black holes bending light, quantum states,
-          dimensional portals, intelligent gravitational fields
+        <metaphor concept="AI Insight">
+          Gravitational lensing—massive intelligence bending raw data (light)
+          into focused clarity. The "Eye of the Universe."
         </metaphor>
         <metaphor concept="Testing Precision">
-          Focused light beams, orbital trajectories, calibration marks,
-          perfectly aligned geometric forms
+          Laser interferometry—beams of light intersecting to measure infinitesimal
+          disturbances. Perfect alignment.
         </metaphor>
-        <metaphor concept="Data Flow">
-          Waveforms, signal propagation, particle streams,
-          luminous threads connecting nodes
+        <metaphor concept="Data Bridge">
+          Einstein-Rosen bridges (wormholes)—shortcuts through complexity.
+          Instant connection between problem and solution.
         </metaphor>
-        <metaphor concept="Automation">
-          Perpetual motion, orbital systems, self-sustaining loops,
-          autonomous navigation paths
+        <metaphor concept="Status/State">
+          Stellar phases—Nebula (formation/pending), Main Sequence (stable/passing),
+          Supernova (critical failure/alert).
         </metaphor>
       </visual_metaphors>
     </visual_theme>
 
     <color_palette>
-      <color name="Deep Void" hex="#0D0F14" role="primary_background">
-        Near-black with subtle blue undertone. The infinite depth of space.
-        Use for backgrounds and negative space.
+      <color name="Void" hex="#050508" role="primary_background">
+        Absolute black with a hint of violet. The deepest part of space.
       </color>
-      <color name="Cosmic Black" hex="#1A1D24" role="secondary_background">
-        Slightly elevated dark surface. For layered elements and cards.
+      <color name="Horizon" hex="#12121A" role="secondary_background">
+        The dark matter surface.
       </color>
-      <color name="Safety Amber" hex="#E5A832" role="primary_accent">
-        Warm golden yellow. Represents success, completion, intelligence.
-        The glow of a passing test, the warmth of AI assistance.
+      <color name="Nebula Gold" hex="#FFB700" role="primary_accent">
+        The color of a G-type main sequence star. Warmth, life, success.
       </color>
-      <color name="Amber Glow" hex="#D4952B" role="accent_shadow">
-        Deeper amber for gradients and depth on golden elements.
+      <color name="Quasar Cyan" hex="#00E5FF" role="secondary_accent">
+        High-energy radiation. Technology, cooling, precision, analysis.
       </color>
-      <color name="Electric Indigo" hex="#6366F1" role="secondary_accent">
-        Vibrant purple-blue. Represents technology, connectivity, the digital realm.
-        The pulse of automation, the spark of intelligence.
+      <color name="Event Violet" hex="#8B5CF6" role="accent_highlight">
+        The mysterious energy of the AI mind. Deep and magical.
       </color>
-      <color name="Violet Shift" hex="#7C3AED" role="accent_highlight">
-        Brighter violet for highlights and energy bursts.
-      </color>
-      <color name="Pure Light" hex="#FFFFFF" role="highlight">
-        Clean white for maximum contrast points and text.
-      </color>
-      <color name="Mist" hex="#E5E7EB" role="subtle_text">
-        Soft gray for secondary information.
+      <color name="Star Core" hex="#FFFFFF" role="highlight">
+        Blinding white for the center of focus.
       </color>
     </color_palette>
 
@@ -145,20 +138,17 @@
     </typography_reference>
 
     <design_principles>
-      <principle name="Purposeful Minimalism">
-        Every element earns its place. Remove until it breaks, then add one thing back.
+      <principle name="Luminous Clarity">
+        Light is information. Shadows are unknowns. The UI uses light
+        to guide attention and reveal truth.
       </principle>
-      <principle name="Intelligent Contrast">
-        Use the amber-indigo duality to create visual hierarchy and meaning.
-        Amber = success/warmth. Indigo = technology/precision.
+      <principle name="Weightless Physics">
+        Elements should feel suspended in zero-g. Floating, drifting,
+        yet held in place by invisible forces (gravity/logic).
       </principle>
-      <principle name="Dimensional Depth">
-        Suggest layers and depth through subtle gradients, glows, and shadows.
-        The interface exists in a three-dimensional space.
-      </principle>
-      <principle name="Motion Implied">
-        Static images should suggest movement—orbital paths, flowing data,
-        expanding waves. The system is alive and working.
+      <principle name="Micro-Detail">
+        Like looking through a telescope, the closer you look, the more
+        detail you see. Fine hairlines, subtle textures.
       </principle>
     </design_principles>
 
@@ -170,61 +160,52 @@
   <originality_rules priority="MAXIMUM">
 
     <philosophy>
-      Originality is not optional—it is the foundation. The MCP Dashboard logo
-      must be instantly recognizable and completely unique. It should feel
-      inevitable in retrospect but surprising on first encounter.
+      Aestra is not just another dashboard; it is an intelligence.
+      The visual identity must reflect something *alien but benevolent*.
+      Avoid human-scale tools (wrenches, gears) in favor of cosmic-scale phenomena.
     </philosophy>
 
     <forbidden_elements reason="Overused tech clichés that destroy distinctiveness">
       <forbidden>Gears, cogs, or mechanical components</forbidden>
       <forbidden>Lightbulbs or "idea" symbols</forbidden>
-      <forbidden>Circuit boards, chips, or PCB traces</forbidden>
-      <forbidden>Binary code (0s and 1s)</forbidden>
-      <forbidden>Generic robot faces or heads</forbidden>
-      <forbidden>Brain imagery or neural network visualizations</forbidden>
+      <forbidden>Circuit boards, chips, or BGA patterns</forbidden>
+      <forbidden>Binary code (0s and 1s) or Matrix rain</forbidden>
+      <forbidden>Generic robot heads or androids</forbidden>
+      <forbidden>Brain imagery (sulci/gyri)</forbidden>
       <forbidden>Puzzle pieces</forbidden>
-      <forbidden>Checkmarks in boxes (for testing concepts)</forbidden>
+      <forbidden>Checkmarks (too literal for the brand)</forbidden>
       <forbidden>Magnifying glasses</forbidden>
-      <forbidden>Generic globe or world icons</forbidden>
-      <forbidden>Handshake or connection icons</forbidden>
-      <forbidden>Cloud shapes</forbidden>
-      <forbidden>Generic shield shapes</forbidden>
-      <forbidden>Rocket ships</forbidden>
-      <forbidden>Lightning bolts as primary elements</forbidden>
-      <forbidden>Eye symbols</forbidden>
-      <forbidden>Lock icons</forbidden>
-      <forbidden>Hexagons as the primary shape (overused in tech)</forbidden>
+      <forbidden>Generic globe grids</forbidden>
+      <forbidden>Rockets (too startup-y)</forbidden>
+      <forbidden>Lightning bolts (unless abstract energy)</forbidden>
+      <forbidden>Padlocks</forbidden>
+      <forbidden>Hexagons (unless distorted/perspective)</forbidden>
+      <forbidden>Standard "atom" loops (too 1950s science)</forbidden>
     </forbidden_elements>
 
     <required_approach>
-      <requirement>Invent a completely new symbol—do not iterate on existing logos</requirement>
-      <requirement>Use abstract geometric forms that carry meaning through shape relationships</requirement>
-      <requirement>Embed the dual nature of "testing precision" and "AI intelligence" in the form itself</requirement>
-      <requirement>Create visual tension and resolution within the mark</requirement>
-      <requirement>Design something that works at 16px and 512px equally well</requirement>
-      <requirement>The symbol should feel like it could only belong to this product</requirement>
+      <requirement>Think in terms of light and gravity, not solid matter</requirement>
+      <requirement>Use transparency and refraction key visual elements</requirement>
+      <requirement>The logo should feel like a "sigil" or a "glyph" from a superior civilization</requirement>
+      <requirement>Asymmetry is preferred over perfect symmetry (organic growth)</requirement>
     </required_approach>
 
     <creative_directions hint="Use these as springboards, not destinations">
-      <direction name="The Convergence Point">
-        Where multiple test paths meet an intelligent decision node.
-        Visualize the moment of synthesis—separate streams becoming unified insight.
+      <direction name="The Prism">
+        A single beam of white light (raw data) hitting a geometric form
+        and splitting into organized spectrums (insights).
       </direction>
-      <direction name="The Orbital Lens">
-        A focusing mechanism that bends light/data around a central intelligence.
-        Gravitational lensing as a metaphor for AI-powered analysis.
+      <direction name="The Orbit">
+        Two bodies dancing around a common center of gravity.
+        The "binary star" system of Human + AI.
       </direction>
-      <direction name="The Quantum State">
-        Superposition of success and failure until observed. The moment before
-        the test result collapses into certainty. Probability becoming reality.
+      <direction name="The Lens">
+        A distortion in space-time that reveals what is behind it.
+        Magnifying the truth through curvature.
       </direction>
-      <direction name="The Signal Bloom">
-        A waveform that expands and reveals. Test data transforming into
-        actionable intelligence. The unfolding of meaning.
-      </direction>
-      <direction name="The Calibration Mark">
-        Precision instruments used to align and verify. Registration marks,
-        crosshairs, but abstracted into something new and elegant.
+      <direction name="The Monolith">
+        A perfect, mysterious geometry floating in chaos.
+        Order amidst entropy.
       </direction>
     </creative_directions>
 
@@ -236,140 +217,113 @@
   <assets_to_create>
 
     <asset id="1" filename="01-logo-icon.md">
-      <name>Logo Icon (Symbol Only)</name>
+      <name>Aestra Symbol</name>
       <purpose>
-        The core brand mark. Used as app icon, favicon source, avatar,
-        and anywhere the brand needs representation without text.
+        The core brand mark. App icon, favicon source.
       </purpose>
       <dimensions width="512" height="512" unit="px"/>
-      <background type="solid" color="#0D0F14" note="Deep Void for easy removal"/>
+      <background type="solid" color="#050508" note="Void black"/>
       <requirements>
-        <requirement>Must be recognizable at 32px (favicon size)</requirement>
-        <requirement>Must scale beautifully to 512px+ (app stores, presentations)</requirement>
-        <requirement>Primary colors: Amber (#E5A832) and Indigo (#6366F1) with white accents</requirement>
-        <requirement>Geometric precision—every curve and angle intentional</requirement>
-        <requirement>Convey intelligence, precision, and forward motion</requirement>
-        <requirement>NO text, letters, or typography in this version</requirement>
+        <requirement>Abstract, lens-like or orbital geometry</requirement>
+        <requirement>Primary colors: Nebula Gold + Quasar Cyan</requirement>
+        <requirement>Must look "glowing" or self-illuminated</requirement>
+        <requirement>Simple enough for 32px, deep enough for 512px</requirement>
+        <requirement>NO text</requirement>
       </requirements>
       <prompt_requirements>
-        Include specific geometry descriptions, color placement, lighting direction,
-        material suggestions (metallic, glass, luminous), and style keywords for
-        the Nano Banana Pro generator.
+        Focus on "glowing geometric glass," "refracted light,"
+        "orbital paths," "ethereal energy."
       </prompt_requirements>
     </asset>
 
     <asset id="2" filename="02-logo-full.md">
-      <name>Logo Full (Icon + Wordmark)</name>
+      <name>Aestra Wordmark Lockup</name>
       <purpose>
-        Complete logo with symbol and "MCP Dashboard" text. Used in headers,
-        marketing materials, documentation, and formal brand applications.
+        Full logo for headers and marketing.
       </purpose>
       <dimensions width="1200" height="400" unit="px"/>
-      <background type="solid" color="#0D0F14"/>
+      <background type="solid" color="#050508"/>
       <requirements>
-        <requirement>Icon from Asset 1 positioned left, wordmark right</requirement>
-        <requirement>Wordmark text: "MCP Dashboard" in clean sans-serif</requirement>
-        <requirement>Harmonious spacing—icon and text feel unified</requirement>
-        <requirement>Text in white (#FFFFFF) or light gray (#E5E7EB)</requirement>
-        <requirement>Horizontal lockup (icon left, text right)</requirement>
-        <requirement>Icon should be proportionally sized to text height</requirement>
+        <requirement>Symbol + "Aestra" text</requirement>
+        <requirement>Clean, modern, tracking slightly wide</requirement>
+        <requirement>Text white or very light gray</requirement>
+        <requirement>Horizontal alignment</requirement>
       </requirements>
       <prompt_requirements>
-        Reference the icon design from Asset 1. Specify text styling,
-        kerning preferences, alignment, and the relationship between
-        symbol and wordmark.
+        Specific kerning instructions, font style (geometric sans),
+        balanced composition.
       </prompt_requirements>
     </asset>
 
     <asset id="3" filename="03-avatar.md">
-      <name>Default User Avatar</name>
+      <name>Cosmic Avatar</name>
       <purpose>
-        Placeholder avatar for users without profile photos. Should feel
-        friendly and professional while maintaining brand identity.
+        Default user profile picture.
       </purpose>
       <dimensions width="256" height="256" unit="px"/>
-      <background type="solid" color="#1A1D24" note="Cosmic Black"/>
+      <background type="solid" color="#12121A"/>
       <requirements>
-        <requirement>Abstract representation of a person (not a literal face)</requirement>
-        <requirement>Geometric/minimal style matching brand aesthetic</requirement>
-        <requirement>Use brand colors subtly—avoid overwhelming</requirement>
-        <requirement>Should feel neutral, welcoming, and professional</requirement>
-        <requirement>Circular composition (will be masked to circle in UI)</requirement>
-        <requirement>Works well when displayed small (32-48px in lists)</requirement>
+        <requirement>Abstract energy signature</requirement>
+        <requirement>Not a face, but a "presence"</requirement>
+        <requirement>Soft, glowing, non-threatening</requirement>
+        <requirement>Circular composition</requirement>
       </requirements>
       <prompt_requirements>
-        Describe an abstract human form using geometric shapes.
-        Suggest a cosmic/ethereal quality—a silhouette among stars,
-        a figure composed of light particles, etc.
+        "Condensed stardust," "energy being," "luminous silhouette."
       </prompt_requirements>
     </asset>
 
     <asset id="4" filename="04-placeholder.md">
-      <name>Generic Empty State Placeholder</name>
+      <name>Deep Space Empty State</name>
       <purpose>
-        Visual for empty states, loading states, or "no data" scenarios.
-        Should communicate "awaiting content" without feeling broken.
+        "No Data" / "Loading" visualization.
       </purpose>
       <dimensions width="800" height="600" unit="px"/>
-      <background type="solid" color="#0D0F14"/>
+      <background type="solid" color="#050508"/>
       <requirements>
-        <requirement>Abstract, ambient visualization</requirement>
-        <requirement>Suggests potential/possibility rather than emptiness</requirement>
-        <requirement>Brand colors in subtle, atmospheric application</requirement>
-        <requirement>Could work as a subtle background or centerpiece</requirement>
-        <requirement>Evokes "the calm before data arrives"</requirement>
-        <requirement>Particle systems, soft gradients, or constellation patterns</requirement>
+        <requirement>Vast, quiet, waiting</requirement>
+        <requirement>Subtle particle drift</requirement>
+        <requirement>Beautiful emptiness</requirement>
+        <requirement>Dark, low contrast</requirement>
       </requirements>
       <prompt_requirements>
-        Create an atmospheric scene that feels like the moment before
-        something appears. Cosmic dust settling, stars forming,
-        data streams about to coalesce.
+        "Cosmic dust," "distant stars," "quiet void," "potential energy."
       </prompt_requirements>
     </asset>
 
     <asset id="5" filename="05-favicon.md">
-      <name>Favicon</name>
+      <name>Star Favicon</name>
       <purpose>
-        Browser tab icon. Must be crystal clear at tiny sizes.
-        Derived from logo icon but optimized for extreme small scale.
+        Browser tab icon.
       </purpose>
       <dimensions width="64" height="64" unit="px"/>
-      <background type="solid" color="#0D0F14"/>
+      <background type="solid" color="#050508"/>
       <requirements>
-        <requirement>Simplified version of logo icon</requirement>
-        <requirement>Maximum 2-3 visual elements</requirement>
-        <requirement>High contrast for visibility in browser tabs</requirement>
-        <requirement>Recognizable at 16x16 when browser scales down</requirement>
-        <requirement>Use strongest brand colors only (Amber primary)</requirement>
-        <requirement>Consider how it looks next to competitor favicons</requirement>
+        <requirement>The "core" of the main symbol</requirement>
+        <requirement>High contrast Gold/Cyan against Black</requirement>
+        <requirement>Readability is king</requirement>
       </requirements>
       <prompt_requirements>
-        Specify extreme simplification. Bold shapes, strong contrast,
-        no fine details that will disappear at small sizes.
+        "Bright center," "sharp edges," "maximum contrast."
       </prompt_requirements>
     </asset>
 
     <asset id="6" filename="06-og-image.md">
-      <name>Open Graph / Social Preview Image</name>
+      <name>Cinematic OG Image</name>
       <purpose>
-        Image shown when sharing links on Twitter, LinkedIn, Slack, etc.
-        The first visual impression for many potential users.
+        Social sharing preview.
       </purpose>
       <dimensions width="1200" height="630" unit="px"/>
-      <background type="gradient" from="#0D0F14" to="#1A1D24"/>
+      <background type="gradient" from="#050508" to="#12121A"/>
       <requirements>
-        <requirement>Logo prominently featured (icon + wordmark)</requirement>
-        <requirement>Tagline: "Test Results, Ready for the AI Age"</requirement>
-        <requirement>Atmospheric brand imagery in background</requirement>
-        <requirement>Safe zones: keep key content away from edges (social crops vary)</requirement>
-        <requirement>Should stop the scroll—visually striking</requirement>
-        <requirement>Professional but not boring</requirement>
-        <requirement>Include subtle UI elements or dashboard hints</requirement>
+        <requirement>Prominent Logo + "Aestra"</requirement>
+        <requirement>Tagline: "The Intelligent Horizon"</requirement>
+        <requirement>Dramatic lighting/environment</requirement>
+        <requirement>Feels like a movie poster for a sci-fi film</requirement>
       </requirements>
       <prompt_requirements>
-        Create a cinematic composition. Logo centered or rule-of-thirds.
-        Background should feature brand elements (particles, gradients,
-        geometric patterns) without competing with logo/text.
+        "Epic scale," "volumetric lighting," "cinematic composition,"
+        "depth of field."
       </prompt_requirements>
     </asset>
 
@@ -382,8 +336,7 @@
 
     <instructions>
       Create exactly 6 separate markdown files, one for each asset.
-      Each file must be completely self-contained—copy-paste ready for
-      the Nano Banana Pro image generator without any additional context.
+      Each file must be completely self-contained.
     </instructions>
 
     <file_structure>
@@ -430,8 +383,8 @@
     <prompt_writing_guidelines>
       <guideline>Start with the subject/main element</guideline>
       <guideline>Specify exact colors using hex codes</guideline>
-      <guideline>Describe lighting and material qualities</guideline>
-      <guideline>Include style modifiers (minimalist, geometric, etc.)</guideline>
+      <guideline>Describe lighting and material qualities (glass, light, void)</guideline>
+      <guideline>Include style modifiers (minimalist, cosmic, cinematic)</guideline>
       <guideline>Specify "solid [color] background" for easy removal</guideline>
       <guideline>Add negative prompts to avoid unwanted elements</guideline>
       <guideline>Keep prompts focused—quality over quantity of descriptors</guideline>
@@ -445,17 +398,15 @@
        ═══════════════════════════════════════════════════════════════════════ -->
   <behavioral_rules>
     <always>
-      <rule>Prioritize originality above all else—create something new</rule>
+      <rule>Prioritize the "Aestra" cosmic aesthetic</rule>
       <rule>Maintain visual coherence across all 6 assets</rule>
       <rule>Write prompts that are specific and actionable</rule>
-      <rule>Consider how assets work together as a system</rule>
-      <rule>Test mental imagery: can you clearly see what you're describing?</rule>
+      <rule>Focus on light, gravity, and glass as primary materials</rule>
     </always>
     <never>
       <rule>Never use forbidden visual elements listed above</rule>
       <rule>Never write vague or generic descriptions</rule>
       <rule>Never sacrifice brand identity for "safe" choices</rule>
-      <rule>Never create assets that look like any existing tech logo</rule>
     </never>
   </behavioral_rules>
 
