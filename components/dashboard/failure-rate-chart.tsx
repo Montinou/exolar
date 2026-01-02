@@ -33,7 +33,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
 
         const response = await fetch(`/api/trends?${params.toString()}`)
         const json = await response.json()
-        setData(json)
+        setData(Array.isArray(json) ? json : [])
       } catch (error) {
         console.error("Failed to fetch failure trends:", error)
       } finally {

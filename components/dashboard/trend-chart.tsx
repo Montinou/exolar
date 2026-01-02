@@ -10,7 +10,7 @@ interface TrendChartProps {
 }
 
 export function TrendChart({ data }: TrendChartProps) {
-  const chartData = data.map((item) => ({
+  const chartData = (data || []).map((item) => ({
     date: new Date(item.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     Passed: item.passed,
     Failed: item.failed,

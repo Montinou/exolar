@@ -73,8 +73,9 @@ function AIContextSection({ aiContext }: AIContextSectionProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showAllSteps, setShowAllSteps] = useState(false)
 
-  const displaySteps = showAllSteps ? aiContext.steps : aiContext.steps.slice(-10)
-  const hasMoreSteps = aiContext.steps.length > 10
+  const steps = aiContext.steps || []
+  const displaySteps = showAllSteps ? steps : steps.slice(-10)
+  const hasMoreSteps = steps.length > 10
 
   return (
     <div className="mt-3 pt-3 border-t border-border/50">
@@ -128,10 +129,10 @@ function AIContextSection({ aiContext }: AIContextSectionProps) {
           )}
 
           {/* Test Steps Timeline */}
-          {aiContext.steps && aiContext.steps.length > 0 && (
+          {steps.length > 0 && (
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Test Steps ({aiContext.steps.length})</span>
+                <span className="text-xs font-medium text-muted-foreground">Test Steps ({steps.length})</span>
                 {hasMoreSteps && (
                   <Button
                     variant="ghost"
@@ -139,14 +140,14 @@ function AIContextSection({ aiContext }: AIContextSectionProps) {
                     className="h-5 text-xs px-2"
                     onClick={() => setShowAllSteps(!showAllSteps)}
                   >
-                    {showAllSteps ? "Show last 10" : `Show all ${aiContext.steps.length}`}
+                    {showAllSteps ? "Show last 10" : `Show all ${steps.length}`}
                   </Button>
                 )}
               </div>
               <div className="bg-muted/30 rounded p-2 space-y-1 max-h-[200px] overflow-y-auto">
                 {displaySteps.map((step, index) => {
                   const isLastStep = step === aiContext.last_step
-                  const actualIndex = showAllSteps ? index + 1 : aiContext.steps.length - displaySteps.length + index + 1
+                  const actualIndex = showAllSteps ? index + 1 : steps.length - displaySteps.length + index + 1
                   return (
                     <div
                       key={index}

@@ -12,8 +12,8 @@ const devices = [
     description: "Monitor test runs and get push notifications for failures on the go.",
     icon: Smartphone,
     image: "/assets/mobile-mockup.png",
-    width: 600,
-    height: 800,
+    width: 1112,
+    height: 1564,
   },
   {
     id: "desktop",
@@ -21,8 +21,8 @@ const devices = [
     description: "Full command center with deep trace analysis and AI debugging tools.",
     icon: Monitor,
     image: "/assets/desktop-mockup.png",
-    width: 800,
-    height: 600,
+    width: 1788,
+    height: 1528,
   },
   {
     id: "tablet",
@@ -30,8 +30,8 @@ const devices = [
     description: "Touch-optimized dashboards for tracking trends and flake rates.",
     icon: Tablet,
     image: "/assets/tablet-mockup.png",
-    width: 800,
-    height: 600,
+    width: 1300,
+    height: 1148,
   },
   {
     id: "cli",
@@ -39,8 +39,8 @@ const devices = [
     description: "Direct MCP integration for your terminal and IDE agents.",
     icon: Terminal,
     image: "/assets/cli-mockup.png",
-    width: 800,
-    height: 600,
+    width: 1412,
+    height: 1216,
   },
 ]
 
