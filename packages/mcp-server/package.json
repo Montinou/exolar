@@ -1,6 +1,6 @@
 {
   "name": "e2e-test-dashboard-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "MCP server for E2E Test Dashboard - access test execution data from Claude Code",
   "type": "module",
   "bin": {
