@@ -21,7 +21,7 @@ export function Hero() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-sm">
             <Sparkles className="w-4 h-4" style={{ color: "var(--safety-amber)" }} />
-            <span className="text-muted-foreground">First E2E Dashboard with Native MCP Support</span>
+            <span className="text-muted-foreground">Aestra: First E2E Dashboard with Native MCP Support</span>
           </div>
 
           {/* Headline */}
@@ -47,7 +47,7 @@ export function Hero() {
             className="text-xl md:text-2xl max-w-2xl mx-auto"
             style={{ color: "oklch(0.7 0 0)" }}
           >
-            The first E2E dashboard with native Model Context Protocol (MCP) support.
+            Aestra is the first E2E testing platform with native Model Context Protocol (MCP) support.
             Let your AI agents debug your tests for you.
           </p>
 

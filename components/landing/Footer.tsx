@@ -46,7 +46,7 @@ export function Footer() {
               className="text-sm mt-1"
               style={{ color: "oklch(0.5 0 0)" }}
             >
-              E2E Test Dashboard
+              Aestra
             </p>
           </div>
 
@@ -87,7 +87,7 @@ export function Footer() {
             color: "oklch(0.4 0 0)",
           }}
         >
-          <p>&copy; {new Date().getFullYear()} E2E Test Dashboard. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Aestra. All rights reserved.</p>
         </div>
       </div>
     </footer>
