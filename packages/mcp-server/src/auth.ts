@@ -6,9 +6,10 @@
 
 import * as http from "http"
 import * as url from "url"
+import { exec } from "child_process"
 import { saveConfig, type MCPConfig } from "./config.js"
 
-const DEFAULT_DASHBOARD_URL = process.env.E2E_DASHBOARD_URL || "https://e2e-dashboard.vercel.app"
+const DEFAULT_DASHBOARD_URL = process.env.E2E_DASHBOARD_URL || "https://e2e-test-dashboard.vercel.app"
 
 interface AuthResult {
   success: boolean
@@ -133,7 +134,6 @@ export async function authenticate(dashboardUrl?: string): Promise<AuthResult> {
 }
 
 function openBrowser(url: string): void {
-  const { exec } = require("child_process")
   const platform = process.platform
 
   let command: string

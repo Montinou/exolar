@@ -170,26 +170,18 @@ export function DeviceShowcase() {
               )}
             >
               <div className="relative group max-w-[85vw] sm:max-w-[400px] md:max-w-[500px] lg:max-w-none">
-                {/* CSS Mask for Seamless Blending */}
-                <div
-                   className="absolute inset-0 z-20 pointer-events-none"
-                   style={{
-                     background: "radial-gradient(circle at center, transparent 30%, var(--deep-void) 100%)",
-                     opacity: 0.8
-                   }}
-                />
-
-                {/* Image */}
+                {/* Image with radial mask for seamless edge blending */}
                 <Image
                   src={activeDevice.image}
                   alt={activeDevice.name}
                   width={activeDevice.width}
                   height={activeDevice.height}
-                  className="rounded-xl shadow-2xl relative z-10 w-full h-auto"
+                  className="rounded-2xl relative z-10 w-full h-auto"
                   sizes="(max-width: 640px) 85vw, (max-width: 768px) 400px, (max-width: 1024px) 500px, 800px"
                   style={{
-                    boxShadow: "0 0 100px -20px var(--aestra-cyan)",
-                    maskImage: "linear-gradient(to bottom, black 80%, transparent 100%)"
+                    boxShadow: "0 0 80px -10px oklch(0.75 0.15 195 / 0.5)",
+                    maskImage: "radial-gradient(ellipse 90% 85% at 50% 45%, black 50%, transparent 100%)",
+                    WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 45%, black 50%, transparent 100%)"
                   }}
                 />
 

@@ -5,8 +5,9 @@
  */
 import * as http from "http";
 import * as url from "url";
+import { exec } from "child_process";
 import { saveConfig } from "./config.js";
-const DEFAULT_DASHBOARD_URL = process.env.E2E_DASHBOARD_URL || "https://e2e-dashboard.vercel.app";
+const DEFAULT_DASHBOARD_URL = process.env.E2E_DASHBOARD_URL || "https://e2e-test-dashboard.vercel.app";
 export async function authenticate(dashboardUrl) {
     const baseUrl = dashboardUrl || DEFAULT_DASHBOARD_URL;
     return new Promise((resolve) => {
@@ -114,7 +115,6 @@ export async function authenticate(dashboardUrl) {
     });
 }
 function openBrowser(url) {
-    const { exec } = require("child_process");
     const platform = process.platform;
     let command;
     if (platform === "darwin") {
