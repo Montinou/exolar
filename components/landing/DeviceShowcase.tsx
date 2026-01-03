@@ -21,7 +21,7 @@ const devices = [
     name: "Desktop HQ",
     description: "Full command center with deep trace analysis and AI debugging tools.",
     icon: Monitor,
-    image: "/assets/desktop-mockup-v3.png",
+    image: "/assets/desktop-mockup.png",
     width: 1024,
     height: 1024,
   },
