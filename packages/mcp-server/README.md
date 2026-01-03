@@ -44,18 +44,34 @@ npx e2e-test-dashboard-mcp --help
 npx e2e-test-dashboard-mcp --login --url https://your-dashboard.com
 ```
 
-## Available Tools
+## Available Tools (15)
 
 Once connected, Claude Code can use these tools:
 
 ### Core Data Retrieval
 - **`get_executions`** - List test executions with filters (status, branch, suite, date range)
 - **`get_execution_details`** - Get execution details including all test results and artifacts
+  - New: `status` filter (passed/failed/skipped/all)
+  - New: `include_artifacts` option (default: false to reduce response size)
 - **`search_tests`** - Search tests by name/file with aggregated statistics
 - **`get_test_history`** - Get execution history for a specific test over time
 
+### Aggregation Tools (New)
+- **`get_execution_summary`** - Lightweight summary without full test list (~1KB vs 110KB)
+  - Returns: pass/fail counts, error distribution, files affected
+  - Use this first before get_execution_details for large executions
+- **`get_execution_failures`** - Get only failed tests with smart grouping
+  - `group_by`: file, error_type, or none
+  - `include_stack_traces`: optional (increases response size)
+- **`generate_failure_report`** - Pre-formatted markdown report for an execution
+  - Ready for documentation or issue creation
+  - Includes error analysis and recommendations
+
 ### Analysis Tools
-- **`get_failed_tests`** - Get failed tests with AI-enriched context and error types
+- **`get_failed_tests`** - Get failed tests across executions
+  - New: `execution_id` filter for specific execution
+  - New: `test_file` filter for specific file
+  - No longer requires AI context to return results
 - **`get_dashboard_metrics`** - Overall metrics: pass rate, failure counts, avg duration
 - **`get_trends`** - Time-series pass/fail data over configurable days
 - **`get_error_distribution`** - Breakdown of error types from failures
@@ -72,12 +88,23 @@ Once connected, Claude Code can use these tools:
 
 After connecting, ask Claude things like:
 
+### Quick Analysis (Recommended)
+- "Get a summary of the latest execution" → uses `get_execution_summary`
+- "Show me the failures from execution #115" → uses `get_execution_failures`
+- "Generate a failure report for the last CI run" → uses `generate_failure_report`
+
+### General Queries
 - "Show me recent test failures"
 - "What are our flakiest tests?"
 - "Search for tests related to login"
 - "Get the dashboard metrics for the last 7 days"
 - "Show me the error distribution from this week"
 - "What's the test history for the checkout test?"
+
+### Efficient Workflows
+1. **Analyze failures**: Start with `get_execution_summary` for overview, then `get_execution_failures` for details
+2. **Create reports**: Use `generate_failure_report` to get pre-formatted markdown
+3. **Filter large results**: Use `status=failed` with `get_execution_details` instead of getting all tests
 
 ## How It Works
 

@@ -115,22 +115,30 @@ The dashboard includes a built-in MCP server that allows Claude Code to access y
 4. Replace `<your-token>` with your Neon Auth token
 5. Restart Claude Code
 
-### Available MCP Tools (12)
+### Available MCP Tools (15)
 
 | Tool | Description |
 |------|-------------|
-| `get_executions` | List test executions with filters |
-| `get_execution_details` | Get execution + all test results |
-| `search_tests` | Search tests by name or file |
-| `get_test_history` | History for a specific test |
-| `get_failed_tests` | Failed tests with AI context |
-| `get_dashboard_metrics` | Pass rate, failure counts, duration |
-| `get_trends` | Time-series pass/fail data |
-| `get_error_distribution` | Error type breakdown |
-| `get_flaky_tests` | Flaky tests list |
+| **Core Data** | |
+| `get_executions` | List test executions with filters (status, branch, suite, date range) |
+| `get_execution_details` | Get execution + test results (supports `status` filter: passed/failed/skipped/all) |
+| `search_tests` | Search tests by name or file with aggregated statistics |
+| `get_test_history` | History for a specific test over time |
+| **Aggregation (New)** | |
+| `get_execution_summary` | Lightweight summary without full test list (~1KB vs 110KB) |
+| `get_execution_failures` | Failed tests only with grouping by file/error_type |
+| `generate_failure_report` | Pre-formatted markdown report for an execution |
+| **Analysis** | |
+| `get_failed_tests` | Failed tests with optional AI context and execution_id filter |
+| `get_dashboard_metrics` | Pass rate, failure counts, avg duration |
+| `get_trends` | Time-series pass/fail data over configurable days |
+| `get_error_distribution` | Error type breakdown from failures |
+| **Flakiness** | |
+| `get_flaky_tests` | Flaky tests sorted by flakiness rate |
 | `get_flakiness_summary` | Overall flakiness metrics |
-| `list_branches` | Available branches |
-| `list_suites` | Available test suites |
+| **Metadata** | |
+| `list_branches` | Branches with test runs in last 30 days |
+| `list_suites` | Test suites with recent runs |
 
 ### MCP Environment Variables
 
