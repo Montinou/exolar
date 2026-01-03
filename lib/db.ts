@@ -179,8 +179,8 @@ export async function getFailedTestsByExecutionId(
     ORDER BY tr.test_file ASC, tr.test_name ASC
   `)
 
-  // Ensure we always return an array
-  return (results || []) as unknown as FailedTestResult[]
+  // Ensure we always return a proper array (Neon returns array-like object)
+  return Array.isArray(results) ? results as FailedTestResult[] : Array.from(results || []) as FailedTestResult[]
 }
 
 /**
@@ -262,9 +262,13 @@ export async function getExecutionSummary(
       pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0,
       duration_ms: execution.duration_ms || 0,
     },
-    // Ensure arrays are always defined
-    error_distribution: (errorDistribution || []) as Array<{ error_pattern: string; count: number }>,
-    files_affected: (filesAffected || []) as Array<{ file: string; failed: number; passed: number }>,
+    // Ensure we return proper arrays (Neon returns array-like objects)
+    error_distribution: Array.isArray(errorDistribution)
+      ? errorDistribution as Array<{ error_pattern: string; count: number }>
+      : Array.from(errorDistribution || []) as Array<{ error_pattern: string; count: number }>,
+    files_affected: Array.isArray(filesAffected)
+      ? filesAffected as Array<{ file: string; failed: number; passed: number }>
+      : Array.from(filesAffected || []) as Array<{ file: string; failed: number; passed: number }>,
   }
 }
 
@@ -300,8 +304,10 @@ export async function getErrorDistributionByExecution(
     ORDER BY count DESC
   `
 
-  // Ensure we always return an array
-  return (results || []) as Array<{ error_pattern: string; count: number; test_files: string[] }>
+  // Ensure we return a proper array (Neon returns array-like objects)
+  return Array.isArray(results)
+    ? results as Array<{ error_pattern: string; count: number; test_files: string[] }>
+    : Array.from(results || []) as Array<{ error_pattern: string; count: number; test_files: string[] }>
 }
 
 export async function getDashboardMetrics(organizationId: number, dateRange?: DateRangeFilter) {
