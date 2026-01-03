@@ -8,9 +8,23 @@ import { Check, Loader2, Terminal } from "lucide-react"
 
 function MCPAuthContent() {
   const searchParams = useSearchParams()
-  const callbackPort = searchParams.get("port")
+  // Get port from URL params, or fallback to sessionStorage
+  const urlPort = searchParams.get("port")
+  const [callbackPort, setCallbackPort] = useState<string | null>(urlPort)
   const [status, setStatus] = useState<"loading" | "ready" | "authorizing" | "success" | "error">("loading")
   const [error, setError] = useState<string | null>(null)
+
+  // On mount, check sessionStorage if port not in URL
+  useEffect(() => {
+    if (!urlPort) {
+      const storedPort = sessionStorage.getItem("mcp_callback_port")
+      if (storedPort) {
+        setCallbackPort(storedPort)
+        // Clean up sessionStorage after retrieving
+        sessionStorage.removeItem("mcp_callback_port")
+      }
+    }
+  }, [urlPort])
 
   useEffect(() => {
     // Check if user is authenticated
@@ -20,13 +34,14 @@ function MCPAuthContent() {
         if (res.ok) {
           setStatus("ready")
         } else {
-          // Store the port in sessionStorage before redirecting to login
-          // so we can return to this page after auth
+          // Store the port in sessionStorage as backup
           if (callbackPort) {
             sessionStorage.setItem("mcp_callback_port", callbackPort)
           }
-          // Redirect to login (Neon Auth uses /auth/sign-in)
-          window.location.href = `/auth/sign-in`
+          // Redirect to login with callback URL to return here after auth
+          const currentUrl = window.location.href
+          const signInUrl = `/auth/sign-in?callbackUrl=${encodeURIComponent(currentUrl)}`
+          window.location.href = signInUrl
         }
       } catch {
         setError("Failed to check authentication status")
