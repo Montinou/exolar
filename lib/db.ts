@@ -117,6 +117,190 @@ export async function getTestResultsByExecutionId(organizationId: number, execut
   return results as TestResult[]
 }
 
+// ============================================
+// Execution Analysis Functions (MCP Aggregation)
+// ============================================
+
+export interface FailedTestResult {
+  test_name: string
+  test_file: string
+  error_message: string | null
+  duration_ms: number
+  retry_count: number
+  stack_trace?: string | null
+}
+
+export interface ExecutionSummary {
+  execution: TestExecution
+  summary: {
+    total: number
+    passed: number
+    failed: number
+    skipped: number
+    pass_rate: number
+    duration_ms: number
+  }
+  error_distribution: Array<{ error_pattern: string; count: number }>
+  files_affected: Array<{ file: string; failed: number; passed: number }>
+}
+
+/**
+ * Get only failed tests from an execution (much smaller than full results)
+ * Optionally includes retries for debugging flaky tests
+ */
+export async function getFailedTestsByExecutionId(
+  organizationId: number,
+  executionId: number,
+  options: {
+    includeRetries?: boolean
+    includeStackTraces?: boolean
+  } = {}
+): Promise<FailedTestResult[]> {
+  const sql = getSql()
+  const { includeRetries = false, includeStackTraces = false } = options
+
+  const retryCondition = includeRetries ? "" : "AND tr.retry_count = 0"
+  const stackTraceSelect = includeStackTraces ? ", tr.stack_trace" : ""
+
+  const results = await sql.unsafe(`
+    SELECT
+      tr.test_name,
+      tr.test_file,
+      tr.error_message,
+      tr.duration_ms,
+      tr.retry_count
+      ${stackTraceSelect}
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+      AND tr.status = 'failed'
+      ${retryCondition}
+    ORDER BY tr.test_file ASC, tr.test_name ASC
+  `)
+
+  return results as unknown as FailedTestResult[]
+}
+
+/**
+ * Get aggregated summary of an execution without the full test list
+ * Much lighter than getTestResultsByExecutionId for quick analysis
+ */
+export async function getExecutionSummary(
+  organizationId: number,
+  executionId: number
+): Promise<ExecutionSummary | null> {
+  const sql = getSql()
+
+  // Get execution metadata
+  const execution = await getExecutionById(organizationId, executionId)
+  if (!execution) return null
+
+  // Get test counts by status
+  const statusCounts = await sql`
+    SELECT
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE tr.status = 'passed') as passed,
+      COUNT(*) FILTER (WHERE tr.status = 'failed') as failed,
+      COUNT(*) FILTER (WHERE tr.status = 'skipped') as skipped
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+      AND tr.retry_count = 0
+  `
+
+  // Get error distribution (group similar errors)
+  const errorDistribution = await sql`
+    SELECT
+      CASE
+        WHEN tr.error_message LIKE '%Proposal failed with status%' THEN 'API Error: Proposal failed'
+        WHEN tr.error_message LIKE '%TimeoutError%' THEN 'TimeoutError'
+        WHEN tr.error_message LIKE '%expect%toBeTruthy%' THEN 'AssertionError: toBeTruthy'
+        WHEN tr.error_message LIKE '%expect%toBeVisible%' THEN 'AssertionError: toBeVisible'
+        WHEN tr.error_message LIKE '%locator.click%' THEN 'LocatorError: click failed'
+        WHEN tr.error_message IS NULL THEN 'Unknown Error'
+        ELSE SUBSTRING(tr.error_message, 1, 50)
+      END as error_pattern,
+      COUNT(*) as count
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+      AND tr.status = 'failed'
+      AND tr.retry_count = 0
+    GROUP BY error_pattern
+    ORDER BY count DESC
+  `
+
+  // Get files affected
+  const filesAffected = await sql`
+    SELECT
+      tr.test_file as file,
+      COUNT(*) FILTER (WHERE tr.status = 'failed') as failed,
+      COUNT(*) FILTER (WHERE tr.status = 'passed') as passed
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+      AND tr.retry_count = 0
+    GROUP BY tr.test_file
+    ORDER BY failed DESC, tr.test_file ASC
+  `
+
+  const total = Number(statusCounts[0].total)
+  const passed = Number(statusCounts[0].passed)
+
+  return {
+    execution,
+    summary: {
+      total,
+      passed,
+      failed: Number(statusCounts[0].failed),
+      skipped: Number(statusCounts[0].skipped),
+      pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0,
+      duration_ms: execution.duration_ms || 0,
+    },
+    error_distribution: errorDistribution as Array<{ error_pattern: string; count: number }>,
+    files_affected: filesAffected as Array<{ file: string; failed: number; passed: number }>,
+  }
+}
+
+/**
+ * Get error type distribution for a specific execution
+ */
+export async function getErrorDistributionByExecution(
+  organizationId: number,
+  executionId: number
+): Promise<Array<{ error_pattern: string; count: number; test_files: string[] }>> {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT
+      CASE
+        WHEN tr.error_message LIKE '%Proposal failed with status%' THEN 'API Error: Proposal failed'
+        WHEN tr.error_message LIKE '%TimeoutError%' THEN 'TimeoutError'
+        WHEN tr.error_message LIKE '%expect%toBeTruthy%' THEN 'AssertionError: toBeTruthy'
+        WHEN tr.error_message LIKE '%expect%toBeVisible%' THEN 'AssertionError: toBeVisible'
+        WHEN tr.error_message LIKE '%locator.click%' THEN 'LocatorError: click failed'
+        WHEN tr.error_message IS NULL THEN 'Unknown Error'
+        ELSE SUBSTRING(tr.error_message, 1, 50)
+      END as error_pattern,
+      COUNT(*) as count,
+      array_agg(DISTINCT tr.test_file) as test_files
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+      AND tr.status = 'failed'
+      AND tr.retry_count = 0
+    GROUP BY error_pattern
+    ORDER BY count DESC
+  `
+
+  return results as Array<{ error_pattern: string; count: number; test_files: string[] }>
+}
+
 export async function getDashboardMetrics(organizationId: number, dateRange?: DateRangeFilter) {
   const sql = getSql()
   const conditions = ["completed_at IS NOT NULL", `organization_id = ${organizationId}`]
@@ -703,16 +887,22 @@ export async function getFailuresWithAIContext(
     testFile?: string
     limit?: number
     since?: string
+    executionId?: number
+    requireAIContext?: boolean
   } = {}
 ): Promise<TestResult[]> {
   const sql = getSql()
-  const { errorType, testFile, limit = 50, since } = options
+  const { errorType, testFile, limit = 50, since, executionId, requireAIContext = false } = options
 
   const conditions = [
-    "tr.ai_context IS NOT NULL",
     "tr.status IN ('failed', 'timedout')",
     `te.organization_id = ${organizationId}`,
   ]
+
+  // Only require ai_context when filtering by AI error type or explicitly requested
+  if (requireAIContext || errorType) {
+    conditions.push("tr.ai_context IS NOT NULL")
+  }
 
   if (errorType) {
     conditions.push(`tr.ai_context->'error'->>'type' = '${errorType.replace(/'/g, "''")}'`)
@@ -724,6 +914,10 @@ export async function getFailuresWithAIContext(
 
   if (since) {
     conditions.push(`tr.created_at >= '${since}'`)
+  }
+
+  if (executionId) {
+    conditions.push(`tr.execution_id = ${executionId}`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
