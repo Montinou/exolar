@@ -180,8 +180,13 @@ export function DeviceShowcase() {
                   sizes="(max-width: 640px) 85vw, (max-width: 768px) 400px, (max-width: 1024px) 500px, 800px"
                   style={{
                     boxShadow: "0 0 80px -10px oklch(0.75 0.15 195 / 0.5)",
-                    maskImage: "radial-gradient(ellipse 90% 85% at 50% 45%, black 50%, transparent 100%)",
-                    WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 45%, black 50%, transparent 100%)"
+                    maskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
+                    WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
+                    // Scale up slightly and shift up to hide the white space at top of desktop mockup
+                    ...(activeDevice.id === "desktop" ? {
+                      transform: "scale(1.08) translateY(-3%)",
+                      transformOrigin: "center top"
+                    } : {})
                   }}
                 />
 
