@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import Image from "next/image"
+
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
@@ -162,11 +162,7 @@ export default async function DashboardPage({
         <div className="container mx-auto px-4 py-4 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="space-y-1 sm:space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="relative w-8 h-8 sm:w-10 sm:h-10 rounded-lg overflow-hidden shadow-sm border border-white/10">
-                    <Image src="/branding/logo-icon.jpeg" alt="Aestra Logo" fill className="object-cover" />
-                </div>
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <BrandLogo variant="icon" width={32} height={32} />
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">Aestra</h1>
               </div>
