@@ -246,4 +246,81 @@
     background: oklch(0.15 0.025 260 / 0.7);
     transform: translateY(-2px);
   }
+
+  /* Glass Card with optional glow border */
+  .glass-card {
+    @apply backdrop-blur-xl rounded-xl border transition-all duration-300;
+    background: oklch(0.12 0.02 260 / 0.6);
+    border-color: oklch(1 0 0 / 0.1);
+  }
+
+  .glass-card-glow {
+    box-shadow: 0 0 30px oklch(0.75 0.15 195 / 0.15);
+    border-color: oklch(0.75 0.15 195 / 0.3);
+  }
+
+  .glass-card-glow:hover {
+    box-shadow: 0 0 40px oklch(0.75 0.15 195 / 0.25);
+  }
+
+  /* Colored stat values with glow effect */
+  .stat-value-success {
+    color: var(--status-success);
+    text-shadow: 0 0 20px oklch(0.72 0.19 145 / 0.5);
+  }
+
+  .stat-value-error {
+    color: var(--status-error);
+    text-shadow: 0 0 20px oklch(0.65 0.22 25 / 0.5);
+  }
+
+  .stat-value-warning {
+    color: var(--status-warning);
+    text-shadow: 0 0 20px oklch(0.78 0.18 75 / 0.5);
+  }
+
+  .stat-value-info {
+    color: var(--status-info);
+    text-shadow: 0 0 20px oklch(0.70 0.15 230 / 0.5);
+  }
+
+  .stat-value-cyan {
+    color: var(--aestra-cyan);
+    text-shadow: 0 0 20px oklch(0.75 0.15 195 / 0.5);
+  }
+
+  /* Status left border indicators */
+  .status-border-success {
+    border-left: 4px solid var(--status-success);
+  }
+
+  .status-border-error {
+    border-left: 4px solid var(--status-error);
+  }
+
+  .status-border-warning {
+    border-left: 4px solid var(--status-warning);
+  }
+
+  .status-border-info {
+    border-left: 4px solid var(--status-info);
+  }
+
+  /* Chart gradient definitions for SVG */
+  .chart-area-gradient {
+    fill: url(#areaGradient);
+  }
+
+  /* Progress bar segments */
+  .progress-segment {
+    @apply transition-all duration-300;
+  }
+
+  .progress-segment:first-child {
+    @apply rounded-l-full;
+  }
+
+  .progress-segment:last-child {
+    @apply rounded-r-full;
+  }
 }

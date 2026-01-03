@@ -9,8 +9,8 @@ import {
   ResponsiveContainer,
   Tooltip,
   Cell,
+  CartesianGrid,
 } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Loader2 } from "lucide-react"
 
 interface ErrorDistribution {
@@ -55,81 +55,88 @@ export function ErrorDistributionChart() {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
-            Error Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[200px] flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertCircle className="h-5 w-5 text-[var(--status-error)]" />
+          <h3 className="text-sm font-medium text-muted-foreground">Error Distribution</h3>
+        </div>
+        <div className="h-[200px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
     )
   }
 
   if (formattedData.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
-            Error Distribution
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No categorized errors</p>
-              <p className="text-xs">AI context data not available</p>
-            </div>
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertCircle className="h-5 w-5 text-[var(--status-error)]" />
+          <h3 className="text-sm font-medium text-muted-foreground">Error Distribution</h3>
+        </div>
+        <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+          <div className="text-center">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No categorized errors</p>
+            <p className="text-xs">AI context data not available</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5" />
-            Error Distribution
-          </span>
-          <span className="text-sm font-normal text-muted-foreground">
-            Last 7 days
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={200}>
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5 text-[var(--status-error)]" />
+          <h3 className="text-sm font-medium text-muted-foreground">Error Distribution</h3>
+        </div>
+        <span className="text-xs text-muted-foreground">Last 7 days</span>
+      </div>
+      <div className="h-[200px] sm:h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={formattedData}
             layout="vertical"
             margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
           >
-            <XAxis type="number" tick={{ fontSize: 12 }} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="oklch(1 0 0 / 0.05)"
+              horizontal={false}
+            />
+            <XAxis
+              type="number"
+              tick={{ fill: "oklch(0.708 0 0)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: "oklch(1 0 0 / 0.1)" }}
+            />
             <YAxis
               dataKey="displayType"
               type="category"
-              tick={{ fontSize: 11 }}
+              tick={{ fill: "oklch(0.708 0 0)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               width={100}
             />
             <Tooltip
+              contentStyle={{
+                background: "oklch(0.12 0.02 260 / 0.9)",
+                border: "1px solid oklch(1 0 0 / 0.1)",
+                borderRadius: "8px",
+                backdropFilter: "blur(8px)",
+              }}
+              itemStyle={{ color: "oklch(0.985 0 0)" }}
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const tooltipData = payload[0].payload
                   return (
-                    <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                      <p className="font-medium text-sm">
+                    <div className="glass-card p-3">
+                      <p className="font-medium text-sm text-foreground">
                         {tooltipData.error_type}
                       </p>
-                      <p className="font-semibold" style={{ color: "var(--status-error)" }}>
+                      <p className="font-semibold stat-value-error">
                         {tooltipData.count} failures
                       </p>
                     </div>
@@ -142,13 +149,13 @@ export function ErrorDistributionChart() {
               {formattedData.map((_, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={index === 0 ? "var(--status-error)" : "var(--status-error-light)"}
+                  fill={index === 0 ? "var(--status-error)" : "oklch(0.65 0.22 25 / 0.6)"}
                 />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -11,7 +11,6 @@ import {
   ReferenceLine,
   Tooltip,
 } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingDown, Loader2 } from "lucide-react"
 import type { FailureTrendData } from "@/lib/types"
 
@@ -59,77 +58,78 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5" />
-            Failure Rate Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[150px] sm:h-[200px] flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
+          <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+        </div>
+        <div className="h-[200px] sm:h-[220px] flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
     )
   }
 
   if (data.length === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5" />
-            Failure Rate Trend
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[150px] sm:h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-            No data available for selected period
-          </div>
-        </CardContent>
-      </Card>
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
+          <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+        </div>
+        <div className="h-[200px] sm:h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+          No data available for selected period
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5" />
-            Failure Rate Trend
-          </span>
-          <span className="text-sm font-normal text-muted-foreground">
-            Avg: {avgFailureRate.toFixed(1)}%
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[150px] sm:h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={formattedData}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
+          <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+        </div>
+        <span className="text-xs stat-value-error">
+          Avg: {avgFailureRate.toFixed(1)}%
+        </span>
+      </div>
+      <div className="h-[200px] sm:h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={formattedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="oklch(1 0 0 / 0.05)"
+              vertical={false}
+            />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 12 }}
-              className="text-muted-foreground"
+              tick={{ fill: "oklch(0.708 0 0)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: "oklch(1 0 0 / 0.1)" }}
             />
             <YAxis
-              tick={{ fontSize: 12 }}
+              tick={{ fill: "oklch(0.708 0 0)", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
               tickFormatter={(value) => `${value}%`}
-              className="text-muted-foreground"
               domain={[0, "auto"]}
             />
             <Tooltip
+              contentStyle={{
+                background: "oklch(0.12 0.02 260 / 0.9)",
+                border: "1px solid oklch(1 0 0 / 0.1)",
+                borderRadius: "8px",
+                backdropFilter: "blur(8px)",
+              }}
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const tooltipData = payload[0].payload
                   return (
-                    <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                      <p className="font-medium">{tooltipData.date}</p>
-                      <p className="font-semibold" style={{ color: "var(--status-error)" }}>
+                    <div className="glass-card p-3">
+                      <p className="font-medium text-foreground">{tooltipData.date}</p>
+                      <p className="font-semibold stat-value-error">
                         Failure Rate: {Number(tooltipData.failure_rate).toFixed(1)}%
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -143,12 +143,13 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
             />
             <ReferenceLine
               y={avgFailureRate}
-              stroke="var(--chart-neutral)"
+              stroke="oklch(0.5 0 0)"
               strokeDasharray="3 3"
               label={{
                 value: "Avg",
                 position: "right",
                 fontSize: 10,
+                fill: "oklch(0.708 0 0)",
               }}
             />
             <Line
@@ -156,13 +157,23 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
               dataKey="failure_rate"
               stroke="var(--status-error)"
               strokeWidth={2}
-              dot={{ fill: "var(--status-error)", strokeWidth: 2, r: 4 }}
-              activeDot={{ r: 6 }}
+              dot={{
+                fill: "var(--status-error)",
+                strokeWidth: 0,
+                r: 3,
+              }}
+              activeDot={{
+                r: 5,
+                fill: "var(--status-error)",
+                style: { filter: "drop-shadow(0 0 8px var(--status-error))" },
+              }}
+              style={{
+                filter: "drop-shadow(0 0 6px oklch(0.65 0.22 25 / 0.5))",
+              }}
             />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   )
 }

@@ -114,6 +114,13 @@ export interface TestArtifact {
 // Dashboard Aggregate Types
 // ============================================
 
+export interface LatestPassRate {
+  total_tests: number
+  passed_tests: number
+  failed_tests: number
+  skipped_tests: number
+}
+
 export interface DashboardMetrics {
   total_executions: number
   pass_rate: number
@@ -122,6 +129,8 @@ export interface DashboardMetrics {
   critical_failures: number
   last_24h_executions: number
   failure_volume: number
+  latestPassRate: LatestPassRate | null
+  flakyTests: number
 }
 
 export interface TrendData {

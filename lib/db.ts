@@ -173,6 +173,24 @@ export async function getDashboardMetrics(organizationId: number, dateRange?: Da
     ${sql.unsafe(criticalWhereClause)}
   `
 
+  // Get latest execution test counts for donut chart
+  const latestExecution = await sql`
+    SELECT total_tests, passed, failed, skipped
+    FROM test_executions
+    WHERE organization_id = ${organizationId}
+      AND completed_at IS NOT NULL
+    ORDER BY started_at DESC
+    LIMIT 1
+  `
+
+  // Get count of flaky tests (tests that have had at least one flaky run)
+  const flakyCount = await sql`
+    SELECT COUNT(*) as flaky_count
+    FROM test_flakiness_history
+    WHERE organization_id = ${organizationId}
+      AND flaky_runs > 0
+  `
+
   return {
     total_executions: Number(metrics[0].total_executions),
     pass_rate: Number(metrics[0].pass_rate),
@@ -181,6 +199,13 @@ export async function getDashboardMetrics(organizationId: number, dateRange?: Da
     critical_failures: Number(criticalFailures[0].critical_failures),
     last_24h_executions: Number(metrics[0].last_24h_executions),
     failure_volume: Number(metrics[0].failure_volume),
+    latestPassRate: latestExecution[0] ? {
+      total_tests: Number(latestExecution[0].total_tests),
+      passed_tests: Number(latestExecution[0].passed),
+      failed_tests: Number(latestExecution[0].failed),
+      skipped_tests: Number(latestExecution[0].skipped),
+    } : null,
+    flakyTests: Number(flakyCount[0].flaky_count) || 0,
   } as DashboardMetrics
 }
 

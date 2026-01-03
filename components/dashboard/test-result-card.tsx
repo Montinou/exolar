@@ -232,10 +232,17 @@ export function TestResultCard({ test, variant = "full" }: TestResultCardProps) 
   const isPassed = test.status === "passed"
   const isSkipped = test.status === "skipped"
 
+  // Get border class based on status
+  const getBorderClass = () => {
+    if (isPassed) return "status-border-success"
+    if (isFailed) return "status-border-error"
+    return "status-border-warning"
+  }
+
   // Compact variant for passed/skipped tests
   if (variant === "compact" || isSkipped) {
     return (
-      <div className="border rounded-lg p-4 space-y-2 bg-card">
+      <div className={`glass-card p-4 space-y-2 ${getBorderClass()}`}>
         <div className="flex items-center gap-2">
           {getStatusIcon(test.status)}
           <h4 className="font-semibold text-sm">{test.test_name}</h4>
@@ -259,7 +266,7 @@ export function TestResultCard({ test, variant = "full" }: TestResultCardProps) 
 
   // Full variant for failed tests (or passed with full details)
   return (
-    <div className="border rounded-lg p-4 space-y-3 bg-card">
+    <div className={`glass-card p-4 space-y-3 ${getBorderClass()}`}>
       <div className="flex items-start justify-between">
         <div className="space-y-1 flex-1">
           <div className="flex items-center gap-2">

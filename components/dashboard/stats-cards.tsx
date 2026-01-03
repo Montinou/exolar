@@ -1,19 +1,29 @@
-import { Card, CardContent } from "@/components/ui/card"
 import { CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react"
 import type { DashboardMetrics } from "@/lib/types"
+import { cn } from "@/lib/utils"
 
 interface StatsCardsProps {
   metrics: DashboardMetrics
 }
 
+type StatType = "passRate" | "failRate" | "duration" | "critical"
+
 export function StatsCards({ metrics }: StatsCardsProps) {
-  const stats = [
+  const stats: Array<{
+    label: string
+    value: string
+    description: string
+    icon: typeof CheckCircle2
+    trend: "positive" | "negative" | "neutral"
+    type: StatType
+  }> = [
     {
       label: "Pass Rate",
       value: `${metrics.pass_rate.toFixed(1)}%`,
       description: `${metrics.total_executions} total runs`,
       icon: CheckCircle2,
       trend: metrics.pass_rate >= 90 ? "positive" : metrics.pass_rate >= 75 ? "neutral" : "negative",
+      type: "passRate",
     },
     {
       label: "Failure Rate",
@@ -21,6 +31,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       description: `${metrics.failure_volume} failed runs`,
       icon: XCircle,
       trend: metrics.failure_rate <= 5 ? "positive" : metrics.failure_rate <= 15 ? "neutral" : "negative",
+      type: "failRate",
     },
     {
       label: "Avg Duration",
@@ -28,6 +39,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       description: "Per test execution",
       icon: Clock,
       trend: "neutral",
+      type: "duration",
     },
     {
       label: "Critical Failures",
@@ -35,35 +47,60 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       description: "Last 7 days",
       icon: AlertTriangle,
       trend: metrics.critical_failures === 0 ? "positive" : metrics.critical_failures <= 3 ? "neutral" : "negative",
+      type: "critical",
     },
   ]
 
+  // Get the appropriate value class based on stat type
+  const getValueClass = (type: StatType, trend: string) => {
+    switch (type) {
+      case "passRate":
+        return "stat-value-success"
+      case "failRate":
+        return trend === "positive" ? "stat-value-success" : "stat-value-error"
+      case "critical":
+        return trend === "positive" ? "stat-value-success" : trend === "negative" ? "stat-value-error" : "stat-value-warning"
+      case "duration":
+        return "stat-value-cyan"
+      default:
+        return ""
+    }
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => {
         const Icon = stat.icon
         return (
-          <Card key={stat.label} className="border-border/50">
-            <CardContent className="flex flex-col gap-3 p-6">
+          <div
+            key={stat.label}
+            className="glass-card glass-card-glow p-6"
+          >
+            <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">{stat.label}</span>
                 <Icon
-                  className="h-4 w-4"
+                  className="h-5 w-5"
                   style={{
                     color: stat.trend === "positive"
                       ? "var(--status-success)"
                       : stat.trend === "negative"
                         ? "var(--status-error)"
-                        : undefined
+                        : "var(--aestra-cyan)"
                   }}
                 />
               </div>
               <div className="space-y-1">
-                <p className="text-3xl font-bold tracking-tight">{stat.value}</p>
+                <p className={cn(
+                  "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+                  getValueClass(stat.type, stat.trend)
+                )}>
+                  {stat.value}
+                </p>
                 <p className="text-xs text-muted-foreground">{stat.description}</p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )
       })}
     </div>

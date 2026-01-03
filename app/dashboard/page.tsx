@@ -3,8 +3,12 @@ import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
 import { StatsCards } from "@/components/dashboard/stats-cards"
+import { TestSummaryBar } from "@/components/dashboard/test-summary-bar"
+import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
+import { TrendAreaChart } from "@/components/dashboard/trend-area-chart"
 import { ErrorDistributionChart } from "@/components/dashboard/error-distribution-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
+import { FlakinessBySuiteChart } from "@/components/dashboard/flakiness-by-suite-chart"
 import { ExecutionsView } from "@/components/dashboard/executions-view"
 import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
@@ -40,19 +44,50 @@ async function DashboardContent({
     db.getSuites(),
   ])
 
+  // Extract metrics for new components
+  const totalTests = metrics.latestPassRate?.total_tests ?? 0
+  const passedTests = metrics.latestPassRate?.passed_tests ?? 0
+  const failedTests = metrics.latestPassRate?.failed_tests ?? 0
+  const flakyTests = metrics.flakyTests ?? 0
+
   return (
     <>
       <div className="space-y-6">
+        {/* Stats Overview */}
         <StatsCards metrics={metrics} />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ErrorDistributionChart />
+
+        {/* Test Summary Progress Bar */}
+        <TestSummaryBar
+          total={totalTests}
+          passed={passedTests}
+          failed={failedTests}
+          flaky={flakyTests}
+        />
+
+        {/* Charts Row - 3 columns on large screens */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <StatusDonutChart
+            passRate={totalTests > 0 ? (passedTests / totalTests) * 100 : 0}
+            failRate={totalTests > 0 ? (failedTests / totalTests) * 100 : 0}
+            flakyRate={totalTests > 0 ? (flakyTests / totalTests) * 100 : 0}
+          />
           <FailureRateChart dateFrom={params.from} dateTo={params.to} />
+          <ErrorDistributionChart />
         </div>
+
+        {/* Analysis Row - Flakiest and Slowest Tests */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <FlakiestTestsCard />
           <SlowestTestsCard />
         </div>
-        <SuitePassRatesCard />
+
+        {/* Suite Analysis Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SuitePassRatesCard />
+          <FlakinessBySuiteChart data={[]} />
+        </div>
+
+        {/* Filters and Executions */}
         <div className="space-y-4">
           <Filters branches={branches} suites={suites} />
           <ExecutionsView executions={executions} branchGroups={branchGroups} />
@@ -65,22 +100,51 @@ async function DashboardContent({
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Stats Cards Skeleton */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-6">
-              <Skeleton className="h-20 w-full" />
-            </CardContent>
-          </Card>
+          <div key={i} className="glass-card glass-card-glow p-6">
+            <Skeleton className="h-20 w-full bg-muted/30" />
+          </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Skeleton className="h-[400px] w-full" />
-        </div>
-        <Skeleton className="h-[300px] w-full" />
+
+      {/* Test Summary Bar Skeleton */}
+      <div className="glass-card glass-card-glow p-6">
+        <Skeleton className="h-12 w-full bg-muted/30" />
       </div>
-      <Skeleton className="h-[500px] w-full" />
+
+      {/* Charts Row Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="glass-card glass-card-glow p-6">
+            <Skeleton className="h-[220px] w-full bg-muted/30" />
+          </div>
+        ))}
+      </div>
+
+      {/* Analysis Row Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="glass-card glass-card-glow p-6">
+            <Skeleton className="h-[200px] w-full bg-muted/30" />
+          </div>
+        ))}
+      </div>
+
+      {/* Suite Row Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="glass-card glass-card-glow p-6">
+            <Skeleton className="h-[200px] w-full bg-muted/30" />
+          </div>
+        ))}
+      </div>
+
+      {/* Executions Skeleton */}
+      <div className="glass-card glass-card-glow p-6">
+        <Skeleton className="h-[400px] w-full bg-muted/30" />
+      </div>
     </div>
   )
 }
@@ -93,13 +157,13 @@ export default async function DashboardPage({
   return (
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-balance">Aestra</h1>
-              <p className="text-muted-foreground text-pretty">Test Results, Illuminated by Intelligence</p>
+        <div className="container mx-auto px-4 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1 sm:space-y-2">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">Aestra</h1>
+              <p className="text-sm sm:text-base text-muted-foreground text-pretty">Test Results, Illuminated by Intelligence</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <SearchTests />
               <AdminLink />
               <UserMenu />
@@ -108,7 +172,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8">
         <Suspense fallback={<DashboardSkeleton />}>
 
           <DashboardContent searchParams={searchParams} />
