@@ -179,7 +179,8 @@ export async function getFailedTestsByExecutionId(
     ORDER BY tr.test_file ASC, tr.test_name ASC
   `)
 
-  return results as unknown as FailedTestResult[]
+  // Ensure we always return an array
+  return (results || []) as unknown as FailedTestResult[]
 }
 
 /**
@@ -261,8 +262,9 @@ export async function getExecutionSummary(
       pass_rate: total > 0 ? Math.round((passed / total) * 1000) / 10 : 0,
       duration_ms: execution.duration_ms || 0,
     },
-    error_distribution: errorDistribution as Array<{ error_pattern: string; count: number }>,
-    files_affected: filesAffected as Array<{ file: string; failed: number; passed: number }>,
+    // Ensure arrays are always defined
+    error_distribution: (errorDistribution || []) as Array<{ error_pattern: string; count: number }>,
+    files_affected: (filesAffected || []) as Array<{ file: string; failed: number; passed: number }>,
   }
 }
 
@@ -298,7 +300,8 @@ export async function getErrorDistributionByExecution(
     ORDER BY count DESC
   `
 
-  return results as Array<{ error_pattern: string; count: number; test_files: string[] }>
+  // Ensure we always return an array
+  return (results || []) as Array<{ error_pattern: string; count: number; test_files: string[] }>
 }
 
 export async function getDashboardMetrics(organizationId: number, dateRange?: DateRangeFilter) {
