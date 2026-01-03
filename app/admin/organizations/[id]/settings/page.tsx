@@ -145,7 +145,7 @@ export default function OrgSettingsPage({ params }: { params: Promise<{ id: stri
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md glass-card">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <Shield className="h-6 w-6 text-destructive" />
@@ -196,7 +196,7 @@ export default function OrgSettingsPage({ params }: { params: Promise<{ id: stri
 
       <div className="container mx-auto px-4 py-8 max-w-2xl space-y-8">
         {/* Organization Details */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle>Organization Details</CardTitle>
             <CardDescription>Update the name and slug for this organization</CardDescription>
@@ -239,7 +239,7 @@ export default function OrgSettingsPage({ params }: { params: Promise<{ id: stri
         </Card>
 
         {/* Danger Zone */}
-        <Card className="border-destructive">
+        <Card className="glass-card border-destructive">
           <CardHeader>
             <CardTitle className="text-destructive">Danger Zone</CardTitle>
             <CardDescription>
@@ -258,7 +258,7 @@ export default function OrgSettingsPage({ params }: { params: Promise<{ id: stri
                   Delete Organization
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="glass-card">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>

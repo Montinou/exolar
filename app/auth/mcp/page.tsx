@@ -91,7 +91,7 @@ function MCPAuthContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md glass-card glass-card-glow">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Terminal className="h-6 w-6 text-primary" />
@@ -110,7 +110,7 @@ function MCPAuthContent() {
 
           {status === "ready" && (
             <>
-              <div className="bg-muted rounded-lg p-4 text-sm space-y-2">
+              <div className="glass-panel rounded-lg p-4 text-sm space-y-2">
                 <p className="font-medium">Claude Code will be able to:</p>
                 <ul className="list-disc list-inside text-muted-foreground space-y-1">
                   <li>View your test executions and results</li>
@@ -166,7 +166,7 @@ function MCPAuthContent() {
 function LoadingFallback() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md glass-card glass-card-glow">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Terminal className="h-6 w-6 text-primary" />

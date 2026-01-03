@@ -215,7 +215,7 @@ export default function AdminPage() {
 
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Invite Form */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
@@ -262,7 +262,7 @@ export default function AdminPage() {
         </Card>
 
         {/* Pending Invites */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -315,7 +315,7 @@ export default function AdminPage() {
         </Card>
 
         {/* Users List */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />

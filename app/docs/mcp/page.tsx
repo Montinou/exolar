@@ -52,9 +52,9 @@ function ToolList({ tools }: { tools: { name: string; desc: string }[] }) {
       {tools.map((tool) => (
         <div
           key={tool.name}
-          className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg bg-muted/50"
+          className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg glass-panel"
         >
-          <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded text-primary w-fit">
+          <code className="text-sm font-mono bg-muted/50 px-2 py-0.5 rounded text-primary w-fit">
             {tool.name}
           </code>
           <span className="text-sm text-muted-foreground">{tool.desc}</span>
@@ -84,7 +84,7 @@ export default function MCPDocsPage() {
         <h2 className="text-xl sm:text-2xl font-semibold">Installation</h2>
 
         <div className="space-y-4">
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
               Authenticate
@@ -94,11 +94,11 @@ export default function MCPDocsPage() {
             </p>
             <CodeBlock code="npx e2e-test-dashboard-mcp --login" />
             <p className="text-xs text-muted-foreground mt-3">
-              This will store your credentials securely in <code className="px-1 py-0.5 rounded bg-muted">~/.e2e-dashboard-mcp/config.json</code>
+              This will store your credentials securely in <code className="px-1 py-0.5 rounded glass-panel">~/.e2e-dashboard-mcp/config.json</code>
             </p>
           </div>
 
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
               Add to Claude Code
@@ -170,7 +170,7 @@ npx e2e-test-dashboard-mcp --login --url https://your-dashboard.com`}
         </p>
         <div className="grid gap-2">
           {usageExamples.map((example) => (
-            <div key={example} className="p-3 rounded-lg bg-muted/50 text-sm">
+            <div key={example} className="p-3 rounded-lg glass-panel text-sm">
               &ldquo;{example}&rdquo;
             </div>
           ))}
@@ -208,25 +208,25 @@ npx e2e-test-dashboard-mcp --login --url https://your-dashboard.com`}
       <section id="troubleshooting" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Troubleshooting</h2>
         <div className="space-y-3 sm:space-y-4">
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">&ldquo;Not authenticated&rdquo; error</h3>
             <p className="text-sm text-muted-foreground">
-              Run <code className="px-1 py-0.5 rounded bg-muted">npx e2e-test-dashboard-mcp --login</code> to authenticate.
+              Run <code className="px-1 py-0.5 rounded glass-panel">npx e2e-test-dashboard-mcp --login</code> to authenticate.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">&ldquo;Token expired&rdquo; error</h3>
             <p className="text-sm text-muted-foreground">
-              Your token has expired. Run <code className="px-1 py-0.5 rounded bg-muted">--login</code> again to get a new one.
+              Your token has expired. Run <code className="px-1 py-0.5 rounded glass-panel">--login</code> again to get a new one.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">&ldquo;Connection failed&rdquo; error</h3>
             <p className="text-sm text-muted-foreground">
               Check your internet connection and that the dashboard is accessible.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">Browser doesn&apos;t open</h3>
             <p className="text-sm text-muted-foreground">
               If the browser doesn&apos;t open automatically, copy the URL shown in the terminal and paste it in your browser.

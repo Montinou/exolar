@@ -43,12 +43,12 @@ export default function DocsPage() {
       <section className="space-y-4 sm:space-y-6">
         <h2 className="text-xl sm:text-2xl font-semibold">Quick Start</h2>
         <div className="grid gap-4">
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-3 sm:mb-4">1. Set up the GitHub Action</h3>
             <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
               First, <Link href="/settings/api-keys" className="text-primary hover:underline">create an API key</Link>, then add the GitHub Action to your repository:
             </p>
-            <pre className="p-3 sm:p-4 rounded-md bg-muted text-xs sm:text-sm overflow-x-auto">
+            <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
               <code>{`# .github/workflows/playwright.yml
 - name: Upload to Aestra
   uses: Montinou/e2e-test-dashboard-action@v1
@@ -57,12 +57,12 @@ export default function DocsPage() {
             </pre>
           </div>
 
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-3 sm:mb-4">2. Connect Claude Code (Optional)</h3>
             <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
               Install the MCP server to give your AI coding assistant direct access to test results.
             </p>
-            <pre className="p-3 sm:p-4 rounded-md bg-muted text-xs sm:text-sm overflow-x-auto">
+            <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
               <code>{`# Authenticate
 npx e2e-test-dashboard-mcp --login
 
@@ -81,7 +81,7 @@ claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`
             <Link
               key={link.href}
               href={link.href}
-              className="group p-4 sm:p-6 rounded-lg border border-border bg-card hover:border-primary/50 hover:bg-card/80 transition-colors"
+              className="group p-4 sm:p-6 rounded-xl glass-card hover:glass-card-glow transition-all"
             >
               <link.icon className="h-6 w-6 sm:h-8 sm:w-8 mb-3 sm:mb-4 text-primary" />
               <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors flex items-center gap-2">

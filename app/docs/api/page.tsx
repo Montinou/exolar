@@ -75,7 +75,7 @@ function ParamsTable({ params }: { params: { name: string; type: string; desc: s
       {/* Mobile: Card layout */}
       <div className="sm:hidden space-y-2">
         {params.map((param) => (
-          <div key={param.name} className="p-3 rounded-lg bg-muted/50">
+          <div key={param.name} className="p-3 rounded-lg glass-panel">
             <div className="flex items-center gap-2 mb-1">
               <code className="text-primary text-sm">{param.name}</code>
               <span className="text-xs text-muted-foreground">({param.type})</span>
@@ -157,7 +157,7 @@ export default function APIDocsPage() {
 
         <div className="space-y-6 sm:space-y-8">
           {endpoints.map((endpoint) => (
-            <div key={endpoint.path} className="p-4 sm:p-6 rounded-lg border border-border">
+            <div key={endpoint.path} className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
                 <span
                   className={`px-2 py-1 rounded text-xs font-mono font-semibold ${

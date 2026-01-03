@@ -98,7 +98,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
   if (error || !execution) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md glass-card">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <XCircle className="h-6 w-6 text-destructive" />
@@ -174,7 +174,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
       <div className="container mx-auto px-4 py-8 space-y-6">
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
+          <Card className="glass-card glass-card-glow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Tests</CardTitle>
               <Hash className="h-4 w-4 text-muted-foreground" />
@@ -187,7 +187,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-card glass-card-glow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Duration</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -200,7 +200,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-card glass-card-glow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Branch</CardTitle>
               <GitBranch className="h-4 w-4 text-muted-foreground" />
@@ -215,7 +215,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass-card glass-card-glow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
               {execution.status === "success" ? (
@@ -240,7 +240,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
 
         {/* Commit Message */}
         {execution.commit_message && (
-          <Card>
+          <Card className="glass-card glass-card-glow">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">Commit Message</CardTitle>
             </CardHeader>
@@ -251,7 +251,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
         )}
 
         {/* Test Results */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle>Test Results</CardTitle>
             <CardDescription>

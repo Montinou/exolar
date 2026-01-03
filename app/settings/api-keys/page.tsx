@@ -174,243 +174,245 @@ export default function ApiKeysSettingsPage() {
   const revokedKeys = apiKeys.filter((k) => k.revoked_at)
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl px-4">
-      <div className="mb-6">
-        <Link
-          href="/"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Dashboard
-        </Link>
-      </div>
-
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Key className="h-6 w-6" />
-            API Keys
-          </h1>
-          <p className="text-muted-foreground">
-            Manage API keys for CI/CD integration
-          </p>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8 max-w-4xl px-4">
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Dashboard
+          </Link>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create API Key
-        </Button>
-      </div>
 
-      {error && (
-        <Card className="mb-6 border-destructive">
-          <CardContent className="pt-6">
-            <p className="text-destructive">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Key className="h-6 w-6" />
+              API Keys
+            </h1>
+            <p className="text-muted-foreground">
+              Manage API keys for CI/CD integration
+            </p>
+          </div>
+          <Button className="btn-amber" onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create API Key
+          </Button>
+        </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Active Keys ({activeKeys.length})</CardTitle>
-          <CardDescription>
-            API keys used for GitHub Actions and CI/CD integrations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground">Loading...</p>
-          ) : activeKeys.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No API keys yet</p>
-              <p className="text-sm">Create one to start uploading test results from CI/CD</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key Prefix</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Last Used</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activeKeys.map((apiKey) => (
-                  <TableRow key={apiKey.id}>
-                    <TableCell className="font-medium">{apiKey.name}</TableCell>
-                    <TableCell>
-                      <code className="bg-muted px-2 py-1 rounded text-sm">
-                        {apiKey.key_prefix}...
-                      </code>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(apiKey.created_at)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {apiKey.last_used_at ? formatDate(apiKey.last_used_at) : "Never"}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => {
-                          setKeyToRevoke(apiKey)
-                          setRevokeDialogOpen(true)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        {error && (
+          <Card className="mb-6 border-destructive glass-card">
+            <CardContent className="pt-6">
+              <p className="text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
-      {revokedKeys.length > 0 && (
-        <Card>
+        <Card className="mb-6 glass-card glass-card-glow">
           <CardHeader>
-            <CardTitle className="text-muted-foreground">
-              Revoked Keys ({revokedKeys.length})
-            </CardTitle>
+            <CardTitle>Active Keys ({activeKeys.length})</CardTitle>
+            <CardDescription>
+              API keys used for GitHub Actions and CI/CD integrations
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key Prefix</TableHead>
-                  <TableHead>Revoked</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {revokedKeys.map((apiKey) => (
-                  <TableRow key={apiKey.id} className="opacity-50">
-                    <TableCell className="font-medium">{apiKey.name}</TableCell>
-                    <TableCell>
-                      <code className="bg-muted px-2 py-1 rounded text-sm">
-                        {apiKey.key_prefix}...
-                      </code>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="destructive">
-                        {formatDate(apiKey.revoked_at)}
-                      </Badge>
-                    </TableCell>
+            {loading ? (
+              <p className="text-muted-foreground">Loading...</p>
+            ) : activeKeys.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No API keys yet</p>
+                <p className="text-sm">Create one to start uploading test results from CI/CD</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Key Prefix</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Last Used</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {activeKeys.map((apiKey) => (
+                    <TableRow key={apiKey.id}>
+                      <TableCell className="font-medium">{apiKey.name}</TableCell>
+                      <TableCell>
+                        <code className="bg-muted px-2 py-1 rounded text-sm">
+                          {apiKey.key_prefix}...
+                        </code>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(apiKey.created_at)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {apiKey.last_used_at ? formatDate(apiKey.last_used_at) : "Never"}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setKeyToRevoke(apiKey)
+                            setRevokeDialogOpen(true)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Create Key Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create API Key</DialogTitle>
-            <DialogDescription>
-              Create a new API key for CI/CD integration. The key will only be shown once.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Key Name</Label>
-              <Input
-                id="name"
-                placeholder="e.g., GitHub Actions CI"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateKey()}
-              />
-              <p className="text-xs text-muted-foreground">
-                Use a descriptive name to identify where this key is used
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateKey} disabled={creating || !newKeyName.trim()}>
-              {creating ? "Creating..." : "Create Key"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {revokedKeys.length > 0 && (
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-muted-foreground">
+                Revoked Keys ({revokedKeys.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Key Prefix</TableHead>
+                    <TableHead>Revoked</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {revokedKeys.map((apiKey) => (
+                    <TableRow key={apiKey.id} className="opacity-50">
+                      <TableCell className="font-medium">{apiKey.name}</TableCell>
+                      <TableCell>
+                        <code className="bg-muted px-2 py-1 rounded text-sm">
+                          {apiKey.key_prefix}...
+                        </code>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="destructive">
+                          {formatDate(apiKey.revoked_at)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Show New Key Dialog */}
-      <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Save Your API Key
-            </DialogTitle>
-            <DialogDescription>
-              Copy this key now. You won&apos;t be able to see it again!
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>API Key</Label>
-              <div className="relative">
-                <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto font-mono break-all">
-                  {newKey?.key}
-                </pre>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="absolute top-2 right-2"
-                  onClick={copyKey}
-                >
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
+        {/* Create Key Dialog */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent className="glass-card">
+            <DialogHeader>
+              <DialogTitle>Create API Key</DialogTitle>
+              <DialogDescription>
+                Create a new API key for CI/CD integration. The key will only be shown once.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Key Name</Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., GitHub Actions CI"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateKey()}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use a descriptive name to identify where this key is used
+                </p>
               </div>
             </div>
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-              <p className="text-sm text-amber-200">
-                <strong>Important:</strong> Store this key securely in your GitHub repository secrets
-                as <code className="bg-amber-500/20 px-1 rounded">AESTRA_API_KEY</code>
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowKeyDialog(false)}>
-              {copied ? "Done" : "I've saved the key"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button className="btn-amber" onClick={handleCreateKey} disabled={creating || !newKeyName.trim()}>
+                {creating ? "Creating..." : "Create Key"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Revoke Key Dialog */}
-      <AlertDialog open={revokeDialogOpen} onOpenChange={setRevokeDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to revoke &quot;{keyToRevoke?.name}&quot;?
-              Any CI/CD pipelines using this key will stop working.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleRevokeKey}
-              disabled={revoking}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {revoking ? "Revoking..." : "Revoke Key"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        {/* Show New Key Dialog */}
+        <Dialog open={showKeyDialog} onOpenChange={setShowKeyDialog}>
+          <DialogContent className="glass-card">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Save Your API Key
+              </DialogTitle>
+              <DialogDescription>
+                Copy this key now. You won&apos;t be able to see it again!
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>API Key</Label>
+                <div className="relative">
+                  <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto font-mono break-all">
+                    {newKey?.key}
+                  </pre>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="absolute top-2 right-2"
+                    onClick={copyKey}
+                  >
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                <p className="text-sm text-amber-200">
+                  <strong>Important:</strong> Store this key securely in your GitHub repository secrets
+                  as <code className="bg-amber-500/20 px-1 rounded">AESTRA_API_KEY</code>
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button className="btn-amber" onClick={() => setShowKeyDialog(false)}>
+                {copied ? "Done" : "I've saved the key"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Revoke Key Dialog */}
+        <AlertDialog open={revokeDialogOpen} onOpenChange={setRevokeDialogOpen}>
+          <AlertDialogContent className="glass-card">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Revoke API Key</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to revoke &quot;{keyToRevoke?.name}&quot;?
+                Any CI/CD pipelines using this key will stop working.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleRevokeKey}
+                disabled={revoking}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {revoking ? "Revoking..." : "Revoke Key"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   )
 }

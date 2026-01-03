@@ -174,7 +174,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md glass-card">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <Shield className="h-6 w-6 text-destructive" />
@@ -225,7 +225,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
 
       <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Invite Form */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
@@ -277,7 +277,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
 
         {/* Pending Invites */}
         {invites.length > 0 && (
-          <Card>
+          <Card className="glass-card glass-card-glow">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
@@ -315,7 +315,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
         )}
 
         {/* Members List */}
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />

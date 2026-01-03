@@ -134,7 +134,7 @@ export default function OrganizationsPage() {
   if (!isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-md glass-card">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <Shield className="h-6 w-6 text-destructive" />
@@ -180,7 +180,7 @@ export default function OrganizationsPage() {
                     New Organization
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="glass-card">
                   <DialogHeader>
                     <DialogTitle>Create Organization</DialogTitle>
                     <DialogDescription>
@@ -238,7 +238,7 @@ export default function OrganizationsPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <Card>
+        <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle>All Organizations</CardTitle>
             <CardDescription>

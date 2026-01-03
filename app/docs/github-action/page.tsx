@@ -80,7 +80,7 @@ function InputTable() {
       {/* Mobile: Card layout */}
       <div className="sm:hidden space-y-3">
         {inputReference.map((input) => (
-          <div key={input.name} className="p-3 rounded-lg bg-muted/50">
+          <div key={input.name} className="p-3 rounded-lg glass-panel">
             <div className="flex items-center gap-2 mb-2">
               <code className="text-primary text-sm">{input.name}</code>
               {input.required === "Yes" && (
@@ -144,29 +144,29 @@ export default function GitHubActionDocsPage() {
         <h2 className="text-xl sm:text-2xl font-semibold">Quick Start</h2>
 
         <div className="space-y-4">
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
               Get your API Key
             </h3>
             <p className="text-sm text-muted-foreground">
               Go to <Link href="/settings/api-keys" className="text-primary hover:underline">Settings &rarr; API Keys</Link> in the dashboard and create a new API key.
-              Copy the key (it starts with <code className="px-1 py-0.5 rounded bg-muted">aestra_</code>) - you&apos;ll need it for the next step.
+              Copy the key (it starts with <code className="px-1 py-0.5 rounded glass-panel">aestra_</code>) - you&apos;ll need it for the next step.
             </p>
           </div>
 
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
               Add the secret to GitHub
             </h3>
             <p className="text-sm text-muted-foreground">
               In your GitHub repository, go to <strong>Settings &rarr; Secrets and variables &rarr; Actions</strong>.
-              Create a new secret named <code className="px-1 py-0.5 rounded bg-muted">AESTRA_API_KEY</code> with your API key.
+              Create a new secret named <code className="px-1 py-0.5 rounded glass-panel">AESTRA_API_KEY</code> with your API key.
             </p>
           </div>
 
-          <div className="p-4 sm:p-6 rounded-lg border border-border bg-card">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">3</span>
               Add to your workflow
@@ -219,22 +219,22 @@ export default defineConfig({
       <section id="troubleshooting" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Troubleshooting</h2>
         <div className="space-y-3 sm:space-y-4">
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">No test results uploaded</h3>
             <p className="text-sm text-muted-foreground">
-              Make sure your Playwright config includes the JSON reporter and the <code className="px-1 py-0.5 rounded bg-muted">results-path</code> matches your output directory.
+              Make sure your Playwright config includes the JSON reporter and the <code className="px-1 py-0.5 rounded glass-panel">results-path</code> matches your output directory.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">Authentication failed</h3>
             <p className="text-sm text-muted-foreground">
               Verify your API key is correct and the secret is properly configured in GitHub.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-border">
+          <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">Action not running on failure</h3>
             <p className="text-sm text-muted-foreground">
-              Add <code className="px-1 py-0.5 rounded bg-muted">if: always()</code> to ensure the action runs even when tests fail.
+              Add <code className="px-1 py-0.5 rounded glass-panel">if: always()</code> to ensure the action runs even when tests fail.
             </p>
           </div>
         </div>

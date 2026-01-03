@@ -21,9 +21,9 @@ const devices = [
     name: "Desktop HQ",
     description: "Full command center with deep trace analysis and AI debugging tools.",
     icon: Monitor,
-    image: "/assets/desktop-mockup.png",
-    width: 1788,
-    height: 1528,
+    image: "/assets/desktop-mockup-v3.png",
+    width: 1024,
+    height: 1024,
   },
   {
     id: "tablet",
@@ -182,11 +182,6 @@ export function DeviceShowcase() {
                     boxShadow: "0 0 80px -10px oklch(0.75 0.15 195 / 0.5)",
                     maskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
                     WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
-                    // Scale up slightly and shift up to hide the white space at top of desktop mockup
-                    ...(activeDevice.id === "desktop" ? {
-                      transform: "scale(1.08) translateY(-3%)",
-                      transformOrigin: "center top"
-                    } : {})
                   }}
                 />
 
