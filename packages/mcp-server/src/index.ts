@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * E2E Test Dashboard MCP Server
+ * E2E Test Dashboard MCP Server (Exolar QA)
  *
  * A stdio-based MCP server that provides access to E2E test execution data.
  *
  * First-time setup:
- *   npx e2e-test-dashboard-mcp --login
+ *   npx @exolar/mcp-server --login
  *
  * This will open your browser to authenticate with the dashboard.
  * After authentication, run normally:
- *   npx e2e-test-dashboard-mcp
+ *   npx @exolar/mcp-server
  *
  * Or via Claude Code:
- *   claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp
+ *   claude mcp add --transport stdio exolar -- npx -y @exolar/mcp-server
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
@@ -25,7 +25,7 @@ import { getConfig, clearConfig, getConfigPath } from "./config.js"
 import { authenticate } from "./auth.js"
 import { MCPClient } from "./client.js"
 
-const SERVER_NAME = "e2e-test-dashboard-mcp"
+const SERVER_NAME = "exolar-mcp-server"
 const SERVER_VERSION = "1.0.0"
 
 async function main() {
@@ -46,7 +46,7 @@ async function main() {
       console.error(`  Token expires: ${new Date(result.config.expiresAt).toLocaleDateString()}`)
       console.error(`  Config saved to: ${getConfigPath()}`)
       console.error(`\nYou can now use the MCP server with Claude Code:`)
-      console.error(`  claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp\n`)
+      console.error(`  claude mcp add --transport stdio exolar -- npx -y @exolar/mcp-server\n`)
       process.exit(0)
     } else {
       console.error(`\n✗ Authentication failed: ${result.error}`)
@@ -80,7 +80,7 @@ async function main() {
     console.error(`
 ${SERVER_NAME} v${SERVER_VERSION}
 
-Usage: npx e2e-test-dashboard-mcp [options]
+Usage: npx @exolar/mcp-server [options]
 
 Options:
   --login, -l     Authenticate with the dashboard (opens browser)
@@ -90,10 +90,10 @@ Options:
   --help, -h      Show this help message
 
 First-time setup:
-  npx e2e-test-dashboard-mcp --login
+  npx @exolar/mcp-server --login
 
 Add to Claude Code:
-  claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp
+  claude mcp add --transport stdio exolar -- npx -y @exolar/mcp-server
 `)
     process.exit(0)
   }
@@ -106,9 +106,9 @@ Add to Claude Code:
 ${SERVER_NAME} v${SERVER_VERSION}
 
 Not authenticated. Please run:
-  npx e2e-test-dashboard-mcp --login
+  npx @exolar/mcp-server --login
 
-This will open your browser to authenticate with the E2E Test Dashboard.
+This will open your browser to authenticate with the Exolar QA Dashboard.
 `)
     process.exit(1)
   }

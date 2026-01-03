@@ -3,7 +3,7 @@ import { validateApiKey } from "@/lib/auth"
 import { validateIngestRequest } from "@/lib/validation"
 import { getQueriesForOrg, insertArtifacts, generateTestSignature, setServiceAccountContext } from "@/lib/db"
 import { uploadToR2, generateArtifactKey, isR2Configured } from "@/lib/r2"
-import { validateOrgApiKey, isAestraApiKey } from "@/lib/api-keys"
+import { validateOrgApiKey, isExolarApiKey } from "@/lib/api-keys"
 import type { IngestResponse, ArtifactRequest } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -73,8 +73,8 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
   const authHeader = request.headers.get("authorization")
   let organizationId: number
 
-  // Check if it's an aestra_ prefixed org API key
-  if (isAestraApiKey(authHeader)) {
+  // Check if it's an exolar_ prefixed org API key
+  if (isExolarApiKey(authHeader)) {
     const validatedKey = await validateOrgApiKey(authHeader)
     if (!validatedKey) {
       return NextResponse.json(

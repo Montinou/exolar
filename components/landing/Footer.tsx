@@ -37,9 +37,9 @@ export function Footer() {
           <div className="text-center md:text-left">
              <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
                  <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 shadow-lg">
-                    <Image src="/branding/logo-icon.jpeg" alt="Aestra Logo" fill className="object-cover" />
+                    <Image src="/branding/logo-icon.jpeg" alt="Exolar Logo" fill className="object-cover" />
                  </div>
-                 <span className="text-xl font-bold tracking-tight" style={{ color: "oklch(0.95 0 0)" }}>Aestra</span>
+                 <span className="text-xl font-bold tracking-tight" style={{ color: "oklch(0.95 0 0)" }}>Exolar</span>
             </div>
             <p
               className="text-lg font-medium"
@@ -88,7 +88,7 @@ export function Footer() {
             color: "oklch(0.4 0 0)",
           }}
         >
-          <p>&copy; {new Date().getFullYear()} Aestra. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Exolar QA. All rights reserved.</p>
         </div>
       </div>
     </footer>

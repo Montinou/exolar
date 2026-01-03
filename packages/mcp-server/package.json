@@ -1,10 +1,10 @@
 {
-  "name": "e2e-test-dashboard-mcp",
-  "version": "1.0.3",
-  "description": "MCP server for E2E Test Dashboard - access test execution data from Claude Code",
+  "name": "@exolar-qa/mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Exolar QA Dashboard - access test execution data from Claude Code",
   "type": "module",
   "bin": {
-    "e2e-test-dashboard-mcp": "./bin/server.js"
+    "exolar-mcp": "./bin/server.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -34,13 +34,15 @@
     "e2e",
     "testing",
     "playwright",
+    "exolar",
+    "qa",
     "test-dashboard"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Montinou/e2e-test-dashboard"
   },
-  "homepage": "https://www.npmjs.com/package/e2e-test-dashboard-mcp",
+  "homepage": "https://www.npmjs.com/package/@exolar-qa/mcp-server",
   "license": "MIT",
   "author": "lordmont"
 }

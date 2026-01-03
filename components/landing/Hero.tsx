@@ -22,14 +22,14 @@ export function Hero() {
           {/* Logo */}
           <div className="flex justify-center">
             <div className="relative w-20 h-20 rounded-2xl overflow-hidden glass-panel shadow-2xl p-1">
-               <Image src="/branding/logo-icon.jpeg" alt="Aestra Logo" fill className="object-cover rounded-xl" />
+               <Image src="/branding/logo-icon.jpeg" alt="Exolar QA Logo" fill className="object-cover rounded-xl" />
             </div>
           </div>
 
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-sm">
             <Sparkles className="w-4 h-4" style={{ color: "var(--safety-amber)" }} />
-            <span className="text-muted-foreground">Aestra: First E2E Dashboard with Native MCP Support</span>
+            <span className="text-muted-foreground">Exolar: First E2E Dashboard with Native MCP Support</span>
           </div>
 
           {/* Headline */}
@@ -40,7 +40,7 @@ export function Hero() {
             Test Results, Ready for the{" "}
             <span
               style={{
-                background: "linear-gradient(135deg, var(--safety-amber), var(--aestra-cyan))",
+                background: "linear-gradient(135deg, var(--safety-amber), var(--exolar-cyan))",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
@@ -55,7 +55,7 @@ export function Hero() {
             className="text-xl md:text-2xl max-w-2xl mx-auto"
             style={{ color: "oklch(0.7 0 0)" }}
           >
-            Aestra is the first E2E testing platform with native Model Context Protocol (MCP) support.
+            Exolar QA is the first E2E testing platform with native Model Context Protocol (MCP) support.
             Let your AI agents debug your tests for you.
           </p>
 

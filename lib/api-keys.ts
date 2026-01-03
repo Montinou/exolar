@@ -2,18 +2,18 @@
  * Organization API Key Utilities
  *
  * Handles generation, hashing, and validation of API keys for CI/CD ingestion.
- * Keys are prefixed with "aestra_" and stored as SHA-256 hashes.
+ * Keys are prefixed with "exolar_" and stored as SHA-256 hashes.
  */
 
 import crypto from "crypto"
 import { getApiKeyByHash, updateApiKeyLastUsed } from "./db"
 
-const API_KEY_PREFIX = "aestra_"
+const API_KEY_PREFIX = "exolar_"
 
 export interface GeneratedApiKey {
   key: string      // Full key (shown once to user)
   hash: string     // SHA-256 hash (stored in DB)
-  prefix: string   // Display prefix (e.g., "aestra_abc1...")
+  prefix: string   // Display prefix (e.g., "exolar_abc1...")
 }
 
 export interface ValidatedApiKey {
@@ -59,7 +59,7 @@ export async function validateOrgApiKey(
 
   const key = authHeader.slice(7)
 
-  // Must be an aestra_ prefixed key
+  // Must be an exolar_ prefixed key
   if (!key.startsWith(API_KEY_PREFIX)) {
     return null
   }
@@ -96,10 +96,10 @@ export async function validateOrgApiKey(
 }
 
 /**
- * Check if an Authorization header contains a valid aestra API key format
+ * Check if an Authorization header contains a valid Exolar API key format
  * (does not validate against DB, just format check)
  */
-export function isAestraApiKey(authHeader: string | null): boolean {
+export function isExolarApiKey(authHeader: string | null): boolean {
   if (!authHeader?.startsWith("Bearer ")) {
     return false
   }

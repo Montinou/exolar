@@ -8,8 +8,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Aestra",
-  description: "The Intelligent Horizon for Agentic Testing",
+  title: "Exolar QA",
+  description: "Exolar QA: The Intelligent Horizon for Agentic Testing",
   generator: "v0.app",
   icons: {
     icon: "/branding/favicon.png",

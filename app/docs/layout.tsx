@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ArrowLeft, Book, Terminal, Github, Code, Menu } from "lucide-react"
+import { ArrowLeft, Book, Terminal, Github, Code, Menu, Rocket, Package, HelpCircle, Key } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import {
   Sheet,
@@ -16,9 +16,12 @@ import { Button } from "@/components/ui/button"
 
 const navigation = [
   { name: "Getting Started", href: "/docs", icon: Book },
-  { name: "MCP Integration", href: "/docs/mcp", icon: Terminal },
+  { name: "Quick Start", href: "/docs/quickstart", icon: Rocket },
+  { name: "Playwright Reporter", href: "/docs/reporter", icon: Package },
   { name: "GitHub Action", href: "/docs/github-action", icon: Github },
+  { name: "MCP Integration", href: "/docs/mcp", icon: Terminal },
   { name: "API Reference", href: "/docs/api", icon: Code },
+  { name: "Troubleshooting", href: "/docs/troubleshooting", icon: HelpCircle },
 ]
 
 export default function DocsLayout({

@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * E2E Test Dashboard MCP Server
+ * E2E Test Dashboard MCP Server (Exolar QA)
  *
  * A stdio-based MCP server that provides access to E2E test execution data.
  *
  * First-time setup:
- *   npx e2e-test-dashboard-mcp --login
+ *   npx @exolar/mcp-server --login
  *
  * This will open your browser to authenticate with the dashboard.
  * After authentication, run normally:
- *   npx e2e-test-dashboard-mcp
+ *   npx @exolar/mcp-server
  *
  * Or via Claude Code:
- *   claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp
+ *   claude mcp add --transport stdio exolar -- npx -y @exolar/mcp-server
  */
 export {};
 //# sourceMappingURL=index.d.ts.map

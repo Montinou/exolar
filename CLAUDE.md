@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-tenant E2E Test Dashboard for monitoring Playwright test executions from GitHub Actions. Features organization-level data isolation with RLS, real-time metrics, trend charts, and artifact management via Cloudflare R2.
+Exolar QA (formerly E2E Test Dashboard) is a multi-tenant dashboard for monitoring Playwright test executions.
 
 ## Commands
 

@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Terminal, Github, Code, ArrowRight } from "lucide-react"
+import { Terminal, Github, Code, ArrowRight, Rocket, Package, HelpCircle } from "lucide-react"
 
 export const metadata = {
   title: "Documentation - Aestra",
@@ -7,6 +7,19 @@ export const metadata = {
 }
 
 const quickLinks = [
+  {
+    title: "Quick Start",
+    description: "Get up and running in 5 minutes with our step-by-step guide",
+    href: "/docs/quickstart",
+    icon: Rocket,
+    highlight: true,
+  },
+  {
+    title: "Playwright Reporter",
+    description: "Install the npm package to automatically upload test results",
+    href: "/docs/reporter",
+    icon: Package,
+  },
   {
     title: "MCP Integration",
     description: "Connect Claude Code to your test data with the MCP server",
@@ -25,6 +38,12 @@ const quickLinks = [
     href: "/docs/api",
     icon: Code,
   },
+  {
+    title: "Troubleshooting",
+    description: "Common issues and solutions for Aestra integration",
+    href: "/docs/troubleshooting",
+    icon: HelpCircle,
+  },
 ]
 
 export default function DocsPage() {
@@ -41,36 +60,49 @@ export default function DocsPage() {
 
       {/* Quick Start */}
       <section className="space-y-4 sm:space-y-6">
-        <h2 className="text-xl sm:text-2xl font-semibold">Quick Start</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold">Get Started in 3 Steps</h2>
         <div className="grid gap-4">
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
-            <h3 className="font-semibold mb-3 sm:mb-4">1. Set up the GitHub Action</h3>
+            <h3 className="font-semibold mb-3 sm:mb-4">1. Install the Reporter</h3>
             <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
-              First, <Link href="/settings/api-keys" className="text-primary hover:underline">create an API key</Link>, then add the GitHub Action to your repository:
+              Add the Aestra Playwright reporter to your project:
             </p>
             <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
-              <code>{`# .github/workflows/playwright.yml
-- name: Upload to Aestra
-  uses: Montinou/e2e-test-dashboard-action@v1
-  with:
-    api-key: \${{ secrets.AESTRA_API_KEY }}`}</code>
+              <code>npm install -D @aestra/playwright-reporter</code>
             </pre>
           </div>
 
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
-            <h3 className="font-semibold mb-3 sm:mb-4">2. Connect Claude Code (Optional)</h3>
+            <h3 className="font-semibold mb-3 sm:mb-4">2. Configure Playwright</h3>
             <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
-              Install the MCP server to give your AI coding assistant direct access to test results.
+              <Link href="/settings/api-keys" className="text-primary hover:underline">Create an API key</Link>, then add the reporter to your config:
             </p>
             <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
-              <code>{`# Authenticate
-npx e2e-test-dashboard-mcp --login
+              <code>{`// playwright.config.ts
+import { aestra } from "@aestra/playwright-reporter";
 
-# Add to Claude Code
-claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`}</code>
+export default defineConfig({
+  reporter: [["html"], [aestra, { apiKey: process.env.AESTRA_API_KEY }]],
+});`}</code>
+            </pre>
+          </div>
+
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+            <h3 className="font-semibold mb-3 sm:mb-4">3. Add to CI</h3>
+            <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
+              Pass the API key as an environment variable in GitHub Actions:
+            </p>
+            <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
+              <code>{`- run: npx playwright test
+  env:
+    AESTRA_API_KEY: \${{ secrets.AESTRA_API_KEY }}`}</code>
             </pre>
           </div>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Need more details? Check out the{" "}
+          <Link href="/docs/quickstart" className="text-primary hover:underline">full Quick Start guide</Link>.
+        </p>
       </section>
 
       {/* Quick Links */}
@@ -81,12 +113,19 @@ claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`
             <Link
               key={link.href}
               href={link.href}
-              className="group p-4 sm:p-6 rounded-xl glass-card hover:glass-card-glow transition-all"
+              className={`group p-4 sm:p-6 rounded-xl glass-card hover:glass-card-glow transition-all ${
+                "highlight" in link && link.highlight ? "border-2 border-primary/50" : ""
+              }`}
             >
               <link.icon className="h-6 w-6 sm:h-8 sm:w-8 mb-3 sm:mb-4 text-primary" />
               <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors flex items-center gap-2">
                 {link.title}
-                <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                {"highlight" in link && link.highlight && (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+                    Start here
+                  </span>
+                )}
+                <ArrowRight className="h-4 w-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all ml-auto" />
               </h3>
               <p className="text-sm text-muted-foreground">{link.description}</p>
             </Link>

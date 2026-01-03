@@ -1,6 +1,6 @@
-# E2E Test Dashboard MCP Server
+# Exolar QA MCP Server
 
-An MCP (Model Context Protocol) server that provides Claude Code with direct access to your E2E test execution data from the E2E Test Dashboard.
+An MCP (Model Context Protocol) server that provides Claude Code with direct access to your E2E test execution data from the Exolar QA Dashboard.
 
 ## Quick Start
 
@@ -9,7 +9,7 @@ An MCP (Model Context Protocol) server that provides Claude Code with direct acc
 Run this command to open your browser and log in to the dashboard:
 
 ```bash
-npx e2e-test-dashboard-mcp --login
+npx @exolar-qa/mcp-server --login
 ```
 
 This will:
@@ -20,7 +20,7 @@ This will:
 ### Step 2: Add to Claude Code
 
 ```bash
-claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp
+claude mcp add --transport stdio exolar -- npx -y @exolar-qa/mcp-server
 ```
 
 That's it! Claude Code now has access to your test data.
@@ -29,19 +29,19 @@ That's it! Claude Code now has access to your test data.
 
 ```bash
 # Authenticate with the dashboard (opens browser)
-npx e2e-test-dashboard-mcp --login
+npx @exolar-qa/mcp-server --login
 
 # Check authentication status
-npx e2e-test-dashboard-mcp --status
+npx @exolar-qa/mcp-server --status
 
 # Clear stored credentials
-npx e2e-test-dashboard-mcp --logout
+npx @exolar-qa/mcp-server --logout
 
 # Show help
-npx e2e-test-dashboard-mcp --help
+npx @exolar-qa/mcp-server --help
 
 # Use a custom dashboard URL
-npx e2e-test-dashboard-mcp --login --url https://your-dashboard.com
+npx @exolar-qa/mcp-server --login --url https://your-dashboard.com
 ```
 
 ## Available Tools (15)
@@ -126,7 +126,7 @@ After connecting, ask Claude things like:
 ## Troubleshooting
 
 ### "Not authenticated" error
-Run `npx e2e-test-dashboard-mcp --login` to authenticate.
+Run `npx @exolar-qa/mcp-server --login` to authenticate.
 
 ### "Token expired" error
 Your token has expired. Run `--login` again to get a new one.

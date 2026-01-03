@@ -1,0 +1,53 @@
+{
+  "name": "@exolar-qa/playwright-reporter",
+  "version": "1.0.0",
+  "description": "Playwright reporter that sends test results to Exolar QA Dashboard",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "playwright",
+    "reporter",
+    "testing",
+    "e2e",
+    "dashboard",
+    "exolar",
+    "ci",
+    "github-actions"
+  ],
+  "author": "Exolar QA",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Montinou/e2e-test-dashboard"
+  },
+  "homepage": "https://exolar.qa/docs/reporter",
+  "bugs": {
+    "url": "https://github.com/Montinou/e2e-test-dashboard/issues"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.30.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}

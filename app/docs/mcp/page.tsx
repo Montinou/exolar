@@ -92,7 +92,7 @@ export default function MCPDocsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Run this command to open your browser and log in to the dashboard:
             </p>
-            <CodeBlock code="npx e2e-test-dashboard-mcp --login" />
+            <CodeBlock code="npx @exolar-qa/mcp-server --login" />
             <p className="text-xs text-muted-foreground mt-3">
               This will store your credentials securely in <code className="px-1 py-0.5 rounded glass-panel">~/.e2e-dashboard-mcp/config.json</code>
             </p>
@@ -106,7 +106,7 @@ export default function MCPDocsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               Register the MCP server with Claude Code:
             </p>
-            <CodeBlock code="claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp" />
+            <CodeBlock code="claude mcp add --transport stdio exolar -- npx -y @exolar-qa/mcp-server" />
           </div>
         </div>
       </section>
@@ -116,19 +116,19 @@ export default function MCPDocsPage() {
         <h2 className="text-xl sm:text-2xl font-semibold">CLI Commands</h2>
         <CodeBlock
           code={`# Authenticate with the dashboard (opens browser)
-npx e2e-test-dashboard-mcp --login
+npx @exolar-qa/mcp-server --login
 
 # Check authentication status
-npx e2e-test-dashboard-mcp --status
+npx @exolar-qa/mcp-server --status
 
 # Clear stored credentials
-npx e2e-test-dashboard-mcp --logout
+npx @exolar-qa/mcp-server --logout
 
 # Show help
-npx e2e-test-dashboard-mcp --help
+npx @exolar-qa/mcp-server --help
 
 # Use a custom dashboard URL
-npx e2e-test-dashboard-mcp --login --url https://your-dashboard.com`}
+npx @exolar-qa/mcp-server --login --url https://your-dashboard.com`}
         />
       </section>
 
@@ -211,7 +211,7 @@ npx e2e-test-dashboard-mcp --login --url https://your-dashboard.com`}
           <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2">&ldquo;Not authenticated&rdquo; error</h3>
             <p className="text-sm text-muted-foreground">
-              Run <code className="px-1 py-0.5 rounded glass-panel">npx e2e-test-dashboard-mcp --login</code> to authenticate.
+              Run <code className="px-1 py-0.5 rounded glass-panel">npx @exolar-qa/mcp-server --login</code> to authenticate.
             </p>
           </div>
           <div className="p-3 sm:p-4 rounded-xl glass-card">

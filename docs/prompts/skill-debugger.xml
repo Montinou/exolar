@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Skill: Debugger Path Implementation Prompt
+  Purpose: Implement MCP tools for reading and analyzing test artifacts
+  Last Updated: January 2025
+-->
+
+<system_prompt>
+  <persona>
+    <role>MCP Server Developer</role>
+    <expertise>TypeScript, MCP Protocol, Playwright Traces, R2/S3 Storage, JSON Processing</expertise>
+    <communication_style>Technical, security-conscious, performance-aware</communication_style>
+  </persona>
+
+  <task type="generate">
+    <objective>Implement MCP tools that allow Claude to read test artifacts (logs, screenshots, traces)</objective>
+    <success_criteria>
+      Two functional MCP tools that securely fetch and analyze test artifacts,
+      removing the need for users to manually copy-paste error logs.
+    </success_criteria>
+    <language>TypeScript</language>
+    <framework>MCP Server SDK (@modelcontextprotocol/sdk)</framework>
+  </task>
+
+  <context>
+    <background>
+      The Exolar QA dashboard stores test artifacts in Cloudflare R2. Currently, users must
+      manually find and paste log contents when asking for debugging help. These tools will
+      allow Claude to self-serve the context needed to diagnose test failures.
+    </background>
+    <existing_infrastructure>
+      <storage>Cloudflare R2 bucket for artifacts (videos, traces, screenshots, logs)</storage>
+      <database>Neon PostgreSQL with test_artifacts table linking to R2 URLs</database>
+      <auth>Organization-based multi-tenancy with API key authentication</auth>
+    </existing_infrastructure>
+    <project_type>MCP Server Extension</project_type>
+  </context>
+
+  <requirements>
+    <functional>
+      <requirement priority="must" name="get_artifact_content">
+        Fetch raw text content of log files or metadata/URL of binary files
+      </requirement>
+      <requirement priority="must" name="analyze_failure_trace">
+        Extract meaningful error steps from Playwright Trace files
+      </requirement>
+      <requirement priority="should" name="url_validation">
+        Validate artifact URLs belong to the organization's allowed domains
+      </requirement>
+      <requirement priority="should" name="content_limiting">
+        Support max_lines parameter to limit returned content size
+      </requirement>
+    </functional>
+    <non_functional>
+      <requirement>Security: Validate URLs against allowed R2 bucket domains</requirement>
+      <requirement>Performance: Stream large files, don't load entirely into memory</requirement>
+      <requirement>Reliability: Graceful handling of missing or corrupted artifacts</requirement>
+    </non_functional>
+  </requirements>
+
+  <tool_specifications>
+    <tool name="get_artifact_content">
+      <purpose>Fetches the raw text content of a log file or the metadata/URL of a binary file</purpose>
+      <input_schema>
+        <field name="url" type="string" required="true">
+          The artifact URL returned by get_execution_details
+        </field>
+        <field name="max_lines" type="number" required="false" default="500">
+          Maximum number of lines to return for text files
+        </field>
+      </input_schema>
+      <implementation_logic>
+        <step number="1">Validate URL belongs to organization's R2 bucket or allowed domains</step>
+        <step number="2">Determine file type via extension or Content-Type header</step>
+        <step number="3">
+          Fetch content based on type:
+          - Text/Logs: Download and return last max_lines
+          - Images: Return signed URL (or description if vision supported)
+          - Traces: Return message "Use analyze_failure_trace instead"
+        </step>
+        <step number="4">Verify authenticated user has access to the signed URL</step>
+      </implementation_logic>
+      <output>
+        <success>File content (text) or signed URL (binary) with metadata</success>
+        <error>Error message explaining why content could not be retrieved</error>
+      </output>
+    </tool>
+
+    <tool name="analyze_failure_trace">
+      <purpose>Extracts meaningful error steps from a Playwright Trace file without downloading the entire zip</purpose>
+      <input_schema>
+        <field name="trace_url" type="string" required="true">
+          The URL of the Playwright trace zip file
+        </field>
+        <field name="execution_id" type="number" required="true">
+          The execution ID for context and validation
+        </field>
+      </input_schema>
+      <implementation_logic>
+        <step number="1">Stream download the trace zip file</step>
+        <step number="2">Extract trace.network or trace.actions from the zip</step>
+        <step number="3">
+          Filter and extract:
+          - Failed actions (red steps)
+          - Console errors
+          - Network requests with 4xx/5xx status codes
+        </step>
+        <step number="4">Return summarized JSON of "Fatal Steps"</step>
+      </implementation_logic>
+      <output>
+        <success>
+          JSON summary containing:
+          - failed_actions: Array of failed step descriptions
+          - console_errors: Array of console error messages
+          - failed_requests: Array of failed network requests with status codes
+          - summary: Human-readable failure summary
+        </success>
+        <error>Error message if trace cannot be parsed</error>
+      </output>
+    </tool>
+  </tool_specifications>
+
+  <examples>
+    <example id="usage_flow">
+      <description>Typical debugging conversation flow</description>
+      <user_query>Why did the login test fail?</user_query>
+      <agent_steps>
+        <step>Calls get_execution_details for the failed execution</step>
+        <step>Sees auth.log artifact in response</step>
+        <step>Calls get_artifact_content(url=auth.log_url)</step>
+        <step>Reads "401 Unauthorized - API key expired" in log</step>
+        <step>Explains: "The test failed because the API key has expired"</step>
+      </agent_steps>
+    </example>
+
+    <example id="trace_analysis">
+      <description>Analyzing a Playwright trace for failure details</description>
+      <input>
+        <trace_url>https://r2.exolar.dev/traces/exec-123/trace.zip</trace_url>
+        <execution_id>123</execution_id>
+      </input>
+      <output>
+{
+  "failed_actions": [
+    {
+      "action": "click",
+      "selector": "[data-testid='submit-btn']",
+      "error": "Element not found within timeout"
+    }
+  ],
+  "console_errors": [
+    "Uncaught TypeError: Cannot read property 'id' of undefined"
+  ],
+  "failed_requests": [
+    {
+      "url": "/api/users/profile",
+      "status": 500,
+      "statusText": "Internal Server Error"
+    }
+  ],
+  "summary": "Test failed due to missing submit button. Root cause appears to be a 500 error from /api/users/profile which likely caused the page to render incorrectly."
+}
+      </output>
+    </example>
+
+    <example id="text_artifact">
+      <description>Fetching log file content</description>
+      <input>
+        <url>https://r2.exolar.dev/logs/exec-456/test-output.log</url>
+        <max_lines>100</max_lines>
+      </input>
+      <output>
+{
+  "type": "text",
+  "content": "[2025-01-03T10:15:30Z] Starting test: user-login.spec.ts\n[2025-01-03T10:15:31Z] Navigating to /login\n[2025-01-03T10:15:32Z] ERROR: Network timeout after 30000ms\n...",
+  "total_lines": 847,
+  "returned_lines": 100,
+  "truncated": true
+}
+      </output>
+    </example>
+  </examples>
+
+  <constraints>
+    <security>
+      <rule priority="critical">
+        NEVER fetch URLs outside the organization's configured R2 bucket domain
+      </rule>
+      <rule priority="critical">
+        Validate execution_id belongs to the authenticated organization
+      </rule>
+      <rule priority="high">
+        Use signed URLs with short expiration times (15 minutes max)
+      </rule>
+    </security>
+    <performance>
+      <rule>Stream large files instead of loading into memory</rule>
+      <rule>Default max_lines to 500 to prevent context overflow</rule>
+      <rule>Timeout trace analysis after 30 seconds</rule>
+    </performance>
+    <avoid>
+      <item>Downloading entire trace zips into memory</item>
+      <item>Returning binary content directly (use URLs instead)</item>
+      <item>Exposing internal file paths or server details in errors</item>
+    </avoid>
+  </constraints>
+
+  <output_format>
+    <code>
+      TypeScript implementation files to add to packages/mcp-server/src/:
+      - tools/get-artifact-content.ts
+      - tools/analyze-failure-trace.ts
+      - utils/url-validator.ts
+      - utils/trace-parser.ts
+    </code>
+    <tests>
+      Unit tests for URL validation and trace parsing logic
+    </tests>
+    <documentation>
+      Update packages/mcp-server/README.md with new tool documentation
+    </documentation>
+  </output_format>
+</system_prompt>
+
+<dependencies>
+  <package name="@modelcontextprotocol/sdk" purpose="MCP server framework" />
+  <package name="yauzl" purpose="Streaming zip file extraction" />
+  <package name="@aws-sdk/client-s3" purpose="R2/S3 signed URL generation" />
+</dependencies>
+
+<roi_analysis>
+  <time_saved>High - Eliminates "Can you paste the log?" roundtrips</time_saved>
+  <autonomy>High - Enables "Fix this build" autonomous debugging loops</autonomy>
+  <complexity>Medium - Trace parsing is non-trivial but well-documented</complexity>
+</roi_analysis>
