@@ -159,27 +159,51 @@ export async function getFailedTestsByExecutionId(
   const sql = getSql()
   const { includeRetries = false, includeStackTraces = false } = options
 
-  const retryCondition = includeRetries ? "" : "AND tr.retry_count = 0"
-  const stackTraceSelect = includeStackTraces ? ", tr.stack_trace" : ""
+  // Build query conditions using sql.unsafe for dynamic parts
+  const conditions = [
+    `tr.execution_id = ${executionId}`,
+    `te.organization_id = ${organizationId}`,
+    "tr.status = 'failed'",
+  ]
 
-  const results = await sql.unsafe(`
-    SELECT
-      tr.test_name,
-      tr.test_file,
-      tr.error_message,
-      tr.duration_ms,
-      tr.retry_count
-      ${stackTraceSelect}
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    WHERE tr.execution_id = ${executionId}
-      AND te.organization_id = ${organizationId}
-      AND tr.status = 'failed'
-      ${retryCondition}
-    ORDER BY tr.test_file ASC, tr.test_name ASC
-  `)
+  if (!includeRetries) {
+    conditions.push("tr.retry_count = 0")
+  }
 
-  // Ensure we always return a proper array (Neon returns array-like object)
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  // Use different queries based on options to avoid sql.unsafe edge cases
+  let results
+  if (includeStackTraces) {
+    results = await sql`
+      SELECT
+        tr.test_name,
+        tr.test_file,
+        tr.error_message,
+        tr.duration_ms,
+        tr.retry_count,
+        tr.stack_trace
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${sql.unsafe(whereClause)}
+      ORDER BY tr.test_file ASC, tr.test_name ASC
+    `
+  } else {
+    results = await sql`
+      SELECT
+        tr.test_name,
+        tr.test_file,
+        tr.error_message,
+        tr.duration_ms,
+        tr.retry_count
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${sql.unsafe(whereClause)}
+      ORDER BY tr.test_file ASC, tr.test_name ASC
+    `
+  }
+
+  // Ensure we always return a proper array
   return Array.isArray(results) ? results as FailedTestResult[] : Array.from(results || []) as FailedTestResult[]
 }
 
