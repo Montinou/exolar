@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { AlertCircle, CheckCircle2, Clock, FileVideo, Download, ChevronDown, ChevronRight, Globe, Zap, FileText } from "lucide-react"
-import type { TestResult, AIFailureContext } from "@/lib/types"
+import { AlertCircle, CheckCircle2, Clock, FileVideo, Download, ChevronDown, ChevronRight, Globe, Zap, FileText, Loader2 } from "lucide-react"
+import type { TestResult, AIFailureContext, TestArtifact } from "@/lib/types"
 import { FlakyBadge } from "./flaky-badge"
 
 // ============================================
@@ -219,6 +219,53 @@ function AIContextSection({ aiContext }: AIContextSectionProps) {
 }
 
 // ============================================
+// Artifact Download Button Component
+// ============================================
+
+interface ArtifactDownloadButtonProps {
+  artifact: TestArtifact
+}
+
+function ArtifactDownloadButton({ artifact }: ArtifactDownloadButtonProps) {
+  const [loading, setLoading] = useState(false)
+
+  const handleDownload = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/artifacts/${artifact.id}/signed-url`)
+      if (!response.ok) {
+        throw new Error('Failed to get download URL')
+      }
+      const { signed_url } = await response.json()
+      window.open(signed_url, '_blank')
+    } catch (error) {
+      console.error('Download failed:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleDownload}
+      disabled={loading}
+      className="flex items-center gap-2"
+    >
+      {loading ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : artifact.type === "video" ? (
+        <FileVideo className="h-3 w-3" />
+      ) : (
+        <Download className="h-3 w-3" />
+      )}
+      {artifact.type}
+    </Button>
+  )
+}
+
+// ============================================
 // Test Result Card Component
 // ============================================
 
@@ -316,21 +363,7 @@ export function TestResultCard({ test, variant = "full" }: TestResultCardProps) 
       {test.artifacts && test.artifacts.length > 0 && (
         <div className="flex gap-2 pt-2 border-t">
           {test.artifacts.map((artifact) => (
-            <Button key={artifact.id} variant="outline" size="sm" asChild>
-              <a
-                href={artifact.r2_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2"
-              >
-                {artifact.type === "video" ? (
-                  <FileVideo className="h-3 w-3" />
-                ) : (
-                  <Download className="h-3 w-3" />
-                )}
-                {artifact.type}
-              </a>
-            </Button>
+            <ArtifactDownloadButton key={artifact.id} artifact={artifact} />
           ))}
         </div>
       )}
