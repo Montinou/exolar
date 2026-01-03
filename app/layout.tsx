@@ -13,7 +13,17 @@ export const metadata: Metadata = {
   generator: "v0.app",
   icons: {
     icon: "/branding/favicon.png",
-    apple: "/branding/logo-icon.jpeg",
+    apple: "/branding/logo-icon.png",
+  },
+  openGraph: {
+    images: [
+      {
+        url: "/branding/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Exolar QA Dashboard",
+      },
+    ],
   },
 }
 

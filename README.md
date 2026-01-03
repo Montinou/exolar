@@ -1,4 +1,4 @@
-# Exolar QA (E2E Test Dashboard)
+# Exolar QA (formerly E2E Test Dashboard)
 
 A comprehensive multi-tenant dashboard for monitoring Playwright test executions from GitHub Actions with NeonDB, Row-Level Security, and Cloudflare R2 integration.
 
