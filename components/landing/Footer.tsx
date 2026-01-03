@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Github, BookOpen } from "lucide-react"
 import { WishlistForm } from "./WishlistForm"
 
@@ -34,6 +35,12 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Tagline */}
           <div className="text-center md:text-left">
+             <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                 <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 shadow-lg">
+                    <Image src="/branding/logo-icon.jpeg" alt="Aestra Logo" fill className="object-cover" />
+                 </div>
+                 <span className="text-xl font-bold tracking-tight" style={{ color: "oklch(0.95 0 0)" }}>Aestra</span>
+            </div>
             <p
               className="text-lg font-medium"
               style={{ color: "oklch(0.7 0 0)" }}
@@ -41,12 +48,6 @@ export function Footer() {
               Built for the{" "}
               <span style={{ color: "var(--safety-amber)" }}>Agentic</span>{" "}
               Future.
-            </p>
-            <p
-              className="text-sm mt-1"
-              style={{ color: "oklch(0.5 0 0)" }}
-            >
-              Aestra
             </p>
           </div>
 

@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building } from "lucide-react"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import Link from "next/link"
 import type { DashboardUser, Invite } from "@/lib/db-users"
 
@@ -196,7 +197,10 @@ export default function AdminPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-2xl font-bold">Admin Panel</h1>
+                <div className="flex items-center gap-2">
+                  <BrandLogo variant="icon" width={24} height={24} />
+                  <h1 className="text-2xl font-bold">Admin Panel</h1>
+                </div>
                 <p className="text-sm text-muted-foreground">Manage users and invites</p>
               </div>
             </div>

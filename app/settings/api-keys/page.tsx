@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Image from "next/image"
 import {
   Card,
   CardHeader,
@@ -188,10 +189,12 @@ export default function ApiKeysSettingsPage() {
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Key className="h-6 w-6" />
-              API Keys
-            </h1>
+            <div className="flex items-center gap-3">
+              <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-sm">
+                <Image src="/branding/logo-icon.jpeg" alt="Aestra" fill className="object-cover" />
+              </div>
+              <h1 className="text-2xl font-bold">API Keys</h1>
+            </div>
             <p className="text-muted-foreground">
               Manage API keys for CI/CD integration
             </p>

@@ -1,11 +1,14 @@
 "use client"
 
+import Image from "next/image"
+
 import { useEffect, useState, type ReactNode } from "react"
 import { authClient } from "@/lib/auth/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ShieldX, Mail, Loader2 } from "lucide-react"
+import { ShieldX, Loader2 } from "lucide-react"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import type { DashboardUser } from "@/lib/db-users"
 
 interface AccessCheckResponse {
@@ -118,8 +121,13 @@ function LoginPrompt() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Mail className="h-6 w-6 text-primary" />
+          <div className="mx-auto mb-4 h-16 w-16 relative flex items-center justify-center">
+            <Image 
+              src="/branding/logo-icon.jpeg" 
+              alt="Logo" 
+              fill 
+              className="object-contain rounded-full"
+            />
           </div>
           <CardTitle className="text-2xl">Welcome</CardTitle>
           <CardDescription>
@@ -146,8 +154,8 @@ function AccessDenied({ email }: { email?: string }) {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-            <ShieldX className="h-6 w-6 text-destructive" />
+          <div className="mx-auto mb-6 flex justify-center">
+            <BrandLogo variant="icon" width={48} height={48} />
           </div>
           <CardTitle className="text-2xl">Access Denied</CardTitle>
           <CardDescription>

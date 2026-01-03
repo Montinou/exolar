@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import {
   Card,
   CardHeader,
@@ -75,7 +76,12 @@ export default function MCPSettingsPage() {
           </Link>
         </div>
 
-        <h1 className="text-2xl font-bold mb-2">MCP Integration</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-sm">
+            <Image src="/branding/logo-icon.jpeg" alt="Aestra" fill className="object-cover" />
+          </div>
+          <h1 className="text-2xl font-bold">MCP Integration</h1>
+        </div>
         <p className="text-muted-foreground mb-6">
           Connect Claude Code to access your test data directly
         </p>

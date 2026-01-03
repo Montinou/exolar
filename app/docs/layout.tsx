@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ArrowLeft, Book, Terminal, Github, Code, Menu } from "lucide-react"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import {
   Sheet,
   SheetContent,
@@ -85,7 +86,10 @@ export default function DocsLayout({
               <span className="sm:hidden">Home</span>
             </Link>
             <span className="text-border hidden sm:block">/</span>
-            <span className="font-semibold hidden sm:block">Documentation</span>
+            <div className="hidden sm:flex items-center gap-2">
+              <BrandLogo variant="icon" width={24} height={24} />
+              <span className="font-semibold">Documentation</span>
+            </div>
           </div>
           <Link
             href="https://github.com/Montinou/e2e-test-dashboard"

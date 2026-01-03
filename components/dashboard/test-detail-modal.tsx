@@ -104,7 +104,7 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
             <TabsTrigger value="skipped" className="text-xs sm:text-sm">Skipped ({skippedTests.length})</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-4">
+          <ScrollArea className="flex-1 h-0 min-h-0 mt-4">
             <TabsContent value="failed" className="space-y-4 m-0 pr-4">
               {failedTests.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No failed tests</p>

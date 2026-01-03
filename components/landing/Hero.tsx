@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { WishlistForm } from "./WishlistForm"
 
@@ -18,6 +19,13 @@ export function Hero() {
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 py-20">
         <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          {/* Logo */}
+          <div className="flex justify-center">
+            <div className="relative w-20 h-20 rounded-2xl overflow-hidden glass-panel shadow-2xl p-1">
+               <Image src="/branding/logo-icon.jpeg" alt="Aestra Logo" fill className="object-cover rounded-xl" />
+            </div>
+          </div>
+
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-sm">
             <Sparkles className="w-4 h-4" style={{ color: "var(--safety-amber)" }} />
