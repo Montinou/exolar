@@ -18,8 +18,17 @@ export const allTools = [
   // Core Tools
   {
     name: "get_executions",
-    description:
-      "List test executions with optional filters. Returns workflow runs with pass/fail counts, duration, and metadata.",
+    description: `List test executions with optional filters. Returns workflow runs with pass/fail counts, duration, and metadata.
+
+Fields returned per execution:
+- id: number - Execution ID (use with get_execution_details)
+- suite: string - Test suite name (e.g., "Negotiation")
+- branch: string - Git branch name
+- commit_sha: string - Git commit hash
+- status: "success" | "failure" | "running"
+- passed_count, failed_count, skipped_count: number
+- duration_ms: number - Total execution time
+- started_at, completed_at: ISO datetime`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -38,20 +47,48 @@ export const allTools = [
   },
   {
     name: "get_execution_details",
-    description:
-      "Get detailed info about a specific test execution including all test results, artifacts, and failure details.",
+    description: `Get detailed info about a specific test execution including all test results, artifacts, and failure details.
+
+TIP: For large executions (40+ tests), use get_execution_summary or get_execution_failures instead to reduce response size.
+
+Fields returned per test:
+- test_name: string - Test title
+- test_file: string - Spec file path (e.g., "negotiation/flow.spec.ts")
+- status: "passed" | "failed" | "skipped"
+- error_message: string | null - Error description for failures
+- duration_ms: number - Test duration
+- retry_count: number - Number of retries
+- artifacts: array | null - Screenshots, traces, etc.`,
     inputSchema: {
       type: "object" as const,
       properties: {
         execution_id: { type: "number", description: "Execution ID" },
+        status: {
+          type: "string",
+          enum: ["passed", "failed", "skipped", "all"],
+          description:
+            "Filter by test status. Use 'failed' to reduce response size. Default: 'all'",
+        },
+        include_artifacts: {
+          type: "boolean",
+          description: "Include artifact links (screenshots, traces). Default: true",
+        },
       },
       required: ["execution_id"],
     },
   },
   {
     name: "search_tests",
-    description:
-      "Search for tests by name or file path. Returns aggregated statistics including run count, pass rate, and last run.",
+    description: `Search for tests by name or file path. Returns aggregated statistics including run count, pass rate, and last run.
+
+Fields returned per test:
+- test_signature: string - Unique test identifier (use with get_test_history)
+- test_name: string - Test title
+- test_file: string - Spec file path
+- run_count: number - Total executions
+- pass_rate: number - Success percentage (0-100)
+- last_run: ISO datetime
+- last_status: "passed" | "failed" | "skipped"`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -63,8 +100,16 @@ export const allTools = [
   },
   {
     name: "get_test_history",
-    description:
-      "Get execution history for a specific test across all runs. Useful for tracking test stability over time.",
+    description: `Get execution history for a specific test across all runs. Useful for tracking test stability over time.
+
+Fields returned per run:
+- execution_id: number - Parent execution ID
+- status: "passed" | "failed" | "skipped"
+- error_message: string | null
+- duration_ms: number
+- retry_count: number
+- run_at: ISO datetime
+- branch: string - Git branch for this run`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -81,14 +126,27 @@ export const allTools = [
   // Analysis Tools
   {
     name: "get_failed_tests",
-    description:
-      "Get failed tests with AI-enriched context including error type, suggested fixes, and related code areas.",
+    description: `Get failed tests with optional AI-enriched context. Now works without AI context by default.
+
+Returns per test:
+- test_name, test_file: Test identification
+- error_message, stack_trace: Error details
+- duration_ms, retry_count: Execution info
+- ai_context: AI analysis (if available)`,
     inputSchema: {
       type: "object" as const,
       properties: {
+        execution_id: {
+          type: "number",
+          description: "Filter to a specific execution (recommended for targeted analysis)",
+        },
         error_type: {
           type: "string",
-          description: "Filter by error type (e.g., 'TimeoutError', 'AssertionError')",
+          description: "Filter by AI error type (e.g., 'TimeoutError', 'AssertionError'). Requires AI context.",
+        },
+        test_file: {
+          type: "string",
+          description: "Filter by test file path (partial match)",
         },
         limit: { type: "number", default: 20 },
         since: { type: "string", description: "Only failures since this date (ISO 8601)" },
@@ -97,8 +155,16 @@ export const allTools = [
   },
   {
     name: "get_dashboard_metrics",
-    description:
-      "Get overall dashboard metrics: total executions, pass rate, failure rate, avg duration, and more.",
+    description: `Get overall dashboard metrics: total executions, pass rate, failure rate, avg duration, and more.
+
+Fields returned:
+- total_executions: number
+- total_tests: number
+- pass_rate: number - Overall percentage (0-100)
+- failure_rate: number
+- avg_duration_ms: number - Average execution time
+- executions_per_day: number
+- most_common_failure: string | null`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -109,8 +175,14 @@ export const allTools = [
   },
   {
     name: "get_trends",
-    description:
-      "Get time-series trend data for pass/fail rates over a period. Useful for tracking test health over time.",
+    description: `Get time-series trend data for pass/fail rates over a period. Useful for tracking test health over time.
+
+Fields returned per day:
+- date: ISO date (YYYY-MM-DD)
+- executions: number - Runs on this day
+- passed: number - Passed tests count
+- failed: number - Failed tests count
+- pass_rate: number - Daily percentage (0-100)`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -120,8 +192,13 @@ export const allTools = [
   },
   {
     name: "get_error_distribution",
-    description:
-      "Get breakdown of error types from failed tests. Shows which error types are most common.",
+    description: `Get breakdown of error types from failed tests. Shows which error types are most common.
+
+Fields returned per error type:
+- error_type: string - Error category (e.g., "TimeoutError", "AssertionError")
+- count: number - Number of occurrences
+- percentage: number - Share of total failures (0-100)
+- example_message: string - Sample error message`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -133,8 +210,16 @@ export const allTools = [
   // Flakiness Tools
   {
     name: "get_flaky_tests",
-    description:
-      "Get list of flaky tests sorted by flakiness rate. A test is flaky if it sometimes passes after retries.",
+    description: `Get list of flaky tests sorted by flakiness rate. A test is flaky if it sometimes passes after retries.
+
+Fields returned per test:
+- test_signature: string - Unique test identifier
+- test_name: string - Test title
+- test_file: string - Spec file path
+- flakiness_rate: number - Percentage of runs that required retries (0-100)
+- total_runs: number - Total executions
+- flaky_runs: number - Runs with retry
+- last_flaky: ISO datetime`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -145,8 +230,13 @@ export const allTools = [
   },
   {
     name: "get_flakiness_summary",
-    description:
-      "Get overall flakiness summary: total flaky tests, average flakiness rate, and total flaky runs.",
+    description: `Get overall flakiness summary: total flaky tests, average flakiness rate, and total flaky runs.
+
+Fields returned:
+- total_flaky_tests: number - Tests with any flaky runs
+- average_flakiness_rate: number - Average across all tests (0-100)
+- total_flaky_runs: number - Total executions with retries
+- worst_offenders: array - Top 5 flakiest tests`,
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -156,7 +246,12 @@ export const allTools = [
   // Artifact Tools
   {
     name: "list_branches",
-    description: "Get list of branches with test runs in the last 30 days.",
+    description: `Get list of branches with test runs in the last 30 days.
+
+Fields returned per branch:
+- branch: string - Branch name
+- last_run: ISO datetime
+- execution_count: number - Runs in last 30 days`,
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -164,10 +259,89 @@ export const allTools = [
   },
   {
     name: "list_suites",
-    description: "Get list of test suites with runs in the last 30 days.",
+    description: `Get list of test suites with runs in the last 30 days.
+
+Fields returned per suite:
+- suite: string - Suite name (e.g., "Negotiation")
+- last_run: ISO datetime
+- execution_count: number - Runs in last 30 days`,
     inputSchema: {
       type: "object" as const,
       properties: {},
+    },
+  },
+
+  // Aggregation Tools (lighter, faster alternatives to get_execution_details)
+  {
+    name: "get_execution_summary",
+    description: `Get aggregated summary of an execution without the full test list. Use this first for quick analysis, then get_execution_failures if you need failure details.
+
+Returns:
+- execution: Metadata (branch, commit, status, duration)
+- summary: Counts (total, passed, failed, skipped, pass_rate)
+- error_distribution: Grouped error types with counts
+- files_affected: Files with failure/pass counts`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        execution_id: { type: "number", description: "Execution ID" },
+      },
+      required: ["execution_id"],
+    },
+  },
+  {
+    name: "get_execution_failures",
+    description: `Get only failed tests from a specific execution with error grouping. Much smaller response than get_execution_details (~5KB vs ~100KB).
+
+Returns failures grouped by file with:
+- test_name: Test title
+- test_file: Spec file path
+- error_message: Error description
+- duration_ms: Test duration`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        execution_id: { type: "number", description: "Execution ID" },
+        group_by: {
+          type: "string",
+          enum: ["file", "error_type", "none"],
+          description: "Group failures by file path, error type, or return flat list",
+        },
+        include_retries: {
+          type: "boolean",
+          description: "Include retry attempts (default: false, only final failures)",
+        },
+        include_stack_traces: {
+          type: "boolean",
+          description: "Include full stack traces (increases response size)",
+        },
+      },
+      required: ["execution_id"],
+    },
+  },
+  {
+    name: "generate_failure_report",
+    description: `Generate a pre-formatted markdown report for an execution. Ready for documentation or sharing.
+
+Returns a markdown string with:
+- Execution metadata and summary
+- Failures grouped by file
+- Error distribution analysis
+- Recommended actions`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        execution_id: { type: "number", description: "Execution ID" },
+        include_passed: {
+          type: "boolean",
+          description: "Include passed tests in report (default: false)",
+        },
+        include_recommendations: {
+          type: "boolean",
+          description: "Include AI-suggested actions (default: true)",
+        },
+      },
+      required: ["execution_id"],
     },
   },
 ]
@@ -223,7 +397,13 @@ export async function handleToolCall(
       }
 
       case "get_execution_details": {
-        const input = z.object({ execution_id: z.number() }).parse(args)
+        const input = z
+          .object({
+            execution_id: z.number(),
+            status: z.enum(["passed", "failed", "skipped", "all"]).default("all"),
+            include_artifacts: z.boolean().default(true),
+          })
+          .parse(args)
 
         const execution = await db.getExecutionById(orgId, input.execution_id)
 
@@ -231,16 +411,30 @@ export async function handleToolCall(
           return errorResponse("Execution not found or access denied")
         }
 
-        const results = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+        let results = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+
+        // Filter by status if specified
+        if (input.status !== "all") {
+          results = results.filter((r) => r.status === input.status)
+        }
+
+        // Optionally strip artifacts to reduce response size
+        const outputResults = input.include_artifacts
+          ? results
+          : results.map((r) => ({ ...r, artifacts: null }))
+
+        const allResults = await db.getTestResultsByExecutionId(orgId, input.execution_id)
 
         return jsonResponse({
           execution,
-          test_results: results,
+          filter: { status: input.status, include_artifacts: input.include_artifacts },
+          test_results: outputResults,
           summary: {
-            total: results.length,
-            passed: results.filter((r) => r.status === "passed").length,
-            failed: results.filter((r) => r.status === "failed").length,
-            skipped: results.filter((r) => r.status === "skipped").length,
+            total: allResults.length,
+            passed: allResults.filter((r) => r.status === "passed").length,
+            failed: allResults.filter((r) => r.status === "failed").length,
+            skipped: allResults.filter((r) => r.status === "skipped").length,
+            filtered_count: outputResults.length,
           },
         })
       }
@@ -282,20 +476,27 @@ export async function handleToolCall(
       case "get_failed_tests": {
         const input = z
           .object({
+            execution_id: z.number().optional(),
             error_type: z.string().optional(),
+            test_file: z.string().optional(),
             limit: z.number().min(1).max(100).default(20),
             since: z.string().optional(),
           })
           .parse(args)
 
         const failures = await db.getFailuresWithAIContext(orgId, {
+          executionId: input.execution_id,
           errorType: input.error_type,
+          testFile: input.test_file,
           limit: input.limit,
           since: input.since,
+          // Only require AI context if filtering by error_type
+          requireAIContext: !!input.error_type,
         })
 
         return jsonResponse({
           organization: authContext.organizationSlug,
+          execution_id: input.execution_id,
           count: failures.length,
           failures,
         })
@@ -386,6 +587,185 @@ export async function handleToolCall(
         return jsonResponse({
           organization: authContext.organizationSlug,
           suites,
+        })
+      }
+
+      // Aggregation Tools
+      case "get_execution_summary": {
+        const input = z.object({ execution_id: z.number() }).parse(args)
+
+        const summary = await db.getExecutionSummary(orgId, input.execution_id)
+
+        if (!summary) {
+          return errorResponse("Execution not found or access denied")
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          ...summary,
+        })
+      }
+
+      case "get_execution_failures": {
+        const input = z
+          .object({
+            execution_id: z.number(),
+            group_by: z.enum(["file", "error_type", "none"]).default("file"),
+            include_retries: z.boolean().default(false),
+            include_stack_traces: z.boolean().default(false),
+          })
+          .parse(args)
+
+        const failures = await db.getFailedTestsByExecutionId(orgId, input.execution_id, {
+          includeRetries: input.include_retries,
+          includeStackTraces: input.include_stack_traces,
+        })
+
+        // Group failures based on group_by parameter
+        let grouped: Record<string, unknown[]> | unknown[] = failures
+
+        if (input.group_by === "file") {
+          const byFile: Record<string, unknown[]> = {}
+          for (const f of failures) {
+            if (!byFile[f.test_file]) byFile[f.test_file] = []
+            byFile[f.test_file].push({
+              test_name: f.test_name,
+              error_message: f.error_message,
+              duration_ms: f.duration_ms,
+              retry_count: f.retry_count,
+              ...(input.include_stack_traces && { stack_trace: f.stack_trace }),
+            })
+          }
+          grouped = byFile
+        } else if (input.group_by === "error_type") {
+          const errorDist = await db.getErrorDistributionByExecution(orgId, input.execution_id)
+          grouped = errorDist
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          execution_id: input.execution_id,
+          total_failures: failures.length,
+          group_by: input.group_by,
+          failures: grouped,
+        })
+      }
+
+      case "generate_failure_report": {
+        const input = z
+          .object({
+            execution_id: z.number(),
+            include_passed: z.boolean().default(false),
+            include_recommendations: z.boolean().default(true),
+          })
+          .parse(args)
+
+        const summary = await db.getExecutionSummary(orgId, input.execution_id)
+
+        if (!summary) {
+          return errorResponse("Execution not found or access denied")
+        }
+
+        const failures = await db.getFailedTestsByExecutionId(orgId, input.execution_id, {
+          includeRetries: false,
+          includeStackTraces: false,
+        })
+
+        // Group failures by file
+        const failuresByFile: Record<string, typeof failures> = {}
+        for (const f of failures) {
+          if (!failuresByFile[f.test_file]) failuresByFile[f.test_file] = []
+          failuresByFile[f.test_file].push(f)
+        }
+
+        // Generate markdown report
+        const { execution, summary: stats, error_distribution } = summary
+        let report = `# Test Execution Report
+
+**Execution ID:** ${execution.id}
+**Branch:** \`${execution.branch}\`
+**Commit:** \`${execution.commit_sha?.substring(0, 8) || "N/A"}\`
+**Date:** ${execution.started_at}
+**Duration:** ${Math.round((stats.duration_ms || 0) / 1000)}s
+
+---
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| **Total Tests** | ${stats.total} |
+| **Passed** | ${stats.passed} |
+| **Failed** | ${stats.failed} |
+| **Skipped** | ${stats.skipped} |
+| **Pass Rate** | ${stats.pass_rate}% |
+
+---
+
+## Error Distribution
+
+| Error Type | Count |
+|------------|-------|
+${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n")}
+
+---
+
+## Failed Tests by File
+
+`
+        for (const [file, tests] of Object.entries(failuresByFile)) {
+          report += `### ${file}\n\n`
+          report += `| Test Name | Error | Duration |\n`
+          report += `|-----------|-------|----------|\n`
+          for (const t of tests) {
+            const errorShort = (t.error_message || "Unknown").substring(0, 60).replace(/\|/g, "\\|")
+            report += `| ${t.test_name} | ${errorShort}... | ${t.duration_ms}ms |\n`
+          }
+          report += `\n`
+        }
+
+        if (input.include_recommendations && stats.failed > 0) {
+          report += `---
+
+## Recommendations
+
+`
+          // Analyze errors and generate recommendations
+          const hasApiErrors = error_distribution.some((e) => e.error_pattern.includes("API Error"))
+          const hasTimeouts = error_distribution.some((e) => e.error_pattern.includes("Timeout"))
+
+          if (hasApiErrors) {
+            report += `1. **Investigate Backend API Issues**
+   - Check API logs for 500 errors
+   - Verify database connectivity
+   - Check environment variables on preview deployment
+
+`
+          }
+
+          if (hasTimeouts) {
+            report += `2. **Fix Timeout Issues**
+   - Review modal close handlers
+   - Check for race conditions in async operations
+   - Consider increasing timeouts or adding explicit waits
+
+`
+          }
+
+          if (!hasApiErrors && !hasTimeouts) {
+            report += `1. **Review Test Assertions**
+   - Check if selectors are up to date
+   - Verify test data setup
+
+`
+          }
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          execution_id: input.execution_id,
+          format: "markdown",
+          report,
         })
       }
 
