@@ -51,8 +51,34 @@ const navigation = [
       { name: "npm Package", href: "/docs/reporter/npm" },
     ]
   },
-  { name: "GitHub Action", href: "/docs/github-action", icon: Github },
-  { name: "MCP Integration", href: "/docs/mcp", icon: Terminal },
+  { 
+    name: "GitHub Action", 
+    href: "/docs/github-action", 
+    icon: Github,
+    subItems: [
+      { name: "Quick Start", href: "/docs/github-action#quick-start" },
+      { name: "Configuration", href: "/docs/github-action#configuration" },
+      { name: "Playwright Config", href: "/docs/github-action#playwright-config" },
+      { name: "Troubleshooting", href: "/docs/github-action#troubleshooting" },
+    ]
+  },
+  { 
+    name: "MCP Integration", 
+    href: "/docs/mcp", 
+    icon: Terminal,
+    subItems: [
+      { name: "Installation", href: "/docs/mcp#installation" },
+      { name: "CLI Commands", href: "/docs/mcp#cli-commands" },
+      { name: "Core Tools", href: "/docs/mcp#core-tools" },
+      { name: "Analysis Tools", href: "/docs/mcp#analysis-tools" },
+      { name: "Flakiness Tools", href: "/docs/mcp#flakiness-tools" },
+      { name: "Aggregation Tools", href: "/docs/mcp#aggregation-tools" },
+      { name: "Performance Tools", href: "/docs/mcp#performance-tools" },
+      { name: "Metadata Tools", href: "/docs/mcp#metadata-tools" },
+      { name: "Security", href: "/docs/mcp#security" },
+      { name: "Troubleshooting", href: "/docs/mcp#troubleshooting" },
+    ]
+  },
   { 
     name: "API Reference", 
     href: "/docs/api", 
@@ -62,7 +88,18 @@ const navigation = [
       { name: "Authentication", href: "/docs/api/authentication" },
     ]
   },
-  { name: "Features", href: "/docs/features", icon: Gauge },
+  { 
+    name: "Features", 
+    href: "/docs/features", 
+    icon: Gauge,
+    subItems: [
+      { name: "Reliability Score", href: "/docs/features#reliability-score" },
+      { name: "Flaky Detection", href: "/docs/features#flaky-detection" },
+      { name: "Performance Regression", href: "/docs/features#performance-regression" },
+      { name: "Multi-tenancy", href: "/docs/features#multi-tenancy" },
+      { name: "AI Analysis", href: "/docs/features#ai-analysis" },
+    ]
+  },
   { name: "Troubleshooting", href: "/docs/troubleshooting", icon: HelpCircle },
 ]
 

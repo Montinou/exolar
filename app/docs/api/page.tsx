@@ -1,123 +1,116 @@
 "use client"
 
 import { CodeBlock } from "@/components/docs/code-block"
-import { TableOfContents, TOCItem } from "@/components/docs/table-of-contents"
-
-const tocItems: TOCItem[] = [
-  { id: "authentication", text: "Authentication" },
-  { id: "base-url", text: "Base URL" },
-  { id: "endpoints", text: "Endpoints" },
-  { id: "examples", text: "Examples" },
-  { id: "rate-limits", text: "Rate Limits" },
-  { id: "error-handling", text: "Error Handling" },
-]
+import { APIEndpoint } from "@/components/docs/api-endpoint"
 
 const endpoints = [
   {
-    method: "GET",
+    method: "GET" as const,
     path: "/api/executions",
     description: "List test executions with optional filters",
-    params: [
-      { name: "limit", type: "number", desc: "Max results (default: 50)" },
-      { name: "status", type: "string", desc: "Filter by status: passed, failed, flaky" },
-      { name: "branch", type: "string", desc: "Filter by git branch" },
-      { name: "suite", type: "string", desc: "Filter by test suite" },
-      { name: "from", type: "string", desc: "Start date (ISO 8601)" },
-      { name: "to", type: "string", desc: "End date (ISO 8601)" },
+    parameters: [
+      { name: "limit", type: "number", default: "50", description: "Max results to return" },
+      { name: "status", type: "string", description: "Filter by status: passed, failed, flaky" },
+      { name: "branch", type: "string", description: "Filter by git branch" },
+      { name: "suite", type: "string", description: "Filter by test suite" },
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
     ],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/executions?limit=10&status=failed"`,
+    responseExample: `{
+  "success": true,
+  "data": [
+    {
+      "id": 123,
+      "suite": "e2e-tests",
+      "branch": "main",
+      "status": "failed",
+      "passed_count": 45,
+      "failed_count": 3,
+      "duration_ms": 120000
+    }
+  ]
+}`,
   },
   {
-    method: "GET",
+    method: "GET" as const,
     path: "/api/executions/:id",
-    description: "Get detailed execution including test results",
-    params: [],
+    description: "Get detailed execution including all test results and artifacts",
+    parameters: [
+      { name: "id", type: "number", required: true, description: "Execution ID" },
+    ],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/executions/123"`,
   },
   {
-    method: "GET",
+    method: "GET" as const,
     path: "/api/metrics",
-    description: "Dashboard metrics: pass rate, failure counts, duration",
-    params: [
-      { name: "days", type: "number", desc: "Number of days to include (default: 7)" },
+    description: "Dashboard metrics: pass rate, failure counts, duration averages",
+    parameters: [
+      { name: "days", type: "number", default: "7", description: "Number of days to include" },
     ],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/metrics?days=7"`,
+    responseExample: `{
+  "success": true,
+  "data": {
+    "totalExecutions": 150,
+    "passRate": 0.92,
+    "avgDuration": 45.3,
+    "failedTests": 12,
+    "flakyTests": 5
+  }
+}`,
   },
   {
-    method: "GET",
+    method: "GET" as const,
     path: "/api/trends",
-    description: "Time-series pass/fail data for charts",
-    params: [
-      { name: "days", type: "number", desc: "Number of days (default: 14)" },
+    description: "Time-series pass/fail data for charts and trend analysis",
+    parameters: [
+      { name: "days", type: "number", default: "14", description: "Number of days to include" },
     ],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/trends?days=14"`,
   },
   {
-    method: "GET",
+    method: "GET" as const,
     path: "/api/flaky-tests",
     description: "List flaky tests sorted by flakiness rate",
-    params: [
-      { name: "limit", type: "number", desc: "Max results (default: 20)" },
-      { name: "days", type: "number", desc: "Analysis window (default: 30)" },
+    parameters: [
+      { name: "limit", type: "number", default: "20", description: "Max results to return" },
+      { name: "days", type: "number", default: "30", description: "Analysis window in days" },
     ],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/flaky-tests?limit=10"`,
   },
   {
-    method: "POST",
+    method: "POST" as const,
     path: "/api/ingest",
-    description: "Upload test results (used by GitHub Action)",
-    params: [],
+    description: "Upload test results (used by Playwright Reporter and GitHub Action)",
+    parameters: [],
+    requestBody: `{
+  "suite": "e2e-tests",
+  "branch": "main",
+  "commit_sha": "abc123",
+  "tests": [
+    {
+      "name": "Login test",
+      "status": "passed",
+      "duration_ms": 1500
+    }
+  ]
+}`,
+    curlExample: `curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"suite":"e2e-tests",...}' \\
+  "https://your-dashboard.com/api/ingest"`,
   },
 ]
-
-function ParamsTable({ params }: { params: { name: string; type: string; desc: string }[] }) {
-  if (params.length === 0) return null
-
-  return (
-    <div>
-      <h4 className="text-sm font-semibold mb-2">Parameters</h4>
-
-      {/* Mobile: Card layout */}
-      <div className="sm:hidden space-y-2">
-        {params.map((param) => (
-          <div key={param.name} className="p-3 rounded-lg glass-panel">
-            <div className="flex items-center gap-2 mb-1">
-              <code className="text-primary text-sm">{param.name}</code>
-              <span className="text-xs text-muted-foreground">({param.type})</span>
-            </div>
-            <p className="text-sm text-muted-foreground">{param.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Desktop: Table layout */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2 px-3 font-medium">Name</th>
-              <th className="text-left py-2 px-3 font-medium">Type</th>
-              <th className="text-left py-2 px-3 font-medium">Description</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {params.map((param) => (
-              <tr key={param.name}>
-                <td className="py-2 px-3">
-                  <code className="text-primary">{param.name}</code>
-                </td>
-                <td className="py-2 px-3 text-muted-foreground">{param.type}</td>
-                <td className="py-2 px-3 text-muted-foreground">{param.desc}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
 
 export default function APIDocsPage() {
   return (
     <div className="space-y-8 sm:space-y-12">
-      {/* Mobile TOC */}
-      <TableOfContents items={tocItems} />
-
       {/* Hero */}
       <div className="space-y-4">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">API Reference</h1>
@@ -155,66 +148,10 @@ export default function APIDocsPage() {
       <section id="endpoints" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Endpoints</h2>
 
-        <div className="space-y-6 sm:space-y-8">
+        <div className="grid gap-4">
           {endpoints.map((endpoint) => (
-            <div key={endpoint.path} className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                <span
-                  className={`px-2 py-1 rounded text-xs font-mono font-semibold ${
-                    endpoint.method === "GET"
-                      ? "bg-green-500/10 text-green-500"
-                      : "bg-blue-500/10 text-blue-500"
-                  }`}
-                >
-                  {endpoint.method}
-                </span>
-                <code className="text-xs sm:text-sm font-mono break-all">{endpoint.path}</code>
-              </div>
-
-              <p className="text-muted-foreground mb-4 text-sm sm:text-base">{endpoint.description}</p>
-
-              <ParamsTable params={endpoint.params} />
-            </div>
+            <APIEndpoint key={endpoint.path} {...endpoint} />
           ))}
-        </div>
-      </section>
-
-      {/* Examples */}
-      <section id="examples" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Examples</h2>
-
-        <div className="space-y-4 sm:space-y-6">
-          <div>
-            <h3 className="font-semibold mb-3">Get recent executions</h3>
-            <CodeBlock
-              code={`curl -H "Authorization: Bearer YOUR_API_KEY" \\
-  "https://your-dashboard.com/api/executions?limit=10&status=failed"`}
-            />
-          </div>
-
-          <div>
-            <h3 className="font-semibold mb-3">Get dashboard metrics</h3>
-            <CodeBlock
-              code={`curl -H "Authorization: Bearer YOUR_API_KEY" \\
-  "https://your-dashboard.com/api/metrics?days=7"`}
-            />
-          </div>
-
-          <div>
-            <h3 className="font-semibold mb-3">Response format</h3>
-            <CodeBlock
-              code={`{
-  "success": true,
-  "data": {
-    "totalExecutions": 150,
-    "passRate": 0.92,
-    "avgDuration": 45.3,
-    "failedTests": 12,
-    "flakyTests": 5
-  }
-}`}
-            />
-          </div>
         </div>
       </section>
 

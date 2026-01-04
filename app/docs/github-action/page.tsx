@@ -2,14 +2,6 @@
 
 import Link from "next/link"
 import { CodeBlock } from "@/components/docs/code-block"
-import { TableOfContents, TOCItem } from "@/components/docs/table-of-contents"
-
-const tocItems: TOCItem[] = [
-  { id: "quick-start", text: "Quick Start" },
-  { id: "configuration", text: "Configuration" },
-  { id: "playwright-config", text: "Playwright Configuration" },
-  { id: "troubleshooting", text: "Troubleshooting" },
-]
 
 const basicExample = `name: Playwright Tests
 
@@ -127,8 +119,6 @@ function InputTable() {
 export default function GitHubActionDocsPage() {
   return (
     <div className="space-y-8 sm:space-y-12">
-      {/* Mobile TOC */}
-      <TableOfContents items={tocItems} />
 
       {/* Hero */}
       <div className="space-y-4">
@@ -219,19 +209,19 @@ export default defineConfig({
       <section id="troubleshooting" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Troubleshooting</h2>
         <div className="space-y-3 sm:space-y-4">
-          <div className="p-3 sm:p-4 rounded-xl glass-card">
+          <div className="p-3 sm:p-4 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2">No test results uploaded</h3>
             <p className="text-sm text-muted-foreground">
               Make sure your Playwright config includes the JSON reporter and the <code className="px-1 py-0.5 rounded glass-panel">results-path</code> matches your output directory.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-xl glass-card">
+          <div className="p-3 sm:p-4 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2">Authentication failed</h3>
             <p className="text-sm text-muted-foreground">
               Verify your API key is correct and the secret is properly configured in GitHub.
             </p>
           </div>
-          <div className="p-3 sm:p-4 rounded-xl glass-card">
+          <div className="p-3 sm:p-4 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2">Action not running on failure</h3>
             <p className="text-sm text-muted-foreground">
               Add <code className="px-1 py-0.5 rounded glass-panel">if: always()</code> to ensure the action runs even when tests fail.

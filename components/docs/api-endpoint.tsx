@@ -47,7 +47,7 @@ export function APIEndpoint({
   className,
 }: APIEndpointProps) {
   return (
-    <div className={cn("p-4 sm:p-6 rounded-xl glass-card", className)}>
+    <div className={cn("p-4 sm:p-6 rounded-xl glass-card glass-card-glow", className)}>
       <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
         <span
           className={cn(

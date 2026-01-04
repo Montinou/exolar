@@ -234,7 +234,7 @@ export default function TroubleshootingPage() {
           <div
             key={issue.id}
             id={issue.id}
-            className="p-4 sm:p-6 rounded-xl glass-card scroll-mt-20"
+            className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow scroll-mt-20"
           >
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <HelpCircle className="h-5 w-5 text-primary shrink-0" />

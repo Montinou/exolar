@@ -2,21 +2,7 @@
 
 import { Check } from "lucide-react"
 import { CodeBlock } from "@/components/docs/code-block"
-import { TableOfContents, TOCItem } from "@/components/docs/table-of-contents"
 import { ToolCard } from "@/components/docs/tool-card"
-
-const tocItems: TOCItem[] = [
-  { id: "installation", text: "Installation" },
-  { id: "cli-commands", text: "CLI Commands" },
-  { id: "core-tools", text: "Core Tools" },
-  { id: "analysis-tools", text: "Analysis Tools" },
-  { id: "flakiness-tools", text: "Flakiness Tools" },
-  { id: "aggregation-tools", text: "Aggregation Tools" },
-  { id: "performance-tools", text: "Performance Tools" },
-  { id: "metadata-tools", text: "Metadata Tools" },
-  { id: "security", text: "Security" },
-  { id: "troubleshooting", text: "Troubleshooting" },
-]
 
 // Core Tools
 const coreTools = [
@@ -349,7 +335,6 @@ const usageExamples = [
 export default function MCPDocsPage() {
   return (
     <div className="space-y-8 sm:space-y-12">
-      <TableOfContents items={tocItems} />
 
       {/* Hero */}
       <div className="space-y-4">

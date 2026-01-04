@@ -67,8 +67,8 @@ export function TableOfContents({ items }: TableOfContentsProps) {
 
   return (
     <>
-      {/* Desktop: always visible in sidebar area */}
-      <nav className="hidden xl:block sticky top-20">
+      {/* Desktop: fixed position on far right for 2xl+ screens */}
+      <nav className="hidden 2xl:block fixed right-8 top-24 w-56">
         <h4 className="text-sm font-semibold mb-3">On this page</h4>
         <TOCLinks />
       </nav>
