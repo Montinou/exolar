@@ -14,6 +14,8 @@ import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { Gauge } from "lucide-react"
 
+export const dynamic = "force-dynamic"
+
 async function PerformanceContent({
   searchParams,
 }: {

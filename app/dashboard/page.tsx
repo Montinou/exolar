@@ -21,6 +21,8 @@ import { SuitePassRatesCard } from "@/components/dashboard/suite-pass-rates-card
 import { Skeleton } from "@/components/ui/skeleton"
 import { BrandLogo } from "@/components/ui/brand-logo"
 
+export const dynamic = "force-dynamic"
+
 async function DashboardContent({
   searchParams,
 }: {

@@ -11,6 +11,8 @@ import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { CompareClient } from "./compare-client"
 import type { TestExecution } from "@/lib/types"
 
+export const dynamic = "force-dynamic"
+
 interface CompareContentProps {
   searchParams: Promise<{
     baseline?: string

@@ -22,6 +22,8 @@ import {
 } from "lucide-react"
 import type { ReliabilityScore } from "@/lib/types"
 
+export const dynamic = "force-dynamic"
+
 async function ReliabilityContent({
   searchParams,
 }: {

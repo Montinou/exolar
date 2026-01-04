@@ -7,6 +7,8 @@ import { FeaturesGrid } from "@/components/landing/FeaturesGrid"
 import { InstallTabs } from "@/components/landing/InstallTabs"
 import { Footer } from "@/components/landing/Footer"
 
+export const dynamic = "force-dynamic"
+
 export default async function LandingPage() {
   // Redirect signed-in users to dashboard
   const session = await getSessionContext()
