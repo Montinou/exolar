@@ -8,7 +8,7 @@ import { WishlistForm } from "./WishlistForm"
 export function Footer() {
   return (
     <footer
-      className="py-16 border-t"
+      className="pt-16 border-t"
       style={{
         background: "var(--deep-void)",
         borderColor: "var(--glass-border)",
@@ -35,11 +35,6 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Tagline */}
           <div className="text-center md:text-left">
-             <div className="flex items-center justify-center md:justify-start mb-4">
-                 <div className="relative w-40 h-12">
-                    <Image src="/branding/logo-full.png" alt="Exolar QA Logo" fill className="object-contain" />
-                 </div>
-            </div>
             <p
               className="text-lg font-medium"
               style={{ color: "oklch(0.7 0 0)" }}
@@ -78,17 +73,29 @@ export function Footer() {
             </Link>
           </div>
         </div>
+      </div>
 
-        {/* Copyright */}
-        <div
-          className="mt-12 pt-8 border-t text-center text-xs"
-          style={{
-            borderColor: "var(--glass-border)",
-            color: "oklch(0.4 0 0)",
-          }}
-        >
-          <p>&copy; {new Date().getFullYear()} Exolar QA. All rights reserved.</p>
-        </div>
+      {/* Full-width Logo Banner */}
+      <div className="w-full mt-12">
+        <Image
+          src="/branding/logo-full.png"
+          alt="Exolar QA Logo"
+          width={2940}
+          height={426}
+          className="w-full h-auto object-contain"
+          priority
+        />
+      </div>
+
+      {/* Copyright */}
+      <div
+        className="py-4 text-center text-xs"
+        style={{
+          background: "var(--deep-void)",
+          color: "oklch(0.4 0 0)",
+        }}
+      >
+        <p>&copy; {new Date().getFullYear()} Exolar QA. All rights reserved.</p>
       </div>
     </footer>
   )
