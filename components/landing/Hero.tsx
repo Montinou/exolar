@@ -22,7 +22,7 @@ export function Hero() {
           {/* Logo */}
           <div className="flex justify-center">
             <div className="relative w-20 h-20 rounded-2xl overflow-hidden glass-panel shadow-2xl p-1">
-               <Image src="/branding/logo-icon.jpeg" alt="Exolar QA Logo" fill className="object-cover rounded-xl" />
+               <Image src="/branding/logo-icon.png" alt="Exolar QA Logo" fill className="object-cover rounded-xl" />
             </div>
           </div>
 
