@@ -14,6 +14,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: 3.958.0
         version: 3.958.0
+      '@exolar-qa/mcp-server':
+        specifier: ^1.0.0
+        version: 1.0.0(hono@4.11.3)(zod@3.25.76)
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.60.0(react@19.2.0))
@@ -125,9 +128,6 @@ importers:
       date-fns:
         specifier: 4.1.0
         version: 4.1.0
-      e2e-test-dashboard-mcp:
-        specifier: ^1.0.2
-        version: 1.0.3(hono@4.11.3)(zod@3.25.76)
       embla-carousel-react:
         specifier: 8.5.1
         version: 8.5.1(react@19.2.0)
@@ -474,6 +474,11 @@ packages:
 
   '@emnapi/runtime@1.7.1':
     resolution: {integrity: sha512-PVtJr5CmLwYAU9PZDMITZoR5iAOShYREoR45EyyLrbntV50mdePTgUn4AmOw90Ifcj+x2kRjdzr1HP3RrNiHGA==}
+
+  '@exolar-qa/mcp-server@1.0.0':
+    resolution: {integrity: sha512-lw+GnUj9+hRw+xH595E4wqq9wa85Y2qJauXoeSzANRutygRQi1De7T59ER3H7H4NorQNvfqMNs3H3DxPjfdMiQ==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
 
   '@fastify/ajv-compiler@3.6.0':
     resolution: {integrity: sha512-LwdXQJjmMD+GwLOkP7TVC68qa+pSSogeWWmznRJ/coyTcfe9qA05AHFSe1eZFwK6q+xVRpChnvFUkf1iYaSZsQ==}
@@ -2986,11 +2991,6 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
-  e2e-test-dashboard-mcp@1.0.3:
-    resolution: {integrity: sha512-vpwmrZ+2zhrLWjbfVAJOdvsdtCV0CGZlHd4nl9PY6uoW62qApw77ZO2lhHh1sA2c/VOQk186nDNqvoisc8zThQ==}
-    engines: {node: '>=18.0.0'}
-    hasBin: true
-
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
@@ -4732,6 +4732,15 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@exolar-qa/mcp-server@1.0.0(hono@4.11.3)(zod@3.25.76)':
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.25.1(hono@4.11.3)(zod@3.25.76)
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - hono
+      - supports-color
+      - zod
 
   '@fastify/ajv-compiler@3.6.0':
     dependencies:
@@ -7493,15 +7502,6 @@ snapshots:
       call-bind-apply-helpers: 1.0.2
       es-errors: 1.3.0
       gopd: 1.2.0
-
-  e2e-test-dashboard-mcp@1.0.3(hono@4.11.3)(zod@3.25.76):
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.25.1(hono@4.11.3)(zod@3.25.76)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - hono
-      - supports-color
-      - zod
 
   ee-first@1.1.1: {}
 
