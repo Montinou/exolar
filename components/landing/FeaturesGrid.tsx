@@ -1,14 +1,22 @@
 "use client"
 
-import { Clock, AlertTriangle, Layers } from "lucide-react"
+import { Activity, TrendingUp, AlertTriangle, Clock, LayoutDashboard } from "lucide-react"
 
-const features = [
+// Row 1: Most valuable features (3 items)
+const topFeatures = [
   {
-    icon: Clock,
-    title: "History Retention",
-    description: "Keep test execution history for as long as you need. Analyze trends over weeks or months.",
+    icon: Activity,
+    title: "Reliability Score",
+    description: "Single 0-100 gauge showing test suite health at a glance. Know instantly if your tests are reliable.",
     iconColor: "var(--exolar-cyan)",
     bgColor: "oklch(0.75 0.15 195 / 0.15)",
+  },
+  {
+    icon: TrendingUp,
+    title: "Performance Alerts",
+    description: "Automatic detection when tests slow down. Catch regressions before they impact your CI/CD pipeline.",
+    iconColor: "oklch(0.65 0.2 25)",
+    bgColor: "oklch(0.65 0.2 25 / 0.15)",
   },
   {
     icon: AlertTriangle,
@@ -17,14 +25,56 @@ const features = [
     iconColor: "var(--safety-amber)",
     bgColor: "oklch(0.78 0.18 75 / 0.15)",
   },
+]
+
+// Row 2: Supporting features (2 items, centered)
+const bottomFeatures = [
   {
-    icon: Layers,
-    title: "Multi-Project Support",
-    description: "Manage multiple test suites from a single dashboard. Perfect for monorepos and microservices.",
-    iconColor: "oklch(0.6 0 0)",
-    bgColor: "oklch(0.5 0 0 / 0.15)",
+    icon: Clock,
+    title: "History Retention",
+    description: "Keep test execution history for as long as you need. Analyze trends over weeks or months.",
+    iconColor: "var(--exolar-cyan)",
+    bgColor: "oklch(0.75 0.15 195 / 0.15)",
+  },
+  {
+    icon: LayoutDashboard,
+    title: "Real-time Dashboard",
+    description: "Live metrics, trends, and detailed test results. Everything you need in one place.",
+    iconColor: "oklch(0.75 0.18 145)",
+    bgColor: "oklch(0.75 0.18 145 / 0.15)",
   },
 ]
+
+function FeatureCard({ feature }: { feature: typeof topFeatures[0] }) {
+  return (
+    <div className="glass-panel p-6 space-y-4 transition-all duration-300 hover:scale-105 cursor-default">
+      {/* Icon */}
+      <div
+        className="w-12 h-12 rounded-lg flex items-center justify-center"
+        style={{ background: feature.bgColor }}
+      >
+        <feature.icon
+          className="w-6 h-6"
+          style={{ color: feature.iconColor }}
+        />
+      </div>
+
+      {/* Content */}
+      <h3
+        className="text-lg font-semibold"
+        style={{ color: "oklch(0.95 0 0)" }}
+      >
+        {feature.title}
+      </h3>
+      <p
+        className="text-sm"
+        style={{ color: "oklch(0.6 0 0)" }}
+      >
+        {feature.description}
+      </p>
+    </div>
+  )
+}
 
 export function FeaturesGrid() {
   return (
@@ -43,38 +93,17 @@ export function FeaturesGrid() {
           </p>
         </div>
 
-        {/* Features grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="glass-panel p-6 space-y-4 transition-all duration-300 hover:scale-105 cursor-default"
-            >
-              {/* Icon */}
-              <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center"
-                style={{ background: feature.bgColor }}
-              >
-                <feature.icon
-                  className="w-6 h-6"
-                  style={{ color: feature.iconColor }}
-                />
-              </div>
+        {/* Row 1: Top 3 features */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-6">
+          {topFeatures.map((feature) => (
+            <FeatureCard key={feature.title} feature={feature} />
+          ))}
+        </div>
 
-              {/* Content */}
-              <h3
-                className="text-lg font-semibold"
-                style={{ color: "oklch(0.95 0 0)" }}
-              >
-                {feature.title}
-              </h3>
-              <p
-                className="text-sm"
-                style={{ color: "oklch(0.6 0 0)" }}
-              >
-                {feature.description}
-              </p>
-            </div>
+        {/* Row 2: Bottom 2 features (centered under gaps of row 1) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          {bottomFeatures.map((feature) => (
+            <FeatureCard key={feature.title} feature={feature} />
           ))}
         </div>
       </div>

@@ -138,6 +138,8 @@ export default defineConfig({
         <h2 className="text-xl sm:text-2xl font-semibold">Features</h2>
         <div className="prose prose-neutral dark:prose-invert max-w-none">
           <ul className="space-y-2 text-muted-foreground text-sm sm:text-base">
+            <li><strong className="text-foreground">Reliability Score</strong> - Single 0-100 gauge showing test suite health at a glance</li>
+            <li><strong className="text-foreground">Performance Regression Detection</strong> - Automatic alerts when tests become slower than baseline</li>
             <li><strong className="text-foreground">Real-time Dashboard</strong> - View test results, trends, and metrics</li>
             <li><strong className="text-foreground">Flaky Test Detection</strong> - Automatically identify and track flaky tests</li>
             <li><strong className="text-foreground">AI-Powered Analysis</strong> - Get intelligent insights about test failures</li>

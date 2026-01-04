@@ -4,8 +4,11 @@ A comprehensive multi-tenant dashboard for monitoring Playwright test executions
 
 ## Features
 
+- **Reliability Score**: Single 0-100 gauge showing overall test suite health at a glance
+- **Performance Regression Detection**: Automatic alerts when tests become slower than baseline
 - **Multi-Tenancy**: Organization-level data isolation with RLS
 - **Real-time Metrics**: Pass rates, average duration, critical failures, and execution counts
+- **Flaky Test Detection**: Automatically identify and track flaky tests with statistical analysis
 - **Trend Visualization**: 7-day trend charts showing test stability over time
 - **Detailed Test Results**: View individual test failures with error messages and stack traces
 - **Artifact Management**: Access test videos, traces, and screenshots stored in Cloudflare R2
