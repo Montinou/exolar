@@ -35,11 +35,10 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
           {/* Tagline */}
           <div className="text-center md:text-left">
-             <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
-                 <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-white/10 shadow-lg">
-                    <Image src="/branding/logo-icon.png" alt="Exolar Logo" fill className="object-cover" />
+             <div className="flex items-center justify-center md:justify-start mb-4">
+                 <div className="relative w-40 h-12">
+                    <Image src="/branding/logo-full.png" alt="Exolar QA Logo" fill className="object-contain" />
                  </div>
-                 <span className="text-xl font-bold tracking-tight" style={{ color: "oklch(0.95 0 0)" }}>Exolar</span>
             </div>
             <p
               className="text-lg font-medium"

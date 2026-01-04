@@ -21,8 +21,8 @@ export function Hero() {
         <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Logo */}
           <div className="flex justify-center">
-            <div className="relative w-20 h-20 rounded-2xl overflow-hidden glass-panel shadow-2xl p-1">
-               <Image src="/branding/logo-icon.png" alt="Exolar QA Logo" fill className="object-cover rounded-xl" />
+            <div className="relative w-20 h-20 rounded-full overflow-hidden glass-panel shadow-2xl">
+               <Image src="/branding/logo-icon.png" alt="Exolar QA Logo" fill className="object-contain" />
             </div>
           </div>
 

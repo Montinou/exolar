@@ -77,8 +77,8 @@ export default function MCPSettingsPage() {
         </div>
 
         <div className="flex items-center gap-3 mb-2">
-          <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-sm">
-            <Image src="/branding/logo-icon.png" alt="Exolar" fill className="object-cover" />
+          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 shadow-sm">
+            <Image src="/branding/logo-icon.png" alt="Exolar" fill className="object-contain" />
           </div>
           <h1 className="text-2xl font-bold">MCP Integration</h1>
         </div>

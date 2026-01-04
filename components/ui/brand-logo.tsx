@@ -28,7 +28,7 @@ export function BrandLogo({
         height={h}
         className={cn(
           "object-contain",
-          variant === "icon" ? "rounded-lg" : ""
+          variant === "icon" ? "rounded-full" : ""
         )}
         priority
       />
