@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Activity, Gauge } from "lucide-react"
+import { LayoutDashboard, Activity, Gauge, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -21,6 +21,11 @@ const navItems = [
     href: "/dashboard/performance",
     icon: Gauge,
   },
+  {
+    label: "Docs",
+    href: "/docs",
+    icon: BookOpen,
+  },
 ]
 
 export function DashboardNav() {
@@ -32,7 +37,9 @@ export function DashboardNav() {
         const isActive =
           item.href === "/dashboard"
             ? pathname === "/dashboard"
-            : pathname.startsWith(item.href)
+            : item.href === "/docs"
+              ? pathname.startsWith("/docs")
+              : pathname.startsWith(item.href)
 
         return (
           <Link
