@@ -340,6 +340,48 @@ const metadataTools = [
   },
 ]
 
+// Installation & Auto-Triage Tools
+const autoTriageTools = [
+  {
+    name: "get_installation_config",
+    description: "Get installation configuration for connecting Claude Code or other IDEs to Exolar QA. Returns ready-to-use config snippets.",
+    category: "metadata" as const,
+    parameters: [
+      { name: "ide", type: "string", description: "Target IDE: claude_desktop | cursor | claude_code_cli | all" },
+    ],
+    responseFields: [
+      "claude_desktop: Config snippet for Claude Desktop",
+      "cursor: Config snippet for Cursor IDE",
+      "claude_code_cli: Commands for Claude Code CLI",
+      "setup_steps: Step-by-step installation guide",
+      "credentials_location: Where tokens are stored",
+      "docs_url: Link to settings page",
+    ],
+    example: `"Install Exolar QA skills in my IDE"`,
+  },
+  {
+    name: "classify_failure",
+    description: "Classify a test failure as FLAKE vs BUG. Returns structured data with classification signals, historical metrics, and confidence score.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "test_id", type: "number", description: "Test result ID (from test_results table)" },
+      { name: "execution_id", type: "number", description: "Execution ID (alternative to test_id)" },
+      { name: "test_name", type: "string", description: "Test name (required with execution_id)" },
+      { name: "test_file", type: "string", description: "Test file path (optional, disambiguates)" },
+    ],
+    responseFields: [
+      "current_failure: Error details, retry count, status",
+      "historical_metrics: Total runs, flaky runs, flakiness rate",
+      "recent_runs: Last 10 executions with status",
+      "classification_signals: Weighted FLAKE vs BUG indicators",
+      "suggested_classification: FLAKE | BUG | UNKNOWN",
+      "confidence: 0.0-1.0 score",
+      "reasoning: Explanation of classification",
+    ],
+    example: `"Is this test failure a flake or a real bug?"`,
+  },
+]
+
 const usageExamples = [
   "Show me recent test failures",
   "What are our flakiest tests?",
@@ -353,6 +395,10 @@ const usageExamples = [
   "Compare the last two runs on main branch",
   "What tests broke in the feature branch compared to main?",
   "Show me new failures between execution 123 and 456",
+  "Install Exolar QA skills in my IDE",
+  "Is this test failure a flake or a real bug?",
+  "Classify the failure in test 'should login successfully'",
+  "Help me set up MCP integration",
 ]
 
 export default function MCPDocsPage() {
@@ -494,6 +540,19 @@ npx @exolar-qa/mcp-server --login --url https://your-dashboard.com`}
         </p>
         <div className="grid gap-4">
           {metadataTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
+        </div>
+      </section>
+
+      {/* Installation & Auto-Triage Tools */}
+      <section id="auto-triage-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Installation & Auto-Triage</h2>
+        <p className="text-muted-foreground">
+          Tools for quick IDE setup and automatic failure classification (FLAKE vs BUG).
+        </p>
+        <div className="grid gap-4">
+          {autoTriageTools.map((tool) => (
             <ToolCard key={tool.name} {...tool} />
           ))}
         </div>

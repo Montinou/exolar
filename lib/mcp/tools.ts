@@ -1,7 +1,7 @@
 /**
  * MCP Tools - Tool Definitions and Handlers
  *
- * All 12 MCP tools for the E2E Dashboard.
+ * All 20 MCP tools for the E2E Dashboard.
  * Uses existing lib/db.ts functions directly.
  */
 
@@ -456,6 +456,74 @@ Use filter param to focus on specific categories (e.g., filter="new_failure" to 
           type: "string",
           enum: ["new_failure", "fixed", "new_test", "removed_test", "all"],
           description: "Filter results by diff category (default: all)",
+        },
+      },
+    },
+  },
+
+  // Installation & Auto-Triage Tools
+  {
+    name: "get_installation_config",
+    description: `Get installation configuration for connecting Claude Code or other IDEs to Exolar QA.
+
+Returns ready-to-use configuration snippets for:
+- Claude Desktop (config.json snippet)
+- Cursor IDE (mcp.json snippet)
+- Claude Code CLI (add command)
+
+Also includes:
+- setup_steps: Step-by-step instructions
+- auth_command: CLI command to authenticate
+- credentials_location: Where tokens are stored
+- docs_url: Link to settings/documentation
+
+Use this when a user asks to "install Exolar skills" or set up MCP integration.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        ide: {
+          type: "string",
+          enum: ["claude_desktop", "cursor", "claude_code_cli", "all"],
+          description: "Target IDE to get config for. Default: 'all' returns all options.",
+        },
+      },
+    },
+  },
+  {
+    name: "classify_failure",
+    description: `Get structured classification data for a test failure to determine if it's a FLAKE vs BUG.
+
+Provides AI-friendly data including:
+- current_failure: Error details, retry count, status
+- historical_metrics: Total runs, flaky runs, flakiness rate, last flaky/passed/failed
+- recent_runs: Last 10 test executions with status and branch
+- classification_signals: Weighted indicators for FLAKE vs BUG
+- suggested_classification: "FLAKE" | "BUG" | "UNKNOWN"
+- confidence: 0.0-1.0 score
+- reasoning: Explanation of the classification
+
+FLAKE indicators: retry_succeeded, high_flakiness_rate, timing_error_type, mixed_recent_results
+BUG indicators: no_retry_success, low_flakiness_rate, assertion_error_type, consistent_failure_pattern
+
+Input: Either test_id (result ID) OR (execution_id + test_name)`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        test_id: {
+          type: "number",
+          description: "Test result ID (from test_results table)",
+        },
+        execution_id: {
+          type: "number",
+          description: "Execution ID (alternative to test_id)",
+        },
+        test_name: {
+          type: "string",
+          description: "Test name (required if using execution_id)",
+        },
+        test_file: {
+          type: "string",
+          description: "Test file path (optional, helps disambiguate)",
         },
       },
     },
@@ -1008,6 +1076,127 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           filter: input.filter || "all",
           tests: filteredTests,
           test_count: filteredTests.length,
+        })
+      }
+
+      case "get_installation_config": {
+        const input = z
+          .object({
+            ide: z.enum(["claude_desktop", "cursor", "claude_code_cli", "all"]).default("all"),
+          })
+          .parse(args)
+
+        // Infer dashboard URL from environment or use default
+        const dashboardUrl =
+          process.env.NEXT_PUBLIC_DASHBOARD_URL ||
+          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar-qa.vercel.app")
+
+        const npmPackage = "@exolar-qa/mcp-server"
+
+        const configs = {
+          organization: authContext.organizationSlug,
+          npm_package: npmPackage,
+
+          claude_desktop: {
+            config_path: "~/.config/claude/claude_desktop_config.json",
+            config_path_windows: "%APPDATA%\\Claude\\claude_desktop_config.json",
+            config_snippet: {
+              mcpServers: {
+                "exolar-qa": {
+                  command: "npx",
+                  args: ["-y", npmPackage],
+                },
+              },
+            },
+            note: "After adding, restart Claude Desktop",
+          },
+
+          cursor: {
+            config_path: "~/.cursor/mcp.json",
+            config_path_windows: "%USERPROFILE%\\.cursor\\mcp.json",
+            config_snippet: {
+              mcpServers: {
+                "exolar-qa": {
+                  command: "npx",
+                  args: ["-y", npmPackage],
+                },
+              },
+            },
+            note: "After adding, restart Cursor",
+          },
+
+          claude_code_cli: {
+            add_command: `claude mcp add --transport stdio exolar-qa -- npx -y ${npmPackage}`,
+            auth_command: `npx ${npmPackage} --login`,
+            status_command: `npx ${npmPackage} --status`,
+            logout_command: `npx ${npmPackage} --logout`,
+          },
+
+          setup_steps: [
+            `1. Authenticate: npx ${npmPackage} --login`,
+            "2. Add to your IDE using the config above",
+            "3. Restart your IDE",
+            "4. Claude will now have access to your test data",
+          ],
+
+          credentials_location: "~/.e2e-dashboard-mcp/config.json",
+          token_expiry: "30 days",
+          dashboard_url: dashboardUrl,
+          docs_url: `${dashboardUrl}/settings/mcp`,
+        }
+
+        // Filter by IDE if specified
+        if (input.ide !== "all") {
+          const filtered: Record<string, unknown> = {
+            organization: configs.organization,
+            npm_package: configs.npm_package,
+            setup_steps: configs.setup_steps,
+            credentials_location: configs.credentials_location,
+            token_expiry: configs.token_expiry,
+            docs_url: configs.docs_url,
+          }
+          if (input.ide === "claude_desktop") {
+            filtered.claude_desktop = configs.claude_desktop
+          } else if (input.ide === "cursor") {
+            filtered.cursor = configs.cursor
+          } else if (input.ide === "claude_code_cli") {
+            filtered.claude_code_cli = configs.claude_code_cli
+          }
+          return jsonResponse(filtered)
+        }
+
+        return jsonResponse(configs)
+      }
+
+      case "classify_failure": {
+        const input = z
+          .object({
+            test_id: z.number().optional(),
+            execution_id: z.number().optional(),
+            test_name: z.string().optional(),
+            test_file: z.string().optional(),
+          })
+          .parse(args)
+
+        // Must have either test_id OR (execution_id + test_name)
+        if (!input.test_id && (!input.execution_id || !input.test_name)) {
+          return errorResponse("Must provide either test_id OR (execution_id + test_name)")
+        }
+
+        const classification = await db.getFailureClassification(orgId, {
+          testId: input.test_id,
+          executionId: input.execution_id,
+          testName: input.test_name,
+          testFile: input.test_file,
+        })
+
+        if (!classification) {
+          return errorResponse("Test not found or no failure data available")
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          ...classification,
         })
       }
 

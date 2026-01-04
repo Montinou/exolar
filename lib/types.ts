@@ -502,3 +502,139 @@ export interface ComparisonResult {
   summary: ComparisonSummary
   tests: TestComparisonItem[]
 }
+
+// ============================================
+// MCP Installation Config Types
+// ============================================
+
+/**
+ * IDE-specific configuration snippet for MCP server installation
+ */
+export interface IDEConfigSnippet {
+  config_path: string
+  config_path_windows?: string
+  config_snippet: {
+    mcpServers: Record<
+      string,
+      {
+        command: string
+        args: string[]
+        env?: Record<string, string>
+      }
+    >
+  }
+  note?: string
+}
+
+/**
+ * CLI commands for MCP server installation
+ */
+export interface CLICommands {
+  add_command: string
+  auth_command: string
+  status_command: string
+  logout_command: string
+}
+
+/**
+ * Complete installation configuration for all supported IDEs
+ */
+export interface InstallationConfig {
+  organization: string
+  npm_package: string
+  claude_desktop: IDEConfigSnippet
+  cursor: IDEConfigSnippet
+  claude_code_cli: CLICommands
+  setup_steps: string[]
+  credentials_location: string
+  token_expiry: string
+  dashboard_url: string
+  docs_url: string
+}
+
+// ============================================
+// Failure Classification Types (Auto-Triage)
+// ============================================
+
+/**
+ * A weighted signal that contributes to FLAKE vs BUG classification
+ */
+export interface ClassificationSignal {
+  signal: string
+  value: number | boolean | string
+  weight: number
+  category: "flake" | "bug"
+}
+
+/**
+ * Current failure details for classification
+ */
+export interface FailureDetails {
+  execution_id: number
+  result_id: number
+  status: string
+  retry_count: number
+  error_type: string | null
+  error_message: string | null
+  failed_step: string | null
+  duration_ms: number
+  browser: string
+  occurred_at: string
+}
+
+/**
+ * Historical metrics for a test (aggregated from flakiness history)
+ */
+export interface ClassificationHistoricalMetrics {
+  total_runs: number
+  flaky_runs: number
+  failed_runs: number
+  passed_runs: number
+  flakiness_rate: number
+  failure_rate: number
+  avg_duration_ms: number
+  last_flaky_at: string | null
+  last_passed_at: string | null
+  last_failed_at: string | null
+  first_seen_at: string
+}
+
+/**
+ * A single run in the recent history
+ */
+export interface RecentRun {
+  execution_id: number
+  status: string
+  retry_count: number
+  duration_ms: number
+  branch: string
+  occurred_at: string
+}
+
+/**
+ * Complete failure classification result
+ */
+export interface FailureClassification {
+  test_id: string
+  test_signature: string
+  current_failure: FailureDetails
+  historical_metrics: ClassificationHistoricalMetrics
+  recent_runs: RecentRun[]
+  classification_signals: {
+    flake_indicators: ClassificationSignal[]
+    bug_indicators: ClassificationSignal[]
+  }
+  suggested_classification: "FLAKE" | "BUG" | "UNKNOWN"
+  confidence: number
+  reasoning: string
+}
+
+/**
+ * Options for querying failure classification
+ */
+export interface ClassificationOptions {
+  testId?: number
+  executionId?: number
+  testName?: string
+  testFile?: string
+}

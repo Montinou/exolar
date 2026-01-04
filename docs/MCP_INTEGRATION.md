@@ -115,6 +115,30 @@ Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 | `get_performance_regressions` | Tests slower than baseline | `threshold`, `hours`, `branch`, `suite`, `limit`, `sort_by` |
 | `compare_executions` | Compare two test executions | `baseline_id`, `current_id`, `baseline_branch`, `current_branch`, `suite`, `filter` |
 
+### Installation & Auto-Triage Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_installation_config` | Get IDE config snippets for MCP setup | `ide` (optional: "claude_desktop", "cursor", "claude_code_cli", "all") |
+| `classify_failure` | Classify test failure as FLAKE vs BUG | `test_id` OR (`execution_id` + `test_name`), `test_file` (optional) |
+
+**Installation Config** returns:
+- Config snippets for Claude Desktop, Cursor, and Claude Code CLI
+- Setup steps and authentication commands
+- Dashboard URLs and credential locations
+- Use this when a user asks to "install Exolar skills"
+
+**Classify Failure** returns:
+- `current_failure`: Error details, retry count, status
+- `historical_metrics`: Total runs, flaky runs, flakiness rate
+- `recent_runs`: Last 10 executions with status
+- `classification_signals`: Weighted FLAKE vs BUG indicators
+- `suggested_classification`: "FLAKE" | "BUG" | "UNKNOWN"
+- `confidence`: 0.0-1.0 score with reasoning
+
+FLAKE indicators: `retry_succeeded`, `high_flakiness_rate`, `timing_error_type`, `mixed_recent_results`
+BUG indicators: `no_retry_success`, `low_flakiness_rate`, `assertion_error_type`, `consistent_failure_pattern`
+
 **Reliability Score** returns:
 - `score`: 0-100 health score
 - `status`: "healthy" (80+), "warning" (60-79), "critical" (<60)
@@ -149,6 +173,10 @@ Once configured, you can ask Claude things like:
 - "Compare the last two runs on main branch"
 - "What tests broke in the feature branch compared to main?"
 - "Show me new failures between execution 123 and 456"
+- "Install Exolar QA skills in my IDE"
+- "Is this test failure a flake or a real bug?"
+- "Classify the failure in test 'should login successfully'"
+- "Help me set up MCP integration"
 
 ## Troubleshooting
 
