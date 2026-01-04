@@ -37,6 +37,11 @@ const metadataTools = [
   { name: "list_suites", desc: "Test suites with recent runs" },
 ]
 
+const performanceTools = [
+  { name: "get_reliability_score", desc: "Suite health score (0-100) with branch/suite filters" },
+  { name: "get_performance_regressions", desc: "Tests slower than baseline with severity and sorting" },
+]
+
 const usageExamples = [
   "Show me recent test failures",
   "What are our flakiest tests?",
@@ -44,6 +49,9 @@ const usageExamples = [
   "Get the dashboard metrics for the last 7 days",
   "Show me the error distribution from this week",
   "What's the test history for the checkout test?",
+  "What's the health score for my test suite?",
+  "Are there any performance regressions on main?",
+  "Show me tests that got slower in the last 24 hours",
 ]
 
 function ToolList({ tools }: { tools: { name: string; desc: string }[] }) {
@@ -158,6 +166,11 @@ npx @exolar-qa/mcp-server --login --url https://your-dashboard.com`}
           <div>
             <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Metadata Tools</h3>
             <ToolList tools={metadataTools} />
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Performance & Reliability</h3>
+            <ToolList tools={performanceTools} />
           </div>
         </div>
       </section>

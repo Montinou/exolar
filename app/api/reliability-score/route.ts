@@ -14,10 +14,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const from = searchParams.get("from") || undefined
     const to = searchParams.get("to") || undefined
+    const branch = searchParams.get("branch") || undefined
+    const suite = searchParams.get("suite") || undefined
 
-    const dateRange = from && to ? { from, to } : undefined
     const db = getQueriesForOrg(context.organizationId)
-    const score = await db.getReliabilityScore(dateRange)
+    const score = await db.getReliabilityScore({ from, to, branch, suite })
 
     return NextResponse.json(score)
   } catch (error) {

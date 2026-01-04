@@ -300,6 +300,8 @@ The dashboard exposes a MCP server for Claude Code integration at `/api/mcp`.
 | `get_flaky_tests` | Flaky tests list |
 | `list_branches` | Available branches |
 | `list_suites` | Available test suites |
+| `get_reliability_score` | Suite health score (0-100) with branch/suite filters |
+| `get_performance_regressions` | Tests slower than baseline with sorting options |
 
 See `docs/MCP_INTEGRATION.md` for configuration and usage.
 

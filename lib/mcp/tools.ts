@@ -344,6 +344,71 @@ Returns a markdown string with:
       required: ["execution_id"],
     },
   },
+
+  // Performance & Reliability Tools
+  {
+    name: "get_reliability_score",
+    description: `Get overall test suite health score (0-100). Quick way to assess suite stability before deeper analysis.
+
+Formula: (PassRate × 40%) + ((100 - FlakyRate) × 30%) + (DurationStability × 30%)
+
+Returns:
+- score: number (0-100) - Overall health score
+- status: "healthy" (80+) | "warning" (60-79) | "critical" (<60)
+- breakdown: Pass rate, flakiness, and stability contributions
+- rawMetrics: Actual pass rate %, flaky rate %, duration CV
+- trend: Change from previous period (-100 to +100)
+
+Use this first to quickly assess suite health before calling get_flaky_tests or get_failed_tests.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        from: { type: "string", description: "Start date (ISO 8601)" },
+        to: { type: "string", description: "End date (ISO 8601)" },
+        branch: { type: "string", description: "Filter by branch name" },
+        suite: { type: "string", description: "Filter by test suite" },
+      },
+    },
+  },
+  {
+    name: "get_performance_regressions",
+    description: `Get tests running slower than their historical baseline. Detects performance regressions automatically.
+
+Returns per regression:
+- testName, testFile: Test identification
+- testSignature: Unique identifier for get_test_history
+- currentAvgMs: Current average duration in milliseconds
+- baselineDurationMs: Historical baseline duration
+- regressionPercent: How much slower (positive %)
+- severity: "critical" (>50%) | "warning" (20-50%)
+- trend: "increasing" | "stable" | "decreasing"
+
+Summary includes: totalRegressions, criticalCount, warningCount.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        threshold: {
+          type: "number",
+          description: "Minimum regression % to flag (default: 0.20 = 20%)",
+        },
+        hours: {
+          type: "number",
+          description: "Look back period in hours (default: 24)",
+        },
+        branch: { type: "string", description: "Filter by branch name" },
+        suite: { type: "string", description: "Filter by test suite" },
+        limit: {
+          type: "number",
+          description: "Max results to return (default: 20)",
+        },
+        sort_by: {
+          type: "string",
+          enum: ["regression", "duration", "name"],
+          description: "Sort order: by regression %, duration, or name (default: regression)",
+        },
+      },
+    },
+  },
 ]
 
 // ============================================
@@ -766,6 +831,56 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           execution_id: input.execution_id,
           format: "markdown",
           report,
+        })
+      }
+
+      case "get_reliability_score": {
+        const input = z
+          .object({
+            from: z.string().optional(),
+            to: z.string().optional(),
+            branch: z.string().optional(),
+            suite: z.string().optional(),
+          })
+          .parse(args)
+
+        const score = await db.getReliabilityScore(orgId, {
+          from: input.from,
+          to: input.to,
+          branch: input.branch,
+          suite: input.suite,
+        })
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          ...score,
+        })
+      }
+
+      case "get_performance_regressions": {
+        const input = z
+          .object({
+            threshold: z.number().optional(),
+            hours: z.number().optional(),
+            branch: z.string().optional(),
+            suite: z.string().optional(),
+            limit: z.number().optional(),
+            sort_by: z.enum(["regression", "duration", "name"]).optional(),
+          })
+          .parse(args)
+
+        const summary = await db.getPerformanceRegressions(orgId, {
+          threshold: input.threshold,
+          hours: input.hours,
+          branch: input.branch,
+          suite: input.suite,
+          limit: input.limit,
+          sortBy: input.sort_by,
+        })
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          ...summary,
         })
       }
 

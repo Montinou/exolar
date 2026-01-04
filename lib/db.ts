@@ -1340,21 +1340,40 @@ export async function updateApiKeyLastUsed(keyId: number): Promise<void> {
 // Reliability Score
 // ============================================
 
+export interface ReliabilityScoreOptions {
+  from?: string
+  to?: string
+  branch?: string
+  suite?: string
+}
+
 /**
  * Calculate overall test suite reliability score (0-100)
  * Formula: (PassRate × 0.4) + ((1 - FlakyRate) × 0.3) + (DurationStability × 0.3)
  */
 export async function getReliabilityScore(
   organizationId: number,
-  dateRange?: DateRangeFilter
+  options?: ReliabilityScoreOptions | DateRangeFilter
 ): Promise<ReliabilityScore> {
   const sql = getSql()
 
+  // Handle both old DateRangeFilter and new ReliabilityScoreOptions
+  const opts: ReliabilityScoreOptions = options || {}
+  const from = opts.from
+  const to = opts.to
+  const branch = "branch" in opts ? opts.branch : undefined
+  const suite = "suite" in opts ? opts.suite : undefined
+
   // Build date filter for current period
   const dateFilter =
-    dateRange?.from && dateRange?.to
-      ? `AND te.started_at BETWEEN '${dateRange.from}'::timestamptz AND '${dateRange.to}'::timestamptz`
+    from && to
+      ? `AND te.started_at BETWEEN '${from}'::timestamptz AND '${to}'::timestamptz`
       : `AND te.started_at > NOW() - INTERVAL '7 days'`
+
+  // Build optional branch/suite filters
+  const branchFilter = branch ? `AND te.branch = '${branch}'` : ""
+  const suiteFilter = suite ? `AND te.suite = '${suite}'` : ""
+  const extraFilters = branchFilter + suiteFilter
 
   const result = await sql`
     WITH current_metrics AS (
@@ -1366,6 +1385,7 @@ export async function getReliabilityScore(
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
         ${sql.unsafe(dateFilter)}
+        ${sql.unsafe(extraFilters)}
     ),
     previous_metrics AS (
       SELECT
@@ -1376,6 +1396,7 @@ export async function getReliabilityScore(
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
         AND te.started_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days'
+        ${sql.unsafe(extraFilters)}
     )
     SELECT
       cm.pass_rate,
@@ -1487,19 +1508,60 @@ export async function updatePerformanceBaselines(organizationId: number): Promis
   return result.length
 }
 
+export interface PerformanceRegressionsOptions {
+  threshold?: number // Default 0.20 (20%)
+  hours?: number // Default 24
+  branch?: string
+  suite?: string
+  limit?: number // Default 20
+  sortBy?: "regression" | "duration" | "name" // Default 'regression'
+}
+
 /**
  * Get performance regressions for an organization
  * Compares recent test performance against stored baselines
  *
- * @param threshold - Minimum regression to flag (default 0.20 = 20%)
- * @param hours - Look back window for recent performance (default 24)
+ * @param options.threshold - Minimum regression to flag (default 0.20 = 20%)
+ * @param options.hours - Look back window for recent performance (default 24)
+ * @param options.branch - Filter by branch name
+ * @param options.suite - Filter by test suite
+ * @param options.limit - Max results (default 20)
+ * @param options.sortBy - Sort by 'regression', 'duration', or 'name'
  */
 export async function getPerformanceRegressions(
   organizationId: number,
-  threshold: number = 0.20,
-  hours: number = 24
+  optionsOrThreshold?: PerformanceRegressionsOptions | number,
+  hoursParam?: number
 ): Promise<PerformanceRegressionSummary> {
   const sql = getSql()
+
+  // Support both old (threshold, hours) and new (options) signatures
+  let options: PerformanceRegressionsOptions
+  if (typeof optionsOrThreshold === "number") {
+    options = { threshold: optionsOrThreshold, hours: hoursParam }
+  } else {
+    options = optionsOrThreshold || {}
+  }
+
+  const threshold = options.threshold ?? 0.20
+  const hours = options.hours ?? 24
+  const branch = options.branch
+  const suite = options.suite
+  const limit = options.limit ?? 20
+  const sortBy = options.sortBy ?? "regression"
+
+  // Build optional branch/suite filters
+  const branchFilter = branch ? `AND te.branch = '${branch}'` : ""
+  const suiteFilter = suite ? `AND te.suite = '${suite}'` : ""
+  const extraFilters = branchFilter + suiteFilter
+
+  // Build ORDER BY clause based on sortBy
+  const orderByClause =
+    sortBy === "duration"
+      ? "current_avg_ms DESC"
+      : sortBy === "name"
+        ? "test_name ASC"
+        : "regression_ratio DESC"
 
   const regressions = await sql`
     WITH recent_performance AS (
@@ -1514,6 +1576,7 @@ export async function getPerformanceRegressions(
       WHERE te.organization_id = ${organizationId}
         AND te.started_at > NOW() - INTERVAL '${hours} hours'
         AND tr.status IN ('passed', 'failed')
+        ${sql.unsafe(extraFilters)}
       GROUP BY tr.test_name, tr.test_file, tr.test_signature
     ),
     trend_calc AS (
@@ -1545,6 +1608,7 @@ export async function getPerformanceRegressions(
           WHERE te2.organization_id = ${organizationId}
             AND COALESCE(tr2.test_signature, MD5(tr2.test_file || '::' || tr2.test_name)) = rp.test_signature
             AND te2.started_at > NOW() - INTERVAL '3 days'
+            ${sql.unsafe(extraFilters)}
         ) as trend
       FROM recent_performance rp
       JOIN test_performance_baselines tpb ON
@@ -1566,8 +1630,8 @@ export async function getPerformanceRegressions(
       COALESCE(trend, 'stable') as trend
     FROM trend_calc
     WHERE regression_ratio > ${threshold}
-    ORDER BY regression_ratio DESC
-    LIMIT 20
+    ORDER BY ${sql.unsafe(orderByClause)}
+    LIMIT ${limit}
   `
 
   const regressionsArray = Array.isArray(regressions)

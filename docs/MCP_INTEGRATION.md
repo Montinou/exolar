@@ -107,6 +107,24 @@ Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 | `list_branches` | Available branches | (none) |
 | `list_suites` | Available test suites | (none) |
 
+### Performance & Reliability Tools
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `get_reliability_score` | Overall suite health score (0-100) | `from`, `to`, `branch`, `suite` |
+| `get_performance_regressions` | Tests slower than baseline | `threshold`, `hours`, `branch`, `suite`, `limit`, `sort_by` |
+
+**Reliability Score** returns:
+- `score`: 0-100 health score
+- `status`: "healthy" (80+), "warning" (60-79), "critical" (<60)
+- `breakdown`: Pass rate, flakiness, stability contributions
+- `trend`: Change from previous period
+
+**Performance Regressions** returns:
+- Tests with duration exceeding their historical baseline
+- Severity: "critical" (>50% slower) or "warning" (20-50% slower)
+- Sort options: `regression`, `duration`, `name`
+
 ## Example Prompts
 
 Once configured, you can ask Claude things like:
@@ -117,6 +135,9 @@ Once configured, you can ask Claude things like:
 - "What were the test results from the last CI run?"
 - "Get metrics for the past week"
 - "Show error distribution for failed tests"
+- "What's the health score for my test suite?"
+- "Are there any performance regressions on the main branch?"
+- "Show me tests that got slower in the last 24 hours"
 
 ## Troubleshooting
 
