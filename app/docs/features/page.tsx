@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Gauge, GitBranch, Zap, BarChart3, Building2 } from "lucide-react"
+import { ArrowRight, Gauge, GitBranch, Zap, BarChart3, Building2, GitCompare } from "lucide-react"
 import {
   Accordion,
   AccordionContent,
@@ -204,6 +204,55 @@ export default function FeaturesPage() {
                   30 days, excluding outliers. The system compares recent runs (last 24-48 hours)
                   against this baseline to detect regressions.
                 </p>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </FeatureCard>
+      </section>
+
+      {/* Compare Runs */}
+      <section id="compare-runs" className="scroll-mt-20">
+        <FeatureCard
+          icon={GitCompare}
+          title="Compare Runs"
+          description="Side-by-side comparison of two test executions to identify regressions, improvements, and changes."
+        >
+          <Accordion type="multiple" className="w-full">
+            <AccordionItem value="comparison-modes" className="border-border/50">
+              <AccordionTrigger className="text-sm hover:no-underline py-2">
+                Comparison modes
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3 pt-2 text-sm text-muted-foreground">
+                  <p><strong className="text-foreground">By Execution ID</strong> — Compare specific runs using their IDs</p>
+                  <p><strong className="text-foreground">By Branch</strong> — Compare latest executions from two branches (e.g., main vs feature-x)</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="diff-categories" className="border-b-0">
+              <AccordionTrigger className="text-sm hover:no-underline py-2">
+                Diff categories
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-2 pt-2">
+                  <div className="p-2 rounded-lg glass-panel">
+                    <p className="font-medium text-red-500">New Failures</p>
+                    <p className="text-xs text-muted-foreground">Tests that passed in baseline but failed in current</p>
+                  </div>
+                  <div className="p-2 rounded-lg glass-panel">
+                    <p className="font-medium text-green-500">Fixed</p>
+                    <p className="text-xs text-muted-foreground">Tests that failed in baseline but passed in current</p>
+                  </div>
+                  <div className="p-2 rounded-lg glass-panel">
+                    <p className="font-medium text-blue-500">New Tests</p>
+                    <p className="text-xs text-muted-foreground">Tests only present in current execution</p>
+                  </div>
+                  <div className="p-2 rounded-lg glass-panel">
+                    <p className="font-medium text-gray-500">Removed Tests</p>
+                    <p className="text-xs text-muted-foreground">Tests only present in baseline execution</p>
+                  </div>
+                </div>
               </AccordionContent>
             </AccordionItem>
           </Accordion>

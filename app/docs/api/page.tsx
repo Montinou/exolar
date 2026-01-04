@@ -85,6 +85,36 @@ const endpoints = [
   "https://your-dashboard.com/api/flaky-tests?limit=10"`,
   },
   {
+    method: "GET" as const,
+    path: "/api/compare",
+    description: "Compare two executions to identify regressions, improvements, and test changes",
+    parameters: [
+      { name: "baseline", type: "number", description: "Baseline execution ID" },
+      { name: "current", type: "number", description: "Current execution ID" },
+      { name: "baseline_branch", type: "string", description: "Use latest from this branch as baseline" },
+      { name: "current_branch", type: "string", description: "Use latest from this branch as current" },
+      { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
+      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | all" },
+    ],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/compare?baseline_branch=main&current_branch=feature-x"`,
+    responseExample: `{
+  "success": true,
+  "data": {
+    "baseline": { "id": 123, "branch": "main", ... },
+    "current": { "id": 456, "branch": "feature-x", ... },
+    "summary": {
+      "passRateDelta": -5.2,
+      "newFailures": 3,
+      "fixed": 1
+    },
+    "tests": [
+      { "testName": "Login test", "diffCategory": "new_failure", ... }
+    ]
+  }
+}`,
+  },
+  {
     method: "POST" as const,
     path: "/api/ingest",
     description: "Upload test results (used by Playwright Reporter and GitHub Action)",

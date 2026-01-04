@@ -292,6 +292,26 @@ const performanceTools = [
     ],
     example: `"Show me tests that got slower in the last 24 hours"`,
   },
+  {
+    name: "compare_executions",
+    description: "Compare two test executions side-by-side to identify regressions, improvements, and changes.",
+    category: "performance" as const,
+    parameters: [
+      { name: "baseline_id", type: "number", description: "Baseline execution ID" },
+      { name: "current_id", type: "number", description: "Current execution ID" },
+      { name: "baseline_branch", type: "string", description: "Use latest execution from this branch as baseline" },
+      { name: "current_branch", type: "string", description: "Use latest execution from this branch as current" },
+      { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
+      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | all" },
+    ],
+    responseFields: [
+      "baseline, current: Execution metadata (id, branch, commit, status)",
+      "summary: Pass rate delta, duration delta, test count changes",
+      "tests: Array of test comparisons with diff categories",
+      "Diff categories: new_failure, fixed, new_test, removed_test, unchanged",
+    ],
+    example: `"Compare the last two runs on main branch"`,
+  },
 ]
 
 // Metadata Tools
@@ -330,6 +350,9 @@ const usageExamples = [
   "What's the health score for my test suite?",
   "Are there any performance regressions on main?",
   "Generate a failure report for execution 123",
+  "Compare the last two runs on main branch",
+  "What tests broke in the feature branch compared to main?",
+  "Show me new failures between execution 123 and 456",
 ]
 
 export default function MCPDocsPage() {
