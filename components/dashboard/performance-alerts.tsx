@@ -21,6 +21,11 @@ function TrendIndicator({ trend }: { trend: string }) {
   }
 }
 
+interface PerformanceAlertsCardProps {
+  branch?: string
+  suite?: string
+}
+
 function RegressionRow({ regression }: { regression: PerformanceRegression }) {
   const isCritical = regression.severity === "critical"
 
@@ -70,13 +75,22 @@ function RegressionRow({ regression }: { regression: PerformanceRegression }) {
   )
 }
 
-export function PerformanceAlertsCard() {
+export function PerformanceAlertsCard({ branch, suite }: PerformanceAlertsCardProps) {
   const [data, setData] = useState<PerformanceRegressionSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/performance-regressions")
+    setLoading(true)
+    setError(null)
+
+    const params = new URLSearchParams()
+    if (branch) params.set("branch", branch)
+    if (suite) params.set("suite", suite)
+
+    const url = `/api/performance-regressions${params.toString() ? `?${params}` : ""}`
+
+    fetch(url)
       .then((res) => res.json())
       .then((json) => {
         if (json.error) throw new Error(json.error)
@@ -84,7 +98,7 @@ export function PerformanceAlertsCard() {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [branch, suite])
 
   if (loading) {
     return (

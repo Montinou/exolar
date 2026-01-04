@@ -1563,6 +1563,9 @@ export async function getPerformanceRegressions(
         ? "test_name ASC"
         : "regression_ratio DESC"
 
+  // Build interval clause (can't use parameterized value inside INTERVAL)
+  const hoursIntervalClause = `AND te.started_at > NOW() - INTERVAL '${hours} hours'`
+
   const regressions = await sql`
     WITH recent_performance AS (
       SELECT
@@ -1574,7 +1577,7 @@ export async function getPerformanceRegressions(
       FROM test_results tr
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
-        AND te.started_at > NOW() - INTERVAL '${hours} hours'
+        ${sql.unsafe(hoursIntervalClause)}
         AND tr.status IN ('passed', 'failed')
         ${sql.unsafe(extraFilters)}
       GROUP BY tr.test_name, tr.test_file, tr.test_signature
@@ -1711,8 +1714,8 @@ export function getQueriesForOrg(organizationId: number) {
       getTrendData(organizationId, days, dateRange),
     getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
       getFailureTrendData(organizationId, days, dateRange),
-    getReliabilityScore: (dateRange?: DateRangeFilter) =>
-      getReliabilityScore(organizationId, dateRange),
+    getReliabilityScore: (options?: ReliabilityScoreOptions | DateRangeFilter) =>
+      getReliabilityScore(organizationId, options),
 
     // Helper queries
     getBranches: () =>
@@ -1765,8 +1768,8 @@ export function getQueriesForOrg(organizationId: number) {
     // Performance regression functions
     updatePerformanceBaselines: () =>
       updatePerformanceBaselines(organizationId),
-    getPerformanceRegressions: (threshold?: number, hours?: number) =>
-      getPerformanceRegressions(organizationId, threshold, hours),
+    getPerformanceRegressions: (options?: PerformanceRegressionsOptions | number, hours?: number) =>
+      getPerformanceRegressions(organizationId, options, hours),
     getTestDurationHistory: (testSignature: string, days?: number) =>
       getTestDurationHistory(organizationId, testSignature, days),
   }

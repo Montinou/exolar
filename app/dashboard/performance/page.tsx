@@ -1,11 +1,13 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { AdminLink } from "@/components/dashboard/admin-link"
 import { SearchTests } from "@/components/dashboard/search-tests"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { Filters } from "@/components/dashboard/filters"
 import { PerformanceAlertsCard } from "@/components/dashboard/performance-alerts"
 import { SlowestTestsCard } from "@/components/dashboard/slowest-tests-card"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
@@ -15,19 +17,33 @@ import { Gauge } from "lucide-react"
 async function PerformanceContent({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
 }) {
   const context = await getSessionContext()
   if (!context) {
     redirect("/auth/signin")
   }
 
+  const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
+
+  const [branches, suites] = await Promise.all([
+    db.getBranches(),
+    db.getSuites(),
+  ])
 
   return (
     <div className="space-y-6">
+      {/* Filters */}
+      <Filters
+        branches={branches}
+        suites={suites}
+        showStatus={false}
+        basePath="/dashboard/performance"
+      />
+
       {/* Performance Alerts - Main Feature */}
-      <PerformanceAlertsCard />
+      <PerformanceAlertsCard branch={params.branch} suite={params.suite} />
 
       {/* Performance Analysis Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -102,7 +118,7 @@ function PerformanceSkeleton() {
 export default async function PerformancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

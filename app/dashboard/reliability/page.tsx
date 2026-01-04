@@ -1,7 +1,7 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
-import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
+import { getQueriesForOrg } from "@/lib/db"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -9,6 +9,7 @@ import { UserMenu } from "@/components/dashboard/user-menu"
 import { AdminLink } from "@/components/dashboard/admin-link"
 import { SearchTests } from "@/components/dashboard/search-tests"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { Filters } from "@/components/dashboard/filters"
 import { ReliabilityScoreCard } from "@/components/dashboard/reliability-score"
 import {
   Activity,
@@ -24,7 +25,7 @@ import type { ReliabilityScore } from "@/lib/types"
 async function ReliabilityContent({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
 }) {
   const context = await getSessionContext()
   if (!context) {
@@ -34,10 +35,16 @@ async function ReliabilityContent({
   const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
 
-  const dateRange: DateRangeFilter | undefined =
-    params.from || params.to ? { from: params.from, to: params.to } : undefined
-
-  const score: ReliabilityScore = await db.getReliabilityScore(dateRange)
+  const [score, branches, suites] = await Promise.all([
+    db.getReliabilityScore({
+      from: params.from,
+      to: params.to,
+      branch: params.branch,
+      suite: params.suite,
+    }),
+    db.getBranches(),
+    db.getSuites(),
+  ]) as [ReliabilityScore, string[], string[]]
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -63,10 +70,23 @@ async function ReliabilityContent({
 
   return (
     <div className="space-y-6">
+      {/* Filters */}
+      <Filters
+        branches={branches}
+        suites={suites}
+        showStatus={false}
+        basePath="/dashboard/reliability"
+      />
+
       {/* Hero Section - Score Card */}
       <div className="flex justify-center">
         <div className="w-full max-w-md">
-          <ReliabilityScoreCard />
+          <ReliabilityScoreCard
+            branch={params.branch}
+            suite={params.suite}
+            from={params.from}
+            to={params.to}
+          />
         </div>
       </div>
 
@@ -283,7 +303,7 @@ function ReliabilitySkeleton() {
 export default async function ReliabilityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

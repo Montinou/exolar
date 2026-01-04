@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { format, parseISO } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,11 +11,14 @@ import { X } from "lucide-react"
 interface FiltersProps {
   branches: string[]
   suites: string[]
+  basePath?: string
+  showStatus?: boolean
 }
 
-export function Filters({ branches, suites }: FiltersProps) {
+export function Filters({ branches, suites, basePath, showStatus = true }: FiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
 
   const currentStatus = searchParams.get("status")
   const currentBranch = searchParams.get("branch")
@@ -57,29 +60,31 @@ export function Filters({ branches, suites }: FiltersProps) {
   }
 
   const clearFilters = () => {
-    router.push("/")
+    router.push(basePath || pathname)
   }
 
-  const hasFilters = currentStatus || currentBranch || currentSuite || currentFrom || currentTo
+  const hasFilters = (showStatus && currentStatus) || currentBranch || currentSuite || currentFrom || currentTo
 
   return (
     <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
       <DateRangePicker value={dateRange} onChange={updateDateRange} className="w-full sm:w-auto" />
 
-      <Select
-        value={currentStatus || "all"}
-        onValueChange={(value) => updateFilter("status", value === "all" ? null : value)}
-      >
-        <SelectTrigger className="w-full sm:w-[150px]">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="success">Success</SelectItem>
-          <SelectItem value="failure">Failure</SelectItem>
-          <SelectItem value="running">Running</SelectItem>
-        </SelectContent>
-      </Select>
+      {showStatus && (
+        <Select
+          value={currentStatus || "all"}
+          onValueChange={(value) => updateFilter("status", value === "all" ? null : value)}
+        >
+          <SelectTrigger className="w-full sm:w-[150px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="success">Success</SelectItem>
+            <SelectItem value="failure">Failure</SelectItem>
+            <SelectItem value="running">Running</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
 
       <Select
         value={currentSuite || "all"}

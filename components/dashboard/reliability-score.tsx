@@ -10,7 +10,14 @@ import {
 import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import type { ReliabilityScore } from "@/lib/types"
 
-export function ReliabilityScoreCard() {
+interface ReliabilityScoreCardProps {
+  branch?: string
+  suite?: string
+  from?: string
+  to?: string
+}
+
+export function ReliabilityScoreCard({ branch, suite, from, to }: ReliabilityScoreCardProps) {
   const [score, setScore] = useState<ReliabilityScore | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -18,7 +25,15 @@ export function ReliabilityScoreCard() {
   useEffect(() => {
     async function fetchScore() {
       try {
-        const response = await fetch("/api/reliability-score")
+        setLoading(true)
+        const params = new URLSearchParams()
+        if (branch) params.set("branch", branch)
+        if (suite) params.set("suite", suite)
+        if (from) params.set("from", from)
+        if (to) params.set("to", to)
+
+        const url = `/api/reliability-score${params.toString() ? `?${params}` : ""}`
+        const response = await fetch(url)
         if (!response.ok) {
           throw new Error("Failed to fetch reliability score")
         }
@@ -34,7 +49,7 @@ export function ReliabilityScoreCard() {
     }
 
     fetchScore()
-  }, [])
+  }, [branch, suite, from, to])
 
   if (loading) {
     return (
