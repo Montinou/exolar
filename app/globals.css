@@ -264,6 +264,16 @@
     /* Already included in .glass-card */
   }
 
+  /* Amber variant for warning/alert cards */
+  .glass-card-amber {
+    border-color: oklch(0.78 0.18 75 / 0.3);
+    box-shadow: 0 0 30px oklch(0.78 0.18 75 / 0.15);
+  }
+
+  .glass-card-amber:hover {
+    box-shadow: 0 0 40px oklch(0.78 0.18 75 / 0.25);
+  }
+
   /* Colored stat values with glow effect */
   .stat-value-success {
     color: var(--status-success);

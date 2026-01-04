@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Package, ArrowRight } from "lucide-react"
+import { CodeBlock } from "@/components/docs/code-block"
 
 export const metadata = {
   title: "Playwright Reporter - Exolar QA",
@@ -8,7 +9,7 @@ export const metadata = {
 
 const integrationOptions = [
   {
-    title: "npm Package (Recommended)",
+    title: "npm Package",
     description: "Install our official Playwright reporter for the best experience. Includes all configuration options.",
     href: "/docs/reporter/npm",
     icon: Package,
@@ -104,7 +105,7 @@ export default function ReporterPage() {
                       {option.title}
                     </h3>
                     {option.recommended && (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-exolar-cyan/10 text-exolar-cyan border border-exolar-cyan/30">
                         Recommended
                       </span>
                     )}
@@ -121,8 +122,9 @@ export default function ReporterPage() {
       {/* Quick Example */}
       <section className="space-y-4">
         <h2 className="text-xl sm:text-2xl font-semibold">Quick Example</h2>
-        <pre className="p-4 sm:p-6 rounded-xl glass-card text-xs sm:text-sm overflow-x-auto">
-          <code>{`// playwright.config.ts
+        <CodeBlock
+          title="playwright.config.ts"
+          code={`// playwright.config.ts
 import { defineConfig } from "@playwright/test";
 import { exolar } from "@exolar-qa/playwright-reporter";
 
@@ -131,8 +133,8 @@ export default defineConfig({
     ["html"],
     [exolar, { apiKey: process.env.EXOLAR_API_KEY }]
   ],
-});`}</code>
-        </pre>
+});`}
+        />
         <p className="text-sm text-muted-foreground">
           That&apos;s it! The reporter will automatically send results to Exolar QA when running in CI.
         </p>

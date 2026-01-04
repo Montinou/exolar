@@ -204,7 +204,7 @@ export default function TroubleshootingPage() {
       </div>
 
       {/* Quick Check */}
-      <section className="p-4 sm:p-6 rounded-xl glass-card border-l-4 border-amber-500">
+      <section className="p-4 sm:p-6 rounded-xl glass-card glass-card-amber">
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
           <div>
@@ -279,7 +279,7 @@ export default function TroubleshootingPage() {
       </section>
 
       {/* Still Need Help */}
-      <section className="p-4 sm:p-6 rounded-xl glass-card border-l-4 border-primary">
+      <section className="p-4 sm:p-6 rounded-xl glass-card">
         <h2 className="font-semibold mb-2">Still need help?</h2>
         <p className="text-sm text-muted-foreground mb-4">
           If you can&apos;t find a solution here, please:

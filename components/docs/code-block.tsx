@@ -22,14 +22,14 @@ export function CodeBlock({ code, title, className }: CodeBlockProps) {
   return (
     <div className={cn("relative group", className)}>
       {title && (
-        <div className="px-3 sm:px-4 py-2 bg-muted/50 border-b border-border rounded-t-lg text-xs text-muted-foreground font-mono truncate">
+        <div className="px-3 sm:px-4 py-2 bg-muted/50 border-b border-border rounded-t-xl text-xs text-muted-foreground font-mono truncate">
           {title}
         </div>
       )}
       <pre
         className={cn(
-          "p-3 sm:p-4 bg-muted text-xs sm:text-sm overflow-x-auto",
-          title ? "rounded-b-lg" : "rounded-lg"
+          "p-3 sm:p-4 glass-card text-xs sm:text-sm overflow-x-auto",
+          title ? "rounded-b-xl rounded-t-none" : "rounded-xl"
         )}
       >
         <code>{code}</code>

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Activity, Gauge, BookOpen } from "lucide-react"
+import { LayoutDashboard, Activity, Gauge, GitCompare, BookOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
@@ -20,6 +20,11 @@ const navItems = [
     label: "Performance",
     href: "/dashboard/performance",
     icon: Gauge,
+  },
+  {
+    label: "Compare",
+    href: "/dashboard/compare",
+    icon: GitCompare,
   },
   {
     label: "Docs",

@@ -19,7 +19,7 @@ export default function QuickStartPage() {
       </div>
 
       {/* Prerequisites */}
-      <section className="p-4 sm:p-6 rounded-xl glass-card border-l-4 border-primary">
+      <section className="p-4 sm:p-6 rounded-xl glass-card">
         <h2 className="text-lg font-semibold mb-2">Prerequisites</h2>
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li className="flex items-center gap-2">

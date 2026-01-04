@@ -1,6 +1,6 @@
 "use client"
 
-import { Activity, TrendingUp, AlertTriangle, Clock, LayoutDashboard } from "lucide-react"
+import { Activity, TrendingUp, AlertTriangle, Clock, LayoutDashboard, GitCompare } from "lucide-react"
 
 // Row 1: Most valuable features (3 items)
 const topFeatures = [
@@ -27,8 +27,15 @@ const topFeatures = [
   },
 ]
 
-// Row 2: Supporting features (2 items, centered)
+// Row 2: Supporting features (3 items)
 const bottomFeatures = [
+  {
+    icon: GitCompare,
+    title: "Compare Runs",
+    description: "Side-by-side comparison of test runs. Instantly identify regressions, fixes, and new tests.",
+    iconColor: "oklch(0.65 0.18 290)",
+    bgColor: "oklch(0.65 0.18 290 / 0.15)",
+  },
   {
     icon: Clock,
     title: "History Retention",
@@ -100,8 +107,8 @@ export function FeaturesGrid() {
           ))}
         </div>
 
-        {/* Row 2: Bottom 2 features (centered under gaps of row 1) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+        {/* Row 2: Bottom 3 features */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {bottomFeatures.map((feature) => (
             <FeatureCard key={feature.title} feature={feature} />
           ))}

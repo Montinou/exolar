@@ -302,6 +302,7 @@ The dashboard exposes a MCP server for Claude Code integration at `/api/mcp`.
 | `list_suites` | Available test suites |
 | `get_reliability_score` | Suite health score (0-100) with branch/suite filters |
 | `get_performance_regressions` | Tests slower than baseline with sorting options |
+| `compare_executions` | Compare two executions (by ID or branch) to find regressions/improvements |
 
 See `docs/MCP_INTEGRATION.md` for configuration and usage.
 
@@ -310,6 +311,7 @@ See `docs/MCP_INTEGRATION.md` for configuration and usage.
 ### Implemented
 - **Reliability Score** (`/dashboard/reliability`) - Single 0-100 gauge showing test suite health
 - **Performance Regression Detection** (`/dashboard/performance`) - Automatic alerts when tests slow down
+- **Comparative Run Analysis** (`/dashboard/compare`) - Side-by-side comparison of test executions
 - Pass/Fail/Flaky rate metrics with trends
 - Stats cards (pass rate, failure rate, avg duration, critical failures)
 - Status donut chart, trend area chart, failure rate chart
@@ -329,5 +331,4 @@ See `docs/MODERN_DASHBOARD_FEATURES.md` for planned features including:
 - AI Root Cause Analysis
 - Intelligent Failure Clustering
 - Slack/Teams Notifications
-- Comparative Run Analysis
 - Auto-Quarantine Flaky Tests

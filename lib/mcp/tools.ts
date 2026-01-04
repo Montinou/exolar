@@ -409,6 +409,57 @@ Summary includes: totalRegressions, criticalCount, warningCount.`,
       },
     },
   },
+  {
+    name: "compare_executions",
+    description: `Compare two test executions to identify regressions, improvements, and changes. Side-by-side analysis of test results.
+
+Use baseline_id/current_id for specific executions, or baseline_branch/current_branch for branch comparison (uses latest execution from each).
+
+Returns:
+- baseline: Execution metadata (id, branch, commit, status, test counts)
+- current: Execution metadata
+- summary: Pass rate delta, duration delta, test count delta, status change counts
+- tests: Array of test comparisons with diff categories
+
+Diff Categories:
+- new_failure: Was passing in baseline, now failing
+- fixed: Was failing in baseline, now passing
+- new_test: Only exists in current execution
+- removed_test: Only exists in baseline execution
+- unchanged: Same status in both
+
+Use filter param to focus on specific categories (e.g., filter="new_failure" to see only regressions).`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        baseline_id: {
+          type: "number",
+          description: "Baseline execution ID (the 'before' run)",
+        },
+        current_id: {
+          type: "number",
+          description: "Current execution ID (the 'after' run)",
+        },
+        baseline_branch: {
+          type: "string",
+          description: "Use latest execution from this branch as baseline",
+        },
+        current_branch: {
+          type: "string",
+          description: "Use latest execution from this branch as current",
+        },
+        suite: {
+          type: "string",
+          description: "Filter to specific suite (applies to branch lookups)",
+        },
+        filter: {
+          type: "string",
+          enum: ["new_failure", "fixed", "new_test", "removed_test", "all"],
+          description: "Filter results by diff category (default: all)",
+        },
+      },
+    },
+  },
 ]
 
 // ============================================
@@ -881,6 +932,82 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
         return jsonResponse({
           organization: authContext.organizationSlug,
           ...summary,
+        })
+      }
+
+      case "compare_executions": {
+        const input = z
+          .object({
+            baseline_id: z.number().optional(),
+            current_id: z.number().optional(),
+            baseline_branch: z.string().optional(),
+            current_branch: z.string().optional(),
+            suite: z.string().optional(),
+            filter: z.enum(["new_failure", "fixed", "new_test", "removed_test", "all"]).optional(),
+          })
+          .parse(args)
+
+        // Resolve execution IDs
+        let baselineId = input.baseline_id
+        let currentId = input.current_id
+
+        // Resolve branch to execution ID if branch specified
+        if (input.baseline_branch && !baselineId) {
+          const baselineExec = await db.getLatestExecutionByBranch(
+            orgId,
+            input.baseline_branch,
+            input.suite
+          )
+          if (!baselineExec) {
+            return errorResponse(
+              `No execution found for branch "${input.baseline_branch}"${input.suite ? ` with suite "${input.suite}"` : ""}`
+            )
+          }
+          baselineId = baselineExec.id
+        }
+
+        if (input.current_branch && !currentId) {
+          const currentExec = await db.getLatestExecutionByBranch(
+            orgId,
+            input.current_branch,
+            input.suite
+          )
+          if (!currentExec) {
+            return errorResponse(
+              `No execution found for branch "${input.current_branch}"${input.suite ? ` with suite "${input.suite}"` : ""}`
+            )
+          }
+          currentId = currentExec.id
+        }
+
+        // Validate we have both IDs
+        if (!baselineId || !currentId) {
+          return errorResponse(
+            "Must provide either baseline_id/current_id or baseline_branch/current_branch"
+          )
+        }
+
+        // Get comparison
+        const comparison = await db.compareExecutions(orgId, baselineId, currentId)
+
+        if (!comparison) {
+          return errorResponse("One or both executions not found or access denied")
+        }
+
+        // Apply filter if specified
+        let filteredTests = comparison.tests
+        if (input.filter && input.filter !== "all") {
+          filteredTests = comparison.tests.filter((t) => t.diffCategory === input.filter)
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          baseline: comparison.baseline,
+          current: comparison.current,
+          summary: comparison.summary,
+          filter: input.filter || "all",
+          tests: filteredTests,
+          test_count: filteredTests.length,
         })
       }
 

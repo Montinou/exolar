@@ -17,7 +17,7 @@ Features were selected based on:
 |------|---------|--------|------------|--------|-----|--------|
 | 1 | Test Reliability Score | High | Low | 2-3 days | Best | **DONE** |
 | 2 | Performance Regression Detection | High | Medium | 3-5 days | Excellent | **DONE** |
-| 3 | Comparative Run Analysis | High | Medium | 3-5 days | Excellent | Pending |
+| 3 | Comparative Run Analysis | High | Medium | 3-5 days | Excellent | **DONE** |
 
 ### Phase 2: Advanced Analytics & Automation (Features 4-6)
 
@@ -163,10 +163,12 @@ HAVING ((AVG(tr.duration_ms) - tpb.baseline_duration_ms)::float /
 
 ---
 
-## Feature 3: Comparative Run Analysis
+## Feature 3: Comparative Run Analysis (DONE)
 
 ### Overview
 Side-by-side comparison of two test executions to identify regressions, improvements, and changes.
+
+> **Status**: Implemented and available at `/dashboard/compare`
 
 ### Value Proposition
 - **Debug regressions quickly** - See exactly what changed between runs
@@ -369,11 +371,14 @@ Automatically groups similar test failures using string similarity algorithms to
 - [x] Add dedicated page (`app/dashboard/performance/page.tsx`)
 - [x] Add to dashboard navigation
 
-#### 1.3 Comparative Run Analysis (Pending)
-1. Add comparison database function
-2. Create API endpoint
-3. Build comparison UI components
-4. Add comparison modal/page
+#### 1.3 Comparative Run Analysis (DONE)
+- [x] Add comparison database functions (`lib/db.ts` - `compareExecutions()`, `getLatestExecutionByBranch()`)
+- [x] Create API endpoint (`app/api/compare/route.ts`)
+- [x] Build comparison UI components (`execution-selector`, `comparison-summary-cards`, `test-diff-table`, `diff-category-badge`)
+- [x] Add dedicated comparison page (`app/dashboard/compare/page.tsx`)
+- [x] Add to dashboard navigation with "Compare" tab
+- [x] Add "Compare with..." quick action to executions
+- [x] Add `compare_executions` MCP tool
 
 ### Phase 2: Advanced Analytics & Automation
 

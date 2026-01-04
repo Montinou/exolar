@@ -1,10 +1,17 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { GitBranch, CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { GitBranch, CheckCircle2, XCircle, Loader2, Eye, GitCompare } from "lucide-react"
 import type { BranchGroup } from "@/lib/types"
 import { TestDetailModal } from "./test-detail-modal"
 
@@ -13,6 +20,7 @@ interface BranchAccordionProps {
 }
 
 export function BranchAccordion({ branchGroups }: BranchAccordionProps) {
+  const router = useRouter()
   const [selectedExecutionId, setSelectedExecutionId] = useState<number | null>(null)
 
   const getStatusIcon = (status: "success" | "failure" | "running") => {
@@ -103,22 +111,39 @@ export function BranchAccordion({ branchGroups }: BranchAccordionProps) {
                               <div className="flex items-center gap-2">
                                 <TooltipProvider>
                                   {suiteResult.results.map((result, idx) => (
-                                    <Tooltip key={idx}>
-                                      <TooltipTrigger asChild>
-                                        <button
+                                    <DropdownMenu key={idx}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <DropdownMenuTrigger asChild>
+                                            <button className="cursor-pointer hover:scale-110 transition-transform">
+                                              {getStatusIcon(result.status)}
+                                            </button>
+                                          </DropdownMenuTrigger>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p className="capitalize">{result.status}</p>
+                                          <p className="text-xs text-muted-foreground">
+                                            {formatDate(result.startedAt)}
+                                          </p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      <DropdownMenuContent align="start">
+                                        <DropdownMenuItem
                                           onClick={() => setSelectedExecutionId(result.executionId)}
-                                          className="cursor-pointer hover:scale-110 transition-transform"
                                         >
-                                          {getStatusIcon(result.status)}
-                                        </button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="capitalize">{result.status}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {formatDate(result.startedAt)}
-                                        </p>
-                                      </TooltipContent>
-                                    </Tooltip>
+                                          <Eye className="mr-2 h-4 w-4" />
+                                          View Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={() =>
+                                            router.push(`/dashboard/compare?current=${result.executionId}`)
+                                          }
+                                        >
+                                          <GitCompare className="mr-2 h-4 w-4" />
+                                          Compare with...
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                   ))}
                                 </TooltipProvider>
                               </div>

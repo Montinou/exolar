@@ -113,6 +113,7 @@ Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 |------|-------------|------------|
 | `get_reliability_score` | Overall suite health score (0-100) | `from`, `to`, `branch`, `suite` |
 | `get_performance_regressions` | Tests slower than baseline | `threshold`, `hours`, `branch`, `suite`, `limit`, `sort_by` |
+| `compare_executions` | Compare two test executions | `baseline_id`, `current_id`, `baseline_branch`, `current_branch`, `suite`, `filter` |
 
 **Reliability Score** returns:
 - `score`: 0-100 health score
@@ -124,6 +125,13 @@ Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 - Tests with duration exceeding their historical baseline
 - Severity: "critical" (>50% slower) or "warning" (20-50% slower)
 - Sort options: `regression`, `duration`, `name`
+
+**Compare Executions** returns:
+- Side-by-side comparison of two test runs
+- Summary: Pass rate delta, duration delta, test count changes
+- Diff categories: `new_failure`, `fixed`, `new_test`, `removed_test`, `unchanged`
+- Use `baseline_branch`/`current_branch` to compare latest executions from branches
+- Use `filter` to focus on specific diff categories (e.g., `filter="new_failure"` for regressions)
 
 ## Example Prompts
 
@@ -138,6 +146,9 @@ Once configured, you can ask Claude things like:
 - "What's the health score for my test suite?"
 - "Are there any performance regressions on the main branch?"
 - "Show me tests that got slower in the last 24 hours"
+- "Compare the last two runs on main branch"
+- "What tests broke in the feature branch compared to main?"
+- "Show me new failures between execution 123 and 456"
 
 ## Troubleshooting
 
