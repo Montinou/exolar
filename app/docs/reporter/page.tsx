@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Package, FileCode, Settings, ArrowRight } from "lucide-react"
+import { Package, ArrowRight } from "lucide-react"
 
 export const metadata = {
   title: "Playwright Reporter - Exolar QA",
@@ -9,24 +9,10 @@ export const metadata = {
 const integrationOptions = [
   {
     title: "npm Package (Recommended)",
-    description: "Install our official Playwright reporter for the best experience",
+    description: "Install our official Playwright reporter for the best experience. Includes all configuration options.",
     href: "/docs/reporter/npm",
     icon: Package,
     recommended: true,
-  },
-  {
-    title: "Manual Integration",
-    description: "Copy the reporter code directly into your project",
-    href: "/docs/reporter/manual",
-    icon: FileCode,
-    recommended: false,
-  },
-  {
-    title: "Configuration Reference",
-    description: "All available options for the reporter",
-    href: "/docs/reporter/configuration",
-    icon: Settings,
-    recommended: false,
   },
 ]
 

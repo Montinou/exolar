@@ -431,3 +431,74 @@ export interface DurationHistoryPoint {
   avgDuration: number
   runCount: number
 }
+
+// ============================================
+// Comparative Run Analysis Types
+// ============================================
+
+/**
+ * Test diff category indicating what changed between baseline and current
+ */
+export type TestDiffCategory = 'new_failure' | 'fixed' | 'new_test' | 'removed_test' | 'unchanged';
+
+/**
+ * Individual test comparison item showing both baseline and current states
+ */
+export interface TestComparisonItem {
+  testSignature: string
+  testName: string
+  testFile: string
+  baselineStatus: 'passed' | 'failed' | 'skipped' | null
+  currentStatus: 'passed' | 'failed' | 'skipped' | null
+  baselineDurationMs: number | null
+  currentDurationMs: number | null
+  durationDeltaMs: number | null
+  durationDeltaPercent: number | null
+  diffCategory: TestDiffCategory
+}
+
+/**
+ * Summary statistics comparing two executions
+ */
+export interface ComparisonSummary {
+  baselinePassRate: number
+  currentPassRate: number
+  passRateDelta: number
+  baselineTotalTests: number
+  currentTotalTests: number
+  testCountDelta: number
+  baselineAvgDurationMs: number
+  currentAvgDurationMs: number
+  durationDeltaMs: number
+  durationDeltaPercent: number
+  newFailures: number
+  fixed: number
+  newTests: number
+  removedTests: number
+  unchanged: number
+}
+
+/**
+ * Execution info for comparison display
+ */
+export interface ComparisonExecutionInfo {
+  id: number
+  branch: string
+  commitSha: string
+  suite: string | null
+  status: string
+  startedAt: string
+  totalTests: number
+  passed: number
+  failed: number
+}
+
+/**
+ * Complete comparison result between two executions
+ */
+export interface ComparisonResult {
+  baseline: ComparisonExecutionInfo
+  current: ComparisonExecutionInfo
+  summary: ComparisonSummary
+  tests: TestComparisonItem[]
+}

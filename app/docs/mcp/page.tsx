@@ -3,43 +3,335 @@
 import { Check } from "lucide-react"
 import { CodeBlock } from "@/components/docs/code-block"
 import { TableOfContents, TOCItem } from "@/components/docs/table-of-contents"
+import { ToolCard } from "@/components/docs/tool-card"
 
 const tocItems: TOCItem[] = [
   { id: "installation", text: "Installation" },
   { id: "cli-commands", text: "CLI Commands" },
-  { id: "available-tools", text: "Available Tools" },
-  { id: "usage-examples", text: "Usage Examples" },
+  { id: "core-tools", text: "Core Tools" },
+  { id: "analysis-tools", text: "Analysis Tools" },
+  { id: "flakiness-tools", text: "Flakiness Tools" },
+  { id: "aggregation-tools", text: "Aggregation Tools" },
+  { id: "performance-tools", text: "Performance Tools" },
+  { id: "metadata-tools", text: "Metadata Tools" },
   { id: "security", text: "Security" },
   { id: "troubleshooting", text: "Troubleshooting" },
 ]
 
+// Core Tools
 const coreTools = [
-  { name: "get_executions", desc: "List test executions with filters (status, branch, suite, date range)" },
-  { name: "get_execution_details", desc: "Get execution details including all test results and artifacts" },
-  { name: "search_tests", desc: "Search tests by name/file with aggregated statistics" },
-  { name: "get_test_history", desc: "Get execution history for a specific test over time" },
+  {
+    name: "get_executions",
+    description: "List test executions with optional filters. Returns workflow runs with pass/fail counts, duration, and metadata.",
+    category: "core" as const,
+    parameters: [
+      { name: "limit", type: "number", default: "20", description: "Max results (1-100)" },
+      { name: "status", type: "string", description: "Filter: success | failure | running" },
+      { name: "branch", type: "string", description: "Filter by branch name" },
+      { name: "suite", type: "string", description: "Filter by test suite" },
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
+    ],
+    responseFields: [
+      "id: number - Execution ID",
+      "suite: string - Test suite name",
+      "branch: string - Git branch",
+      "commit_sha: string - Git commit",
+      "status: success | failure | running",
+      "passed_count, failed_count, skipped_count: number",
+      "duration_ms: number",
+      "started_at, completed_at: ISO datetime",
+    ],
+    example: `"Show me the last 10 failed executions on main"`,
+  },
+  {
+    name: "get_execution_details",
+    description: "Get detailed info about a specific test execution including all test results and artifacts.",
+    category: "core" as const,
+    parameters: [
+      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
+      { name: "status", type: "string", default: "all", description: "Filter: passed | failed | skipped | all" },
+      { name: "include_artifacts", type: "boolean", default: "true", description: "Include artifact links" },
+    ],
+    responseFields: [
+      "test_name: string - Test title",
+      "test_file: string - Spec file path",
+      "status: passed | failed | skipped",
+      "error_message: string | null",
+      "duration_ms: number",
+      "retry_count: number",
+      "artifacts: array | null",
+    ],
+  },
+  {
+    name: "search_tests",
+    description: "Search for tests by name or file path. Returns aggregated statistics including run count and pass rate.",
+    category: "core" as const,
+    parameters: [
+      { name: "query", type: "string", required: true, description: "Search term (min 2 chars)" },
+      { name: "limit", type: "number", default: "20", description: "Max results" },
+    ],
+    responseFields: [
+      "test_signature: string - Unique test identifier",
+      "test_name: string - Test title",
+      "test_file: string - Spec file path",
+      "run_count: number - Total executions",
+      "pass_rate: number - Success % (0-100)",
+      "last_run: ISO datetime",
+      "last_status: passed | failed | skipped",
+    ],
+    example: `"Search for tests related to login"`,
+  },
+  {
+    name: "get_test_history",
+    description: "Get execution history for a specific test across all runs. Useful for tracking test stability over time.",
+    category: "core" as const,
+    parameters: [
+      { name: "test_signature", type: "string", required: true, description: "Test signature (MD5 hash of file::name)" },
+      { name: "limit", type: "number", default: "20", description: "Max results" },
+    ],
+    responseFields: [
+      "execution_id: number - Parent execution ID",
+      "status: passed | failed | skipped",
+      "error_message: string | null",
+      "duration_ms: number",
+      "retry_count: number",
+      "run_at: ISO datetime",
+      "branch: string",
+    ],
+    example: `"Show me the history for the checkout test"`,
+  },
 ]
 
+// Analysis Tools
 const analysisTools = [
-  { name: "get_failed_tests", desc: "Get failed tests with AI-enriched context and error types" },
-  { name: "get_dashboard_metrics", desc: "Overall metrics: pass rate, failure counts, avg duration" },
-  { name: "get_trends", desc: "Time-series pass/fail data over configurable days" },
-  { name: "get_error_distribution", desc: "Breakdown of error types from failures" },
+  {
+    name: "get_failed_tests",
+    description: "Get failed tests with optional AI-enriched context. Works without AI context by default.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "execution_id", type: "number", description: "Filter to specific execution" },
+      { name: "error_type", type: "string", description: "Filter by error type (e.g., TimeoutError)" },
+      { name: "test_file", type: "string", description: "Filter by file path (partial match)" },
+      { name: "limit", type: "number", default: "20", description: "Max results" },
+      { name: "since", type: "string", description: "Only failures since date (ISO 8601)" },
+    ],
+    responseFields: [
+      "test_name, test_file: Test identification",
+      "error_message, stack_trace: Error details",
+      "duration_ms, retry_count: Execution info",
+      "ai_context: AI analysis (if available)",
+    ],
+    example: `"Show me recent test failures"`,
+  },
+  {
+    name: "get_dashboard_metrics",
+    description: "Get overall dashboard metrics: total executions, pass rate, failure rate, avg duration.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
+    ],
+    responseFields: [
+      "total_executions: number",
+      "total_tests: number",
+      "pass_rate: number (0-100)",
+      "failure_rate: number",
+      "avg_duration_ms: number",
+      "executions_per_day: number",
+      "most_common_failure: string | null",
+    ],
+    example: `"Get dashboard metrics for the last 7 days"`,
+  },
+  {
+    name: "get_trends",
+    description: "Get time-series trend data for pass/fail rates. Useful for charts and tracking health over time.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "days", type: "number", default: "7", description: "Days to look back (1-90)" },
+    ],
+    responseFields: [
+      "date: ISO date (YYYY-MM-DD)",
+      "executions: number - Runs on this day",
+      "passed: number - Passed tests",
+      "failed: number - Failed tests",
+      "pass_rate: number (0-100)",
+    ],
+  },
+  {
+    name: "get_error_distribution",
+    description: "Get breakdown of error types from failed tests. Shows which error types are most common.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "since", type: "string", description: "Only count errors since date (ISO 8601)" },
+    ],
+    responseFields: [
+      "error_type: string - Error category",
+      "count: number - Occurrences",
+      "percentage: number (0-100)",
+      "example_message: string - Sample error",
+    ],
+    example: `"Show me the error distribution from this week"`,
+  },
 ]
 
+// Flakiness Tools
 const flakinessTools = [
-  { name: "get_flaky_tests", desc: "Flaky tests sorted by flakiness rate" },
-  { name: "get_flakiness_summary", desc: "Overall flakiness metrics" },
+  {
+    name: "get_flaky_tests",
+    description: "Get list of flaky tests sorted by flakiness rate. A test is flaky if it passes after retries.",
+    category: "flakiness" as const,
+    parameters: [
+      { name: "limit", type: "number", default: "10", description: "Max results" },
+      { name: "min_runs", type: "number", default: "5", description: "Minimum runs to be considered" },
+    ],
+    responseFields: [
+      "test_signature: string - Unique identifier",
+      "test_name: string - Test title",
+      "test_file: string - Spec file path",
+      "flakiness_rate: number (0-100)",
+      "total_runs: number",
+      "flaky_runs: number",
+      "last_flaky: ISO datetime",
+    ],
+    example: `"What are our flakiest tests?"`,
+  },
+  {
+    name: "get_flakiness_summary",
+    description: "Get overall flakiness summary: total flaky tests, average rate, and worst offenders.",
+    category: "flakiness" as const,
+    parameters: [],
+    responseFields: [
+      "total_flaky_tests: number",
+      "average_flakiness_rate: number (0-100)",
+      "total_flaky_runs: number",
+      "worst_offenders: array - Top 5 flakiest",
+    ],
+  },
 ]
 
-const metadataTools = [
-  { name: "list_branches", desc: "Branches with test runs in last 30 days" },
-  { name: "list_suites", desc: "Test suites with recent runs" },
+// Aggregation Tools
+const aggregationTools = [
+  {
+    name: "get_execution_summary",
+    description: "Get aggregated summary of an execution without the full test list. Use for quick analysis.",
+    category: "core" as const,
+    parameters: [
+      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
+    ],
+    responseFields: [
+      "execution: Metadata (branch, commit, status, duration)",
+      "summary: Counts (total, passed, failed, skipped, pass_rate)",
+      "error_distribution: Grouped error types",
+      "files_affected: Files with failure/pass counts",
+    ],
+  },
+  {
+    name: "get_execution_failures",
+    description: "Get only failed tests from an execution with error grouping. Much smaller response than get_execution_details.",
+    category: "core" as const,
+    parameters: [
+      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
+      { name: "group_by", type: "string", default: "file", description: "Group: file | error_type | none" },
+      { name: "include_retries", type: "boolean", default: "false", description: "Include retry attempts" },
+      { name: "include_stack_traces", type: "boolean", default: "false", description: "Include full stack traces" },
+    ],
+    responseFields: [
+      "test_name: Test title",
+      "test_file: Spec file path",
+      "error_message: Error description",
+      "duration_ms: Test duration",
+    ],
+  },
+  {
+    name: "generate_failure_report",
+    description: "Generate a pre-formatted markdown report for an execution. Ready for documentation or sharing.",
+    category: "core" as const,
+    parameters: [
+      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
+      { name: "include_passed", type: "boolean", default: "false", description: "Include passed tests" },
+      { name: "include_recommendations", type: "boolean", default: "true", description: "Include AI-suggested actions" },
+    ],
+    responseFields: [
+      "Markdown string with:",
+      "- Execution metadata and summary",
+      "- Failures grouped by file",
+      "- Error distribution analysis",
+      "- Recommended actions",
+    ],
+  },
 ]
 
+// Performance Tools
 const performanceTools = [
-  { name: "get_reliability_score", desc: "Suite health score (0-100) with branch/suite filters" },
-  { name: "get_performance_regressions", desc: "Tests slower than baseline with severity and sorting" },
+  {
+    name: "get_reliability_score",
+    description: "Get overall test suite health score (0-100). Quick way to assess suite stability.",
+    category: "performance" as const,
+    parameters: [
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
+      { name: "branch", type: "string", description: "Filter by branch" },
+      { name: "suite", type: "string", description: "Filter by suite" },
+    ],
+    responseFields: [
+      "score: number (0-100) - Health score",
+      "status: healthy (80+) | warning (60-79) | critical (<60)",
+      "breakdown: Pass rate, flakiness, stability contributions",
+      "rawMetrics: Actual percentages",
+      "trend: Change from previous period",
+    ],
+    example: `"What's the health score for my test suite?"`,
+  },
+  {
+    name: "get_performance_regressions",
+    description: "Get tests running slower than their historical baseline. Detects performance regressions automatically.",
+    category: "performance" as const,
+    parameters: [
+      { name: "threshold", type: "number", default: "0.20", description: "Min regression % (20%)" },
+      { name: "hours", type: "number", default: "24", description: "Look back period in hours" },
+      { name: "branch", type: "string", description: "Filter by branch" },
+      { name: "suite", type: "string", description: "Filter by suite" },
+      { name: "limit", type: "number", default: "20", description: "Max results" },
+      { name: "sort_by", type: "string", default: "regression", description: "Sort: regression | duration | name" },
+    ],
+    responseFields: [
+      "testName, testFile: Test identification",
+      "testSignature: Unique identifier",
+      "currentAvgMs: Current average duration",
+      "baselineDurationMs: Historical baseline",
+      "regressionPercent: How much slower (%)",
+      "severity: critical (>50%) | warning (20-50%)",
+      "trend: increasing | stable | decreasing",
+    ],
+    example: `"Show me tests that got slower in the last 24 hours"`,
+  },
+]
+
+// Metadata Tools
+const metadataTools = [
+  {
+    name: "list_branches",
+    description: "Get list of branches with test runs in the last 30 days.",
+    category: "metadata" as const,
+    parameters: [],
+    responseFields: [
+      "branch: string - Branch name",
+      "last_run: ISO datetime",
+      "execution_count: number",
+    ],
+  },
+  {
+    name: "list_suites",
+    description: "Get list of test suites with runs in the last 30 days.",
+    category: "metadata" as const,
+    parameters: [],
+    responseFields: [
+      "suite: string - Suite name",
+      "last_run: ISO datetime",
+      "execution_count: number",
+    ],
+  },
 ]
 
 const usageExamples = [
@@ -51,31 +343,12 @@ const usageExamples = [
   "What's the test history for the checkout test?",
   "What's the health score for my test suite?",
   "Are there any performance regressions on main?",
-  "Show me tests that got slower in the last 24 hours",
+  "Generate a failure report for execution 123",
 ]
-
-function ToolList({ tools }: { tools: { name: string; desc: string }[] }) {
-  return (
-    <div className="grid gap-2 sm:gap-3">
-      {tools.map((tool) => (
-        <div
-          key={tool.name}
-          className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 p-3 rounded-lg glass-panel"
-        >
-          <code className="text-sm font-mono bg-muted/50 px-2 py-0.5 rounded text-primary w-fit">
-            {tool.name}
-          </code>
-          <span className="text-sm text-muted-foreground">{tool.desc}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 export default function MCPDocsPage() {
   return (
     <div className="space-y-8 sm:space-y-12">
-      {/* Mobile TOC */}
       <TableOfContents items={tocItems} />
 
       {/* Hero */}
@@ -119,7 +392,7 @@ export default function MCPDocsPage() {
         </div>
       </section>
 
-      {/* Available Commands */}
+      {/* CLI Commands */}
       <section id="cli-commands" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">CLI Commands</h2>
         <CodeBlock
@@ -140,43 +413,86 @@ npx @exolar-qa/mcp-server --login --url https://your-dashboard.com`}
         />
       </section>
 
-      {/* Available Tools */}
-      <section id="available-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Available Tools</h2>
+      {/* Core Tools */}
+      <section id="core-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Core Tools</h2>
         <p className="text-muted-foreground">
-          Once connected, Claude Code can use these tools to query your test data:
+          Essential tools for retrieving test execution data.
         </p>
+        <div className="grid gap-4">
+          {coreTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
+        </div>
+      </section>
 
-        <div className="space-y-6 sm:space-y-8">
-          <div>
-            <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Core Data Retrieval</h3>
-            <ToolList tools={coreTools} />
-          </div>
+      {/* Analysis Tools */}
+      <section id="analysis-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Analysis Tools</h2>
+        <p className="text-muted-foreground">
+          Tools for analyzing test results, failures, and trends.
+        </p>
+        <div className="grid gap-4">
+          {analysisTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
+        </div>
+      </section>
 
-          <div>
-            <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Analysis Tools</h3>
-            <ToolList tools={analysisTools} />
-          </div>
+      {/* Flakiness Tools */}
+      <section id="flakiness-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Flakiness Tools</h2>
+        <p className="text-muted-foreground">
+          Tools for detecting and analyzing flaky tests.
+        </p>
+        <div className="grid gap-4">
+          {flakinessTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
+        </div>
+      </section>
 
-          <div>
-            <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Flakiness Tools</h3>
-            <ToolList tools={flakinessTools} />
-          </div>
+      {/* Aggregation Tools */}
+      <section id="aggregation-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Aggregation Tools</h2>
+        <p className="text-muted-foreground">
+          Lighter, faster alternatives for quick analysis without full test lists.
+        </p>
+        <div className="grid gap-4">
+          {aggregationTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
+        </div>
+      </section>
 
-          <div>
-            <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Metadata Tools</h3>
-            <ToolList tools={metadataTools} />
-          </div>
+      {/* Performance Tools */}
+      <section id="performance-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Performance & Reliability</h2>
+        <p className="text-muted-foreground">
+          Tools for monitoring test suite health and detecting performance regressions.
+        </p>
+        <div className="grid gap-4">
+          {performanceTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
+        </div>
+      </section>
 
-          <div>
-            <h3 className="font-semibold mb-3 sm:mb-4 text-base sm:text-lg">Performance & Reliability</h3>
-            <ToolList tools={performanceTools} />
-          </div>
+      {/* Metadata Tools */}
+      <section id="metadata-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Metadata Tools</h2>
+        <p className="text-muted-foreground">
+          Tools for listing available branches and suites.
+        </p>
+        <div className="grid gap-4">
+          {metadataTools.map((tool) => (
+            <ToolCard key={tool.name} {...tool} />
+          ))}
         </div>
       </section>
 
       {/* Usage Examples */}
-      <section id="usage-examples" className="space-y-4 sm:space-y-6 scroll-mt-20">
+      <section className="space-y-4 sm:space-y-6">
         <h2 className="text-xl sm:text-2xl font-semibold">Usage Examples</h2>
         <p className="text-muted-foreground">
           After connecting, you can ask Claude things like:
