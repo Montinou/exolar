@@ -261,7 +261,7 @@ var ExolarReporter = class {
     if (!this.enabled) return;
     if (this.options.onlyOnFailure && this.failed === 0) {
       console.log(
-        "[Aestra] All tests passed, skipping upload (onlyOnFailure=true)"
+        "[Exolar] All tests passed, skipping upload (onlyOnFailure=true)"
       );
       return;
     }

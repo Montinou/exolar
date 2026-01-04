@@ -49,7 +49,7 @@ function getMimeType(type: string, filename: string): string {
  *
  * Receives test execution data from Playwright custom reporter.
  * Supports two authentication methods:
- *   1. Organization API key (aestra_...) - data goes to the org owning the key
+ *   1. Organization API key (exolar_...) - data goes to the org owning the key
  *   2. Legacy DASHBOARD_API_KEY env var - data goes to LEGACY_ORG_ID
  *
  * Request body:

@@ -13,10 +13,10 @@ Social sharing preview.
 
 ```
 A breathtaking, cinematic 3D composition for a social media preview card.
-Dominating the center is the Aestra Symbol, rendered as a massive, monolithic glass structure floating in deep space.
+Dominating the center is the Exolar Symbol, rendered as a massive, monolithic glass structure floating in deep space.
 The glass refracts the light of a nearby blue giant star (off-screen left, casting Quasar Cyan #00E5FF light) and a distant nebula (off-screen right, casting Nebula Gold #FFB700 light).
 The central white core of the symbol is a blindingly bright vertical beam of pure energy, piercing the darkness.
-Below the floating monolith, the text "Aestra" floats in 3D metallic white letters, reflecting the environment.
+Below the floating monolith, the text "Exolar" floats in 3D metallic white letters, reflecting the environment.
 Below that, smaller and subtler: "The Intelligent Horizon".
 The background is a rich, detailed starfield with faint violet #8B5CF6 nebular clouds in the deep distance.
 The composition uses a shallow depth of field, blurring the background stars slightly to make the logo pop.

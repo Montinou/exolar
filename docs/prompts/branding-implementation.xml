@@ -66,7 +66,7 @@
         Replace all instances of "E2E Test Dashboard" with "Exolar QA"
       </step>
       <step priority="high">
-        Replace title/header instances of "Aestra" with "Exolar" (where applicable)
+        Replace title/header instances of old branding with "Exolar" (where applicable)
       </step>
       <step priority="medium">
         Update meta tags in app/layout.tsx:

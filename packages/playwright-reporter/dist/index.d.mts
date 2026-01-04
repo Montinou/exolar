@@ -213,10 +213,10 @@ declare class ExolarReporter implements Reporter {
  *
  * @example
  * ```typescript
- * import { aestra } from "@aestra/playwright-reporter";
+ * import { exolar } from "@exolar-qa/playwright-reporter";
  *
  * export default defineConfig({
- *   reporter: [["html"], [aestra, { apiKey: process.env.AESTRA_API_KEY }]],
+ *   reporter: [["html"], [exolar, { apiKey: process.env.EXOLAR_API_KEY }]],
  * });
  * ```
  */

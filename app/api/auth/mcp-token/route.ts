@@ -34,7 +34,7 @@ export async function POST() {
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime(expiresAt)
-      .setIssuer("e2e-test-dashboard")
+      .setIssuer("exolar-qa")
       .setAudience("mcp-client")
       .sign(secret)
 

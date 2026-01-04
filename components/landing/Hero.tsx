@@ -90,7 +90,7 @@ export function Hero() {
               <div className="flex items-center gap-3">
                 <div
                   className="w-3 h-3 rounded-full"
-                  style={{ background: "var(--aestra-cyan)" }}
+                  style={{ background: "var(--exolar-cyan)" }}
                 />
                 <span className="font-mono text-sm text-muted-foreground">playwright-trace.json</span>
               </div>
@@ -116,7 +116,7 @@ export function Hero() {
                 <div
                   className="w-24 h-1 rounded-full animate-pulse"
                   style={{
-                    background: "linear-gradient(90deg, var(--aestra-cyan), var(--safety-amber))",
+                    background: "linear-gradient(90deg, var(--exolar-cyan), var(--safety-amber))",
                     boxShadow: "0 0 20px oklch(0.6 0.2 260 / 0.5)",
                   }}
                 />
@@ -143,7 +143,7 @@ export function Hero() {
                   <span style={{ color: "var(--safety-amber)" }}>&gt;</span> Analyzing failures...
                 </div>
                 <div>
-                  <span style={{ color: "var(--aestra-cyan)" }}>i</span> Found flaky test pattern
+                  <span style={{ color: "var(--exolar-cyan)" }}>i</span> Found flaky test pattern
                 </div>
                 <div>
                   <span style={{ color: "oklch(0.65 0.15 140)" }}>+</span> Suggested fix: add wait

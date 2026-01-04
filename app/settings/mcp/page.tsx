@@ -19,8 +19,8 @@ export default function MCPSettingsPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
 
-  const installCommand = "npx e2e-test-dashboard-mcp --login"
-  const addCommand = "claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp"
+  const installCommand = "npx @exolar-qa/mcp-server --login"
+  const addCommand = "claude mcp add --transport stdio exolar-qa -- npx -y @exolar-qa/mcp-server"
 
   async function copyInstallCommand() {
     await navigator.clipboard.writeText(installCommand)
@@ -78,7 +78,7 @@ export default function MCPSettingsPage() {
 
         <div className="flex items-center gap-3 mb-2">
           <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-sm">
-            <Image src="/branding/logo-icon.jpeg" alt="Aestra" fill className="object-cover" />
+            <Image src="/branding/logo-icon.png" alt="Exolar" fill className="object-cover" />
           </div>
           <h1 className="text-2xl font-bold">MCP Integration</h1>
         </div>
@@ -222,19 +222,19 @@ export default function MCPSettingsPage() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg glass-panel">
               <div>
-                <code className="text-sm font-mono">npx e2e-test-dashboard-mcp --status</code>
+                <code className="text-sm font-mono">npx @exolar-qa/mcp-server --status</code>
                 <p className="text-xs text-muted-foreground mt-1">Check authentication status</p>
               </div>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg glass-panel">
               <div>
-                <code className="text-sm font-mono">npx e2e-test-dashboard-mcp --logout</code>
+                <code className="text-sm font-mono">npx @exolar-qa/mcp-server --logout</code>
                 <p className="text-xs text-muted-foreground mt-1">Clear stored credentials</p>
               </div>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg glass-panel">
               <div>
-                <code className="text-sm font-mono">npx e2e-test-dashboard-mcp --help</code>
+                <code className="text-sm font-mono">npx @exolar-qa/mcp-server --help</code>
                 <p className="text-xs text-muted-foreground mt-1">Show all available options</p>
               </div>
             </div>

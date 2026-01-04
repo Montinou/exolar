@@ -1,4 +1,4 @@
-# Aestra Symbol
+# Exolar Symbol
 
 ## Purpose
 The core brand mark. App icon, favicon source.
@@ -17,7 +17,7 @@ Central element: A perfect, glowing white #FFFFFF vertical slash or "shimmer" th
 Surrounding this core: Two converging curved planes of semi-transparent glass. The left plane is a deep Quasar Cyan #00E5FF, and the right plane is a warm Nebula Gold #FFB700. They do not touch but seem to orbit the central white light, creating a "lens" effect.
 The glass textures should imply specialized optics—subtle caustics, internal reflections, but kept very clean and vector-like.
 Lighting is dramatic, coming from the central white core, casting subtle rim lights on the cyan and gold curves.
-The overall shape is roughly hexagonal or circular but open-ended, suggesting an "A" for Aestra without being a literal letter.
+The overall shape is roughly hexagonal or circular but open-ended, suggesting an "E" for Exolar without being a literal letter.
 No text. No extra particles. Just the pure interaction of light and glass in the void.
 High fidelity, 8k resolution, suitable for an app icon.
 ```

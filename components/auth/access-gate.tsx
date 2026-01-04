@@ -122,16 +122,16 @@ function LoginPrompt() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 relative flex items-center justify-center">
-            <Image 
-              src="/branding/logo-icon.jpeg" 
-              alt="Logo" 
+            <Image
+              src="/branding/logo-icon.png"
+              alt="Exolar Logo" 
               fill 
               className="object-contain rounded-full"
             />
           </div>
           <CardTitle className="text-2xl">Welcome</CardTitle>
           <CardDescription>
-            Sign in to access the E2E Test Dashboard
+            Sign in to access Exolar QA
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

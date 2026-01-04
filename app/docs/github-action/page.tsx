@@ -39,19 +39,19 @@ jobs:
       - name: Run Playwright tests
         run: npx playwright test
 
-      - name: Upload to Aestra
+      - name: Upload to Exolar
         if: always()
         uses: Montinou/e2e-test-dashboard-action@v1
         with:
-          api-key: \${{ secrets.AESTRA_API_KEY }}
+          api-key: \${{ secrets.EXOLAR_API_KEY }}
           results-path: ./test-results`
 
-const fullExample = `- name: Upload to Aestra
+const fullExample = `- name: Upload to Exolar
   if: always()
   uses: Montinou/e2e-test-dashboard-action@v1
   with:
     # Required
-    api-key: \${{ secrets.AESTRA_API_KEY }}
+    api-key: \${{ secrets.EXOLAR_API_KEY }}
 
     # Optional - customize paths
     results-path: ./test-results
@@ -134,7 +134,7 @@ export default function GitHubActionDocsPage() {
       <div className="space-y-4">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">GitHub Action</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-          Automatically upload your Playwright test results to Aestra
+          Automatically upload your Playwright test results to Exolar
           from GitHub Actions. Track test history, detect flaky tests, and analyze failures.
         </p>
       </div>
@@ -151,7 +151,7 @@ export default function GitHubActionDocsPage() {
             </h3>
             <p className="text-sm text-muted-foreground">
               Go to <Link href="/settings/api-keys" className="text-primary hover:underline">Settings &rarr; API Keys</Link> in the dashboard and create a new API key.
-              Copy the key (it starts with <code className="px-1 py-0.5 rounded glass-panel">aestra_</code>) - you&apos;ll need it for the next step.
+              Copy the key (it starts with <code className="px-1 py-0.5 rounded glass-panel">exolar_</code>) - you&apos;ll need it for the next step.
             </p>
           </div>
 
@@ -162,7 +162,7 @@ export default function GitHubActionDocsPage() {
             </h3>
             <p className="text-sm text-muted-foreground">
               In your GitHub repository, go to <strong>Settings &rarr; Secrets and variables &rarr; Actions</strong>.
-              Create a new secret named <code className="px-1 py-0.5 rounded glass-panel">AESTRA_API_KEY</code> with your API key.
+              Create a new secret named <code className="px-1 py-0.5 rounded glass-panel">EXOLAR_API_KEY</code> with your API key.
             </p>
           </div>
 

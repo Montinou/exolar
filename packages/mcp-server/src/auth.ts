@@ -9,7 +9,7 @@ import * as url from "url"
 import { exec } from "child_process"
 import { saveConfig, type MCPConfig } from "./config.js"
 
-const DEFAULT_DASHBOARD_URL = process.env.E2E_DASHBOARD_URL || "https://e2e-test-dashboard.vercel.app"
+const DEFAULT_DASHBOARD_URL = process.env.EXOLAR_DASHBOARD_URL || "https://exolar-qa.vercel.app"
 
 interface AuthResult {
   success: boolean

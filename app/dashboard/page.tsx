@@ -164,7 +164,7 @@ export default async function DashboardPage({
             <div className="space-y-1 sm:space-y-2">
               <div className="flex items-center gap-2">
                 <BrandLogo variant="icon" width={32} height={32} />
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">Aestra</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">Exolar</h1>
               </div>
               <p className="text-sm sm:text-base text-muted-foreground text-pretty">Test Results, Illuminated by Intelligence</p>
             </div>

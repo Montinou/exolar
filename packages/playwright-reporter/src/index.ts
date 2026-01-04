@@ -209,7 +209,7 @@ class ExolarReporter implements Reporter {
     // Skip if onlyOnFailure is true and no failures
     if (this.options.onlyOnFailure && this.failed === 0) {
       console.log(
-        "[Aestra] All tests passed, skipping upload (onlyOnFailure=true)"
+        "[Exolar] All tests passed, skipping upload (onlyOnFailure=true)"
       )
       return
     }
@@ -419,10 +419,10 @@ class ExolarReporter implements Reporter {
  *
  * @example
  * ```typescript
- * import { aestra } from "@aestra/playwright-reporter";
+ * import { exolar } from "@exolar-qa/playwright-reporter";
  *
  * export default defineConfig({
- *   reporter: [["html"], [aestra, { apiKey: process.env.AESTRA_API_KEY }]],
+ *   reporter: [["html"], [exolar, { apiKey: process.env.EXOLAR_API_KEY }]],
  * });
  * ```
  */

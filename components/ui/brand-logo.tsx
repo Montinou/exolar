@@ -22,8 +22,8 @@ export function BrandLogo({
   return (
     <div className={cn("relative inline-block", className)}>
       <Image
-        src={variant === "icon" ? "/branding/logo-icon.jpeg" : "/branding/logo-full.jpeg"}
-        alt="Aestra Logo"
+        src={variant === "icon" ? "/branding/logo-icon.png" : "/branding/logo-full.png"}
+        alt="Exolar Logo"
         width={w}
         height={h}
         className={cn(

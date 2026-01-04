@@ -69,7 +69,7 @@ async function validateMCPGeneratedToken(token: string): Promise<MCPAuthContext 
     const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
 
     const { payload } = await jose.jwtVerify(token, secret, {
-      issuer: "e2e-test-dashboard",
+      issuer: "exolar-qa",
       audience: "mcp-client",
     })
 

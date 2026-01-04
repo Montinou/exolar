@@ -38,7 +38,7 @@
 The following packages need to be scoped/renamed:
 
 *   **Reporter Package**:
-    *   Old: `@aestra/playwright-reporter` (or `@e2e/reporter`)
+    *   Old: `@exolar/playwright-reporter` (or `@e2e/reporter`)
     *   **New**: `@exolar/playwright-reporter`
     *   *Action*: Update `packages/playwright-reporter/package.json`.
 
@@ -50,7 +50,7 @@ The following packages need to be scoped/renamed:
 ### Phase 3: Codebase Refactoring
 *   **Global Find/Replace**:
     *   `"E2E Test Dashboard"` -> `"Exolar QA"`
-    *   `"Aestra"` -> `"Exolar"` (where applicable in titles/headers).
+    *   Old branding -> `"Exolar"` (where applicable in titles/headers).
 *   **UI Components**:
     *   Update Header/Nav with new Name/Logo.
     *   Update Landing Page Hero text ("Welcome to Exolar").

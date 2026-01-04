@@ -10,7 +10,7 @@ const _geistMono = Geist_Mono({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Exolar QA",
   description: "Exolar QA: The Intelligent Horizon for Agentic Testing",
-  generator: "v0.app",
+  generator: "Exolar QA",
   icons: {
     icon: "/branding/favicon.png",
     apple: "/branding/logo-icon.png",

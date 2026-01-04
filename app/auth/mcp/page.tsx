@@ -98,7 +98,7 @@ function MCPAuthContent() {
           </div>
           <CardTitle>Authorize Claude Code</CardTitle>
           <CardDescription>
-            Grant Claude Code access to your Aestra data
+            Grant Claude Code access to your Exolar data
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -173,7 +173,7 @@ function LoadingFallback() {
           </div>
           <CardTitle>Authorize Claude Code</CardTitle>
           <CardDescription>
-            Grant Claude Code access to your Aestra data
+            Grant Claude Code access to your Exolar data
           </CardDescription>
         </CardHeader>
         <CardContent>

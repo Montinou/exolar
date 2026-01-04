@@ -2,8 +2,8 @@ import Link from "next/link"
 import { Terminal, Github, Code, ArrowRight, Rocket, Package, HelpCircle } from "lucide-react"
 
 export const metadata = {
-  title: "Documentation - Aestra",
-  description: "Learn how to set up and use Aestra",
+  title: "Documentation - Exolar QA",
+  description: "Learn how to set up and use Exolar QA",
 }
 
 const quickLinks = [
@@ -40,7 +40,7 @@ const quickLinks = [
   },
   {
     title: "Troubleshooting",
-    description: "Common issues and solutions for Aestra integration",
+    description: "Common issues and solutions for Exolar integration",
     href: "/docs/troubleshooting",
     icon: HelpCircle,
   },
@@ -53,7 +53,7 @@ export default function DocsPage() {
       <div className="space-y-4">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Documentation</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-          Learn how to set up Aestra, integrate with your CI/CD pipeline,
+          Learn how to set up Exolar, integrate with your CI/CD pipeline,
           and connect your AI coding assistant for intelligent test analysis.
         </p>
       </div>
@@ -65,10 +65,10 @@ export default function DocsPage() {
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-3 sm:mb-4">1. Install the Reporter</h3>
             <p className="text-sm text-muted-foreground mb-3 sm:mb-4">
-              Add the Aestra Playwright reporter to your project:
+              Add the Exolar Playwright reporter to your project:
             </p>
             <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
-              <code>npm install -D @aestra/playwright-reporter</code>
+              <code>npm install -D @exolar-qa/playwright-reporter</code>
             </pre>
           </div>
 
@@ -79,10 +79,10 @@ export default function DocsPage() {
             </p>
             <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
               <code>{`// playwright.config.ts
-import { aestra } from "@aestra/playwright-reporter";
+import { exolar } from "@exolar-qa/playwright-reporter";
 
 export default defineConfig({
-  reporter: [["html"], [aestra, { apiKey: process.env.AESTRA_API_KEY }]],
+  reporter: [["html"], [exolar, { apiKey: process.env.EXOLAR_API_KEY }]],
 });`}</code>
             </pre>
           </div>
@@ -95,7 +95,7 @@ export default defineConfig({
             <pre className="p-3 sm:p-4 rounded-md glass-panel text-xs sm:text-sm overflow-x-auto">
               <code>{`- run: npx playwright test
   env:
-    AESTRA_API_KEY: \${{ secrets.AESTRA_API_KEY }}`}</code>
+    EXOLAR_API_KEY: \${{ secrets.EXOLAR_API_KEY }}`}</code>
             </pre>
           </div>
         </div>

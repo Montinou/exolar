@@ -8,7 +8,7 @@ const features = [
     title: "Direct Agent Access",
     description:
       "Your AI coding assistant can now read test failures directly from the database. No more copy-pasting logs.",
-    accentColor: "var(--aestra-cyan)",
+    accentColor: "var(--exolar-cyan)",
   },
   {
     icon: Plug,
@@ -22,7 +22,7 @@ const features = [
     title: "Auto-Triage",
     description:
       "Agents can classify failures (Flake vs. Bug) automatically, saving hours of manual investigation every week.",
-    accentColor: "var(--aestra-cyan)",
+    accentColor: "var(--exolar-cyan)",
   },
 ]
 

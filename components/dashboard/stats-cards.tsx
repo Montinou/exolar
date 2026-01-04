@@ -86,7 +86,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
                       ? "var(--status-success)"
                       : stat.trend === "negative"
                         ? "var(--status-error)"
-                        : "var(--aestra-cyan)"
+                        : "var(--exolar-cyan)"
                   }}
                 />
               </div>

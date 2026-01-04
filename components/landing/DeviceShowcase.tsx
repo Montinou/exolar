@@ -64,7 +64,7 @@ export function DeviceShowcase() {
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] lg:w-[800px] lg:h-[800px] rounded-full blur-3xl opacity-20 pointer-events-none"
         style={{
-          background: "radial-gradient(circle, var(--aestra-cyan), transparent 70%)"
+          background: "radial-gradient(circle, var(--exolar-cyan), transparent 70%)"
         }}
       />
 
@@ -78,7 +78,7 @@ export function DeviceShowcase() {
             Your Test Suite,{" "}
             <span
               style={{
-                background: "linear-gradient(135deg, var(--safety-amber), var(--aestra-cyan))",
+                background: "linear-gradient(135deg, var(--safety-amber), var(--exolar-cyan))",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
               }}
@@ -105,7 +105,7 @@ export function DeviceShowcase() {
                     value={device.id}
                     className={cn(
                       "flex-1 min-w-[calc(50%-4px)] flex items-center justify-center gap-2 py-3 px-4 rounded-lg",
-                      "data-[state=active]:bg-[var(--aestra-cyan)] data-[state=active]:text-white",
+                      "data-[state=active]:bg-[var(--exolar-cyan)] data-[state=active]:text-white",
                       "data-[state=inactive]:bg-transparent data-[state=inactive]:text-white/60"
                     )}
                   >
@@ -135,7 +135,7 @@ export function DeviceShowcase() {
                 )}
                 style={
                   activeDevice.id === device.id
-                    ? { borderColor: "var(--aestra-cyan)" }
+                    ? { borderColor: "var(--exolar-cyan)" }
                     : {}
                 }
               >
@@ -143,7 +143,7 @@ export function DeviceShowcase() {
                   <div
                     className={cn(
                       "p-3 rounded-lg transition-colors",
-                       activeDevice.id === device.id ? "bg-[var(--aestra-cyan)] text-white" : "bg-white/10"
+                       activeDevice.id === device.id ? "bg-[var(--exolar-cyan)] text-white" : "bg-white/10"
                     )}
                   >
                     <device.icon className="w-6 h-6" />

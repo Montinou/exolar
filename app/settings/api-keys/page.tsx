@@ -191,7 +191,7 @@ export default function ApiKeysSettingsPage() {
           <div>
             <div className="flex items-center gap-3">
               <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-white/10 shadow-sm">
-                <Image src="/branding/logo-icon.jpeg" alt="Aestra" fill className="object-cover" />
+                <Image src="/branding/logo-icon.png" alt="Exolar" fill className="object-cover" />
               </div>
               <h1 className="text-2xl font-bold">API Keys</h1>
             </div>
@@ -381,7 +381,7 @@ export default function ApiKeysSettingsPage() {
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
                 <p className="text-sm text-amber-200">
                   <strong>Important:</strong> Store this key securely in your GitHub repository secrets
-                  as <code className="bg-amber-500/20 px-1 rounded">AESTRA_API_KEY</code>
+                  as <code className="bg-amber-500/20 px-1 rounded">EXOLAR_API_KEY</code>
                 </p>
               </div>
             </div>

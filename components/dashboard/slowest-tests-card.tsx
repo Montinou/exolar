@@ -47,7 +47,7 @@ export function SlowestTestsCard() {
     return (
       <div className="glass-card glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Clock className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Clock className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Slowest Tests</h3>
         </div>
         <div className="space-y-3">
@@ -63,7 +63,7 @@ export function SlowestTestsCard() {
     return (
       <div className="glass-card glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Clock className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Clock className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Slowest Tests</h3>
         </div>
         <div className="text-center py-6 text-muted-foreground">
@@ -79,7 +79,7 @@ export function SlowestTestsCard() {
     return (
       <div className="glass-card glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Clock className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Clock className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Slowest Tests</h3>
         </div>
         <div className="text-center py-6 text-muted-foreground">
@@ -95,7 +95,7 @@ export function SlowestTestsCard() {
     <div className="glass-card glass-card-glow p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Clock className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Slowest Tests</h3>
         </div>
         <Badge variant="secondary">Last 7 days</Badge>
@@ -114,7 +114,7 @@ export function SlowestTestsCard() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <Badge variant="outline" className="font-mono stat-value-cyan border-[var(--aestra-cyan)]/30">
+              <Badge variant="outline" className="font-mono stat-value-cyan border-[var(--exolar-cyan)]/30">
                 {formatDuration(test.avg_duration_ms)}
               </Badge>
               <span className="text-xs text-muted-foreground">

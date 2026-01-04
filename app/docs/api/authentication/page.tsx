@@ -2,8 +2,8 @@ import Link from "next/link"
 import { ArrowRight, Key, Shield, AlertTriangle } from "lucide-react"
 
 export const metadata = {
-  title: "API Authentication - Aestra",
-  description: "Learn how to create and manage API keys for Aestra",
+  title: "API Authentication - Exolar QA",
+  description: "Learn how to create and manage API keys for Exolar QA",
 }
 
 export default function ApiAuthenticationPage() {
@@ -20,7 +20,7 @@ export default function ApiAuthenticationPage() {
         </div>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">API Authentication</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-          Aestra uses API keys to authenticate requests. API keys are scoped to your organization
+          Exolar uses API keys to authenticate requests. API keys are scoped to your organization
           and can be managed from your dashboard settings.
         </p>
       </div>
@@ -58,13 +58,13 @@ export default function ApiAuthenticationPage() {
       <section className="space-y-4">
         <h2 className="text-xl sm:text-2xl font-semibold">Key Format</h2>
         <p className="text-muted-foreground">
-          Aestra API keys are prefixed with <code className="px-1.5 py-0.5 rounded bg-muted text-xs">aestra_</code> for easy identification:
+          Exolar API keys are prefixed with <code className="px-1.5 py-0.5 rounded bg-muted text-xs">exolar_</code> for easy identification:
         </p>
         <pre className="p-4 rounded-lg glass-panel text-sm overflow-x-auto">
-          <code>aestra_abc123def456...</code>
+          <code>exolar_abc123def456...</code>
         </pre>
         <p className="text-sm text-muted-foreground">
-          The prefix helps you identify Aestra keys in your environment variables and secrets.
+          The prefix helps you identify Exolar keys in your environment variables and secrets.
         </p>
       </section>
 
@@ -76,15 +76,15 @@ export default function ApiAuthenticationPage() {
           <div className="p-4 sm:p-6 rounded-xl glass-card">
             <h3 className="font-medium mb-3">With the Playwright Reporter</h3>
             <p className="text-sm text-muted-foreground mb-3">
-              Set the <code className="px-1.5 py-0.5 rounded bg-muted text-xs">AESTRA_API_KEY</code> environment variable:
+              Set the <code className="px-1.5 py-0.5 rounded bg-muted text-xs">EXOLAR_API_KEY</code> environment variable:
             </p>
             <pre className="p-3 rounded-lg bg-muted/50 text-xs overflow-x-auto">
               <code>{`# In GitHub Actions
 env:
-  AESTRA_API_KEY: \${{ secrets.AESTRA_API_KEY }}
+  EXOLAR_API_KEY: \${{ secrets.EXOLAR_API_KEY }}
 
 # Or in the reporter config
-[aestra, { apiKey: process.env.AESTRA_API_KEY }]`}</code>
+[exolar, { apiKey: process.env.EXOLAR_API_KEY }]`}</code>
             </pre>
           </div>
 
@@ -94,8 +94,8 @@ env:
               Include the key in the <code className="px-1.5 py-0.5 rounded bg-muted text-xs">Authorization</code> header:
             </p>
             <pre className="p-3 rounded-lg bg-muted/50 text-xs overflow-x-auto">
-              <code>{`curl -X POST https://aestra.dev/api/test-results \\
-  -H "Authorization: Bearer aestra_your_api_key" \\
+              <code>{`curl -X POST https://exolar-qa.vercel.app/api/test-results \\
+  -H "Authorization: Bearer exolar_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{ ... }'`}</code>
             </pre>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Brand Assets Generator Prompt
-  Product: Aestra (formerly MCP Dashboard)
+  Product: Exolar (formerly MCP Dashboard)
   Target AI: Nano Banana Pro (solid backgrounds for seamless removal)
   Output: 6 separate markdown files with image generation prompts
 -->
@@ -37,7 +37,7 @@
     <objective>
       Generate 6 unique, highly detailed image generation prompts for brand assets.
       Each prompt must be crafted to produce cohesive, original visuals that embody
-      the Aestra brand identity while being completely distinct from existing
+      the Exolar brand identity while being completely distinct from existing
       tech logos and generic visual patterns.
     </objective>
     <success_criteria>
@@ -56,11 +56,11 @@
   <brand_identity>
 
     <product_info>
-      <name>Aestra</name>
-      <full_name>Aestra: The Intelligent Horizon</full_name>
+      <name>Exolar</name>
+      <full_name>Exolar: The Intelligent Horizon</full_name>
       <tagline>Test Results, Illuminated by Intelligence</tagline>
       <description>
-        Aestra is the first E2E testing dashboard with native Model Context Protocol (MCP)
+        Exolar is the first E2E testing dashboard with native Model Context Protocol (MCP)
         support. It acts as a bridge between raw test data and actionable intelligence,
         where AI agents actively participate in debugging and analysis.
         The name evokes "Aether" (the medium of light) and "Astra" (stars/navigation),
@@ -160,7 +160,7 @@
   <originality_rules priority="MAXIMUM">
 
     <philosophy>
-      Aestra is not just another dashboard; it is an intelligence.
+      Exolar is not just another dashboard; it is an intelligence.
       The visual identity must reflect something *alien but benevolent*.
       Avoid human-scale tools (wrenches, gears) in favor of cosmic-scale phenomena.
     </philosophy>
@@ -217,7 +217,7 @@
   <assets_to_create>
 
     <asset id="1" filename="01-logo-icon.md">
-      <name>Aestra Symbol</name>
+      <name>Exolar Symbol</name>
       <purpose>
         The core brand mark. App icon, favicon source.
       </purpose>
@@ -237,14 +237,14 @@
     </asset>
 
     <asset id="2" filename="02-logo-full.md">
-      <name>Aestra Wordmark Lockup</name>
+      <name>Exolar Wordmark Lockup</name>
       <purpose>
         Full logo for headers and marketing.
       </purpose>
       <dimensions width="1200" height="400" unit="px"/>
       <background type="solid" color="#050508"/>
       <requirements>
-        <requirement>Symbol + "Aestra" text</requirement>
+        <requirement>Symbol + "Exolar" text</requirement>
         <requirement>Clean, modern, tracking slightly wide</requirement>
         <requirement>Text white or very light gray</requirement>
         <requirement>Horizontal alignment</requirement>
@@ -316,7 +316,7 @@
       <dimensions width="1200" height="630" unit="px"/>
       <background type="gradient" from="#050508" to="#12121A"/>
       <requirements>
-        <requirement>Prominent Logo + "Aestra"</requirement>
+        <requirement>Prominent Logo + "Exolar"</requirement>
         <requirement>Tagline: "The Intelligent Horizon"</requirement>
         <requirement>Dramatic lighting/environment</requirement>
         <requirement>Feels like a movie poster for a sci-fi film</requirement>
@@ -398,7 +398,7 @@
        ═══════════════════════════════════════════════════════════════════════ -->
   <behavioral_rules>
     <always>
-      <rule>Prioritize the "Aestra" cosmic aesthetic</rule>
+      <rule>Prioritize the "Exolar" cosmic aesthetic</rule>
       <rule>Maintain visual coherence across all 6 assets</rule>
       <rule>Write prompts that are specific and actionable</rule>
       <rule>Focus on light, gravity, and glass as primary materials</rule>

@@ -2,8 +2,8 @@ import Link from "next/link"
 import { AlertCircle, CheckCircle, HelpCircle, ArrowRight } from "lucide-react"
 
 export const metadata = {
-  title: "Troubleshooting - Aestra",
-  description: "Common issues and solutions for Aestra integration",
+  title: "Troubleshooting - Exolar QA",
+  description: "Common issues and solutions for Exolar integration",
 }
 
 const issues = [
@@ -11,7 +11,7 @@ const issues = [
     id: "no-results",
     title: "No results appearing in dashboard",
     symptoms: [
-      "Tests run successfully but nothing shows in Aestra",
+      "Tests run successfully but nothing shows in Exolar",
       "No errors in CI logs",
       "Dashboard shows empty or stale data",
     ],
@@ -23,19 +23,19 @@ const issues = [
     solutions: [
       {
         step: "Verify API key is set",
-        detail: "Check that AESTRA_API_KEY is properly set in your GitHub Secrets and passed to the test job.",
+        detail: "Check that EXOLAR_API_KEY is properly set in your GitHub Secrets and passed to the test job.",
         code: `# In your workflow
 env:
-  AESTRA_API_KEY: \${{ secrets.AESTRA_API_KEY }}`,
+  EXOLAR_API_KEY: \${{ secrets.EXOLAR_API_KEY }}`,
       },
       {
         step: "Check CI logs for initialization",
-        detail: "Look for the Aestra reporter initialization message in your CI output.",
-        code: `[Aestra] Initialized - will send results to dashboard`,
+        detail: "Look for the Exolar reporter initialization message in your CI output.",
+        code: `[Exolar] Initialized - will send results to dashboard`,
       },
       {
         step: "Verify API key is valid",
-        detail: "Make sure your API key starts with 'aestra_' and hasn't been revoked.",
+        detail: "Make sure your API key starts with 'exolar_' and hasn't been revoked.",
       },
       {
         step: "Check organization",
@@ -66,7 +66,7 @@ env:
       },
       {
         step: "Check for typos",
-        detail: "Ensure the secret name matches exactly: AESTRA_API_KEY",
+        detail: "Ensure the secret name matches exactly: EXOLAR_API_KEY",
       },
     ],
   },
@@ -96,16 +96,16 @@ env:
       {
         step: "Check artifact sizes",
         detail: "Default limit is 5MB. Increase if needed:",
-        code: `[aestra, {
-  apiKey: process.env.AESTRA_API_KEY,
+        code: `[exolar, {
+  apiKey: process.env.EXOLAR_API_KEY,
   maxArtifactSize: 10 * 1024 * 1024, // 10MB
 }]`,
       },
       {
         step: "Verify includeArtifacts is true",
         detail: "Make sure you haven't disabled artifact uploads:",
-        code: `[aestra, {
-  apiKey: process.env.AESTRA_API_KEY,
+        code: `[exolar, {
+  apiKey: process.env.EXOLAR_API_KEY,
   includeArtifacts: true, // default
 }]`,
       },
@@ -115,7 +115,7 @@ env:
     id: "reporter-disabled",
     title: "Reporter disabled / not running in CI",
     symptoms: [
-      "No Aestra messages in CI logs",
+      "No Exolar messages in CI logs",
       "Reporter works locally but not in CI",
     ],
     causes: [
@@ -134,8 +134,8 @@ env:
       {
         step: "Check for disabled flag",
         detail: "Ensure disabled is not set to true:",
-        code: `[aestra, {
-  apiKey: process.env.AESTRA_API_KEY,
+        code: `[exolar, {
+  apiKey: process.env.EXOLAR_API_KEY,
   disabled: false, // or remove this line
 }]`,
       },
@@ -196,7 +196,7 @@ export default function TroubleshootingPage() {
       <div className="space-y-4">
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Troubleshooting</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-          Common issues and solutions for Aestra integration. Can&apos;t find your issue?{" "}
+          Common issues and solutions for Exolar integration. Can&apos;t find your issue?{" "}
           <Link href="https://github.com/Montinou/e2e-test-dashboard/issues" className="text-primary hover:underline">
             Open an issue on GitHub
           </Link>.
@@ -214,15 +214,15 @@ export default function TroubleshootingPage() {
             </p>
             <pre className="p-3 rounded-lg bg-muted/50 text-xs overflow-x-auto">
               <code>{`# ✅ Good - Reporter initialized
-[Aestra] Initialized - will send results to dashboard
-[Aestra] Sending 15 results to dashboard...
-[Aestra] Results sent successfully - execution_id: 123
+[Exolar] Initialized - will send results to dashboard
+[Exolar] Sending 15 results to dashboard...
+[Exolar] Results sent successfully - execution_id: 123
 
 # ❌ Bad - API key missing
-[Aestra] AESTRA_API_KEY not set, reporter disabled
+[Exolar] EXOLAR_API_KEY not set, reporter disabled
 
 # ❌ Bad - Auth failed
-[Aestra] Failed to send results: 401 Unauthorized`}</code>
+[Exolar] Failed to send results: 401 Unauthorized`}</code>
             </pre>
           </div>
         </div>

@@ -4,15 +4,15 @@ import { useState } from "react"
 import { Check, Copy } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const step1Command = `npx e2e-test-dashboard-mcp --login`
+const step1Command = `npx @exolar-qa/mcp-server --login`
 
-const step2Command = `claude mcp add --transport stdio e2e-dashboard -- npx -y e2e-test-dashboard-mcp`
+const step2Command = `claude mcp add --transport stdio exolar-qa -- npx -y @exolar-qa/mcp-server`
 
 const manualConfig = `{
   "mcpServers": {
-    "e2e-dashboard": {
+    "exolar-qa": {
       "command": "npx",
-      "args": ["-y", "e2e-test-dashboard-mcp"]
+      "args": ["-y", "@exolar-qa/mcp-server"]
     }
   }
 }`
@@ -92,7 +92,7 @@ export function InstallTabs() {
                 <div className="flex items-center gap-3">
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-                    style={{ background: "var(--aestra-cyan)", color: "white" }}
+                    style={{ background: "var(--exolar-cyan)", color: "white" }}
                   >
                     1
                   </span>
@@ -107,7 +107,7 @@ export function InstallTabs() {
                 <div className="flex items-center gap-3">
                   <span
                     className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-                    style={{ background: "var(--aestra-cyan)", color: "white" }}
+                    style={{ background: "var(--exolar-cyan)", color: "white" }}
                   >
                     2
                   </span>
@@ -129,7 +129,7 @@ export function InstallTabs() {
               </p>
               <CodeBlock code={manualConfig} language="json" />
               <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>
-                Note: Run <code className="px-1 rounded glass-panel">npx e2e-test-dashboard-mcp --login</code> first to authenticate.
+                Note: Run <code className="px-1 rounded glass-panel">npx @exolar-qa/mcp-server --login</code> first to authenticate.
               </p>
             </TabsContent>
           </Tabs>

@@ -64,7 +64,7 @@ export function SuitePassRatesCard() {
     return (
       <div className="glass-card glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Layers className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Layers className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Suite Pass Rates</h3>
         </div>
         <div className="h-[180px] flex items-center justify-center">
@@ -78,7 +78,7 @@ export function SuitePassRatesCard() {
     return (
       <div className="glass-card glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Layers className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Layers className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Suite Pass Rates</h3>
         </div>
         <div className="h-[180px] flex items-center justify-center text-muted-foreground">
@@ -99,7 +99,7 @@ export function SuitePassRatesCard() {
     <div className="glass-card glass-card-glow p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Layers className="h-5 w-5 text-[var(--aestra-cyan)]" />
+          <Layers className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Suite Pass Rates</h3>
         </div>
         <span className="text-xs text-muted-foreground">Last 7 days</span>

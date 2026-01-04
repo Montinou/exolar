@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS organization_api_keys (
   organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   name VARCHAR(100) NOT NULL,
   key_hash VARCHAR(64) NOT NULL,  -- SHA-256 hash of the key
-  key_prefix VARCHAR(16) NOT NULL,  -- First chars for display (e.g., "aestra_abc1...")
+  key_prefix VARCHAR(16) NOT NULL,  -- First chars for display (e.g., "exolar_abc1...")
   created_by INTEGER REFERENCES dashboard_users(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_used_at TIMESTAMPTZ,
@@ -27,5 +27,5 @@ CREATE INDEX IF NOT EXISTS idx_org_api_keys_active ON organization_api_keys(orga
 
 COMMENT ON TABLE organization_api_keys IS 'API keys for CI/CD ingestion, scoped to organizations';
 COMMENT ON COLUMN organization_api_keys.key_hash IS 'SHA-256 hash of the API key - never store plain keys';
-COMMENT ON COLUMN organization_api_keys.key_prefix IS 'Display prefix for identification (e.g., aestra_abc1...)';
+COMMENT ON COLUMN organization_api_keys.key_prefix IS 'Display prefix for identification (e.g., exolar_abc1...)';
 COMMENT ON COLUMN organization_api_keys.revoked_at IS 'Soft delete - set when key is revoked';
