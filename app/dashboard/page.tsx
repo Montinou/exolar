@@ -1,12 +1,10 @@
 import { Suspense } from "react"
-import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TestSummaryBar } from "@/components/dashboard/test-summary-bar"
 import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
-import { TrendAreaChart } from "@/components/dashboard/trend-area-chart"
 import { ErrorDistributionChart } from "@/components/dashboard/error-distribution-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { FlakinessBySuiteChart } from "@/components/dashboard/flakiness-by-suite-chart"
@@ -15,14 +13,13 @@ import { Filters } from "@/components/dashboard/filters"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { AdminLink } from "@/components/dashboard/admin-link"
 import { SearchTests } from "@/components/dashboard/search-tests"
+import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
+// TODO: SlowestTestsCard is also in /dashboard/performance - consolidate in future dashboard redesign
 import { SlowestTestsCard } from "@/components/dashboard/slowest-tests-card"
 import { SuitePassRatesCard } from "@/components/dashboard/suite-pass-rates-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BrandLogo } from "@/components/ui/brand-logo"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Activity } from "lucide-react"
 
 async function DashboardContent({
   searchParams,
@@ -69,6 +66,7 @@ async function DashboardContent({
         />
 
         {/* Charts Row - 3 columns on large screens */}
+        {/* TODO: FailureRateChart is also in /dashboard/performance - consolidate in future dashboard redesign */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <StatusDonutChart
             passRate={totalTests > 0 ? (passedTests / totalTests) * 100 : 0}
@@ -171,16 +169,15 @@ export default async function DashboardPage({
               <p className="text-sm sm:text-base text-muted-foreground text-pretty">Test Results, Illuminated by Intelligence</p>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Link href="/dashboard/reliability">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Activity className="h-4 w-4" />
-                  <span className="hidden sm:inline">Reliability</span>
-                </Button>
-              </Link>
               <SearchTests />
               <AdminLink />
               <UserMenu />
             </div>
+          </div>
+
+          {/* Dashboard Navigation */}
+          <div className="mt-4">
+            <DashboardNav />
           </div>
         </div>
       </div>

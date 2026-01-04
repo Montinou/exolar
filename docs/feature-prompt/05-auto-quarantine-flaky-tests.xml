@@ -1,0 +1,1228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Auto-Quarantine Flaky Tests Implementation Prompt
+  Feature: Automatically quarantine flaky tests to unblock CI pipelines
+  Complexity: Medium | Impact: High | Effort: 3-5 days
+-->
+
+<task type="generate">
+  <objective>Implement Auto-Quarantine system that automatically quarantines flaky tests based on configurable thresholds, allowing CI to pass while isolating problematic tests for later investigation</objective>
+  <language>TypeScript</language>
+  <framework>Next.js 16 with App Router, shadcn/ui</framework>
+</task>
+
+<context>
+  <project_type>Dashboard Application</project_type>
+  <project_name>Exolar QA - E2E Test Dashboard</project_name>
+  <existing_patterns>
+    <pattern>Database queries use `getQueriesForOrg(organizationId)` wrapper pattern in lib/db.ts</pattern>
+    <pattern>API routes use `export const dynamic = "force-dynamic"` and auth check first</pattern>
+    <pattern>Components use `"use client"`, useState/useEffect for data fetching</pattern>
+    <pattern>Existing test_flakiness_history table tracks flakiness metrics per test</pattern>
+    <pattern>Session context via `getSessionContext()` from lib/session-context.ts</pattern>
+    <pattern>SQL migrations in scripts/ folder with sequential numbering</pattern>
+    <pattern>Admin routes use `requireOrgAdmin()` for authorization</pattern>
+  </existing_patterns>
+  <dependencies>
+    <dependency>@neondatabase/serverless - for database queries</dependency>
+    <dependency>lucide-react - for icons (Shield, ShieldOff, AlertTriangle, Clock, History)</dependency>
+    <dependency>shadcn/ui components - for UI elements (Dialog, Table, Badge, Button)</dependency>
+  </dependencies>
+</context>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Create quarantine rules table with configurable thresholds per organization</requirement>
+    <requirement priority="must">Auto-quarantine tests when flaky rate exceeds threshold (default 30%)</requirement>
+    <requirement priority="must">Quarantined tests status reported separately (don't fail CI overall)</requirement>
+    <requirement priority="must">Display quarantine badge on test cards and result views</requirement>
+    <requirement priority="must">Admin page to view, manage, and release quarantined tests</requirement>
+    <requirement priority="should">Track quarantine history (when quarantined, released, by whom)</requirement>
+    <requirement priority="should">Auto-release tests when flaky rate drops below release threshold</requirement>
+    <requirement priority="should">Email/notification when test is auto-quarantined</requirement>
+    <requirement priority="could">GitHub issue auto-creation for quarantined tests</requirement>
+    <requirement priority="could">Quarantine expiration (auto-release after X days)</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Quarantine check should not add latency to test result ingestion</requirement>
+    <requirement>All data must be filtered by organization_id (multi-tenancy)</requirement>
+    <requirement>Only admins/owners can manually quarantine or release tests</requirement>
+    <requirement>Follow existing code patterns exactly</requirement>
+  </non_functional>
+</requirements>
+
+<implementation_guide>
+  <file path="scripts/0XX_add_quarantine_tables.sql" action="create">
+    <description>SQL migration to create quarantine tables</description>
+    <code_snippet><![CDATA[
+-- Quarantine rules per organization
+CREATE TABLE IF NOT EXISTS quarantine_rules (
+  id SERIAL PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  enabled BOOLEAN DEFAULT true,
+  flaky_threshold_percent INTEGER DEFAULT 30,
+  release_threshold_percent INTEGER DEFAULT 10,
+  min_runs_for_quarantine INTEGER DEFAULT 5,
+  auto_release_enabled BOOLEAN DEFAULT true,
+  auto_release_after_days INTEGER DEFAULT 14,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(organization_id)
+);
+
+-- Quarantined tests
+CREATE TABLE IF NOT EXISTS quarantined_tests (
+  id SERIAL PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  test_signature TEXT NOT NULL,
+  test_name TEXT NOT NULL,
+  test_file TEXT NOT NULL,
+  status VARCHAR(20) DEFAULT 'quarantined' CHECK (status IN ('quarantined', 'released', 'expired')),
+  quarantine_reason TEXT,
+  flaky_rate_at_quarantine DECIMAL(5,2),
+  quarantined_at TIMESTAMPTZ DEFAULT NOW(),
+  quarantined_by UUID REFERENCES dashboard_users(id),
+  released_at TIMESTAMPTZ,
+  released_by UUID REFERENCES dashboard_users(id),
+  release_reason TEXT,
+  github_issue_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(organization_id, test_signature, quarantined_at)
+);
+
+-- Quarantine history for audit trail
+CREATE TABLE IF NOT EXISTS quarantine_history (
+  id SERIAL PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  test_signature TEXT NOT NULL,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('quarantined', 'released', 'expired', 'manual_quarantine', 'manual_release')),
+  performed_by UUID REFERENCES dashboard_users(id),
+  flaky_rate DECIMAL(5,2),
+  reason TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_quarantined_tests_org_status
+  ON quarantined_tests(organization_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_quarantined_tests_signature
+  ON quarantined_tests(organization_id, test_signature);
+
+CREATE INDEX IF NOT EXISTS idx_quarantine_history_org_sig
+  ON quarantine_history(organization_id, test_signature);
+
+-- RLS Policies
+ALTER TABLE quarantine_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quarantined_tests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quarantine_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view quarantine rules for their org"
+  ON quarantine_rules FOR SELECT
+  USING (organization_id IN (
+    SELECT om.organization_id FROM organization_members om
+    WHERE om.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can view quarantined tests for their org"
+  ON quarantined_tests FOR SELECT
+  USING (organization_id IN (
+    SELECT om.organization_id FROM organization_members om
+    WHERE om.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can view quarantine history for their org"
+  ON quarantine_history FOR SELECT
+  USING (organization_id IN (
+    SELECT om.organization_id FROM organization_members om
+    WHERE om.user_id = auth.uid()
+  ));
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/types.ts" action="add">
+    <description>Add TypeScript interfaces for quarantine</description>
+    <code_snippet><![CDATA[
+export interface QuarantineRules {
+  id: number;
+  organizationId: string;
+  enabled: boolean;
+  flakyThresholdPercent: number;
+  releaseThresholdPercent: number;
+  minRunsForQuarantine: number;
+  autoReleaseEnabled: boolean;
+  autoReleaseAfterDays: number;
+}
+
+export type QuarantineStatus = 'quarantined' | 'released' | 'expired';
+
+export interface QuarantinedTest {
+  id: number;
+  organizationId: string;
+  testSignature: string;
+  testName: string;
+  testFile: string;
+  status: QuarantineStatus;
+  quarantineReason: string | null;
+  flakyRateAtQuarantine: number;
+  quarantinedAt: string;
+  quarantinedBy: string | null;
+  releasedAt: string | null;
+  releasedBy: string | null;
+  releaseReason: string | null;
+  githubIssueUrl: string | null;
+  // Computed from current data
+  currentFlakyRate?: number;
+  totalRuns?: number;
+}
+
+export type QuarantineAction =
+  | 'quarantined'
+  | 'released'
+  | 'expired'
+  | 'manual_quarantine'
+  | 'manual_release';
+
+export interface QuarantineHistoryEntry {
+  id: number;
+  testSignature: string;
+  action: QuarantineAction;
+  performedBy: string | null;
+  flakyRate: number;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface QuarantineSummary {
+  totalQuarantined: number;
+  autoQuarantined: number;
+  manuallyQuarantined: number;
+  recentlyReleased: number;
+  pendingReview: number;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/quarantine.ts" action="create">
+    <description>Quarantine service with core logic</description>
+    <code_snippet><![CDATA[
+import { sql } from '@neondatabase/serverless';
+import type {
+  QuarantineRules,
+  QuarantinedTest,
+  QuarantineHistoryEntry,
+  QuarantineSummary,
+} from './types';
+
+export async function getQuarantineRules(
+  organizationId: string
+): Promise<QuarantineRules | null> {
+  const result = await sql`
+    SELECT
+      id,
+      organization_id as "organizationId",
+      enabled,
+      flaky_threshold_percent as "flakyThresholdPercent",
+      release_threshold_percent as "releaseThresholdPercent",
+      min_runs_for_quarantine as "minRunsForQuarantine",
+      auto_release_enabled as "autoReleaseEnabled",
+      auto_release_after_days as "autoReleaseAfterDays"
+    FROM quarantine_rules
+    WHERE organization_id = ${organizationId}
+  `;
+  return result[0] || null;
+}
+
+export async function upsertQuarantineRules(
+  organizationId: string,
+  rules: Partial<Omit<QuarantineRules, 'id' | 'organizationId'>>
+): Promise<void> {
+  await sql`
+    INSERT INTO quarantine_rules (
+      organization_id,
+      enabled,
+      flaky_threshold_percent,
+      release_threshold_percent,
+      min_runs_for_quarantine,
+      auto_release_enabled,
+      auto_release_after_days
+    )
+    VALUES (
+      ${organizationId},
+      ${rules.enabled ?? true},
+      ${rules.flakyThresholdPercent ?? 30},
+      ${rules.releaseThresholdPercent ?? 10},
+      ${rules.minRunsForQuarantine ?? 5},
+      ${rules.autoReleaseEnabled ?? true},
+      ${rules.autoReleaseAfterDays ?? 14}
+    )
+    ON CONFLICT (organization_id)
+    DO UPDATE SET
+      enabled = EXCLUDED.enabled,
+      flaky_threshold_percent = EXCLUDED.flaky_threshold_percent,
+      release_threshold_percent = EXCLUDED.release_threshold_percent,
+      min_runs_for_quarantine = EXCLUDED.min_runs_for_quarantine,
+      auto_release_enabled = EXCLUDED.auto_release_enabled,
+      auto_release_after_days = EXCLUDED.auto_release_after_days,
+      updated_at = NOW()
+  `;
+}
+
+export async function getQuarantinedTests(
+  organizationId: string,
+  status: 'quarantined' | 'all' = 'quarantined'
+): Promise<QuarantinedTest[]> {
+  const statusFilter = status === 'quarantined'
+    ? sql`AND qt.status = 'quarantined'`
+    : sql``;
+
+  return sql`
+    SELECT
+      qt.id,
+      qt.organization_id as "organizationId",
+      qt.test_signature as "testSignature",
+      qt.test_name as "testName",
+      qt.test_file as "testFile",
+      qt.status,
+      qt.quarantine_reason as "quarantineReason",
+      qt.flaky_rate_at_quarantine as "flakyRateAtQuarantine",
+      qt.quarantined_at as "quarantinedAt",
+      qt.quarantined_by as "quarantinedBy",
+      qt.released_at as "releasedAt",
+      qt.released_by as "releasedBy",
+      qt.release_reason as "releaseReason",
+      qt.github_issue_url as "githubIssueUrl",
+      tfh.flaky_rate as "currentFlakyRate",
+      tfh.total_runs as "totalRuns"
+    FROM quarantined_tests qt
+    LEFT JOIN test_flakiness_history tfh ON
+      tfh.test_signature = qt.test_signature
+      AND tfh.organization_id = qt.organization_id
+    WHERE qt.organization_id = ${organizationId}
+      ${statusFilter}
+    ORDER BY qt.quarantined_at DESC
+  `;
+}
+
+export async function isTestQuarantined(
+  organizationId: string,
+  testSignature: string
+): Promise<boolean> {
+  const result = await sql`
+    SELECT 1 FROM quarantined_tests
+    WHERE organization_id = ${organizationId}
+      AND test_signature = ${testSignature}
+      AND status = 'quarantined'
+    LIMIT 1
+  `;
+  return result.length > 0;
+}
+
+export async function quarantineTest(
+  organizationId: string,
+  testSignature: string,
+  testName: string,
+  testFile: string,
+  flakyRate: number,
+  reason: string,
+  userId?: string
+): Promise<void> {
+  await sql`
+    INSERT INTO quarantined_tests (
+      organization_id,
+      test_signature,
+      test_name,
+      test_file,
+      status,
+      quarantine_reason,
+      flaky_rate_at_quarantine,
+      quarantined_by
+    )
+    VALUES (
+      ${organizationId},
+      ${testSignature},
+      ${testName},
+      ${testFile},
+      'quarantined',
+      ${reason},
+      ${flakyRate},
+      ${userId || null}
+    )
+    ON CONFLICT (organization_id, test_signature, quarantined_at)
+    DO UPDATE SET
+      status = 'quarantined',
+      quarantine_reason = EXCLUDED.quarantine_reason,
+      flaky_rate_at_quarantine = EXCLUDED.flaky_rate_at_quarantine
+  `;
+
+  // Record history
+  await sql`
+    INSERT INTO quarantine_history (
+      organization_id,
+      test_signature,
+      action,
+      performed_by,
+      flaky_rate,
+      reason
+    )
+    VALUES (
+      ${organizationId},
+      ${testSignature},
+      ${userId ? 'manual_quarantine' : 'quarantined'},
+      ${userId || null},
+      ${flakyRate},
+      ${reason}
+    )
+  `;
+}
+
+export async function releaseTest(
+  organizationId: string,
+  testSignature: string,
+  reason: string,
+  userId?: string
+): Promise<void> {
+  await sql`
+    UPDATE quarantined_tests
+    SET
+      status = 'released',
+      released_at = NOW(),
+      released_by = ${userId || null},
+      release_reason = ${reason}
+    WHERE organization_id = ${organizationId}
+      AND test_signature = ${testSignature}
+      AND status = 'quarantined'
+  `;
+
+  // Get current flaky rate for history
+  const flakyRate = await sql`
+    SELECT flaky_rate FROM test_flakiness_history
+    WHERE organization_id = ${organizationId}
+      AND test_signature = ${testSignature}
+  `;
+
+  // Record history
+  await sql`
+    INSERT INTO quarantine_history (
+      organization_id,
+      test_signature,
+      action,
+      performed_by,
+      flaky_rate,
+      reason
+    )
+    VALUES (
+      ${organizationId},
+      ${testSignature},
+      ${userId ? 'manual_release' : 'released'},
+      ${userId || null},
+      ${flakyRate[0]?.flaky_rate || 0},
+      ${reason}
+    )
+  `;
+}
+
+export async function processAutoQuarantine(
+  organizationId: string
+): Promise<{ quarantined: string[]; released: string[] }> {
+  const rules = await getQuarantineRules(organizationId);
+  if (!rules || !rules.enabled) {
+    return { quarantined: [], released: [] };
+  }
+
+  const quarantined: string[] = [];
+  const released: string[] = [];
+
+  // Find tests that should be quarantined
+  const toQuarantine = await sql<{
+    testSignature: string;
+    testName: string;
+    testFile: string;
+    flakyRate: number;
+  }[]>`
+    SELECT
+      tfh.test_signature as "testSignature",
+      tfh.test_name as "testName",
+      tfh.test_file as "testFile",
+      tfh.flaky_rate as "flakyRate"
+    FROM test_flakiness_history tfh
+    LEFT JOIN quarantined_tests qt ON
+      qt.test_signature = tfh.test_signature
+      AND qt.organization_id = tfh.organization_id
+      AND qt.status = 'quarantined'
+    WHERE tfh.organization_id = ${organizationId}
+      AND tfh.flaky_rate >= ${rules.flakyThresholdPercent}
+      AND tfh.total_runs >= ${rules.minRunsForQuarantine}
+      AND qt.id IS NULL
+  `;
+
+  for (const test of toQuarantine) {
+    await quarantineTest(
+      organizationId,
+      test.testSignature,
+      test.testName,
+      test.testFile,
+      test.flakyRate,
+      `Auto-quarantined: ${test.flakyRate}% flaky rate exceeds ${rules.flakyThresholdPercent}% threshold`
+    );
+    quarantined.push(test.testSignature);
+  }
+
+  // Find tests that should be released
+  if (rules.autoReleaseEnabled) {
+    const toRelease = await sql<{ testSignature: string; flakyRate: number }[]>`
+      SELECT
+        qt.test_signature as "testSignature",
+        COALESCE(tfh.flaky_rate, 0) as "flakyRate"
+      FROM quarantined_tests qt
+      LEFT JOIN test_flakiness_history tfh ON
+        tfh.test_signature = qt.test_signature
+        AND tfh.organization_id = qt.organization_id
+      WHERE qt.organization_id = ${organizationId}
+        AND qt.status = 'quarantined'
+        AND (
+          COALESCE(tfh.flaky_rate, 0) <= ${rules.releaseThresholdPercent}
+          OR qt.quarantined_at < NOW() - INTERVAL '${rules.autoReleaseAfterDays} days'
+        )
+    `;
+
+    for (const test of toRelease) {
+      await releaseTest(
+        organizationId,
+        test.testSignature,
+        test.flakyRate <= rules.releaseThresholdPercent
+          ? `Auto-released: ${test.flakyRate}% flaky rate below ${rules.releaseThresholdPercent}% threshold`
+          : `Auto-released: Exceeded ${rules.autoReleaseAfterDays} day quarantine period`
+      );
+      released.push(test.testSignature);
+    }
+  }
+
+  return { quarantined, released };
+}
+
+export async function getQuarantineSummary(
+  organizationId: string
+): Promise<QuarantineSummary> {
+  const result = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE status = 'quarantined') as total_quarantined,
+      COUNT(*) FILTER (WHERE status = 'quarantined' AND quarantined_by IS NULL) as auto_quarantined,
+      COUNT(*) FILTER (WHERE status = 'quarantined' AND quarantined_by IS NOT NULL) as manually_quarantined,
+      COUNT(*) FILTER (WHERE status = 'released' AND released_at > NOW() - INTERVAL '7 days') as recently_released
+    FROM quarantined_tests
+    WHERE organization_id = ${organizationId}
+  `;
+
+  const row = result[0] || {};
+
+  return {
+    totalQuarantined: Number(row.total_quarantined) || 0,
+    autoQuarantined: Number(row.auto_quarantined) || 0,
+    manuallyQuarantined: Number(row.manually_quarantined) || 0,
+    recentlyReleased: Number(row.recently_released) || 0,
+    pendingReview: Number(row.total_quarantined) || 0,
+  };
+}
+
+export async function getQuarantineHistory(
+  organizationId: string,
+  testSignature?: string,
+  limit: number = 50
+): Promise<QuarantineHistoryEntry[]> {
+  const signatureFilter = testSignature
+    ? sql`AND test_signature = ${testSignature}`
+    : sql``;
+
+  return sql`
+    SELECT
+      id,
+      test_signature as "testSignature",
+      action,
+      performed_by as "performedBy",
+      flaky_rate as "flakyRate",
+      reason,
+      created_at as "createdAt"
+    FROM quarantine_history
+    WHERE organization_id = ${organizationId}
+      ${signatureFilter}
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/quarantine/route.ts" action="create">
+    <description>Create API endpoint for quarantine management</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import {
+  getQuarantinedTests,
+  getQuarantineSummary,
+  processAutoQuarantine,
+} from "@/lib/quarantine";
+
+export const dynamic = "force-dynamic";
+
+// GET - List quarantined tests
+export async function GET(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status") as 'quarantined' | 'all' || 'quarantined';
+    const includeSummary = searchParams.get("summary") === 'true';
+
+    const tests = await getQuarantinedTests(context.organizationId, status);
+
+    if (includeSummary) {
+      const summary = await getQuarantineSummary(context.organizationId);
+      return NextResponse.json({ tests, summary });
+    }
+
+    return NextResponse.json({ tests });
+  } catch (error) {
+    console.error("[API] Error fetching quarantined tests:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch quarantined tests" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Trigger auto-quarantine processing
+export async function POST(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admins can trigger processing
+    if (context.role !== 'admin' && context.role !== 'owner') {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const result = await processAutoQuarantine(context.organizationId);
+
+    return NextResponse.json({
+      success: true,
+      quarantined: result.quarantined.length,
+      released: result.released.length,
+      details: result,
+    });
+  } catch (error) {
+    console.error("[API] Error processing auto-quarantine:", error);
+    return NextResponse.json(
+      { error: "Failed to process auto-quarantine" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/quarantine/[testSignature]/route.ts" action="create">
+    <description>Create API endpoint for individual test quarantine actions</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import {
+  quarantineTest,
+  releaseTest,
+  isTestQuarantined,
+  getQuarantineHistory,
+} from "@/lib/quarantine";
+
+export const dynamic = "force-dynamic";
+
+// GET - Check if test is quarantined and get history
+export async function GET(
+  request: Request,
+  { params }: { params: { testSignature: string } }
+) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const testSignature = decodeURIComponent(params.testSignature);
+    const isQuarantined = await isTestQuarantined(context.organizationId, testSignature);
+    const history = await getQuarantineHistory(context.organizationId, testSignature, 10);
+
+    return NextResponse.json({ isQuarantined, history });
+  } catch (error) {
+    console.error("[API] Error checking quarantine status:", error);
+    return NextResponse.json(
+      { error: "Failed to check quarantine status" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST - Manually quarantine a test
+export async function POST(
+  request: Request,
+  { params }: { params: { testSignature: string } }
+) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admins can manually quarantine
+    if (context.role !== 'admin' && context.role !== 'owner') {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const testSignature = decodeURIComponent(params.testSignature);
+    const body = await request.json();
+    const { testName, testFile, flakyRate, reason } = body;
+
+    if (!testName || !testFile) {
+      return NextResponse.json(
+        { error: "testName and testFile are required" },
+        { status: 400 }
+      );
+    }
+
+    await quarantineTest(
+      context.organizationId,
+      testSignature,
+      testName,
+      testFile,
+      flakyRate || 0,
+      reason || 'Manually quarantined by admin',
+      context.userId
+    );
+
+    return NextResponse.json({ success: true, action: 'quarantined' });
+  } catch (error) {
+    console.error("[API] Error quarantining test:", error);
+    return NextResponse.json(
+      { error: "Failed to quarantine test" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Release a test from quarantine
+export async function DELETE(
+  request: Request,
+  { params }: { params: { testSignature: string } }
+) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admins can release
+    if (context.role !== 'admin' && context.role !== 'owner') {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const testSignature = decodeURIComponent(params.testSignature);
+    const { searchParams } = new URL(request.url);
+    const reason = searchParams.get("reason") || 'Manually released by admin';
+
+    await releaseTest(
+      context.organizationId,
+      testSignature,
+      reason,
+      context.userId
+    );
+
+    return NextResponse.json({ success: true, action: 'released' });
+  } catch (error) {
+    console.error("[API] Error releasing test:", error);
+    return NextResponse.json(
+      { error: "Failed to release test" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/quarantine/rules/route.ts" action="create">
+    <description>Create API endpoint for quarantine rules management</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { getQuarantineRules, upsertQuarantineRules } from "@/lib/quarantine";
+
+export const dynamic = "force-dynamic";
+
+// GET - Get quarantine rules for org
+export async function GET() {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rules = await getQuarantineRules(context.organizationId);
+
+    // Return defaults if no rules set
+    if (!rules) {
+      return NextResponse.json({
+        enabled: true,
+        flakyThresholdPercent: 30,
+        releaseThresholdPercent: 10,
+        minRunsForQuarantine: 5,
+        autoReleaseEnabled: true,
+        autoReleaseAfterDays: 14,
+      });
+    }
+
+    return NextResponse.json(rules);
+  } catch (error) {
+    console.error("[API] Error fetching quarantine rules:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch quarantine rules" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update quarantine rules
+export async function PUT(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admins can update rules
+    if (context.role !== 'admin' && context.role !== 'owner') {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const body = await request.json();
+
+    await upsertQuarantineRules(context.organizationId, body);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[API] Error updating quarantine rules:", error);
+    return NextResponse.json(
+      { error: "Failed to update quarantine rules" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/quarantine-badge.tsx" action="create">
+    <description>Create quarantine badge component for test cards</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { Shield, ShieldOff, Info } from "lucide-react";
+import { useState } from "react";
+
+interface QuarantineBadgeProps {
+  isQuarantined: boolean;
+  reason?: string;
+  quarantinedAt?: string;
+  flakyRate?: number;
+  onClick?: () => void;
+}
+
+export function QuarantineBadge({
+  isQuarantined,
+  reason,
+  quarantinedAt,
+  flakyRate,
+  onClick,
+}: QuarantineBadgeProps) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  if (!isQuarantined) return null;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 transition-colors"
+      >
+        <Shield className="w-3 h-3" />
+        <span>Quarantined</span>
+      </button>
+
+      {showTooltip && (
+        <div className="absolute z-50 bottom-full mb-2 left-0 w-64 p-3 bg-background border border-border rounded-lg shadow-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield className="w-4 h-4 text-purple-400" />
+            <span className="font-medium text-sm">Quarantined Test</span>
+          </div>
+
+          {reason && (
+            <p className="text-xs text-muted-foreground mb-2">{reason}</p>
+          )}
+
+          <div className="space-y-1 text-xs">
+            {flakyRate !== undefined && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Flaky rate:</span>
+                <span>{flakyRate}%</span>
+              </div>
+            )}
+            {quarantinedAt && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Since:</span>
+                <span>{new Date(quarantinedAt).toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-border">
+            This test will run but won&apos;t fail CI
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function QuarantineStatusIcon({ isQuarantined }: { isQuarantined: boolean }) {
+  if (!isQuarantined) return null;
+
+  return (
+    <span title="Quarantined - won't fail CI">
+      <Shield className="w-4 h-4 text-purple-400" />
+    </span>
+  );
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/quarantine-manager.tsx" action="create">
+    <description>Create quarantine management component for admin page</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  Shield,
+  ShieldOff,
+  Clock,
+  AlertTriangle,
+  RefreshCw,
+  Search,
+  Filter,
+} from "lucide-react";
+import type { QuarantinedTest, QuarantineSummary } from "@/lib/types";
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function QuarantineRow({
+  test,
+  onRelease,
+}: {
+  test: QuarantinedTest;
+  onRelease: (testSignature: string) => void;
+}) {
+  const [releasing, setReleasing] = useState(false);
+
+  const handleRelease = async () => {
+    if (!confirm(`Release "${test.testName}" from quarantine?`)) return;
+
+    setReleasing(true);
+    try {
+      await fetch(`/api/quarantine/${encodeURIComponent(test.testSignature)}`, {
+        method: 'DELETE',
+      });
+      onRelease(test.testSignature);
+    } catch (error) {
+      console.error('Failed to release:', error);
+    } finally {
+      setReleasing(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between py-4 border-b border-border/50 last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-purple-400 flex-shrink-0" />
+          <p className="text-sm font-medium truncate">{test.testName}</p>
+        </div>
+        <p className="text-xs text-muted-foreground truncate mt-1">
+          {test.testFile}
+        </p>
+        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatDate(test.quarantinedAt)}
+          </span>
+          <span className="flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            {test.flakyRateAtQuarantine}% flaky at quarantine
+          </span>
+          {test.currentFlakyRate !== undefined && (
+            <span className={test.currentFlakyRate < test.flakyRateAtQuarantine ? 'text-green-400' : ''}>
+              Currently: {test.currentFlakyRate}%
+            </span>
+          )}
+        </div>
+        {test.quarantineReason && (
+          <p className="text-xs text-muted-foreground mt-1 italic">
+            {test.quarantineReason}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 ml-4">
+        {test.quarantinedBy ? (
+          <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">
+            Manual
+          </span>
+        ) : (
+          <span className="text-xs px-2 py-0.5 rounded bg-purple-500/10 text-purple-400">
+            Auto
+          </span>
+        )}
+
+        <button
+          onClick={handleRelease}
+          disabled={releasing}
+          className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors disabled:opacity-50"
+        >
+          <ShieldOff className="w-3 h-3" />
+          {releasing ? 'Releasing...' : 'Release'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function QuarantineManager() {
+  const [tests, setTests] = useState<QuarantinedTest[]>([]);
+  const [summary, setSummary] = useState<QuarantineSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/quarantine?summary=true');
+      const data = await res.json();
+      setTests(data.tests || []);
+      setSummary(data.summary || null);
+    } catch (error) {
+      console.error('Failed to fetch:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleProcess = async () => {
+    setProcessing(true);
+    try {
+      await fetch('/api/quarantine', { method: 'POST' });
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to process:', error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleRelease = (testSignature: string) => {
+    setTests(tests.filter(t => t.testSignature !== testSignature));
+  };
+
+  const filteredTests = search
+    ? tests.filter(t =>
+        t.testName.toLowerCase().includes(search.toLowerCase()) ||
+        t.testFile.toLowerCase().includes(search.toLowerCase())
+      )
+    : tests;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-purple-400" />
+              <span className="text-2xl font-bold">{summary.totalQuarantined}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Total Quarantined</p>
+          </div>
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-yellow-400" />
+              <span className="text-2xl font-bold">{summary.autoQuarantined}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Auto-Quarantined</p>
+          </div>
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-blue-400" />
+              <span className="text-2xl font-bold">{summary.manuallyQuarantined}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Manual</p>
+          </div>
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-2">
+              <ShieldOff className="w-5 h-5 text-green-400" />
+              <span className="text-2xl font-bold">{summary.recentlyReleased}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Released (7d)</p>
+          </div>
+        </div>
+      )}
+
+      {/* Controls */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search quarantined tests..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <button
+          onClick={handleProcess}
+          disabled={processing}
+          className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${processing ? 'animate-spin' : ''}`} />
+          {processing ? 'Processing...' : 'Run Auto-Quarantine'}
+        </button>
+      </div>
+
+      {/* Test List */}
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="w-5 h-5 text-purple-400" />
+          <h3 className="font-semibold">Quarantined Tests</h3>
+          <span className="text-xs text-muted-foreground">
+            ({filteredTests.length})
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-20 bg-muted/30 rounded animate-pulse" />
+            ))}
+          </div>
+        ) : filteredTests.length === 0 ? (
+          <div className="text-center py-8">
+            <ShieldOff className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              {search ? 'No matching quarantined tests' : 'No tests currently quarantined'}
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-96 overflow-y-auto">
+            {filteredTests.map((test) => (
+              <QuarantineRow key={test.id} test={test} onRelease={handleRelease} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/dashboard/quarantine/page.tsx" action="create">
+    <description>Create quarantine management page</description>
+    <code_snippet><![CDATA[
+import { QuarantineManager } from "@/components/dashboard/quarantine-manager";
+import { QuarantineRulesSettings } from "@/components/dashboard/quarantine-rules-settings";
+
+export default function QuarantinePage() {
+  return (
+    <div className="container mx-auto p-6 space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold">Quarantine Management</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage quarantined flaky tests that won&apos;t fail CI
+        </p>
+      </div>
+
+      <QuarantineRulesSettings />
+      <QuarantineManager />
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+</implementation_guide>
+
+<constraints>
+  <avoid>Don't block test ingestion while checking quarantine status - do it async</avoid>
+  <avoid>Don't quarantine tests with fewer than minRunsForQuarantine runs</avoid>
+  <avoid>Don't allow viewers to quarantine or release tests - admin only</avoid>
+  <prefer>Use soft status changes (quarantined/released) instead of deleting records</prefer>
+  <prefer>Keep full audit history of all quarantine actions</prefer>
+  <prefer>Follow existing glass-card styling and color patterns</prefer>
+</constraints>
+
+<output_format>
+  <code>Implement each file following the code snippets provided</code>
+  <explanation>
+    Implementation notes:
+    1. Run migration first to create quarantine tables
+    2. Default rules are created on first access if none exist
+    3. Auto-quarantine can be triggered via POST /api/quarantine or scheduled cron
+    4. The quarantine badge can be added to test-result-card.tsx
+    5. Add navigation link to /dashboard/quarantine in sidebar
+  </explanation>
+  <usage_example>
+    Add quarantine badge to test result cards:
+    ```tsx
+    import { QuarantineBadge } from "@/components/dashboard/quarantine-badge";
+
+    // In your test result card:
+    <QuarantineBadge
+      isQuarantined={testResult.isQuarantined}
+      reason={testResult.quarantineReason}
+      quarantinedAt={testResult.quarantinedAt}
+      flakyRate={testResult.flakyRate}
+    />
+    ```
+
+    Check quarantine status during result ingestion:
+    ```typescript
+    import { isTestQuarantined } from "@/lib/quarantine";
+
+    const quarantined = await isTestQuarantined(orgId, testSignature);
+    // If quarantined, mark test result but don't count toward CI failure
+    ```
+  </usage_example>
+</output_format>

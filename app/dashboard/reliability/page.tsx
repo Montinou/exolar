@@ -1,18 +1,16 @@
 import { Suspense } from "react"
-import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { AdminLink } from "@/components/dashboard/admin-link"
 import { SearchTests } from "@/components/dashboard/search-tests"
+import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { ReliabilityScoreCard } from "@/components/dashboard/reliability-score"
 import {
-  ArrowLeft,
   Activity,
   CheckCircle2,
   AlertTriangle,
@@ -294,14 +292,9 @@ export default async function ReliabilityPage({
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="space-y-1 sm:space-y-2">
               <div className="flex items-center gap-2">
-                <Link href="/dashboard">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <ArrowLeft className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <Activity className="h-6 w-6 text-[var(--exolar-cyan)]" />
+                <BrandLogo variant="icon" width={32} height={32} />
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                  Reliability Score
+                  Reliability
                 </h1>
               </div>
               <p className="text-sm sm:text-base text-muted-foreground text-pretty">
@@ -313,6 +306,11 @@ export default async function ReliabilityPage({
               <AdminLink />
               <UserMenu />
             </div>
+          </div>
+
+          {/* Dashboard Navigation */}
+          <div className="mt-4">
+            <DashboardNav />
           </div>
         </div>
       </div>

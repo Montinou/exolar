@@ -1,6 +1,6 @@
 # Featured Features for Exolar QA
 
-> Top 3 features selected based on difficulty vs gain analysis from comprehensive dashboard research.
+> Features selected based on difficulty vs gain analysis from comprehensive dashboard research.
 
 ---
 
@@ -11,11 +11,21 @@ Features were selected based on:
 - **Complexity**: Implementation effort
 - **ROI Score**: Impact / Complexity ratio
 
+### Phase 1: Foundation (Features 1-3)
+
 | Rank | Feature | Impact | Complexity | Effort | ROI |
 |------|---------|--------|------------|--------|-----|
 | 1 | Test Reliability Score | High | Low | 2-3 days | Best |
 | 2 | Performance Regression Detection | High | Medium | 3-5 days | Excellent |
 | 3 | Comparative Run Analysis | High | Medium | 3-5 days | Excellent |
+
+### Phase 2: Advanced Analytics & Automation (Features 4-6)
+
+| Rank | Feature | Impact | Complexity | Effort | ROI |
+|------|---------|--------|------------|--------|-----|
+| 4 | AI Root Cause Analysis | High | Medium | 3-5 days | Excellent |
+| 5 | Auto-Quarantine Flaky Tests | High | Medium | 3-5 days | Excellent |
+| 6 | Intelligent Failure Clustering | High | Medium | 3-5 days | Excellent |
 
 ---
 
@@ -218,26 +228,170 @@ FULL OUTER JOIN current c ON
 
 ---
 
+## Feature 4: AI Root Cause Analysis
+
+### Overview
+AI-powered analysis that automatically categorizes test failures into root cause categories to speed up debugging.
+
+### Value Proposition
+- **Faster debugging** - Know immediately if it's an app bug, test bug, or environment issue
+- **Reduced triage time** - Automatic categorization eliminates manual classification
+- **Actionable suggestions** - AI provides recommended fixes based on failure pattern
+
+### Categories
+| Category | Description | Indicators |
+|----------|-------------|------------|
+| Application Bug | Bug in the app under test | Unexpected behavior, regressions |
+| Automation Bug | Bug in the test code | Wrong selectors, timing issues |
+| Environment Issue | Infrastructure problems | Network timeouts, service unavailability |
+| Test Issue | Test data/config problems | Missing data, incorrect setup |
+| Unknown | Insufficient confidence | Ambiguous error patterns |
+
+### Implementation Details
+
+**Files to Create/Modify:**
+- `lib/ai-rca.ts` - AI analysis service using Vercel AI SDK
+- `lib/types.ts` - Add `RCAResult`, `RCACategory` interfaces
+- `app/api/analyze-failure/route.ts` - Single failure analysis endpoint
+- `app/api/analyze-failure/batch/route.ts` - Batch analysis endpoint
+- `app/api/rca-summary/route.ts` - RCA statistics endpoint
+- `components/dashboard/ai-rca-badge.tsx` - Badge component for test cards
+- `components/dashboard/rca-distribution-card.tsx` - Summary card
+
+**AI Integration:**
+- Uses OpenAI `gpt-4o-mini` via Vercel AI SDK
+- Structured output with Zod schema validation
+- Stores results in existing `ai_context` JSONB field
+
+**XML Prompt:** [04-ai-root-cause-analysis.xml](./feature-prompt/04-ai-root-cause-analysis.xml)
+
+---
+
+## Feature 5: Auto-Quarantine Flaky Tests
+
+### Overview
+Automatically quarantine tests that exceed flakiness thresholds, allowing CI to pass while isolating problematic tests.
+
+### Value Proposition
+- **Unblock CI pipelines** - Flaky tests don't fail builds
+- **Automated management** - No manual intervention needed
+- **Full audit trail** - Track when tests were quarantined and why
+- **Auto-recovery** - Tests automatically released when stabilized
+
+### Quarantine Rules
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Flaky Threshold | 30% | Quarantine when flaky rate exceeds this |
+| Release Threshold | 10% | Auto-release when rate drops below this |
+| Min Runs | 5 | Minimum runs before quarantine eligible |
+| Auto-Release Days | 14 | Max days in quarantine before auto-release |
+
+### Implementation Details
+
+**Files to Create/Modify:**
+- `scripts/0XX_add_quarantine_tables.sql` - Database migration
+- `lib/quarantine.ts` - Quarantine service
+- `lib/types.ts` - Add `QuarantinedTest`, `QuarantineRules` interfaces
+- `app/api/quarantine/route.ts` - List and process endpoint
+- `app/api/quarantine/[testSignature]/route.ts` - Individual test actions
+- `app/api/quarantine/rules/route.ts` - Rules management
+- `components/dashboard/quarantine-badge.tsx` - Badge for test cards
+- `components/dashboard/quarantine-manager.tsx` - Admin management UI
+- `app/dashboard/quarantine/page.tsx` - Dedicated management page
+
+**New Database Tables:**
+- `quarantine_rules` - Per-org configuration
+- `quarantined_tests` - Currently quarantined tests
+- `quarantine_history` - Audit trail of all actions
+
+**XML Prompt:** [05-auto-quarantine-flaky-tests.xml](./feature-prompt/05-auto-quarantine-flaky-tests.xml)
+
+---
+
+## Feature 6: Intelligent Failure Clustering
+
+### Overview
+Automatically groups similar test failures using string similarity algorithms to identify systemic issues.
+
+### Value Proposition
+- **Identify patterns** - See when different tests fail for the same reason
+- **Prioritize fixes** - Large clusters indicate systemic issues
+- **Reduce noise** - Focus on root causes, not individual symptoms
+- **Track trends** - See if clusters are growing or shrinking
+
+### Cluster Categories
+| Category | Code | Description |
+|----------|------|-------------|
+| Same Test | C1 | Same test failing repeatedly |
+| Different Tests | C2 | Similar failure across different tests (systemic) |
+| Same File | C3 | Different tests in same file failing |
+
+### Implementation Details
+
+**Files to Create/Modify:**
+- `lib/failure-clustering.ts` - Clustering algorithms (Levenshtein distance)
+- `lib/types.ts` - Add `FailureCluster`, `ClusterCategory` interfaces
+- `app/api/failure-clusters/route.ts` - Clusters list endpoint
+- `app/api/failure-clusters/[id]/route.ts` - Individual cluster details
+- `components/dashboard/failure-clusters.tsx` - Expandable cluster view
+- `components/dashboard/cluster-summary-card.tsx` - Overview stats
+- `app/dashboard/clusters/page.tsx` - Dedicated clusters page
+
+**Algorithm:**
+1. Normalize error messages (remove timestamps, line numbers)
+2. Generate MD5 signature for grouping exact matches
+3. Calculate Levenshtein distance for similar errors
+4. Group by configurable similarity threshold (default 0.75)
+
+**XML Prompt:** [06-intelligent-failure-clustering.xml](./feature-prompt/06-intelligent-failure-clustering.xml)
+
+---
+
 ## Implementation Roadmap
 
-### Phase 1: Test Reliability Score (2-3 days)
+### Phase 1: Foundation
+
+#### 1.1 Test Reliability Score (2-3 days)
 1. Add database function
 2. Create API endpoint
 3. Build gauge component
 4. Add to dashboard
 
-### Phase 2: Performance Regression Detection (3-5 days)
+#### 1.2 Performance Regression Detection (3-5 days)
 1. Create baseline table and migration
 2. Add database functions
 3. Create API endpoint
 4. Build alert card component
 5. Add to dashboard
 
-### Phase 3: Comparative Run Analysis (3-5 days)
+#### 1.3 Comparative Run Analysis (3-5 days)
 1. Add comparison database function
 2. Create API endpoint
 3. Build comparison UI components
 4. Add comparison modal/page
+
+### Phase 2: Advanced Analytics & Automation
+
+#### 2.1 AI Root Cause Analysis (3-5 days)
+1. Set up Vercel AI SDK integration
+2. Create RCA service with AI provider
+3. Add analysis API endpoints
+4. Build RCA badge component
+5. Add distribution summary card
+
+#### 2.2 Auto-Quarantine Flaky Tests (3-5 days)
+1. Create quarantine tables migration
+2. Build quarantine service
+3. Create API endpoints (rules, actions)
+4. Build quarantine badge and manager components
+5. Add admin management page
+
+#### 2.3 Intelligent Failure Clustering (3-5 days)
+1. Implement Levenshtein distance algorithm
+2. Create clustering service
+3. Build API endpoints
+4. Create cluster cards and expandable view
+5. Add dedicated clusters page
 
 ---
 

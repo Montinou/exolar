@@ -375,3 +375,59 @@ export interface ReliabilityScore {
   trend: number // change from previous period (-100 to +100)
   status: "healthy" | "warning" | "critical"
 }
+
+// ============================================
+// Performance Regression Types
+// ============================================
+
+/**
+ * Historical performance baseline for a specific test
+ * Updated from rolling 30-day average
+ */
+export interface TestBaseline {
+  id: number
+  testSignature: string
+  testName: string
+  testFile: string
+  baselineDurationMs: number
+  p50DurationMs: number | null
+  p95DurationMs: number | null
+  sampleCount: number
+  firstSeenAt: string
+  lastUpdatedAt: string
+}
+
+/**
+ * Test that has regressed beyond the threshold
+ * Severity: critical (>50%), warning (20-50%)
+ */
+export interface PerformanceRegression {
+  testName: string
+  testFile: string
+  testSignature: string
+  currentAvgMs: number
+  baselineDurationMs: number
+  regressionPercent: number
+  severity: "critical" | "warning"
+  recentRuns: number
+  trend: "increasing" | "stable" | "decreasing"
+}
+
+/**
+ * Summary of all performance regressions for an org
+ */
+export interface PerformanceRegressionSummary {
+  totalRegressions: number
+  criticalCount: number
+  warningCount: number
+  regressions: PerformanceRegression[]
+}
+
+/**
+ * Duration history point for trend chart
+ */
+export interface DurationHistoryPoint {
+  date: string
+  avgDuration: number
+  runCount: number
+}

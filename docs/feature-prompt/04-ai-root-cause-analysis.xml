@@ -1,0 +1,798 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AI Root Cause Analysis Implementation Prompt
+  Feature: Automatically categorizes test failures using AI to identify root causes
+  Complexity: Medium | Impact: High | Effort: 3-5 days
+-->
+
+<task type="generate">
+  <objective>Implement AI-powered Root Cause Analysis (RCA) that automatically analyzes test failures and categorizes them as Application Bug, Automation Bug, Environment Issue, or Test Issue</objective>
+  <language>TypeScript</language>
+  <framework>Next.js 16 with App Router, Vercel AI SDK, shadcn/ui</framework>
+</task>
+
+<context>
+  <project_type>Dashboard Application</project_type>
+  <project_name>Exolar QA - E2E Test Dashboard</project_name>
+  <existing_patterns>
+    <pattern>Database queries use `getQueriesForOrg(organizationId)` wrapper pattern in lib/db.ts</pattern>
+    <pattern>API routes use `export const dynamic = "force-dynamic"` and auth check first</pattern>
+    <pattern>Components use `"use client"`, useState/useEffect for data fetching</pattern>
+    <pattern>Existing `ai_context` JSONB field in test_results table for storing analysis</pattern>
+    <pattern>Session context via `getSessionContext()` from lib/session-context.ts</pattern>
+    <pattern>Test result cards in components/dashboard/test-result-card.tsx for reference</pattern>
+  </existing_patterns>
+  <dependencies>
+    <dependency>@ai-sdk/openai or @ai-sdk/anthropic - for AI API calls</dependency>
+    <dependency>ai (Vercel AI SDK) - for structured output generation</dependency>
+    <dependency>@neondatabase/serverless - for database queries</dependency>
+    <dependency>lucide-react - for icons (Brain, Bug, Wrench, Cloud, TestTube)</dependency>
+    <dependency>shadcn/ui components - for UI elements</dependency>
+  </dependencies>
+</context>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Analyze failed tests using AI to determine root cause category</requirement>
+    <requirement priority="must">Categories: Application Bug, Automation Bug, Environment Issue, Test Issue, Unknown</requirement>
+    <requirement priority="must">Store analysis results in existing ai_context JSONB field</requirement>
+    <requirement priority="must">Display RCA badge on failed test cards with category and confidence</requirement>
+    <requirement priority="must">Support manual re-analysis trigger from UI</requirement>
+    <requirement priority="should">Provide detailed explanation of why the category was assigned</requirement>
+    <requirement priority="should">Include suggested fix or next steps based on category</requirement>
+    <requirement priority="should">Batch analyze multiple failures for efficiency</requirement>
+    <requirement priority="could">Learn from user corrections to improve accuracy</requirement>
+    <requirement priority="could">Show aggregate RCA distribution chart</requirement>
+  </functional>
+  <non_functional>
+    <requirement>AI API calls should timeout after 30 seconds</requirement>
+    <requirement>Cache analysis results to avoid re-analyzing identical errors</requirement>
+    <requirement>All data must be filtered by organization_id (multi-tenancy)</requirement>
+    <requirement>Follow existing code patterns exactly</requirement>
+  </non_functional>
+</requirements>
+
+<implementation_guide>
+  <file path="lib/types.ts" action="add">
+    <description>Add TypeScript interfaces for RCA</description>
+    <code_snippet><![CDATA[
+export type RCACategory =
+  | 'application_bug'
+  | 'automation_bug'
+  | 'environment_issue'
+  | 'test_issue'
+  | 'unknown';
+
+export interface RCAResult {
+  category: RCACategory;
+  confidence: number; // 0-100
+  explanation: string;
+  suggestedFix: string | null;
+  analyzedAt: string;
+  modelUsed: string;
+}
+
+export interface AIContext {
+  rca?: RCAResult;
+  failureSignature?: string;
+  errorType?: string;
+  stackTraceHash?: string;
+  // Existing fields preserved
+  [key: string]: unknown;
+}
+
+export interface RCAAnalysisRequest {
+  testResultId: string;
+  testName: string;
+  testFile: string;
+  errorMessage: string;
+  stackTrace?: string;
+  testSteps?: string[];
+  pageUrl?: string;
+  retryCount?: number;
+}
+
+export interface RCASummary {
+  totalAnalyzed: number;
+  byCategory: Record<RCACategory, number>;
+  averageConfidence: number;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/ai-rca.ts" action="create">
+    <description>AI RCA analysis service</description>
+    <code_snippet><![CDATA[
+import { generateObject } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { z } from 'zod';
+import type { RCAResult, RCACategory, RCAAnalysisRequest } from './types';
+
+const RCA_SCHEMA = z.object({
+  category: z.enum([
+    'application_bug',
+    'automation_bug',
+    'environment_issue',
+    'test_issue',
+    'unknown'
+  ]),
+  confidence: z.number().min(0).max(100),
+  explanation: z.string(),
+  suggestedFix: z.string().nullable(),
+});
+
+const CATEGORY_DEFINITIONS = `
+Categories:
+1. application_bug - The failure is caused by a bug in the application under test (AUT).
+   Indicators: Unexpected behavior, feature not working, regression from previous version.
+
+2. automation_bug - The failure is caused by issues in the test code itself.
+   Indicators: Incorrect selectors, wrong assertions, timing issues, stale element references.
+
+3. environment_issue - The failure is caused by infrastructure or environment problems.
+   Indicators: Network timeouts, service unavailability, database connection errors, CI/CD issues.
+
+4. test_issue - The failure is caused by test data, configuration, or setup problems.
+   Indicators: Missing test data, incorrect test configuration, flaky test behavior.
+
+5. unknown - Cannot determine the root cause with sufficient confidence.
+`;
+
+export async function analyzeFailure(request: RCAAnalysisRequest): Promise<RCAResult> {
+  const prompt = `
+You are an expert test failure analyst. Analyze the following test failure and determine its root cause category.
+
+${CATEGORY_DEFINITIONS}
+
+Test Information:
+- Test Name: ${request.testName}
+- Test File: ${request.testFile}
+- Error Message: ${request.errorMessage}
+${request.stackTrace ? `- Stack Trace:\n${request.stackTrace.slice(0, 2000)}` : ''}
+${request.pageUrl ? `- Page URL: ${request.pageUrl}` : ''}
+${request.retryCount ? `- Retry Count: ${request.retryCount}` : ''}
+${request.testSteps?.length ? `- Test Steps:\n${request.testSteps.join('\n')}` : ''}
+
+Analyze this failure and provide:
+1. The most likely root cause category
+2. Your confidence level (0-100)
+3. A brief explanation of why you chose this category
+4. A suggested fix or next step (if applicable)
+`;
+
+  try {
+    const result = await generateObject({
+      model: openai('gpt-4o-mini'),
+      schema: RCA_SCHEMA,
+      prompt,
+      maxTokens: 500,
+    });
+
+    return {
+      category: result.object.category as RCACategory,
+      confidence: result.object.confidence,
+      explanation: result.object.explanation,
+      suggestedFix: result.object.suggestedFix,
+      analyzedAt: new Date().toISOString(),
+      modelUsed: 'gpt-4o-mini',
+    };
+  } catch (error) {
+    console.error('[AI-RCA] Analysis failed:', error);
+    return {
+      category: 'unknown',
+      confidence: 0,
+      explanation: 'AI analysis failed to complete',
+      suggestedFix: null,
+      analyzedAt: new Date().toISOString(),
+      modelUsed: 'gpt-4o-mini',
+    };
+  }
+}
+
+export async function batchAnalyzeFailures(
+  requests: RCAAnalysisRequest[]
+): Promise<Map<string, RCAResult>> {
+  const results = new Map<string, RCAResult>();
+
+  // Process in batches of 5 to avoid rate limits
+  const batchSize = 5;
+  for (let i = 0; i < requests.length; i += batchSize) {
+    const batch = requests.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(async (req) => ({
+        id: req.testResultId,
+        result: await analyzeFailure(req),
+      }))
+    );
+
+    batchResults.forEach(({ id, result }) => {
+      results.set(id, result);
+    });
+  }
+
+  return results;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/db.ts" action="add_functions">
+    <description>Add database functions for RCA storage and retrieval</description>
+    <code_snippet><![CDATA[
+export async function updateTestRCA(
+  testResultId: string,
+  organizationId: string,
+  rcaResult: RCAResult
+): Promise<void> {
+  await sql`
+    UPDATE test_results tr
+    SET ai_context = COALESCE(ai_context, '{}'::jsonb) || ${JSON.stringify({ rca: rcaResult })}::jsonb
+    FROM test_executions te
+    WHERE tr.id = ${testResultId}
+      AND tr.execution_id = te.id
+      AND te.organization_id = ${organizationId}
+  `;
+}
+
+export async function getFailuresWithoutRCA(
+  organizationId: string,
+  limit: number = 20
+): Promise<{
+  id: string;
+  testName: string;
+  testFile: string;
+  errorMessage: string;
+  stackTrace: string | null;
+  pageUrl: string | null;
+  retryCount: number;
+}[]> {
+  return sql`
+    SELECT
+      tr.id,
+      tr.test_name as "testName",
+      tr.test_file as "testFile",
+      tr.error_message as "errorMessage",
+      tr.stack_trace as "stackTrace",
+      tr.page_url as "pageUrl",
+      tr.retry_count as "retryCount"
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND tr.status = 'failed'
+      AND (tr.ai_context IS NULL OR tr.ai_context->>'rca' IS NULL)
+      AND te.started_at > NOW() - INTERVAL '7 days'
+    ORDER BY te.started_at DESC
+    LIMIT ${limit}
+  `;
+}
+
+export async function getRCASummary(
+  organizationId: string,
+  dateRange?: { from?: string; to?: string }
+): Promise<RCASummary> {
+  const dateFilter = dateRange?.from && dateRange?.to
+    ? sql`AND te.started_at BETWEEN ${dateRange.from}::timestamptz AND ${dateRange.to}::timestamptz`
+    : sql`AND te.started_at > NOW() - INTERVAL '7 days'`;
+
+  const result = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE tr.ai_context->'rca'->>'category' IS NOT NULL) as total_analyzed,
+      COUNT(*) FILTER (WHERE tr.ai_context->'rca'->>'category' = 'application_bug') as application_bug,
+      COUNT(*) FILTER (WHERE tr.ai_context->'rca'->>'category' = 'automation_bug') as automation_bug,
+      COUNT(*) FILTER (WHERE tr.ai_context->'rca'->>'category' = 'environment_issue') as environment_issue,
+      COUNT(*) FILTER (WHERE tr.ai_context->'rca'->>'category' = 'test_issue') as test_issue,
+      COUNT(*) FILTER (WHERE tr.ai_context->'rca'->>'category' = 'unknown') as unknown,
+      AVG((tr.ai_context->'rca'->>'confidence')::int) FILTER (WHERE tr.ai_context->'rca'->>'confidence' IS NOT NULL) as avg_confidence
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND tr.status = 'failed'
+      ${dateFilter}
+  `;
+
+  const row = result[0] || {};
+
+  return {
+    totalAnalyzed: Number(row.total_analyzed) || 0,
+    byCategory: {
+      application_bug: Number(row.application_bug) || 0,
+      automation_bug: Number(row.automation_bug) || 0,
+      environment_issue: Number(row.environment_issue) || 0,
+      test_issue: Number(row.test_issue) || 0,
+      unknown: Number(row.unknown) || 0,
+    },
+    averageConfidence: Math.round(Number(row.avg_confidence) || 0),
+  };
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/analyze-failure/route.ts" action="create">
+    <description>Create API endpoint for single failure analysis</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { analyzeFailure } from "@/lib/ai-rca";
+import { updateTestRCA } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { testResultId, testName, testFile, errorMessage, stackTrace, pageUrl, retryCount } = body;
+
+    if (!testResultId || !testName || !testFile || !errorMessage) {
+      return NextResponse.json(
+        { error: "Missing required fields: testResultId, testName, testFile, errorMessage" },
+        { status: 400 }
+      );
+    }
+
+    const rcaResult = await analyzeFailure({
+      testResultId,
+      testName,
+      testFile,
+      errorMessage,
+      stackTrace,
+      pageUrl,
+      retryCount,
+    });
+
+    // Store result in database
+    await updateTestRCA(testResultId, context.organizationId, rcaResult);
+
+    return NextResponse.json(rcaResult);
+  } catch (error) {
+    console.error("[API] Error analyzing failure:", error);
+    return NextResponse.json(
+      { error: "Failed to analyze failure" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/analyze-failure/batch/route.ts" action="create">
+    <description>Create API endpoint for batch failure analysis</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { batchAnalyzeFailures } from "@/lib/ai-rca";
+import { updateTestRCA, getFailuresWithoutRCA } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const limit = Number(searchParams.get("limit")) || 20;
+
+    // Get failures without RCA
+    const failures = await getFailuresWithoutRCA(context.organizationId, limit);
+
+    if (failures.length === 0) {
+      return NextResponse.json({
+        analyzed: 0,
+        message: "No failures pending analysis",
+      });
+    }
+
+    // Batch analyze
+    const results = await batchAnalyzeFailures(
+      failures.map((f) => ({
+        testResultId: f.id,
+        testName: f.testName,
+        testFile: f.testFile,
+        errorMessage: f.errorMessage,
+        stackTrace: f.stackTrace || undefined,
+        pageUrl: f.pageUrl || undefined,
+        retryCount: f.retryCount,
+      }))
+    );
+
+    // Store all results
+    await Promise.all(
+      Array.from(results.entries()).map(([id, result]) =>
+        updateTestRCA(id, context.organizationId, result)
+      )
+    );
+
+    return NextResponse.json({
+      analyzed: results.size,
+      message: `Successfully analyzed ${results.size} failures`,
+    });
+  } catch (error) {
+    console.error("[API] Error batch analyzing failures:", error);
+    return NextResponse.json(
+      { error: "Failed to batch analyze failures" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/rca-summary/route.ts" action="create">
+    <description>Create API endpoint for RCA summary statistics</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { getRCASummary } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const from = searchParams.get("from") || undefined;
+    const to = searchParams.get("to") || undefined;
+
+    const dateRange = from && to ? { from, to } : undefined;
+    const summary = await getRCASummary(context.organizationId, dateRange);
+
+    return NextResponse.json(summary);
+  } catch (error) {
+    console.error("[API] Error fetching RCA summary:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch RCA summary" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/ai-rca-badge.tsx" action="create">
+    <description>Create RCA category badge component</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState } from "react";
+import { Bug, Wrench, Cloud, TestTube, HelpCircle, Brain, RefreshCw } from "lucide-react";
+import type { RCAResult, RCACategory } from "@/lib/types";
+
+const CATEGORY_CONFIG: Record<RCACategory, {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+}> = {
+  application_bug: {
+    label: "App Bug",
+    icon: Bug,
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
+  },
+  automation_bug: {
+    label: "Test Bug",
+    icon: Wrench,
+    color: "text-orange-500",
+    bgColor: "bg-orange-500/10",
+  },
+  environment_issue: {
+    label: "Environment",
+    icon: Cloud,
+    color: "text-blue-500",
+    bgColor: "bg-blue-500/10",
+  },
+  test_issue: {
+    label: "Test Issue",
+    icon: TestTube,
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
+  },
+  unknown: {
+    label: "Unknown",
+    icon: HelpCircle,
+    color: "text-gray-500",
+    bgColor: "bg-gray-500/10",
+  },
+};
+
+interface AIRCABadgeProps {
+  rca?: RCAResult;
+  testResultId: string;
+  testName: string;
+  testFile: string;
+  errorMessage: string;
+  stackTrace?: string;
+  onAnalyzed?: (result: RCAResult) => void;
+}
+
+export function AIRCABadge({
+  rca,
+  testResultId,
+  testName,
+  testFile,
+  errorMessage,
+  stackTrace,
+  onAnalyzed,
+}: AIRCABadgeProps) {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [localRCA, setLocalRCA] = useState<RCAResult | undefined>(rca);
+
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch("/api/analyze-failure", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          testResultId,
+          testName,
+          testFile,
+          errorMessage,
+          stackTrace,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setLocalRCA(result);
+        onAnalyzed?.(result);
+      }
+    } catch (error) {
+      console.error("Failed to analyze:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // No RCA yet - show analyze button
+  if (!localRCA) {
+    return (
+      <button
+        onClick={handleAnalyze}
+        disabled={isAnalyzing}
+        className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-[oklch(0.75_0.15_195)]/10 text-[oklch(0.75_0.15_195)] hover:bg-[oklch(0.75_0.15_195)]/20 transition-colors disabled:opacity-50"
+      >
+        {isAnalyzing ? (
+          <RefreshCw className="w-3 h-3 animate-spin" />
+        ) : (
+          <Brain className="w-3 h-3" />
+        )}
+        {isAnalyzing ? "Analyzing..." : "Analyze"}
+      </button>
+    );
+  }
+
+  const config = CATEGORY_CONFIG[localRCA.category];
+  const Icon = config.icon;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setShowDetails(!showDetails)}
+        className={`flex items-center gap-1.5 px-2 py-1 text-xs rounded-full ${config.bgColor} ${config.color} hover:opacity-80 transition-opacity`}
+      >
+        <Icon className="w-3 h-3" />
+        <span>{config.label}</span>
+        <span className="opacity-60">{localRCA.confidence}%</span>
+      </button>
+
+      {showDetails && (
+        <div className="absolute z-50 top-full mt-2 left-0 w-72 p-4 bg-background border border-border rounded-lg shadow-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Icon className={`w-4 h-4 ${config.color}`} />
+              <span className="font-medium">{config.label}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {localRCA.confidence}% confidence
+            </span>
+          </div>
+
+          <p className="text-sm text-muted-foreground mb-3">
+            {localRCA.explanation}
+          </p>
+
+          {localRCA.suggestedFix && (
+            <div className="p-2 bg-muted/30 rounded text-xs">
+              <span className="font-medium">Suggested Fix:</span>
+              <p className="mt-1 text-muted-foreground">{localRCA.suggestedFix}</p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border">
+            <span className="text-xs text-muted-foreground">
+              {new Date(localRCA.analyzedAt).toLocaleDateString()}
+            </span>
+            <button
+              onClick={handleAnalyze}
+              disabled={isAnalyzing}
+              className="flex items-center gap-1 text-xs text-[oklch(0.75_0.15_195)] hover:underline disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${isAnalyzing ? 'animate-spin' : ''}`} />
+              Re-analyze
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/rca-distribution-card.tsx" action="create">
+    <description>Create RCA distribution summary card</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState, useEffect } from "react";
+import { Brain, Bug, Wrench, Cloud, TestTube, HelpCircle } from "lucide-react";
+import type { RCASummary, RCACategory } from "@/lib/types";
+
+const CATEGORY_CONFIG: Record<RCACategory, {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+}> = {
+  application_bug: { label: "App Bugs", icon: Bug, color: "bg-red-500" },
+  automation_bug: { label: "Test Bugs", icon: Wrench, color: "bg-orange-500" },
+  environment_issue: { label: "Environment", icon: Cloud, color: "bg-blue-500" },
+  test_issue: { label: "Test Issues", icon: TestTube, color: "bg-yellow-500" },
+  unknown: { label: "Unknown", icon: HelpCircle, color: "bg-gray-500" },
+};
+
+export function RCADistributionCard() {
+  const [summary, setSummary] = useState<RCASummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/rca-summary")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setSummary(data);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Brain className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">AI Root Cause Analysis</h3>
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-8 bg-muted/30 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !summary) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Brain className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">AI Root Cause Analysis</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{error || "No data available"}</p>
+      </div>
+    );
+  }
+
+  const total = summary.totalAnalyzed || 1;
+
+  return (
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Brain className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">AI Root Cause Analysis</h3>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {summary.totalAnalyzed} analyzed
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {(Object.entries(CATEGORY_CONFIG) as [RCACategory, typeof CATEGORY_CONFIG[RCACategory]][]).map(
+          ([category, config]) => {
+            const count = summary.byCategory[category] || 0;
+            const percent = Math.round((count / total) * 100);
+            const Icon = config.icon;
+
+            return (
+              <div key={category} className="space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-muted-foreground" />
+                    <span>{config.label}</span>
+                  </div>
+                  <span className="font-medium">{count}</span>
+                </div>
+                <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${config.color} transition-all duration-500`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+              </div>
+            );
+          }
+        )}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-border flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">Avg. Confidence</span>
+        <span className="font-medium">{summary.averageConfidence}%</span>
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+</implementation_guide>
+
+<constraints>
+  <avoid>Don't send full stack traces (truncate to 2000 chars) to reduce token usage</avoid>
+  <avoid>Don't re-analyze failures that already have RCA stored</avoid>
+  <avoid>Don't block the UI during analysis - show loading state</avoid>
+  <prefer>Use gpt-4o-mini for cost efficiency - gpt-4o only for complex cases</prefer>
+  <prefer>Cache analysis results to avoid redundant API calls</prefer>
+  <prefer>Follow existing glass-card styling</prefer>
+  <prefer>Use Vercel AI SDK's structured output for reliable JSON parsing</prefer>
+</constraints>
+
+<output_format>
+  <code>Implement each file following the code snippets provided</code>
+  <explanation>
+    Implementation notes:
+    1. Ensure OPENAI_API_KEY environment variable is set
+    2. The AI context field already exists in test_results table (JSONB)
+    3. RCA results are stored alongside any existing AI context data
+    4. The badge component can be added to test-result-card.tsx
+    5. Consider adding rate limiting for batch analysis
+  </explanation>
+  <usage_example>
+    Add the badge to test result cards:
+    ```tsx
+    import { AIRCABadge } from "@/components/dashboard/ai-rca-badge";
+
+    // In your test result card:
+    {testResult.status === 'failed' && (
+      <AIRCABadge
+        rca={testResult.aiContext?.rca}
+        testResultId={testResult.id}
+        testName={testResult.testName}
+        testFile={testResult.testFile}
+        errorMessage={testResult.errorMessage}
+        stackTrace={testResult.stackTrace}
+      />
+    )}
+    ```
+
+    Add the distribution card to the dashboard:
+    ```tsx
+    import { RCADistributionCard } from "@/components/dashboard/rca-distribution-card";
+
+    // In your dashboard grid:
+    <RCADistributionCard />
+    ```
+  </usage_example>
+</output_format>

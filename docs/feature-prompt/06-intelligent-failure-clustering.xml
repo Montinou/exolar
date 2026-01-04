@@ -1,0 +1,870 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Intelligent Failure Clustering Implementation Prompt
+  Feature: Groups similar test failures using string similarity algorithms
+  Complexity: Medium | Impact: High | Effort: 3-5 days
+-->
+
+<task type="generate">
+  <objective>Implement Intelligent Failure Clustering that automatically groups similar test failures across different tests using string similarity algorithms to help identify systemic issues</objective>
+  <language>TypeScript</language>
+  <framework>Next.js 16 with App Router, shadcn/ui</framework>
+</task>
+
+<context>
+  <project_type>Dashboard Application</project_type>
+  <project_name>Exolar QA - E2E Test Dashboard</project_name>
+  <existing_patterns>
+    <pattern>Database queries use `getQueriesForOrg(organizationId)` wrapper pattern in lib/db.ts</pattern>
+    <pattern>API routes use `export const dynamic = "force-dynamic"` and auth check first</pattern>
+    <pattern>Components use `"use client"`, useState/useEffect for data fetching</pattern>
+    <pattern>Existing error_distribution_chart.tsx groups by error type - clustering groups by similarity</pattern>
+    <pattern>Session context via `getSessionContext()` from lib/session-context.ts</pattern>
+    <pattern>test_results table has error_message and stack_trace fields</pattern>
+  </existing_patterns>
+  <dependencies>
+    <dependency>@neondatabase/serverless - for database queries</dependency>
+    <dependency>lucide-react - for icons (Layers, ChevronDown, ChevronRight, AlertCircle)</dependency>
+    <dependency>shadcn/ui components - for UI elements (Accordion, Badge)</dependency>
+    <dependency>string-similarity or fastest-levenshtein - for similarity calculations</dependency>
+  </dependencies>
+</context>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Cluster failures by error message similarity using Levenshtein distance</requirement>
+    <requirement priority="must">Support multiple cluster categories: C1 (same test), C2 (different tests), C3 (different failure same test)</requirement>
+    <requirement priority="must">Display clusters with expandable views showing individual failures</requirement>
+    <requirement priority="must">Show cluster size, affected tests count, and representative error message</requirement>
+    <requirement priority="must">Link each failure in cluster to test result detail</requirement>
+    <requirement priority="should">Calculate cluster trend (growing, stable, shrinking)</requirement>
+    <requirement priority="should">Allow configuring similarity threshold (default 0.8)</requirement>
+    <requirement priority="should">Provide cluster-level actions (create issue, assign, etc.)</requirement>
+    <requirement priority="could">Cache cluster results for performance</requirement>
+    <requirement priority="could">ML-enhanced clustering using embeddings</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Clustering should complete within 2 seconds for up to 1000 failures</requirement>
+    <requirement>All data must be filtered by organization_id (multi-tenancy)</requirement>
+    <requirement>Follow existing code patterns exactly</requirement>
+  </non_functional>
+</requirements>
+
+<implementation_guide>
+  <file path="lib/types.ts" action="add">
+    <description>Add TypeScript interfaces for failure clustering</description>
+    <code_snippet><![CDATA[
+export type ClusterCategory = 'same_test' | 'different_tests' | 'different_failure_same_test';
+
+export interface FailureCluster {
+  id: string;
+  category: ClusterCategory;
+  representativeError: string;
+  errorSignature: string;
+  failureCount: number;
+  affectedTests: number;
+  affectedFiles: number;
+  firstSeen: string;
+  lastSeen: string;
+  trend: 'growing' | 'stable' | 'shrinking';
+  failures: ClusteredFailure[];
+}
+
+export interface ClusteredFailure {
+  testResultId: string;
+  executionId: string;
+  testName: string;
+  testFile: string;
+  errorMessage: string;
+  startedAt: string;
+  status: string;
+  similarity: number;
+}
+
+export interface ClusterSummary {
+  totalClusters: number;
+  totalFailures: number;
+  byCategory: Record<ClusterCategory, number>;
+  topClusters: FailureCluster[];
+}
+
+export interface ClusteringConfig {
+  similarityThreshold: number;
+  maxClusters: number;
+  includeStackTrace: boolean;
+  timeRangeHours: number;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/failure-clustering.ts" action="create">
+    <description>Failure clustering service with similarity algorithms</description>
+    <code_snippet><![CDATA[
+import type {
+  FailureCluster,
+  ClusteredFailure,
+  ClusterSummary,
+  ClusterCategory,
+  ClusteringConfig,
+} from './types';
+import { sql } from '@neondatabase/serverless';
+import crypto from 'crypto';
+
+// Levenshtein distance calculation
+function levenshteinDistance(str1: string, str2: string): number {
+  const m = str1.length;
+  const n = str2.length;
+
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  const dp: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return dp[m][n];
+}
+
+// Calculate similarity ratio (0-1)
+function similarity(str1: string, str2: string): number {
+  const maxLen = Math.max(str1.length, str2.length);
+  if (maxLen === 0) return 1;
+  const distance = levenshteinDistance(str1, str2);
+  return 1 - distance / maxLen;
+}
+
+// Normalize error message for comparison
+function normalizeError(error: string): string {
+  return error
+    .replace(/at line \d+/gi, 'at line N')
+    .replace(/:\d+:\d+/g, ':N:N')
+    .replace(/\d{4}-\d{2}-\d{2}/g, 'DATE')
+    .replace(/\d+ms/g, 'Nms')
+    .replace(/[a-f0-9]{8,}/gi, 'HASH')
+    .replace(/localhost:\d+/g, 'localhost:PORT')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .slice(0, 500); // Limit length for performance
+}
+
+// Generate error signature for grouping
+function generateErrorSignature(error: string): string {
+  const normalized = normalizeError(error);
+  return crypto.createHash('md5').update(normalized).digest('hex').slice(0, 16);
+}
+
+// Determine cluster category
+function determineCategory(failures: ClusteredFailure[]): ClusterCategory {
+  const uniqueTests = new Set(failures.map(f => `${f.testFile}::${f.testName}`));
+  const uniqueFiles = new Set(failures.map(f => f.testFile));
+
+  if (uniqueTests.size === 1) {
+    return 'same_test'; // C1: Same test, same failure
+  } else if (uniqueFiles.size > 1) {
+    return 'different_tests'; // C2: Different tests, similar failure
+  } else {
+    return 'different_failure_same_test'; // C3: Same file, different tests
+  }
+}
+
+// Calculate cluster trend based on recent vs older failures
+function calculateTrend(failures: ClusteredFailure[]): 'growing' | 'stable' | 'shrinking' {
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+  const recentCount = failures.filter(f => new Date(f.startedAt) > oneDayAgo).length;
+  const olderCount = failures.filter(f => {
+    const date = new Date(f.startedAt);
+    return date <= oneDayAgo && date > threeDaysAgo;
+  }).length;
+
+  if (recentCount > olderCount * 1.5) return 'growing';
+  if (recentCount < olderCount * 0.5) return 'shrinking';
+  return 'stable';
+}
+
+// Main clustering function
+export async function clusterFailures(
+  organizationId: string,
+  config: Partial<ClusteringConfig> = {}
+): Promise<FailureCluster[]> {
+  const {
+    similarityThreshold = 0.75,
+    maxClusters = 50,
+    includeStackTrace = false,
+    timeRangeHours = 168, // 7 days
+  } = config;
+
+  // Fetch recent failures
+  const failures = await sql<{
+    id: string;
+    executionId: string;
+    testName: string;
+    testFile: string;
+    errorMessage: string;
+    stackTrace: string | null;
+    startedAt: string;
+    status: string;
+  }[]>`
+    SELECT
+      tr.id,
+      tr.execution_id as "executionId",
+      tr.test_name as "testName",
+      tr.test_file as "testFile",
+      tr.error_message as "errorMessage",
+      ${includeStackTrace ? sql`tr.stack_trace` : sql`NULL`} as "stackTrace",
+      te.started_at as "startedAt",
+      tr.status
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND tr.status = 'failed'
+      AND tr.error_message IS NOT NULL
+      AND te.started_at > NOW() - INTERVAL '${timeRangeHours} hours'
+    ORDER BY te.started_at DESC
+    LIMIT 1000
+  `;
+
+  if (failures.length === 0) {
+    return [];
+  }
+
+  // Group by error signature first (exact matches)
+  const signatureGroups = new Map<string, typeof failures>();
+
+  for (const failure of failures) {
+    const signature = generateErrorSignature(failure.errorMessage);
+    const group = signatureGroups.get(signature) || [];
+    group.push(failure);
+    signatureGroups.set(signature, group);
+  }
+
+  // Build clusters
+  const clusters: FailureCluster[] = [];
+  const processedSignatures = new Set<string>();
+
+  for (const [signature, group] of signatureGroups) {
+    if (processedSignatures.has(signature)) continue;
+
+    // Find similar signatures and merge
+    const relatedFailures = [...group];
+
+    for (const [otherSig, otherGroup] of signatureGroups) {
+      if (otherSig === signature || processedSignatures.has(otherSig)) continue;
+
+      // Compare representative errors
+      const sim = similarity(
+        normalizeError(group[0].errorMessage),
+        normalizeError(otherGroup[0].errorMessage)
+      );
+
+      if (sim >= similarityThreshold) {
+        relatedFailures.push(...otherGroup);
+        processedSignatures.add(otherSig);
+      }
+    }
+
+    processedSignatures.add(signature);
+
+    const clusteredFailures: ClusteredFailure[] = relatedFailures.map(f => ({
+      testResultId: f.id,
+      executionId: f.executionId,
+      testName: f.testName,
+      testFile: f.testFile,
+      errorMessage: f.errorMessage,
+      startedAt: f.startedAt,
+      status: f.status,
+      similarity: similarity(
+        normalizeError(group[0].errorMessage),
+        normalizeError(f.errorMessage)
+      ),
+    }));
+
+    const uniqueTests = new Set(clusteredFailures.map(f => `${f.testFile}::${f.testName}`));
+    const uniqueFiles = new Set(clusteredFailures.map(f => f.testFile));
+    const dates = clusteredFailures.map(f => new Date(f.startedAt));
+
+    clusters.push({
+      id: signature,
+      category: determineCategory(clusteredFailures),
+      representativeError: group[0].errorMessage.slice(0, 200),
+      errorSignature: signature,
+      failureCount: clusteredFailures.length,
+      affectedTests: uniqueTests.size,
+      affectedFiles: uniqueFiles.size,
+      firstSeen: new Date(Math.min(...dates.map(d => d.getTime()))).toISOString(),
+      lastSeen: new Date(Math.max(...dates.map(d => d.getTime()))).toISOString(),
+      trend: calculateTrend(clusteredFailures),
+      failures: clusteredFailures.sort((a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      ),
+    });
+  }
+
+  // Sort by failure count and limit
+  return clusters
+    .sort((a, b) => b.failureCount - a.failureCount)
+    .slice(0, maxClusters);
+}
+
+export async function getClusterSummary(
+  organizationId: string,
+  timeRangeHours: number = 168
+): Promise<ClusterSummary> {
+  const clusters = await clusterFailures(organizationId, { timeRangeHours, maxClusters: 100 });
+
+  const byCategory: Record<ClusterCategory, number> = {
+    same_test: 0,
+    different_tests: 0,
+    different_failure_same_test: 0,
+  };
+
+  for (const cluster of clusters) {
+    byCategory[cluster.category]++;
+  }
+
+  return {
+    totalClusters: clusters.length,
+    totalFailures: clusters.reduce((sum, c) => sum + c.failureCount, 0),
+    byCategory,
+    topClusters: clusters.slice(0, 10),
+  };
+}
+
+export async function getClusterById(
+  organizationId: string,
+  clusterId: string
+): Promise<FailureCluster | null> {
+  const clusters = await clusterFailures(organizationId, { maxClusters: 100 });
+  return clusters.find(c => c.id === clusterId) || null;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/failure-clusters/route.ts" action="create">
+    <description>Create API endpoint for failure clusters</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { clusterFailures, getClusterSummary } from "@/lib/failure-clustering";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const summaryOnly = searchParams.get("summary") === 'true';
+    const hours = Number(searchParams.get("hours")) || 168;
+    const threshold = Number(searchParams.get("threshold")) || 0.75;
+    const limit = Number(searchParams.get("limit")) || 50;
+
+    if (summaryOnly) {
+      const summary = await getClusterSummary(context.organizationId, hours);
+      return NextResponse.json(summary);
+    }
+
+    const clusters = await clusterFailures(context.organizationId, {
+      timeRangeHours: hours,
+      similarityThreshold: threshold,
+      maxClusters: limit,
+    });
+
+    return NextResponse.json({ clusters });
+  } catch (error) {
+    console.error("[API] Error fetching failure clusters:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch failure clusters" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/failure-clusters/[id]/route.ts" action="create">
+    <description>Create API endpoint for individual cluster details</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { getClusterById } from "@/lib/failure-clustering";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const cluster = await getClusterById(context.organizationId, params.id);
+
+    if (!cluster) {
+      return NextResponse.json({ error: "Cluster not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(cluster);
+  } catch (error) {
+    console.error("[API] Error fetching cluster:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch cluster" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/failure-clusters.tsx" action="create">
+    <description>Create failure clusters card component</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  Layers,
+  ChevronDown,
+  ChevronRight,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  ExternalLink,
+  Copy,
+  Check,
+} from "lucide-react";
+import type { FailureCluster, ClusterCategory, ClusterSummary } from "@/lib/types";
+
+const CATEGORY_CONFIG: Record<ClusterCategory, {
+  label: string;
+  description: string;
+  color: string;
+}> = {
+  same_test: {
+    label: "Same Test",
+    description: "Same test failing repeatedly",
+    color: "text-red-400 bg-red-500/10",
+  },
+  different_tests: {
+    label: "Cross-Test",
+    description: "Similar failures across different tests",
+    color: "text-purple-400 bg-purple-500/10",
+  },
+  different_failure_same_test: {
+    label: "Same File",
+    description: "Different tests in same file",
+    color: "text-orange-400 bg-orange-500/10",
+  },
+};
+
+function TrendIcon({ trend }: { trend: string }) {
+  switch (trend) {
+    case 'growing':
+      return <TrendingUp className="w-4 h-4 text-red-400" />;
+    case 'shrinking':
+      return <TrendingDown className="w-4 h-4 text-green-400" />;
+    default:
+      return <Minus className="w-4 h-4 text-muted-foreground" />;
+  }
+}
+
+function ClusterCard({ cluster, onExpand }: { cluster: FailureCluster; onExpand: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const config = CATEGORY_CONFIG[cluster.category];
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(cluster.representativeError);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="border border-border/50 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {expanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          )}
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-xs px-2 py-0.5 rounded ${config.color}`}>
+                {config.label}
+              </span>
+              <span className="text-sm font-medium">
+                {cluster.failureCount} failures
+              </span>
+              <TrendIcon trend={cluster.trend} />
+            </div>
+            <p className="text-sm text-muted-foreground truncate">
+              {cluster.representativeError}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 ml-4 text-xs text-muted-foreground">
+          <span>{cluster.affectedTests} tests</span>
+          <span>{cluster.affectedFiles} files</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border/50 p-4 bg-muted/10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs text-muted-foreground">
+              First seen: {new Date(cluster.firstSeen).toLocaleDateString()} ·
+              Last seen: {new Date(cluster.lastSeen).toLocaleDateString()}
+            </div>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {copied ? (
+                <Check className="w-3 h-3 text-green-400" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+              {copied ? 'Copied!' : 'Copy error'}
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {cluster.failures.slice(0, 10).map((failure) => (
+              <div
+                key={failure.testResultId}
+                className="flex items-center justify-between py-2 px-3 bg-background/50 rounded text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{failure.testName}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {failure.testFile}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 ml-4">
+                  <span className="text-xs text-muted-foreground">
+                    {Math.round(failure.similarity * 100)}% match
+                  </span>
+                  <a
+                    href={`/dashboard/executions/${failure.executionId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 hover:bg-muted rounded"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            ))}
+            {cluster.failures.length > 10 && (
+              <p className="text-xs text-muted-foreground text-center py-2">
+                +{cluster.failures.length - 10} more failures
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function FailureClustersCard() {
+  const [clusters, setClusters] = useState<FailureCluster[]>([]);
+  const [summary, setSummary] = useState<ClusterSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<ClusterCategory | 'all'>('all');
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/failure-clusters').then(r => r.json()),
+      fetch('/api/failure-clusters?summary=true').then(r => r.json()),
+    ])
+      .then(([clustersData, summaryData]) => {
+        if (clustersData.error) throw new Error(clustersData.error);
+        setClusters(clustersData.clusters || []);
+        setSummary(summaryData);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filteredClusters = filter === 'all'
+    ? clusters
+    : clusters.filter(c => c.category === filter);
+
+  if (loading) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Layers className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Failure Clusters</h3>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 bg-muted/30 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Layers className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Failure Clusters</h3>
+        </div>
+        <p className="text-sm text-red-500">{error}</p>
+      </div>
+    );
+  }
+
+  if (clusters.length === 0) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Layers className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Failure Clusters</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <AlertCircle className="w-12 h-12 text-muted-foreground mb-3" />
+          <p className="text-sm font-medium">No Failure Clusters</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            No similar failures detected in the last 7 days
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Layers className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Failure Clusters</h3>
+        </div>
+        {summary && (
+          <span className="text-xs text-muted-foreground">
+            {summary.totalClusters} clusters · {summary.totalFailures} failures
+          </span>
+        )}
+      </div>
+
+      {/* Category Filter */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-3 py-1 text-xs rounded-full transition-colors ${
+            filter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted/30 hover:bg-muted/50'
+          }`}
+        >
+          All ({clusters.length})
+        </button>
+        {(Object.entries(CATEGORY_CONFIG) as [ClusterCategory, typeof CATEGORY_CONFIG[ClusterCategory]][]).map(
+          ([category, config]) => {
+            const count = clusters.filter(c => c.category === category).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={category}
+                onClick={() => setFilter(category)}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  filter === category ? 'bg-primary text-primary-foreground' : 'bg-muted/30 hover:bg-muted/50'
+                }`}
+              >
+                {config.label} ({count})
+              </button>
+            );
+          }
+        )}
+      </div>
+
+      {/* Cluster List */}
+      <div className="space-y-3 max-h-[500px] overflow-y-auto">
+        {filteredClusters.map((cluster) => (
+          <ClusterCard
+            key={cluster.id}
+            cluster={cluster}
+            onExpand={() => {}}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/cluster-summary-card.tsx" action="create">
+    <description>Create cluster summary stats card</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState, useEffect } from "react";
+import { Layers, AlertCircle, FileWarning, Files } from "lucide-react";
+import type { ClusterSummary, ClusterCategory } from "@/lib/types";
+
+const CATEGORY_ICONS: Record<ClusterCategory, React.ElementType> = {
+  same_test: AlertCircle,
+  different_tests: Files,
+  different_failure_same_test: FileWarning,
+};
+
+export function ClusterSummaryCard() {
+  const [summary, setSummary] = useState<ClusterSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/failure-clusters?summary=true')
+      .then(r => r.json())
+      .then(data => setSummary(data))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="h-32 bg-muted/30 rounded animate-pulse" />
+      </div>
+    );
+  }
+
+  if (!summary) {
+    return null;
+  }
+
+  return (
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Layers className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+        <h3 className="font-semibold">Cluster Overview</h3>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        {(Object.entries(summary.byCategory) as [ClusterCategory, number][]).map(
+          ([category, count]) => {
+            const Icon = CATEGORY_ICONS[category];
+            return (
+              <div key={category} className="text-center">
+                <Icon className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-2xl font-bold">{count}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {category.replace(/_/g, ' ')}
+                </p>
+              </div>
+            );
+          }
+        )}
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-border flex justify-between text-sm">
+        <span className="text-muted-foreground">Total Failures</span>
+        <span className="font-medium">{summary.totalFailures}</span>
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/dashboard/clusters/page.tsx" action="create">
+    <description>Create dedicated clusters page (optional)</description>
+    <code_snippet><![CDATA[
+import { FailureClustersCard } from "@/components/dashboard/failure-clusters";
+import { ClusterSummaryCard } from "@/components/dashboard/cluster-summary-card";
+
+export default function ClustersPage() {
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Failure Clusters</h1>
+        <p className="text-muted-foreground mt-1">
+          Similar failures grouped together to identify systemic issues
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <ClusterSummaryCard />
+        </div>
+        <div className="lg:col-span-2">
+          <FailureClustersCard />
+        </div>
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+</implementation_guide>
+
+<constraints>
+  <avoid>Don't compare every failure to every other - use signature grouping first</avoid>
+  <avoid>Don't include passed tests in clustering</avoid>
+  <avoid>Don't cluster very short error messages (&lt;10 chars) - too generic</avoid>
+  <prefer>Normalize error messages before comparison (remove line numbers, timestamps)</prefer>
+  <prefer>Limit failures to recent timeframe (default 7 days) for relevance</prefer>
+  <prefer>Use existing glass-card styling</prefer>
+  <prefer>Show most impactful clusters first (by failure count)</prefer>
+</constraints>
+
+<output_format>
+  <code>Implement each file following the code snippets provided</code>
+  <explanation>
+    Implementation notes:
+    1. Clustering is performed on-demand (not stored) for freshness
+    2. Error normalization removes variable parts (timestamps, line numbers)
+    3. Signature grouping reduces O(n^2) comparisons
+    4. Categories help prioritize: cross-test issues (C2) often indicate systemic bugs
+    5. Consider caching results for 5-10 minutes for performance
+  </explanation>
+  <usage_example>
+    Add the clusters card to the dashboard:
+    ```tsx
+    import { FailureClustersCard } from "@/components/dashboard/failure-clusters";
+    import { ClusterSummaryCard } from "@/components/dashboard/cluster-summary-card";
+
+    // In your dashboard grid:
+    <ClusterSummaryCard />
+    <FailureClustersCard />
+    ```
+
+    Or navigate to dedicated page:
+    ```
+    /dashboard/clusters
+    ```
+  </usage_example>
+</output_format>
