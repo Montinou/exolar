@@ -1,0 +1,335 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test Reliability Score Implementation Prompt
+  Feature: Single score (0-100) representing overall test suite health
+  Complexity: Low | Impact: High | Effort: 2-3 days
+-->
+
+<task type="generate">
+  <objective>Implement a Test Reliability Score feature that displays a gauge/meter showing 0-100 score representing overall test suite health</objective>
+  <language>TypeScript</language>
+  <framework>Next.js 16 with App Router, Recharts, shadcn/ui</framework>
+</task>
+
+<context>
+  <project_type>Dashboard Application</project_type>
+  <project_name>Exolar QA - E2E Test Dashboard</project_name>
+  <existing_patterns>
+    <pattern>Database queries use `getQueriesForOrg(organizationId)` wrapper pattern in lib/db.ts</pattern>
+    <pattern>API routes use `export const dynamic = "force-dynamic"` and auth check first</pattern>
+    <pattern>Components use `"use client"`, useState/useEffect for data fetching</pattern>
+    <pattern>Charts use Recharts with OKLCH colors (oklch(0.75 0.15 195) = cyan)</pattern>
+    <pattern>Cards use `glass-card glass-card-glow p-6` styling from globals.css</pattern>
+    <pattern>Session context via `getSessionContext()` from lib/session-context.ts</pattern>
+  </existing_patterns>
+  <dependencies>
+    <dependency>recharts - for gauge/radial chart</dependency>
+    <dependency>@neondatabase/serverless - for database queries</dependency>
+    <dependency>lucide-react - for icons</dependency>
+    <dependency>shadcn/ui components - for UI elements</dependency>
+  </dependencies>
+</context>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Calculate reliability score using formula: (PassRate × 0.4) + ((1 - FlakyRate) × 0.3) + (DurationStability × 0.3)</requirement>
+    <requirement priority="must">Display score as a gauge/meter chart (0-100)</requirement>
+    <requirement priority="must">Color code: Green (80+), Yellow (60-79), Red (&lt;60)</requirement>
+    <requirement priority="must">Show breakdown of contributing factors (pass rate, flakiness impact, performance impact)</requirement>
+    <requirement priority="should">Include historical trend of the score (last 7 days)</requirement>
+    <requirement priority="should">Support date range filtering (from/to query params)</requirement>
+    <requirement priority="could">Add tooltip explaining score calculation</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Query must complete within 500ms for typical data volumes</requirement>
+    <requirement>All data must be filtered by organization_id (multi-tenancy)</requirement>
+    <requirement>Follow existing code patterns exactly</requirement>
+  </non_functional>
+</requirements>
+
+<implementation_guide>
+  <file path="lib/types.ts" action="add">
+    <description>Add TypeScript interface for reliability score</description>
+    <code_snippet><![CDATA[
+export interface ReliabilityScore {
+  score: number;
+  breakdown: {
+    passRateContribution: number;
+    flakinessContribution: number;
+    stabilityContribution: number;
+  };
+  rawMetrics: {
+    passRate: number;
+    flakyRate: number;
+    durationCV: number; // coefficient of variation
+  };
+  trend: number; // change from previous period (-100 to +100)
+  status: 'healthy' | 'warning' | 'critical';
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/db.ts" action="add_function">
+    <description>Add database function to calculate reliability score</description>
+    <code_snippet><![CDATA[
+export async function getReliabilityScore(
+  organizationId: string,
+  dateRange?: { from?: string; to?: string }
+): Promise<ReliabilityScore> {
+  const dateFilter = dateRange?.from && dateRange?.to
+    ? sql`AND te.started_at BETWEEN ${dateRange.from}::timestamptz AND ${dateRange.to}::timestamptz`
+    : sql`AND te.started_at > NOW() - INTERVAL '7 days'`;
+
+  const result = await sql`
+    WITH current_metrics AS (
+      SELECT
+        COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100 as pass_rate,
+        COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100 as flaky_rate,
+        COALESCE(STDDEV(tr.duration_ms) / NULLIF(AVG(tr.duration_ms), 0), 0) as duration_cv
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        ${dateFilter}
+    ),
+    previous_metrics AS (
+      SELECT
+        COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100 as pass_rate,
+        COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100 as flaky_rate,
+        COALESCE(STDDEV(tr.duration_ms) / NULLIF(AVG(tr.duration_ms), 0), 0) as duration_cv
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND te.started_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days'
+    )
+    SELECT
+      cm.pass_rate,
+      cm.flaky_rate,
+      cm.duration_cv,
+      pm.pass_rate as prev_pass_rate,
+      pm.flaky_rate as prev_flaky_rate,
+      pm.duration_cv as prev_duration_cv
+    FROM current_metrics cm
+    CROSS JOIN previous_metrics pm
+  `;
+
+  const row = result[0] || { pass_rate: 0, flaky_rate: 0, duration_cv: 0 };
+
+  const passRateContribution = (row.pass_rate || 0) * 0.4;
+  const flakinessContribution = ((100 - (row.flaky_rate || 0)) * 0.3);
+  const stabilityContribution = ((1 - Math.min(row.duration_cv || 0, 1)) * 100 * 0.3);
+
+  const score = Math.round(passRateContribution + flakinessContribution + stabilityContribution);
+
+  // Calculate previous score for trend
+  const prevScore = row.prev_pass_rate
+    ? Math.round(
+        (row.prev_pass_rate * 0.4) +
+        ((100 - row.prev_flaky_rate) * 0.3) +
+        ((1 - Math.min(row.prev_duration_cv, 1)) * 100 * 0.3)
+      )
+    : score;
+
+  return {
+    score,
+    breakdown: {
+      passRateContribution: Math.round(passRateContribution),
+      flakinessContribution: Math.round(flakinessContribution),
+      stabilityContribution: Math.round(stabilityContribution),
+    },
+    rawMetrics: {
+      passRate: Math.round(row.pass_rate || 0),
+      flakyRate: Math.round(row.flaky_rate || 0),
+      durationCV: Math.round((row.duration_cv || 0) * 100) / 100,
+    },
+    trend: score - prevScore,
+    status: score >= 80 ? 'healthy' : score >= 60 ? 'warning' : 'critical',
+  };
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/reliability-score/route.ts" action="create">
+    <description>Create API endpoint for reliability score</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { getReliabilityScore } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const from = searchParams.get("from") || undefined;
+    const to = searchParams.get("to") || undefined;
+
+    const dateRange = from && to ? { from, to } : undefined;
+    const score = await getReliabilityScore(context.organizationId, dateRange);
+
+    return NextResponse.json(score);
+  } catch (error) {
+    console.error("[API] Error fetching reliability score:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch reliability score" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/reliability-score.tsx" action="create">
+    <description>Create gauge component for reliability score</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState, useEffect } from "react";
+import { RadialBarChart, RadialBar, PolarAngleAxis, ResponsiveContainer } from "recharts";
+import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import type { ReliabilityScore } from "@/lib/types";
+
+export function ReliabilityScoreCard() {
+  const [score, setScore] = useState<ReliabilityScore | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/reliability-score")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) throw new Error(data.error);
+        setScore(data);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Reliability Score</h3>
+        </div>
+        <div className="h-48 flex items-center justify-center">
+          <div className="animate-pulse bg-muted/30 w-32 h-32 rounded-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !score) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Reliability Score</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{error || "No data available"}</p>
+      </div>
+    );
+  }
+
+  const getScoreColor = (status: string) => {
+    switch (status) {
+      case "healthy": return "oklch(0.75 0.18 145)"; // green
+      case "warning": return "oklch(0.75 0.15 85)";  // yellow
+      case "critical": return "oklch(0.65 0.2 25)";  // red
+      default: return "oklch(0.75 0.15 195)";        // cyan
+    }
+  };
+
+  const TrendIcon = score.trend > 0 ? TrendingUp : score.trend < 0 ? TrendingDown : Minus;
+  const trendColor = score.trend > 0 ? "text-green-500" : score.trend < 0 ? "text-red-500" : "text-muted-foreground";
+
+  const chartData = [{ value: score.score, fill: getScoreColor(score.status) }];
+
+  return (
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Activity className="w-5 h-5 text-[oklch(0.75_0.15_195)]" />
+          <h3 className="font-semibold">Reliability Score</h3>
+        </div>
+        <div className={`flex items-center gap-1 text-sm ${trendColor}`}>
+          <TrendIcon className="w-4 h-4" />
+          <span>{score.trend > 0 ? "+" : ""}{score.trend}</span>
+        </div>
+      </div>
+
+      <div className="h-48 relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart
+            cx="50%"
+            cy="50%"
+            innerRadius="60%"
+            outerRadius="90%"
+            startAngle={180}
+            endAngle={0}
+            data={chartData}
+          >
+            <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+            <RadialBar
+              background={{ fill: "oklch(1 0 0 / 0.05)" }}
+              dataKey="value"
+              cornerRadius={10}
+              angleAxisId={0}
+            />
+          </RadialBarChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-4xl font-bold" style={{ color: getScoreColor(score.status) }}>
+            {score.score}
+          </span>
+          <span className="text-sm text-muted-foreground capitalize">{score.status}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+        <div>
+          <p className="text-xs text-muted-foreground">Pass Rate</p>
+          <p className="text-sm font-medium">{score.rawMetrics.passRate}%</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Flaky Rate</p>
+          <p className="text-sm font-medium">{score.rawMetrics.flakyRate}%</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Stability</p>
+          <p className="text-sm font-medium">{Math.round((1 - score.rawMetrics.durationCV) * 100)}%</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+</implementation_guide>
+
+<constraints>
+  <avoid>Don't create new database tables - use existing test_results and test_executions tables</avoid>
+  <avoid>Don't add external dependencies beyond what's listed in package.json</avoid>
+  <avoid>Don't use localStorage or client-side storage</avoid>
+  <prefer>Follow existing patterns in lib/db.ts for query structure</prefer>
+  <prefer>Use OKLCH colors consistent with existing charts</prefer>
+  <prefer>Use glass-card styling for consistency</prefer>
+</constraints>
+
+<output_format>
+  <code>Implement each file following the code snippets provided</code>
+  <explanation>Explain any deviations from the provided snippets</explanation>
+  <usage_example>
+    Add the component to the dashboard page:
+    ```tsx
+    import { ReliabilityScoreCard } from "@/components/dashboard/reliability-score";
+
+    // In your dashboard grid:
+    <ReliabilityScoreCard />
+    ```
+  </usage_example>
+</output_format>

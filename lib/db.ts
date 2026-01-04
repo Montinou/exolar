@@ -16,6 +16,7 @@ import type {
   FlakinessSummary,
   BranchGroup,
   SuiteResult,
+  ReliabilityScore,
 } from "./types"
 
 export function getSql() {
@@ -1333,6 +1334,103 @@ export async function updateApiKeyLastUsed(keyId: number): Promise<void> {
 }
 
 // ============================================
+// Reliability Score
+// ============================================
+
+/**
+ * Calculate overall test suite reliability score (0-100)
+ * Formula: (PassRate × 0.4) + ((1 - FlakyRate) × 0.3) + (DurationStability × 0.3)
+ */
+export async function getReliabilityScore(
+  organizationId: number,
+  dateRange?: DateRangeFilter
+): Promise<ReliabilityScore> {
+  const sql = getSql()
+
+  // Build date filter for current period
+  const dateFilter =
+    dateRange?.from && dateRange?.to
+      ? `AND te.started_at BETWEEN '${dateRange.from}'::timestamptz AND '${dateRange.to}'::timestamptz`
+      : `AND te.started_at > NOW() - INTERVAL '7 days'`
+
+  const result = await sql`
+    WITH current_metrics AS (
+      SELECT
+        COALESCE(COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100, 0) as pass_rate,
+        COALESCE(COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100, 0) as flaky_rate,
+        COALESCE(STDDEV(tr.duration_ms) / NULLIF(AVG(tr.duration_ms), 0), 0) as duration_cv
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        ${sql.unsafe(dateFilter)}
+    ),
+    previous_metrics AS (
+      SELECT
+        COALESCE(COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100, 0) as pass_rate,
+        COALESCE(COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100, 0) as flaky_rate,
+        COALESCE(STDDEV(tr.duration_ms) / NULLIF(AVG(tr.duration_ms), 0), 0) as duration_cv
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND te.started_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days'
+    )
+    SELECT
+      cm.pass_rate,
+      cm.flaky_rate,
+      cm.duration_cv,
+      pm.pass_rate as prev_pass_rate,
+      pm.flaky_rate as prev_flaky_rate,
+      pm.duration_cv as prev_duration_cv
+    FROM current_metrics cm
+    CROSS JOIN previous_metrics pm
+  `
+
+  const row = result[0] || {
+    pass_rate: 0,
+    flaky_rate: 0,
+    duration_cv: 0,
+    prev_pass_rate: null,
+    prev_flaky_rate: null,
+    prev_duration_cv: null,
+  }
+
+  // Calculate contributions using formula weights
+  const passRateContribution = (Number(row.pass_rate) || 0) * 0.4
+  const flakinessContribution = (100 - (Number(row.flaky_rate) || 0)) * 0.3
+  const stabilityContribution =
+    (1 - Math.min(Number(row.duration_cv) || 0, 1)) * 100 * 0.3
+
+  const score = Math.round(
+    passRateContribution + flakinessContribution + stabilityContribution
+  )
+
+  // Calculate previous score for trend
+  const prevScore = row.prev_pass_rate !== null
+    ? Math.round(
+        Number(row.prev_pass_rate) * 0.4 +
+          (100 - Number(row.prev_flaky_rate)) * 0.3 +
+          (1 - Math.min(Number(row.prev_duration_cv), 1)) * 100 * 0.3
+      )
+    : score
+
+  return {
+    score,
+    breakdown: {
+      passRateContribution: Math.round(passRateContribution),
+      flakinessContribution: Math.round(flakinessContribution),
+      stabilityContribution: Math.round(stabilityContribution),
+    },
+    rawMetrics: {
+      passRate: Math.round(Number(row.pass_rate) || 0),
+      flakyRate: Math.round(Number(row.flaky_rate) || 0),
+      durationCV: Math.round((Number(row.duration_cv) || 0) * 100) / 100,
+    },
+    trend: score - prevScore,
+    status: score >= 80 ? "healthy" : score >= 60 ? "warning" : "critical",
+  }
+}
+
+// ============================================
 // Org-Bound Query Helper
 // ============================================
 
@@ -1364,6 +1462,8 @@ export function getQueriesForOrg(organizationId: number) {
       getTrendData(organizationId, days, dateRange),
     getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
       getFailureTrendData(organizationId, days, dateRange),
+    getReliabilityScore: (dateRange?: DateRangeFilter) =>
+      getReliabilityScore(organizationId, dateRange),
 
     // Helper queries
     getBranches: () =>

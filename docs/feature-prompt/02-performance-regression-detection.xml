@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Performance Regression Detection Implementation Prompt
+  Feature: Automatically detects when tests become slower than historical baseline
+  Complexity: Medium | Impact: High | Effort: 3-5 days
+-->
+
+<task type="generate">
+  <objective>Implement Performance Regression Detection that automatically detects when tests become slower than their historical baseline and displays alerts</objective>
+  <language>TypeScript</language>
+  <framework>Next.js 16 with App Router, Recharts, shadcn/ui</framework>
+</task>
+
+<context>
+  <project_type>Dashboard Application</project_type>
+  <project_name>Exolar QA - E2E Test Dashboard</project_name>
+  <existing_patterns>
+    <pattern>Database queries use `getQueriesForOrg(organizationId)` wrapper pattern in lib/db.ts</pattern>
+    <pattern>API routes use `export const dynamic = "force-dynamic"` and auth check first</pattern>
+    <pattern>Components use `"use client"`, useState/useEffect for data fetching</pattern>
+    <pattern>Existing slowest tests card in components/dashboard/slowest-tests-card.tsx for reference</pattern>
+    <pattern>Session context via `getSessionContext()` from lib/session-context.ts</pattern>
+    <pattern>SQL migrations in scripts/ folder with sequential numbering</pattern>
+  </existing_patterns>
+  <dependencies>
+    <dependency>@neondatabase/serverless - for database queries</dependency>
+    <dependency>lucide-react - for icons (AlertTriangle, Clock, TrendingUp)</dependency>
+    <dependency>shadcn/ui components - for UI elements</dependency>
+  </dependencies>
+</context>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Create baseline table to store historical performance data per test</requirement>
+    <requirement priority="must">Calculate rolling average baseline from last 30 days of data</requirement>
+    <requirement priority="must">Detect regression when current avg exceeds baseline by threshold (default 20%)</requirement>
+    <requirement priority="must">Display alerts card showing tests with performance regressions</requirement>
+    <requirement priority="must">Show regression severity: Critical (&gt;50%), Warning (20-50%)</requirement>
+    <requirement priority="should">Auto-update baselines on configurable schedule</requirement>
+    <requirement priority="should">Show duration trend chart for each regressed test</requirement>
+    <requirement priority="could">Allow manual baseline reset from UI</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Baseline updates should run as background job, not blocking API requests</requirement>
+    <requirement>All data must be filtered by organization_id (multi-tenancy)</requirement>
+    <requirement>Follow existing code patterns exactly</requirement>
+  </non_functional>
+</requirements>
+
+<implementation_guide>
+  <file path="scripts/0XX_add_performance_baselines.sql" action="create">
+    <description>SQL migration to create performance baselines table</description>
+    <code_snippet><![CDATA[
+-- Performance baselines for regression detection
+CREATE TABLE IF NOT EXISTS test_performance_baselines (
+  id SERIAL PRIMARY KEY,
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  test_signature TEXT NOT NULL,
+  test_name TEXT NOT NULL,
+  test_file TEXT NOT NULL,
+  baseline_duration_ms INTEGER NOT NULL,
+  p50_duration_ms INTEGER,
+  p95_duration_ms INTEGER,
+  sample_count INTEGER DEFAULT 0,
+  first_seen_at TIMESTAMPTZ DEFAULT NOW(),
+  last_updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(organization_id, test_signature)
+);
+
+-- Index for fast lookups
+CREATE INDEX IF NOT EXISTS idx_perf_baselines_org_sig
+  ON test_performance_baselines(organization_id, test_signature);
+
+-- RLS Policy
+ALTER TABLE test_performance_baselines ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view baselines for their organization"
+  ON test_performance_baselines FOR SELECT
+  USING (organization_id IN (
+    SELECT om.organization_id FROM organization_members om
+    WHERE om.user_id = auth.uid()
+  ));
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/types.ts" action="add">
+    <description>Add TypeScript interfaces for performance regression</description>
+    <code_snippet><![CDATA[
+export interface TestBaseline {
+  testSignature: string;
+  testName: string;
+  testFile: string;
+  baselineDurationMs: number;
+  p50DurationMs: number | null;
+  p95DurationMs: number | null;
+  sampleCount: number;
+  lastUpdatedAt: string;
+}
+
+export interface PerformanceRegression {
+  testName: string;
+  testFile: string;
+  testSignature: string;
+  currentAvgMs: number;
+  baselineDurationMs: number;
+  regressionPercent: number;
+  severity: 'critical' | 'warning';
+  recentRuns: number;
+  trend: 'increasing' | 'stable' | 'decreasing';
+}
+
+export interface PerformanceRegressionSummary {
+  totalRegressions: number;
+  criticalCount: number;
+  warningCount: number;
+  regressions: PerformanceRegression[];
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="lib/db.ts" action="add_functions">
+    <description>Add database functions for performance regression detection</description>
+    <code_snippet><![CDATA[
+export async function updatePerformanceBaselines(organizationId: string): Promise<void> {
+  // Calculate baselines from last 30 days of data
+  await sql`
+    INSERT INTO test_performance_baselines (
+      organization_id,
+      test_signature,
+      test_name,
+      test_file,
+      baseline_duration_ms,
+      p50_duration_ms,
+      p95_duration_ms,
+      sample_count,
+      last_updated_at
+    )
+    SELECT
+      ${organizationId},
+      CONCAT(tr.test_file, '::', tr.test_name) as test_signature,
+      tr.test_name,
+      tr.test_file,
+      ROUND(AVG(tr.duration_ms))::integer as baseline_duration_ms,
+      ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY tr.duration_ms))::integer as p50,
+      ROUND(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY tr.duration_ms))::integer as p95,
+      COUNT(*)::integer as sample_count,
+      NOW()
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND te.started_at > NOW() - INTERVAL '30 days'
+      AND tr.status IN ('passed', 'failed')
+    GROUP BY tr.test_name, tr.test_file
+    HAVING COUNT(*) >= 3
+    ON CONFLICT (organization_id, test_signature)
+    DO UPDATE SET
+      baseline_duration_ms = EXCLUDED.baseline_duration_ms,
+      p50_duration_ms = EXCLUDED.p50_duration_ms,
+      p95_duration_ms = EXCLUDED.p95_duration_ms,
+      sample_count = EXCLUDED.sample_count,
+      last_updated_at = NOW()
+  `;
+}
+
+export async function getPerformanceRegressions(
+  organizationId: string,
+  threshold: number = 0.20,
+  hours: number = 24
+): Promise<PerformanceRegressionSummary> {
+  const regressions = await sql<PerformanceRegression[]>`
+    WITH recent_performance AS (
+      SELECT
+        tr.test_name,
+        tr.test_file,
+        CONCAT(tr.test_file, '::', tr.test_name) as test_signature,
+        AVG(tr.duration_ms) as current_avg_ms,
+        COUNT(*) as recent_runs,
+        CASE
+          WHEN LAG(AVG(tr.duration_ms)) OVER (
+            PARTITION BY tr.test_name, tr.test_file
+            ORDER BY DATE_TRUNC('hour', te.started_at)
+          ) IS NULL THEN 'stable'
+          WHEN AVG(tr.duration_ms) > LAG(AVG(tr.duration_ms)) OVER (
+            PARTITION BY tr.test_name, tr.test_file
+            ORDER BY DATE_TRUNC('hour', te.started_at)
+          ) * 1.1 THEN 'increasing'
+          WHEN AVG(tr.duration_ms) < LAG(AVG(tr.duration_ms)) OVER (
+            PARTITION BY tr.test_name, tr.test_file
+            ORDER BY DATE_TRUNC('hour', te.started_at)
+          ) * 0.9 THEN 'decreasing'
+          ELSE 'stable'
+        END as trend
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND te.started_at > NOW() - INTERVAL '${hours} hours'
+        AND tr.status IN ('passed', 'failed')
+      GROUP BY tr.test_name, tr.test_file, DATE_TRUNC('hour', te.started_at)
+    ),
+    latest_performance AS (
+      SELECT DISTINCT ON (test_signature)
+        test_name,
+        test_file,
+        test_signature,
+        current_avg_ms,
+        recent_runs,
+        trend
+      FROM recent_performance
+      ORDER BY test_signature, current_avg_ms DESC
+    )
+    SELECT
+      lp.test_name as "testName",
+      lp.test_file as "testFile",
+      lp.test_signature as "testSignature",
+      ROUND(lp.current_avg_ms)::integer as "currentAvgMs",
+      tpb.baseline_duration_ms as "baselineDurationMs",
+      ROUND(((lp.current_avg_ms - tpb.baseline_duration_ms)::float /
+        NULLIF(tpb.baseline_duration_ms, 0) * 100))::integer as "regressionPercent",
+      CASE
+        WHEN (lp.current_avg_ms - tpb.baseline_duration_ms)::float /
+          NULLIF(tpb.baseline_duration_ms, 0) > 0.5 THEN 'critical'
+        ELSE 'warning'
+      END as severity,
+      lp.recent_runs as "recentRuns",
+      lp.trend
+    FROM latest_performance lp
+    JOIN test_performance_baselines tpb ON
+      tpb.test_signature = lp.test_signature
+      AND tpb.organization_id = ${organizationId}
+    WHERE (lp.current_avg_ms - tpb.baseline_duration_ms)::float /
+      NULLIF(tpb.baseline_duration_ms, 0) > ${threshold}
+    ORDER BY "regressionPercent" DESC
+    LIMIT 20
+  `;
+
+  const criticalCount = regressions.filter(r => r.severity === 'critical').length;
+
+  return {
+    totalRegressions: regressions.length,
+    criticalCount,
+    warningCount: regressions.length - criticalCount,
+    regressions,
+  };
+}
+
+export async function getTestDurationHistory(
+  organizationId: string,
+  testSignature: string,
+  days: number = 7
+): Promise<{ date: string; avgDuration: number; runCount: number }[]> {
+  return sql`
+    SELECT
+      DATE(te.started_at) as date,
+      ROUND(AVG(tr.duration_ms))::integer as "avgDuration",
+      COUNT(*)::integer as "runCount"
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND CONCAT(tr.test_file, '::', tr.test_name) = ${testSignature}
+      AND te.started_at > NOW() - INTERVAL '${days} days'
+    GROUP BY DATE(te.started_at)
+    ORDER BY date ASC
+  `;
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/performance-regressions/route.ts" action="create">
+    <description>Create API endpoint for performance regressions</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { getPerformanceRegressions } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const threshold = Number(searchParams.get("threshold")) || 0.20;
+    const hours = Number(searchParams.get("hours")) || 24;
+
+    const summary = await getPerformanceRegressions(
+      context.organizationId,
+      threshold,
+      hours
+    );
+
+    return NextResponse.json(summary);
+  } catch (error) {
+    console.error("[API] Error fetching performance regressions:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch performance regressions" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="app/api/performance-baselines/update/route.ts" action="create">
+    <description>Create API endpoint to trigger baseline updates (admin only)</description>
+    <code_snippet><![CDATA[
+import { NextResponse } from "next/server";
+import { getSessionContext } from "@/lib/session-context";
+import { updatePerformanceBaselines } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request: Request) {
+  try {
+    const context = await getSessionContext();
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Only admins can trigger baseline updates
+    if (context.role !== 'admin' && context.role !== 'owner') {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await updatePerformanceBaselines(context.organizationId);
+
+    return NextResponse.json({ success: true, message: "Baselines updated" });
+  } catch (error) {
+    console.error("[API] Error updating baselines:", error);
+    return NextResponse.json(
+      { error: "Failed to update baselines" },
+      { status: 500 }
+    );
+  }
+}
+    ]]></code_snippet>
+  </file>
+
+  <file path="components/dashboard/performance-alerts.tsx" action="create">
+    <description>Create performance alerts card component</description>
+    <code_snippet><![CDATA[
+"use client";
+
+import { useState, useEffect } from "react";
+import { AlertTriangle, Clock, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import type { PerformanceRegressionSummary, PerformanceRegression } from "@/lib/types";
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function TrendIndicator({ trend }: { trend: string }) {
+  switch (trend) {
+    case 'increasing':
+      return <TrendingUp className="w-3 h-3 text-red-500" />;
+    case 'decreasing':
+      return <TrendingDown className="w-3 h-3 text-green-500" />;
+    default:
+      return <Minus className="w-3 h-3 text-muted-foreground" />;
+  }
+}
+
+function RegressionRow({ regression }: { regression: PerformanceRegression }) {
+  const isCritical = regression.severity === 'critical';
+
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${isCritical ? 'bg-red-500' : 'bg-yellow-500'}`} />
+          <p className="text-sm font-medium truncate" title={regression.testName}>
+            {regression.testName}
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground truncate" title={regression.testFile}>
+          {regression.testFile}
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4 ml-4">
+        <div className="text-right">
+          <p className="text-sm font-mono">
+            {formatDuration(regression.currentAvgMs)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            vs {formatDuration(regression.baselineDurationMs)}
+          </p>
+        </div>
+
+        <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+          isCritical
+            ? 'bg-red-500/20 text-red-400'
+            : 'bg-yellow-500/20 text-yellow-400'
+        }`}>
+          +{regression.regressionPercent}%
+          <TrendIndicator trend={regression.trend} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function PerformanceAlertsCard() {
+  const [data, setData] = useState<PerformanceRegressionSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/performance-regressions")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.error) throw new Error(json.error);
+        setData(json);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-5 h-5 text-yellow-500" />
+          <h3 className="font-semibold">Performance Alerts</h3>
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 bg-muted/30 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-5 h-5 text-yellow-500" />
+          <h3 className="font-semibold">Performance Alerts</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{error}</p>
+      </div>
+    );
+  }
+
+  if (!data || data.totalRegressions === 0) {
+    return (
+      <div className="glass-card glass-card-glow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-5 h-5 text-green-500" />
+          <h3 className="font-semibold">Performance Alerts</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mb-3">
+            <Clock className="w-6 h-6 text-green-500" />
+          </div>
+          <p className="text-sm font-medium">No Performance Regressions</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            All tests running within normal parameters
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-card glass-card-glow p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-yellow-500" />
+          <h3 className="font-semibold">Performance Alerts</h3>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          {data.criticalCount > 0 && (
+            <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded-full">
+              {data.criticalCount} critical
+            </span>
+          )}
+          {data.warningCount > 0 && (
+            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded-full">
+              {data.warningCount} warning
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="max-h-80 overflow-y-auto">
+        {data.regressions.map((regression) => (
+          <RegressionRow key={regression.testSignature} regression={regression} />
+        ))}
+      </div>
+    </div>
+  );
+}
+    ]]></code_snippet>
+  </file>
+</implementation_guide>
+
+<constraints>
+  <avoid>Don't run baseline updates synchronously in API requests - use background jobs</avoid>
+  <avoid>Don't alert on tests with fewer than 3 historical runs</avoid>
+  <avoid>Don't include skipped or timedout tests in baseline calculations</avoid>
+  <prefer>Use p95 for alerting critical issues, avg for warnings</prefer>
+  <prefer>Follow existing error handling patterns</prefer>
+  <prefer>Use existing glass-card styling</prefer>
+</constraints>
+
+<output_format>
+  <code>Implement each file following the code snippets provided</code>
+  <explanation>
+    Implementation notes:
+    1. Run migration first to create the baselines table
+    2. Trigger initial baseline update via POST /api/performance-baselines/update
+    3. Set up cron job to update baselines daily (recommend: 3am UTC)
+    4. Add the component to the dashboard page
+  </explanation>
+  <usage_example>
+    Add the component to the dashboard page:
+    ```tsx
+    import { PerformanceAlertsCard } from "@/components/dashboard/performance-alerts";
+
+    // In your dashboard grid:
+    <PerformanceAlertsCard />
+    ```
+  </usage_example>
+</output_format>

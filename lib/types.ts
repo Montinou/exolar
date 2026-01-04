@@ -351,3 +351,27 @@ export interface FlakinessResponse {
   summary: FlakinessSummary
   tests: TestFlakinessHistory[]
 }
+
+// ============================================
+// Reliability Score Types
+// ============================================
+
+/**
+ * Overall test suite reliability score (0-100)
+ * Formula: (PassRate × 0.4) + ((1 - FlakyRate) × 0.3) + (DurationStability × 0.3)
+ */
+export interface ReliabilityScore {
+  score: number
+  breakdown: {
+    passRateContribution: number
+    flakinessContribution: number
+    stabilityContribution: number
+  }
+  rawMetrics: {
+    passRate: number
+    flakyRate: number
+    durationCV: number // coefficient of variation
+  }
+  trend: number // change from previous period (-100 to +100)
+  status: "healthy" | "warning" | "critical"
+}

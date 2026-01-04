@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
@@ -21,6 +21,8 @@ import { SuitePassRatesCard } from "@/components/dashboard/suite-pass-rates-card
 import { Skeleton } from "@/components/ui/skeleton"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Activity } from "lucide-react"
 
 async function DashboardContent({
   searchParams,
@@ -169,6 +171,12 @@ export default async function DashboardPage({
               <p className="text-sm sm:text-base text-muted-foreground text-pretty">Test Results, Illuminated by Intelligence</p>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
+              <Link href="/dashboard/reliability">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  <span className="hidden sm:inline">Reliability</span>
+                </Button>
+              </Link>
               <SearchTests />
               <AdminLink />
               <UserMenu />
