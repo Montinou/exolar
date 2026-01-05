@@ -198,15 +198,37 @@ Fields returned per day:
     name: "get_error_distribution",
     description: `Get breakdown of error types from failed tests. Shows which error types are most common.
 
+Supports filtering by branch, suite, and date range.
+
 Fields returned per error type:
-- error_type: string - Error category (e.g., "TimeoutError", "AssertionError")
+- error_type: string - Error category (e.g., "TimeoutError", "AssertionError") or file/branch when using group_by
 - count: number - Number of occurrences
 - percentage: number - Share of total failures (0-100)
-- example_message: string - Sample error message`,
+- example_message: string | null - Sample error message from most recent occurrence`,
     inputSchema: {
       type: "object" as const,
       properties: {
-        since: { type: "string", description: "Only count errors since this date (ISO 8601)" },
+        since: { 
+          type: "string", 
+          description: "Only count errors since this date (ISO 8601)" 
+        },
+        branch: { 
+          type: "string", 
+          description: "Filter by branch name" 
+        },
+        suite: { 
+          type: "string", 
+          description: "Filter by test suite" 
+        },
+        limit: { 
+          type: "number", 
+          description: "Max error types to return (default: 10, max: 100)" 
+        },
+        group_by: {
+          type: "string",
+          enum: ["error_type", "file", "branch"],
+          description: "How to group errors. Default: error_type",
+        },
       },
     },
   },
@@ -748,13 +770,33 @@ export async function handleToolCall(
       }
 
       case "get_error_distribution": {
-        const input = z.object({ since: z.string().optional() }).parse(args)
+        const input = z
+          .object({
+            since: z.string().optional(),
+            branch: z.string().optional(),
+            suite: z.string().optional(),
+            limit: z.number().min(1).max(100).default(10),
+            group_by: z.enum(["error_type", "file", "branch"]).default("error_type"),
+          })
+          .parse(args)
 
-        const distribution = await db.getErrorTypeDistribution(orgId, input.since)
+        const distribution = await db.getErrorTypeDistribution(orgId, {
+          since: input.since,
+          branch: input.branch,
+          suite: input.suite,
+          limit: input.limit,
+          groupBy: input.group_by,
+        })
 
         return jsonResponse({
           organization: authContext.organizationSlug,
-          since: input.since || "all time",
+          filters: {
+            since: input.since || "all time",
+            branch: input.branch || "all",
+            suite: input.suite || "all",
+          },
+          group_by: input.group_by,
+          total_types: distribution.length,
           distribution,
         })
       }

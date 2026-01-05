@@ -16,6 +16,8 @@ import { AlertCircle, Loader2 } from "lucide-react"
 interface ErrorDistribution {
   error_type: string
   count: number
+  percentage: number
+  example_message: string | null
 }
 
 export function ErrorDistributionChart() {

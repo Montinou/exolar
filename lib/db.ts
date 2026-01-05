@@ -991,37 +991,128 @@ export async function getFailuresWithAIContext(
   return result as unknown as TestResult[]
 }
 
+// ============================================
+// Error Distribution Types and Options
+// ============================================
+
+export interface ErrorDistributionOptions {
+  since?: string
+  branch?: string
+  suite?: string
+  limit?: number
+  groupBy?: 'error_type' | 'file' | 'branch'
+}
+
+export interface ErrorDistributionItem {
+  error_type: string
+  count: number
+  percentage: number
+  example_message: string | null
+}
+
 export async function getErrorTypeDistribution(
   organizationId: number,
-  since?: string
-): Promise<Array<{ error_type: string; count: number }>> {
+  options: ErrorDistributionOptions | string = {}
+): Promise<ErrorDistributionItem[]> {
   const sql = getSql()
+  
+  // Handle backwards compatibility - if a string is passed, treat it as 'since'
+  const opts: ErrorDistributionOptions = typeof options === 'string' 
+    ? { since: options } 
+    : options
+  
+  const { since, branch, suite, limit = 10, groupBy = 'error_type' } = opts
 
   const conditions = [
-    "tr.ai_context IS NOT NULL",
     "tr.status IN ('failed', 'timedout')",
     `te.organization_id = ${organizationId}`,
   ]
+
+  // AI context is only required when grouping by error_type
+  if (groupBy === 'error_type') {
+    conditions.push("tr.ai_context IS NOT NULL")
+  }
 
   if (since) {
     conditions.push(`tr.created_at >= '${since}'`)
   }
 
+  if (branch) {
+    conditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+  }
+
+  if (suite) {
+    conditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+  }
+
   const whereClause = `WHERE ${conditions.join(" AND ")}`
 
+  // Determine grouping column based on groupBy option
+  let groupColumn: string
+  let selectColumn: string
+  
+  switch (groupBy) {
+    case 'file':
+      groupColumn = 'tr.test_file'
+      selectColumn = 'tr.test_file as error_type'  // Reuse field name for consistent response shape
+      break
+    case 'branch':
+      groupColumn = 'te.branch'
+      selectColumn = 'te.branch as error_type'
+      break
+    case 'error_type':
+    default:
+      groupColumn = "tr.ai_context->'error'->>'type'"
+      selectColumn = "tr.ai_context->'error'->>'type' as error_type"
+  }
+
+  // Ensure limit is within bounds (1-100)
+  const safeLimit = Math.min(Math.max(1, limit), 100)
+
+  // Query with percentage calculation using CTE and example_message from most recent occurrence
   const query = `
-    SELECT
-      tr.ai_context->'error'->>'type' as error_type,
-      COUNT(*) as count
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    ${whereClause}
-    GROUP BY tr.ai_context->'error'->>'type'
-    ORDER BY count DESC
+    WITH total_count AS (
+      SELECT COUNT(*) as total
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${whereClause}
+    ),
+    grouped AS (
+      SELECT
+        ${selectColumn},
+        COUNT(*) as count,
+        MAX(tr.created_at) as latest_at
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${whereClause}
+      GROUP BY ${groupColumn}
+      ORDER BY count DESC
+      LIMIT ${safeLimit}
+    )
+    SELECT 
+      g.error_type,
+      g.count::integer as count,
+      ROUND((g.count::decimal / NULLIF(tc.total, 0)) * 100, 1)::float as percentage,
+      (
+        SELECT tr2.error_message 
+        FROM test_results tr2
+        JOIN test_executions te2 ON tr2.execution_id = te2.id
+        WHERE ${groupBy === 'error_type' 
+          ? "tr2.ai_context->'error'->>'type' = g.error_type" 
+          : groupBy === 'file' 
+            ? "tr2.test_file = g.error_type"
+            : "te2.branch = g.error_type"}
+          AND te2.organization_id = ${organizationId}
+          AND tr2.status IN ('failed', 'timedout')
+        ORDER BY tr2.created_at DESC 
+        LIMIT 1
+      ) as example_message
+    FROM grouped g, total_count tc
+    ORDER BY g.count DESC
   `
 
   const result = await sql.unsafe(query)
-  return result as unknown as Array<{ error_type: string; count: number }>
+  return result as unknown as ErrorDistributionItem[]
 }
 
 // ============================================
@@ -2361,8 +2452,8 @@ export function getQueriesForOrg(organizationId: number) {
     // AI context queries
     getFailuresWithAIContext: (options?: { errorType?: string; testFile?: string; limit?: number; offset?: number; since?: string }) =>
       getFailuresWithAIContext(organizationId, options),
-    getErrorTypeDistribution: (since?: string) =>
-      getErrorTypeDistribution(organizationId, since),
+    getErrorTypeDistribution: (options?: ErrorDistributionOptions | string) =>
+      getErrorTypeDistribution(organizationId, options),
 
     // Flakiness queries
     getFlakiestTests: (limit?: number, minRuns?: number) =>
