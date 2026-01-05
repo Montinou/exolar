@@ -10,7 +10,7 @@ const devices = [
   {
     id: "mobile",
     name: "Mobile App",
-    description: "Monitor test runs and get push notifications for failures on the go.",
+    description: "Monitor test runs, track branch stability, and get push notifications for failures on the go.",
     icon: Smartphone,
     image: "/assets/mobile-mockup.png",
     width: 1112,

@@ -4,9 +4,7 @@ import { useState } from "react"
 import { Check, Copy } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const step1Command = `npx @exolar-qa/mcp-server --login`
-
-const step2Command = `claude mcp add --transport stdio exolar-qa -- npx -y @exolar-qa/mcp-server`
+const step1Command = `npx @exolar-qa/mcp-server setup`
 
 const manualConfig = `{
   "mcpServers": {
@@ -65,7 +63,7 @@ export function InstallTabs() {
             Get Started in Seconds
           </h2>
           <p style={{ color: "oklch(0.6 0 0)" }}>
-            Install the MCP server with two simple commands.
+            Install the MCP server with a single command.
           </p>
         </div>
 
@@ -90,32 +88,11 @@ export function InstallTabs() {
             <TabsContent value="claude-code" className="space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <span
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-                    style={{ background: "var(--exolar-cyan)", color: "white" }}
-                  >
-                    1
-                  </span>
                   <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
-                    Authenticate (opens browser to log in)
+                    Run the setup command
                   </p>
                 </div>
                 <CodeBlock code={step1Command} language="bash" />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-                    style={{ background: "var(--exolar-cyan)", color: "white" }}
-                  >
-                    2
-                  </span>
-                  <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
-                    Add to Claude Code
-                  </p>
-                </div>
-                <CodeBlock code={step2Command} language="bash" />
               </div>
 
               <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>

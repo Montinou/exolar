@@ -12,9 +12,9 @@ const features = [
   },
   {
     icon: Plug,
-    title: "Installable Skills",
+    title: "One-Line Install",
     description:
-      "Seamlessly install E2E skills into Claude Desktop or Cursor with a single AI prompt. Zero configuration required.",
+      "Seamlessly install E2E skills into Claude Desktop with a single command. Zero manual config.",
     accentColor: "var(--safety-amber)",
   },
   {
