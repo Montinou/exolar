@@ -1384,7 +1384,7 @@ export async function getFlakiestTests(
 
   const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter}`
 
-  const results = await sql.unsafe(`
+  const results = await sql`
     SELECT 
       tfh.*,
       (
@@ -1398,10 +1398,10 @@ export async function getFlakiestTests(
         LIMIT 1
       ) as last_flaky_branch
     FROM test_flakiness_history tfh
-    ${whereClause}
+    ${sql.unsafe(whereClause)}
     ORDER BY flakiness_rate DESC, flaky_runs DESC
     LIMIT ${limit}
-  `)
+  `
 
   return results as unknown as TestFlakinessHistory[]
 }
