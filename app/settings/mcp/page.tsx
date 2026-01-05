@@ -220,19 +220,19 @@ export default function MCPSettingsPage() {
             <CardTitle>Other Commands</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg glass-panel">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg glass-panel gap-2">
               <div>
                 <code className="text-sm font-mono">npx @exolar-qa/mcp-server --status</code>
                 <p className="text-xs text-muted-foreground mt-1">Check authentication status</p>
               </div>
             </div>
-            <div className="flex items-center justify-between p-3 rounded-lg glass-panel">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg glass-panel gap-2">
               <div>
                 <code className="text-sm font-mono">npx @exolar-qa/mcp-server --logout</code>
                 <p className="text-xs text-muted-foreground mt-1">Clear stored credentials</p>
               </div>
             </div>
-            <div className="flex items-center justify-between p-3 rounded-lg glass-panel">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg glass-panel gap-2">
               <div>
                 <code className="text-sm font-mono">npx @exolar-qa/mcp-server --help</code>
                 <p className="text-xs text-muted-foreground mt-1">Show all available options</p>

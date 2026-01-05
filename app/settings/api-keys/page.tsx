@@ -187,7 +187,7 @@ export default function ApiKeysSettingsPage() {
           </Link>
         </div>
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
           <div>
             <div className="flex items-center gap-3">
               <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 shadow-sm">
@@ -230,7 +230,8 @@ export default function ApiKeysSettingsPage() {
                 <p className="text-sm">Create one to start uploading test results from CI/CD</p>
               </div>
             ) : (
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -271,7 +272,8 @@ export default function ApiKeysSettingsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -284,7 +286,8 @@ export default function ApiKeysSettingsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -309,7 +312,8 @@ export default function ApiKeysSettingsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -159,7 +159,7 @@ export default function OrganizationsPage() {
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" onClick={() => router.push("/admin")}>
                 <ArrowLeft className="h-5 w-5" />
@@ -172,7 +172,7 @@ export default function OrganizationsPage() {
                 <p className="text-sm text-muted-foreground">Manage multi-tenant organizations</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 self-end sm:self-auto">
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
                   <Button>
@@ -251,8 +251,9 @@ export default function OrganizationsPage() {
                 No organizations yet. Create one to get started.
               </p>
             ) : (
-              <Table>
-                <TableHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Slug</TableHead>
@@ -288,7 +289,8 @@ export default function OrganizationsPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

@@ -199,7 +199,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
     <div className="min-h-screen bg-background">
       <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
@@ -236,7 +236,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 items-end">
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
               <div className="flex-1 space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <Input
@@ -247,7 +247,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
                   onChange={(e) => setInviteEmail(e.target.value)}
                 />
               </div>
-              <div className="w-32 space-y-2">
+              <div className="w-full sm:w-32 space-y-2">
                 <Label htmlFor="role">Role</Label>
                 <Select
                   value={inviteRole}
@@ -288,7 +288,8 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Email</TableHead>
@@ -309,7 +310,8 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         )}
