@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { Smartphone, Monitor, Tablet, Terminal, CheckCircle } from "lucide-react"
+import { Smartphone, Monitor, Tablet, CheckCircle } from "lucide-react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const devices = [
@@ -33,15 +33,6 @@ const devices = [
     image: "/assets/tablet-mockup.png",
     width: 1300,
     height: 1148,
-  },
-  {
-    id: "cli",
-    name: "CLI & API",
-    description: "Direct MCP integration for your terminal and IDE agents.",
-    icon: Terminal,
-    image: "/assets/cli-mockup.png",
-    width: 1412,
-    height: 1216,
   },
 ]
 

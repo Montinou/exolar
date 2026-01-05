@@ -2,97 +2,53 @@
 
 import Image from "next/image"
 
-import { useEffect, useState, type ReactNode } from "react"
-import { authClient } from "@/lib/auth/client"
+import { useEffect, type ReactNode } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ShieldX, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
-import type { DashboardUser } from "@/lib/db-users"
-
-interface AccessCheckResponse {
-  authorized: boolean
-  authenticated: boolean
-  user?: DashboardUser
-  email?: string
-  reason?: "not_authenticated" | "not_invited"
-  isNewUser?: boolean
-}
+import { AccessProvider, useAccess } from "./access-context"
 
 interface AccessGateProps {
   children: ReactNode
 }
 
 export function AccessGate({ children }: AccessGateProps) {
-  const [sessionLoading, setSessionLoading] = useState(true)
-  const [accessState, setAccessState] = useState<{
-    loading: boolean
-    authorized: boolean
-    reason?: string
-    email?: string
-    user?: DashboardUser
-  }>({
-    loading: true,
-    authorized: false,
-  })
+  return (
+    <AccessProvider>
+      <AccessGateContent>{children}</AccessGateContent>
+    </AccessProvider>
+  )
+}
 
-  useEffect(() => {
-    async function checkAccess() {
-      // First check session status
-      const sessionResult = await authClient.getSession()
-      setSessionLoading(false)
-
-      // Then check access with server
-      try {
-        const response = await fetch("/api/auth/check-access")
-        const data: AccessCheckResponse = await response.json()
-
-        setAccessState({
-          loading: false,
-          authorized: data.authorized,
-          reason: data.reason,
-          email: data.email,
-          user: data.user,
-        })
-      } catch (error) {
-        console.error("[AccessGate] Error checking access:", error)
-        setAccessState({
-          loading: false,
-          authorized: false,
-          reason: "error",
-        })
-      }
-    }
-
-    checkAccess()
-  }, [])
+function AccessGateContent({ children }: AccessGateProps) {
+  const { loading, authorized, reason, email } = useAccess()
 
   // Check for pending MCP callback after successful auth
-  // This runs when authenticated (even if not authorized/invited) to complete MCP flow
   useEffect(() => {
-    if (!accessState.loading && typeof window !== "undefined") {
+    if (!loading && typeof window !== "undefined") {
       const mcpPort = sessionStorage.getItem("mcp_callback_port")
       if (mcpPort) {
         sessionStorage.removeItem("mcp_callback_port")
         window.location.href = `/auth/mcp?port=${mcpPort}`
       }
     }
-  }, [accessState.loading])
+  }, [loading])
 
   // Show loading skeleton while checking
-  if (accessState.loading || sessionLoading) {
+  if (loading) {
     return <AccessLoadingSkeleton />
   }
 
   // Not authenticated - show login prompt
-  if (!accessState.authorized && accessState.reason === "not_authenticated") {
+  if (!authorized && reason === "not_authenticated") {
     return <LoginPrompt />
   }
 
   // Authenticated but not invited - show access denied
-  if (!accessState.authorized && accessState.reason === "not_invited") {
-    return <AccessDenied email={accessState.email} />
+  if (!authorized && reason === "not_invited") {
+    return <AccessDenied email={email} />
   }
 
   // Authorized - show content
