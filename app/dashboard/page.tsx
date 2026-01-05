@@ -41,7 +41,7 @@ async function DashboardContent({
 
   const [metrics, executions, branchGroups, branches, suites] = await Promise.all([
     db.getDashboardMetrics(dateRange),
-    db.getExecutions(50, params.status, params.branch, dateRange, params.suite),
+    db.getExecutions(50, 0, params.status, params.branch, dateRange, params.suite),
     db.getExecutionsGroupedByBranch(dateRange),
     db.getBranches(),
     db.getSuites(),

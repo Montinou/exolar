@@ -56,6 +56,7 @@ export interface DateRangeFilter {
 export async function getExecutions(
   organizationId: number,
   limit = 50,
+  offset = 0,
   status?: string,
   branch?: string,
   dateRange?: DateRangeFilter,
@@ -91,6 +92,7 @@ export async function getExecutions(
     ${sql.unsafe(whereClause)}
     ORDER BY started_at DESC
     LIMIT ${limit}
+    OFFSET ${offset}
   `
 
   return result as TestExecution[]
@@ -828,7 +830,7 @@ export async function insertArtifacts(
 // Search and History Functions (Phase 04)
 // ============================================
 
-export async function searchTests(organizationId: number, query: string, limit = 50): Promise<TestSearchResult[]> {
+export async function searchTests(organizationId: number, query: string, limit = 50, offset = 0): Promise<TestSearchResult[]> {
   const sql = getSql()
 
   if (!query || query.length < 2) {
@@ -864,12 +866,13 @@ export async function searchTests(organizationId: number, query: string, limit =
     GROUP BY tr.test_name, tr.test_file, tr.test_signature
     ORDER BY run_count DESC
     LIMIT ${limit}
+    OFFSET ${offset}
   `
 
   return results as TestSearchResult[]
 }
 
-export async function getTestHistory(organizationId: number, signature: string, limit = 20): Promise<TestHistoryItem[]> {
+export async function getTestHistory(organizationId: number, signature: string, limit = 20, offset = 0): Promise<TestHistoryItem[]> {
   const sql = getSql()
 
   const results = await sql`
@@ -885,6 +888,7 @@ export async function getTestHistory(organizationId: number, signature: string, 
       AND te.organization_id = ${organizationId}
     ORDER BY tr.started_at DESC
     LIMIT ${limit}
+    OFFSET ${offset}
   `
 
   return results as TestHistoryItem[]
@@ -932,13 +936,14 @@ export async function getFailuresWithAIContext(
     errorType?: string
     testFile?: string
     limit?: number
+    offset?: number
     since?: string
     executionId?: number
     requireAIContext?: boolean
   } = {}
 ): Promise<TestResult[]> {
   const sql = getSql()
-  const { errorType, testFile, limit = 50, since, executionId, requireAIContext = false } = options
+  const { errorType, testFile, limit = 50, offset = 0, since, executionId, requireAIContext = false } = options
 
   const conditions = [
     "tr.status IN ('failed', 'timedout')",
@@ -979,6 +984,7 @@ export async function getFailuresWithAIContext(
     ${whereClause}
     ORDER BY tr.created_at DESC
     LIMIT ${limit}
+    OFFSET ${offset}
   `
 
   const result = await sql.unsafe(query)
@@ -2319,8 +2325,8 @@ export async function getFailureClassification(
 export function getQueriesForOrg(organizationId: number) {
   return {
     // Execution queries
-    getExecutions: (limit?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string) =>
-      getExecutions(organizationId, limit, status, branch, dateRange, suite),
+    getExecutions: (limit?: number, offset?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string) =>
+      getExecutions(organizationId, limit, offset, status, branch, dateRange, suite),
     getExecutionById: (id: number) =>
       getExecutionById(organizationId, id),
     getTestResultsByExecutionId: (executionId: number) =>
@@ -2345,15 +2351,15 @@ export function getQueriesForOrg(organizationId: number) {
       getSuites(organizationId),
 
     // Search and history queries
-    searchTests: (query: string, limit?: number) =>
-      searchTests(organizationId, query, limit),
-    getTestHistory: (signature: string, limit?: number) =>
-      getTestHistory(organizationId, signature, limit),
+    searchTests: (query: string, limit?: number, offset?: number) =>
+      searchTests(organizationId, query, limit, offset),
+    getTestHistory: (signature: string, limit?: number, offset?: number) =>
+      getTestHistory(organizationId, signature, limit, offset),
     getTestStatistics: (signature: string) =>
       getTestStatistics(organizationId, signature),
 
     // AI context queries
-    getFailuresWithAIContext: (options?: { errorType?: string; testFile?: string; limit?: number; since?: string }) =>
+    getFailuresWithAIContext: (options?: { errorType?: string; testFile?: string; limit?: number; offset?: number; since?: string }) =>
       getFailuresWithAIContext(organizationId, options),
     getErrorTypeDistribution: (since?: string) =>
       getErrorTypeDistribution(organizationId, since),

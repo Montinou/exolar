@@ -33,6 +33,7 @@ Fields returned per execution:
       type: "object" as const,
       properties: {
         limit: { type: "number", description: "Max results (1-100)", default: 20 },
+        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
         status: {
           type: "string",
           enum: ["success", "failure", "running"],
@@ -94,6 +95,7 @@ Fields returned per test:
       properties: {
         query: { type: "string", description: "Search term (min 2 chars)" },
         limit: { type: "number", description: "Max results", default: 20 },
+        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
       },
       required: ["query"],
     },
@@ -118,6 +120,7 @@ Fields returned per run:
           description: "Test signature (MD5 hash of file::name)",
         },
         limit: { type: "number", default: 20 },
+        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
       },
       required: ["test_signature"],
     },
@@ -149,6 +152,7 @@ Returns per test:
           description: "Filter by test file path (partial match)",
         },
         limit: { type: "number", default: 20 },
+        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
         since: { type: "string", description: "Only failures since this date (ISO 8601)" },
       },
     },
@@ -556,6 +560,7 @@ export async function handleToolCall(
         const input = z
           .object({
             limit: z.number().min(1).max(100).default(20),
+            offset: z.number().min(0).default(0),
             status: z.enum(["success", "failure", "running"]).optional(),
             branch: z.string().optional(),
             suite: z.string().optional(),
@@ -567,6 +572,7 @@ export async function handleToolCall(
         const executions = await db.getExecutions(
           orgId,
           input.limit,
+          input.offset,
           input.status,
           input.branch,
           input.from && input.to ? { from: input.from, to: input.to } : undefined,
@@ -576,6 +582,11 @@ export async function handleToolCall(
         return jsonResponse({
           organization: authContext.organizationSlug,
           count: executions.length,
+          pagination: {
+            offset: input.offset,
+            limit: input.limit,
+            has_more: executions.length === input.limit,
+          },
           executions,
         })
       }
@@ -627,14 +638,20 @@ export async function handleToolCall(
           .object({
             query: z.string().min(2),
             limit: z.number().min(1).max(100).default(20),
+            offset: z.number().min(0).default(0),
           })
           .parse(args)
 
-        const tests = await db.searchTests(orgId, input.query, input.limit)
+        const tests = await db.searchTests(orgId, input.query, input.limit, input.offset)
 
         return jsonResponse({
           query: input.query,
           count: tests.length,
+          pagination: {
+            offset: input.offset,
+            limit: input.limit,
+            has_more: tests.length === input.limit,
+          },
           tests,
         })
       }
@@ -644,14 +661,20 @@ export async function handleToolCall(
           .object({
             test_signature: z.string(),
             limit: z.number().min(1).max(100).default(20),
+            offset: z.number().min(0).default(0),
           })
           .parse(args)
 
-        const history = await db.getTestHistory(orgId, input.test_signature, input.limit)
+        const history = await db.getTestHistory(orgId, input.test_signature, input.limit, input.offset)
 
         return jsonResponse({
           test_signature: input.test_signature,
           count: history.length,
+          pagination: {
+            offset: input.offset,
+            limit: input.limit,
+            has_more: history.length === input.limit,
+          },
           history,
         })
       }
@@ -663,6 +686,7 @@ export async function handleToolCall(
             error_type: z.string().optional(),
             test_file: z.string().optional(),
             limit: z.number().min(1).max(100).default(20),
+            offset: z.number().min(0).default(0),
             since: z.string().optional(),
           })
           .parse(args)
@@ -672,6 +696,7 @@ export async function handleToolCall(
           errorType: input.error_type,
           testFile: input.test_file,
           limit: input.limit,
+          offset: input.offset,
           since: input.since,
           // Only require AI context if filtering by error_type
           requireAIContext: !!input.error_type,
@@ -681,6 +706,11 @@ export async function handleToolCall(
           organization: authContext.organizationSlug,
           execution_id: input.execution_id,
           count: failures.length,
+          pagination: {
+            offset: input.offset,
+            limit: input.limit,
+            has_more: failures.length === input.limit,
+          },
           failures,
         })
       }

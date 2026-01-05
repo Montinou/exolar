@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       fromDate || toDate ? { from: fromDate, to: toDate } : undefined
 
     const [executions, branches, suites] = await Promise.all([
-      db.getExecutions(limit, status, branch, dateRange, suite),
+      db.getExecutions(limit, 0, status, branch, dateRange, suite),
       db.getBranches(),
       db.getSuites(),
     ])

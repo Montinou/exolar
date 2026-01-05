@@ -43,27 +43,33 @@ const filteredResults = input.status === "all"
 
 ---
 
-### 2. Missing Pagination in Multiple Tools
+### 2. ~~Missing Pagination in Multiple Tools~~ ✅ COMPLETED
 
-**Affected Tools:**
-- `get_execution_details` - No cursor/offset pagination
-- `search_tests` - Only limit, no offset
-- `get_test_history` - Only limit, no offset
-- `get_failed_tests` - Only limit, no offset
+> **Implemented:** 2026-01-05 | **PR:** N/A (direct commit)
 
-**Current Implementation:**
+**Affected Tools (all now have pagination):**
+- `get_executions` ✅
+- `search_tests` ✅
+- `get_test_history` ✅
+- `get_failed_tests` ✅
+
+**Applied Enhancement:**
 ```typescript
-limit: { type: "number", default: 20 }
+// New parameter added to all tools
+offset: { type: "number", default: 0, description: "Skip N results for pagination" }
+
+// Response now includes pagination metadata
+{
+  pagination: {
+    offset: 0,
+    limit: 20,
+    has_more: true  // true if results.length === limit
+  },
+  results: [...]
+}
 ```
 
-**Recommended Enhancement:**
-```typescript
-limit: { type: "number", default: 20, description: "Max results (1-100)" },
-offset: { type: "number", default: 0, description: "Skip N results for pagination" },
-cursor: { type: "string", description: "Cursor from previous response for efficient pagination" }
-```
-
-**Impact:** Enables efficient navigation of large datasets without fetching all data.
+**Result:** Enables efficient page-by-page navigation of large datasets. Cursor-based pagination deferred to future enhancement.
 
 ---
 
@@ -453,7 +459,7 @@ async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
 | Optimization | Impact | Effort | Status |
 |-------------|--------|--------|--------|
 | Fix double query in `get_execution_details` | High | Low | ✅ Done |
-| Add pagination support | High | Medium | 🔴 TODO |
+| Add pagination support | High | Medium | ✅ Done |
 | Add filters to `get_error_distribution` | Medium | Low | 🟡 Soon |
 | Token expiry warnings | Medium | Low | 🟡 Soon |
 | Response compression for large payloads | Medium | Low | 🟡 Soon |
