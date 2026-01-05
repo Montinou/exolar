@@ -66,12 +66,15 @@ const endpoints = [
   {
     method: "GET" as const,
     path: "/api/trends",
-    description: "Time-series pass/fail data for charts and trend analysis",
+    description: "Time-series pass/fail data with flexible granularity (hourly, daily, weekly, monthly)",
     parameters: [
       { name: "days", type: "number", default: "14", description: "Number of days to include" },
+      { name: "period", type: "string", default: "day", description: "Granularity: hour | day | week | month" },
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
     ],
     curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
-  "https://your-dashboard.com/api/trends?days=14"`,
+  "https://your-dashboard.com/api/trends?period=week&days=28"`,
   },
   {
     method: "GET" as const,

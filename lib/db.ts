@@ -441,35 +441,108 @@ export async function getDashboardMetrics(organizationId: number, dateRange?: Da
   } as DashboardMetrics
 }
 
-export async function getTrendData(organizationId: number, days = 7, dateRange?: DateRangeFilter) {
-  const sql = getSql()
-  const conditions = ["completed_at IS NOT NULL", `organization_id = ${organizationId}`]
+export type TrendPeriod = 'hour' | 'day' | 'week' | 'month'
 
-  if (dateRange?.from) {
-    conditions.push(`started_at >= '${dateRange.from}'`)
+export interface TrendOptions {
+  period?: TrendPeriod
+  count?: number          // Number of periods to look back
+  days?: number           // Deprecated: use count + period instead
+  from?: string           // Explicit start date (ISO 8601)
+  to?: string             // Explicit end date (ISO 8601)
+}
+
+export interface TrendDataPoint {
+  period: string          // ISO date or datetime depending on granularity
+  executions: number      // Total runs in this period
+  passed: number
+  failed: number
+  skipped: number
+  pass_rate: number       // 0-100
+}
+
+/**
+ * Get trend data with flexible time granularity.
+ * Supports hourly, daily, weekly, and monthly aggregation.
+ * 
+ * @param organizationId - Organization ID
+ * @param options - Trend options including period, count, and date range
+ * @returns Array of trend data points
+ */
+export async function getTrendData(
+  organizationId: number,
+  options: TrendOptions | number = {}
+): Promise<TrendDataPoint[]> {
+  const sql = getSql()
+  
+  // Handle backwards compatibility: if number passed, treat as days
+  const opts: TrendOptions = typeof options === 'number' 
+    ? { days: options, period: 'day' } 
+    : options
+  
+  const { period = 'day', count, days, from, to } = opts
+  
+  const conditions = [
+    "completed_at IS NOT NULL",
+    `organization_id = ${organizationId}`
+  ]
+
+  // Determine time filtering
+  if (from) {
+    conditions.push(`started_at >= '${from}'`)
+  } else if (count || days) {
+    const lookback = count || days || 7
+    const interval = period === 'hour' ? 'hours' : 
+                     period === 'day' ? 'days' :
+                     period === 'week' ? 'weeks' : 'months'
+    conditions.push(`started_at > NOW() - INTERVAL '${lookback} ${interval}'`)
   } else {
-    conditions.push(`started_at > NOW() - INTERVAL '${days} days'`)
+    // Default: last 7 of the period type
+    const interval = period === 'hour' ? 'hours' : 
+                     period === 'day' ? 'days' :
+                     period === 'week' ? 'weeks' : 'months'
+    conditions.push(`started_at > NOW() - INTERVAL '7 ${interval}'`)
   }
 
-  if (dateRange?.to) {
-    conditions.push(`started_at <= '${dateRange.to}'`)
+  if (to) {
+    conditions.push(`started_at <= '${to}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
+  
+  // DATE_TRUNC works for all granularities
+  const truncExpr = period === 'hour' ? "DATE_TRUNC('hour', started_at)" :
+                    period === 'day' ? "DATE_TRUNC('day', started_at)" :
+                    period === 'week' ? "DATE_TRUNC('week', started_at)" :
+                    "DATE_TRUNC('month', started_at)"
 
-  const result = await sql`
+  const query = `
     SELECT
-      DATE(started_at) as date,
+      ${truncExpr} as period,
+      COUNT(*) as executions,
       COUNT(*) FILTER (WHERE status = 'success') as passed,
       COUNT(*) FILTER (WHERE status = 'failure') as failed,
-      COUNT(*) as total
+      COUNT(*) FILTER (WHERE status NOT IN ('success', 'failure')) as skipped,
+      CASE 
+        WHEN COUNT(*) > 0 
+        THEN ROUND(COUNT(*) FILTER (WHERE status = 'success')::decimal / COUNT(*) * 100, 1)
+        ELSE 0
+      END as pass_rate
     FROM test_executions
-    ${sql.unsafe(whereClause)}
-    GROUP BY DATE(started_at)
-    ORDER BY date ASC
+    ${whereClause}
+    GROUP BY ${truncExpr}
+    ORDER BY period ASC
   `
 
-  return result as TrendData[]
+  const result = await sql.unsafe(query) as unknown as Record<string, unknown>[]
+  
+  return result.map((r) => ({
+    period: r.period instanceof Date ? r.period.toISOString() : String(r.period),
+    executions: Number(r.executions),
+    passed: Number(r.passed),
+    failed: Number(r.failed),
+    skipped: Number(r.skipped),
+    pass_rate: Number(r.pass_rate) || 0,
+  }))
 }
 
 export async function getFailureTrendData(
@@ -2537,8 +2610,8 @@ export function getQueriesForOrg(organizationId: number) {
     // Metrics queries
     getDashboardMetrics: (dateRange?: DateRangeFilter) =>
       getDashboardMetrics(organizationId, dateRange),
-    getTrendData: (days?: number, dateRange?: DateRangeFilter) =>
-      getTrendData(organizationId, days, dateRange),
+    getTrendData: (options?: TrendOptions) =>
+      getTrendData(organizationId, options || {}),
     getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
       getFailureTrendData(organizationId, days, dateRange),
     getReliabilityScore: (options?: ReliabilityScoreOptions | DateRangeFilter) =>
