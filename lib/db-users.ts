@@ -131,15 +131,17 @@ export async function getAllInvites(): Promise<Invite[]> {
 export async function createInvite(
   email: string,
   role: "admin" | "viewer",
-  invitedBy: number
+  invitedBy: number,
+  organizationId?: number
 ): Promise<Invite> {
   const sql = getSql()
   const result = await sql`
-    INSERT INTO invites (email, role, invited_by)
-    VALUES (${email.toLowerCase()}, ${role}, ${invitedBy})
+    INSERT INTO invites (email, role, invited_by, organization_id)
+    VALUES (${email.toLowerCase()}, ${role}, ${invitedBy}, ${organizationId ?? null})
     ON CONFLICT (email) DO UPDATE SET
       role = ${role},
       invited_by = ${invitedBy},
+      organization_id = ${organizationId ?? null},
       used = false,
       created_at = NOW()
     RETURNING *

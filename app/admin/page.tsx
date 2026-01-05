@@ -15,6 +15,8 @@ import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building } fr
 import { BrandLogo } from "@/components/ui/brand-logo"
 import Link from "next/link"
 import type { DashboardUser, Invite } from "@/lib/db-users"
+import type { Organization } from "@/lib/db-orgs" // We need Organization type. I assume it's exported from db-orgs or I define it locally if types are messy.
+// Actually I'll use `any` or define narrow type locally to avoid import issues if verify fails, but `db-orgs` exports it.
 
 export default function AdminPage() {
   const router = useRouter()
@@ -22,8 +24,11 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [users, setUsers] = useState<DashboardUser[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
+  const [organizations, setOrganizations] = useState<Organization[]>([]) // Add organizations state
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "viewer">("viewer")
+  const [inviteOrg, setInviteOrg] = useState<string>("") // Add inviteOrg state
+  const [invitePassword, setInvitePassword] = useState("") // Add invitePassword state
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,17 +47,20 @@ export default function AdminPage() {
 
         setIsAdmin(true)
 
-        // Load users and invites
-        const [usersRes, invitesRes] = await Promise.all([
+        // Load users, invites, and organizations
+        const [usersRes, invitesRes, orgsRes] = await Promise.all([
           fetch("/api/admin/users"),
           fetch("/api/admin/invites"),
+          fetch("/api/admin/organizations"),
         ])
 
         const usersData = await usersRes.json()
         const invitesData = await invitesRes.json()
+        const orgsData = await orgsRes.json()
 
         setUsers(usersData.users || [])
         setInvites(invitesData.invites || [])
+        setOrganizations(orgsData.organizations || [])
       } catch (err) {
         console.error("Failed to load admin data:", err)
         setError("Failed to load data")
@@ -73,7 +81,12 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+          organizationId: inviteOrg ? parseInt(inviteOrg) : undefined,
+          password: invitePassword || undefined
+        }),
       })
 
       const data = await res.json()
@@ -83,9 +96,18 @@ export default function AdminPage() {
         return
       }
 
-      setInvites([data.invite, ...invites])
+      if (data.user) {
+         // User created directly
+         setUsers([data.user, ...users])
+      } else if (data.invite) {
+         // Invite created
+         setInvites([data.invite, ...invites])
+      }
+      
       setInviteEmail("")
       setInviteRole("viewer")
+      setInviteOrg("")
+      setInvitePassword("")
     } catch (err) {
       console.error("Failed to create invite:", err)
       setError("Failed to create invite")
@@ -230,8 +252,8 @@ export default function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4 md:items-end">
-              <div className="flex-1 space-y-2">
+            <form onSubmit={handleInvite} className="grid gap-4 md:grid-cols-4 items-end">
+              <div className="space-y-2 md:col-span-1">
                 <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
@@ -242,8 +264,33 @@ export default function AdminPage() {
                   required
                 />
               </div>
-              <div className="flex gap-4 items-end">
-                <div className="flex-1 md:w-40 space-y-2">
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="org">Organization (Optional)</Label>
+                <Select value={inviteOrg} onValueChange={setInviteOrg}>
+                  <SelectTrigger id="org">
+                    <SelectValue placeholder="Select Organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Default (Attorneyshare)</SelectItem>
+                    {organizations.map(org => (
+                      <SelectItem key={org.id} value={org.id.toString()}>{org.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor="password">Password (Optional)</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Set password (optional)"
+                  value={invitePassword}
+                  onChange={(e) => setInvitePassword(e.target.value)}
+                  minLength={8}
+                />
+              </div>
+              <div className="flex gap-4 items-end md:col-span-1">
+                <div className="flex-1 space-y-2">
                   <Label htmlFor="role">Role</Label>
                   <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "admin" | "viewer")}>
                     <SelectTrigger>
@@ -285,6 +332,7 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Organization</TableHead>
                     <TableHead className="hidden sm:table-cell">Invited At</TableHead>
                     <TableHead className="w-[80px] sm:w-[100px]">Actions</TableHead>
                   </TableRow>
@@ -292,13 +340,18 @@ export default function AdminPage() {
                 <TableBody>
                   {invites
                     .filter((i) => !i.used)
-                    .map((invite) => (
+                    .map((invite) => {
+                      const org = organizations.find(o => o.id === invite.organization_id)
+                      return (
                       <TableRow key={invite.id}>
                         <TableCell className="max-w-[150px] truncate sm:max-w-none">{invite.email}</TableCell>
                         <TableCell>
                           <Badge variant={invite.role === "admin" ? "default" : "secondary"}>
                             {invite.role}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                           {org ? org.name : (invite.organization_id ? `ID: ${invite.organization_id}` : "Default")}
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
@@ -311,7 +364,8 @@ export default function AdminPage() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      )
+                    })}
                 </TableBody>
               </Table>
             )}
