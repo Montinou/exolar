@@ -39,13 +39,17 @@ async function DashboardContent({
   const dateRange: DateRangeFilter | undefined =
     params.from || params.to ? { from: params.from, to: params.to } : undefined
 
-  const [metrics, executions, branchGroups, branches, suites] = await Promise.all([
+  const [metrics, executions, branchGroups, branchStats, suiteStats] = await Promise.all([
     db.getDashboardMetrics(dateRange),
     db.getExecutions(50, 0, params.status, params.branch, dateRange, params.suite),
     db.getExecutionsGroupedByBranch(dateRange),
     db.getBranches(),
     db.getSuites(),
   ])
+
+  // Extract names for dropdown filters
+  const branches = branchStats.map((b) => b.branch)
+  const suites = suiteStats.map((s) => s.suite)
 
   // Extract metrics for new components
   const totalTests = metrics.latestPassRate?.total_tests ?? 0

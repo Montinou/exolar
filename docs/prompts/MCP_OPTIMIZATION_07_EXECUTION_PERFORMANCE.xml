@@ -1,0 +1,423 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - Medium Priority #7
+  Add Performance Insights to compare_executions
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance the `compare_executions` MCP tool to include performance regression/improvement
+    categorization for each test. While duration delta is already calculated, the enhancement
+    adds semantic labels to help AI assistants quickly identify performance issues.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The `compare_executions` tool compares two test runs and returns test-level differences.
+    It currently returns status comparison (new_failure, fixed, etc.) and raw duration deltas:
+    - durationDeltaMs: Absolute difference in milliseconds
+    - durationDeltaPercent: Percentage change (can be positive or negative)
+    
+    However, it lacks semantic categorization for performance changes. Without this:
+    - AI assistants must interpret raw numbers to understand significance
+    - No threshold-based classification (what constitutes a "regression"?)
+    - Harder to filter or prioritize performance issues
+    
+    The optimization analysis suggests adding:
+    - durationCategory: "regression" | "improvement" | "stable"
+    - Based on configurable thresholds (e.g., >20% slower = regression)
+  </background>
+  <audience>
+    - AI assistants comparing build performance
+    - Developers investigating test slowdowns
+    - CI/CD pipelines detecting performance regressions
+  </audience>
+  <impact>
+    MEDIUM - Provides actionable performance insights without additional processing.
+    Especially useful for detecting tests that got significantly slower after code changes.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/tools.ts" description="compare_executions tool definition" start_line="439" end_line="488">
+{
+  name: "compare_executions",
+  description: `Compare two test executions to identify regressions, improvements, and changes. Side-by-side analysis of test results.
+
+Use baseline_id/current_id for specific executions, or baseline_branch/current_branch for branch comparison (uses latest execution from each).
+
+Returns:
+- baseline: Execution metadata (id, branch, commit, status, test counts)
+- current: Execution metadata
+- summary: Pass rate delta, duration delta, test count delta, status change counts
+- tests: Array of test comparisons with diff categories
+
+Diff Categories:
+- new_failure: Was passing in baseline, now failing
+- fixed: Was failing in baseline, now passing
+- new_test: Only exists in current execution
+- removed_test: Only exists in baseline execution
+- unchanged: Same status in both
+
+Use filter param to focus on specific categories (e.g., filter="new_failure" to see only regressions).`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      baseline_id: { ... },
+      current_id: { ... },
+      ...
+    },
+  },
+}
+  </file>
+
+  <file path="lib/db.ts" description="compareExecutions SQL query" start_line="1846" end_line="1901">
+// Already calculates duration data:
+SELECT
+  ...
+  b.duration_ms as "baselineDurationMs",
+  c.duration_ms as "currentDurationMs",
+  (c.duration_ms - b.duration_ms) as "durationDeltaMs",
+  CASE
+    WHEN b.duration_ms > 0 THEN
+      ROUND(((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100))::integer
+    ELSE NULL
+  END as "durationDeltaPercent",
+  CASE
+    WHEN b.test_signature IS NULL THEN 'new_test'
+    WHEN c.test_signature IS NULL THEN 'removed_test'
+    WHEN b.status = 'passed' AND c.status = 'failed' THEN 'new_failure'
+    WHEN b.status = 'failed' AND c.status = 'passed' THEN 'fixed'
+    ELSE 'unchanged'
+  END as "diffCategory"
+FROM baseline_tests b
+FULL OUTER JOIN current_tests c ON b.test_signature = c.test_signature
+  </file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="medium">
+    <description>No semantic performance categorization</description>
+    <actual>Returns raw durationDeltaPercent (e.g., +45, -20, 0)</actual>
+    <improvement>Add durationCategory field with human-readable labels</improvement>
+  </issue>
+  
+  <issue id="2" severity="low">
+    <description>No threshold customization</description>
+    <actual>Fixed interpretation needed by clients</actual>
+    <improvement>Allow configurable regression/improvement thresholds</improvement>
+  </issue>
+
+  <issue id="3" severity="low">
+    <description>No performance summary in response</description>
+    <actual>Only test-level data; no aggregate performance stats</actual>
+    <improvement>Add performanceSummary with count of regressions/improvements</improvement>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add durationCategory field: "regression" | "improvement" | "stable"</requirement>
+    <requirement priority="must">Use sensible defaults: >20% slower = regression, <-20% faster = improvement</requirement>
+    <requirement priority="should">Add performance_threshold parameter to customize thresholds</requirement>
+    <requirement priority="should">Add performanceSummary to response with regression/improvement counts</requirement>
+    <requirement priority="could">Add include_performance_regressions filter option</requirement>
+  </functional>
+  <non_functional>
+    <requirement>No additional database queries (compute in SQL or post-process)</requirement>
+    <requirement>Maintain backwards compatibility with existing fields</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Add durationCategory to SQL CASE statement in compareExecutions
+    2. Add performance_threshold parameter to tool schema
+    3. Add performanceSummary to response
+    4. Optionally add performance_regressions filter value
+  </approach>
+
+  <updated_sql language="sql">
+-- Add new CASE for duration category
+CASE
+  WHEN b.test_signature IS NULL THEN NULL  -- New test, no comparison
+  WHEN c.test_signature IS NULL THEN NULL  -- Removed test, no comparison
+  WHEN b.duration_ms IS NULL OR b.duration_ms = 0 THEN NULL  -- No baseline duration
+  WHEN ((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100) > 20 THEN 'regression'
+  WHEN ((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100) < -20 THEN 'improvement'
+  ELSE 'stable'
+END as "durationCategory"
+  </updated_sql>
+
+  <updated_db_function language="typescript">
+// Add to compareExecutions function after calculating tests array:
+
+interface TestComparisonItem {
+  testSignature: string
+  testName: string
+  testFile: string
+  baselineStatus: string | null
+  currentStatus: string | null
+  baselineDurationMs: number | null
+  currentDurationMs: number | null
+  durationDeltaMs: number | null
+  durationDeltaPercent: number | null
+  diffCategory: 'new_failure' | 'fixed' | 'new_test' | 'removed_test' | 'unchanged'
+  durationCategory: 'regression' | 'improvement' | 'stable' | null  // NEW
+}
+
+// In SQL query, add:
+CASE
+  WHEN b.test_signature IS NULL THEN NULL
+  WHEN c.test_signature IS NULL THEN NULL
+  WHEN b.duration_ms IS NULL OR b.duration_ms = 0 THEN NULL
+  WHEN ((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100) > ${regressionThreshold} THEN 'regression'
+  WHEN ((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100) < -${improvementThreshold} THEN 'improvement'
+  ELSE 'stable'
+END as "durationCategory"
+  </updated_db_function>
+
+  <updated_tool_definition language="typescript">
+{
+  name: "compare_executions",
+  description: `Compare two test executions to identify regressions, improvements, and changes.
+
+Returns:
+- baseline, current: Execution metadata
+- summary: Pass rate delta, duration delta, status change counts
+- performanceSummary: Count of duration regressions/improvements (NEW)
+- tests: Array of test comparisons with diff and duration categories
+
+Diff Categories: new_failure, fixed, new_test, removed_test, unchanged
+Duration Categories: regression (>threshold% slower), improvement (<-threshold% faster), stable
+
+Use filter param to focus on specific categories.`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      baseline_id: { type: "number", description: "Baseline execution ID (the 'before' run)" },
+      current_id: { type: "number", description: "Current execution ID (the 'after' run)" },
+      baseline_branch: { type: "string", description: "Use latest execution from this branch as baseline" },
+      current_branch: { type: "string", description: "Use latest execution from this branch as current" },
+      suite: { type: "string", description: "Filter to specific suite (applies to branch lookups)" },
+      filter: {
+        type: "string",
+        enum: ["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"],
+        description: "Filter results by category (default: all)",
+      },
+      performance_threshold: {
+        type: "number",
+        default: 20,
+        description: "Percentage change threshold for regression/improvement (default: 20%)",
+      },
+    },
+  },
+}
+  </updated_tool_definition>
+
+  <updated_handler language="typescript">
+case "compare_executions": {
+  const input = z.object({
+    baseline_id: z.number().optional(),
+    current_id: z.number().optional(),
+    baseline_branch: z.string().optional(),
+    current_branch: z.string().optional(),
+    suite: z.string().optional(),
+    filter: z.enum(["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"]).optional(),
+    performance_threshold: z.number().min(1).max(100).default(20),
+  }).parse(args)
+
+  // ... existing ID resolution logic ...
+
+  const comparison = await db.compareExecutions(
+    orgId, 
+    baselineId, 
+    currentId,
+    { performanceThreshold: input.performance_threshold }
+  )
+
+  // Apply filter including new performance_regression option
+  let filteredTests = comparison.tests
+  if (input.filter === "performance_regression") {
+    filteredTests = comparison.tests.filter((t) => t.durationCategory === "regression")
+  } else if (input.filter && input.filter !== "all") {
+    filteredTests = comparison.tests.filter((t) => t.diffCategory === input.filter)
+  }
+
+  // Calculate performance summary
+  const performanceSummary = {
+    regressions: comparison.tests.filter((t) => t.durationCategory === "regression").length,
+    improvements: comparison.tests.filter((t) => t.durationCategory === "improvement").length,
+    stable: comparison.tests.filter((t) => t.durationCategory === "stable").length,
+    threshold_pct: input.performance_threshold,
+  }
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    baseline: comparison.baseline,
+    current: comparison.current,
+    summary: comparison.summary,
+    performanceSummary,  // NEW
+    filter: input.filter || "all",
+    tests: filteredTests,
+    test_count: filteredTests.length,
+  })
+}
+  </updated_handler>
+</solution>
+
+<verification>
+  <test type="manual" description="Test via MCP client">
+    <steps>
+      <step>1. Start dev server: npm run dev</step>
+      <step>2. Compare two executions with known duration differences</step>
+      <step>3. Verify durationCategory is present for each test</step>
+      <step>4. Verify performanceSummary counts match manual calculation</step>
+      <step>5. Test filter="performance_regression" to see only slow tests</step>
+      <step>6. Test with performance_threshold=10 for stricter classification</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API tests">
+    <script language="bash">
+# Test 1: Default comparison
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "compare_executions", "args": {"baseline_id": 1, "current_id": 2}}'
+
+# Verify response includes durationCategory and performanceSummary
+
+# Test 2: Filter performance regressions
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "compare_executions", "args": {"baseline_id": 1, "current_id": 2, "filter": "performance_regression"}}'
+
+# Test 3: Custom threshold
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "compare_executions", "args": {"baseline_id": 1, "current_id": 2, "performance_threshold": 10}}'
+    </script>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/db.ts">
+    Update TestComparisonItem interface to include durationCategory
+  </step>
+  <step number="2" file="lib/db.ts">
+    Add durationCategory CASE to compareExecutions SQL query
+  </step>
+  <step number="3" file="lib/db.ts">
+    Add performanceThreshold parameter to compareExecutions function
+  </step>
+  <step number="4" file="lib/mcp/tools.ts">
+    Update compare_executions tool definition
+  </step>
+  <step number="5" file="lib/mcp/tools.ts">
+    Update handler with performanceSummary and new filter
+  </step>
+  <step number="6">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default performance_threshold to 20%</rule>
+    <rule>Return null for durationCategory when baseline has no duration data</rule>
+    <rule>Include performanceSummary in all responses</rule>
+    <rule>Apply symmetric thresholds (20% slower = regression, 20% faster = improvement)</rule>
+  </always>
+  <never>
+    <rule>Never classify new/removed tests as having performance changes</rule>
+    <rule>Never break existing diffCategory field</rule>
+    <rule>Never allow negative threshold values</rule>
+  </never>
+</behavioral_rules>
+
+<documentation_updates>
+  <description>
+    The MCP documentation page must be updated to reflect the new performance-related
+    response fields (durationCategory, performanceSummary) and the new filter option.
+  </description>
+  
+  <file path="app/docs/mcp/page.tsx" description="MCP Tools Documentation Page">
+    <update location="performanceTools array - compare_executions entry (lines 295-314)">
+      <current_code language="typescript">
+  {
+    name: "compare_executions",
+    description: "Compare two test executions side-by-side to identify regressions, improvements, and changes.",
+    category: "performance" as const,
+    parameters: [
+      { name: "baseline_id", type: "number", description: "Baseline execution ID" },
+      { name: "current_id", type: "number", description: "Current execution ID" },
+      { name: "baseline_branch", type: "string", description: "Use latest execution from this branch as baseline" },
+      { name: "current_branch", type: "string", description: "Use latest execution from this branch as current" },
+      { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
+      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | all" },
+    ],
+    responseFields: [
+      "baseline, current: Execution metadata (id, branch, commit, status)",
+      "summary: Pass rate delta, duration delta, test count changes",
+      "tests: Array of test comparisons with diff categories",
+      "Diff categories: new_failure, fixed, new_test, removed_test, unchanged",
+    ],
+    example: `"Compare the last two runs on main branch"`,
+  },
+      </current_code>
+      <updated_code language="typescript">
+  {
+    name: "compare_executions",
+    description: "Compare two test executions side-by-side to identify regressions, improvements, and performance changes.",
+    category: "performance" as const,
+    parameters: [
+      { name: "baseline_id", type: "number", description: "Baseline execution ID" },
+      { name: "current_id", type: "number", description: "Current execution ID" },
+      { name: "baseline_branch", type: "string", description: "Use latest execution from this branch as baseline" },
+      { name: "current_branch", type: "string", description: "Use latest execution from this branch as current" },
+      { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
+      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | performance_regression | all" },
+      { name: "performance_threshold", type: "number", default: "20", description: "% change threshold for regression/improvement" },
+    ],
+    responseFields: [
+      "baseline, current: Execution metadata (id, branch, commit, status)",
+      "summary: Pass rate delta, duration delta, test count changes",
+      "performanceSummary: Count of regressions, improvements, stable tests",
+      "tests: Array with diff categories and duration categories",
+      "Diff categories: new_failure, fixed, new_test, removed_test, unchanged",
+      "Duration categories: regression, improvement, stable",
+    ],
+    example: `"Compare the last two runs and show performance regressions"`,
+  },
+      </updated_code>
+    </update>
+  </file>
+
+  <file path="app/docs/api/page.tsx" description="API Documentation Page">
+    <update location="endpoints array - /api/compare entry (lines 86-114)">
+      <note>
+        Update the /api/compare endpoint documentation to include performanceSummary
+        in the response example and document the new performance_threshold parameter.
+      </note>
+    </update>
+  </file>
+</documentation_updates>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/db.ts - Update compareExecutions with durationCategory</file>
+    <file>lib/mcp/tools.ts - Update tool definition and handler</file>
+    <file>app/docs/mcp/page.tsx - Update performanceTools array (compare_executions entry)</file>
+    <file>app/docs/api/page.tsx - Update /api/compare endpoint (if applicable)</file>
+  </files_to_modify>
+  <estimated_lines_changed>~60 lines across all files</estimated_lines_changed>
+  <complexity>Low-Medium - Mostly adding a SQL CASE and response processing</complexity>
+</output_format>

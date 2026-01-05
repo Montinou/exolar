@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - Medium Priority #6
+  Add Flexible Time Granularity to get_trends
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance the `get_trends` MCP tool to support flexible time granularity beyond 
+    fixed day intervals. Add support for hourly, weekly, and monthly aggregation,
+    plus explicit date range filtering.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The `get_trends` tool provides time-series data for pass/fail rates but only 
+    supports a `days` parameter (1-90). This is limiting for:
+    
+    - Hourly monitoring: Detecting issues that happened in the last few hours
+    - Weekly/monthly reports: Aggregating data for periodic reviews
+    - Custom date ranges: Analyzing specific periods (e.g., sprint boundaries)
+    
+    Common use cases requiring flexibility:
+    - "Show me test trends for the last 4 weeks"
+    - "What was the pass rate hour-by-hour yesterday?"
+    - "Compare January vs February test health"
+  </background>
+  <audience>
+    - AI assistants generating trend reports
+    - Developers analyzing test health patterns
+    - QA teams preparing periodic health summaries
+  </audience>
+  <impact>
+    MEDIUM - Enables more flexible trend analysis and reporting.
+    Particularly useful for sprint retrospectives and incident analysis.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/tools.ts" description="get_trends tool definition" start_line="181" end_line="196">
+{
+  name: "get_trends",
+  description: `Get time-series trend data for pass/fail rates over a period. Useful for tracking test health over time.
+
+Fields returned per day:
+- date: ISO date (YYYY-MM-DD)
+- executions: number - Runs on this day
+- passed: number - Passed tests count
+- failed: number - Failed tests count
+- pass_rate: number - Daily percentage (0-100)`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      days: { type: "number", description: "Number of days to look back", default: 7 },
+    },
+  },
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="get_trends handler" start_line="760" end_line="770">
+case "get_trends": {
+  const input = z.object({ days: z.number().min(1).max(90).default(7) }).parse(args)
+
+  const trends = await db.getTrendData(orgId, input.days)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    days: input.days,
+    trends,
+  })
+}
+  </file>
+
+  <file path="lib/db.ts" description="getTrendData function" start_line="444" end_line="473">
+export async function getTrendData(organizationId: number, days = 7, dateRange?: DateRangeFilter) {
+  const sql = getSql()
+  const conditions = ["completed_at IS NOT NULL", `organization_id = ${organizationId}`]
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  } else {
+    conditions.push(`started_at > NOW() - INTERVAL '${days} days'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  const result = await sql`
+    SELECT
+      DATE(started_at) as date,
+      COUNT(*) FILTER (WHERE status = 'success') as passed,
+      COUNT(*) FILTER (WHERE status = 'failure') as failed,
+      COUNT(*) as total
+    FROM test_executions
+    ${sql.unsafe(whereClause)}
+    GROUP BY DATE(started_at)
+    ORDER BY date ASC
+  `
+
+  return result as TrendData[]
+}
+  </file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="medium">
+    <description>Only day-level granularity supported</description>
+    <actual>Uses DATE(started_at) always</actual>
+    <fix>Add period parameter for hour/day/week/month granularity</fix>
+  </issue>
+  
+  <issue id="2" severity="medium">
+    <description>No explicit date range support in MCP tool</description>
+    <actual>DB function supports dateRange but tool doesn't expose it</actual>
+    <fix>Add from/to parameters to tool schema</fix>
+  </issue>
+
+  <issue id="3" severity="low">
+    <description>Field names don't match description</description>
+    <actual>Returns "total" not "executions"</actual>
+    <fix>Rename field or update description</fix>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add period parameter with hour/day/week/month options</requirement>
+    <requirement priority="must">Add from/to date parameters for explicit ranges</requirement>
+    <requirement priority="must">Rename count parameter to replace "days" with generic "count"</requirement>
+    <requirement priority="should">Maintain backwards compatibility with days parameter</requirement>
+    <requirement priority="should">Add proper pass_rate calculation in response</requirement>
+    <requirement priority="could">Add comparison with previous period</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Hourly queries should be limited to 7 days max</requirement>
+    <requirement>Monthly queries should be limited to 2 years max</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Add period enum parameter (hour, day, week, month)
+    2. Add from/to parameters with proper date parsing
+    3. Update database function to use DATE_TRUNC for different periods
+    4. Keep days parameter as fallback for backwards compatibility
+  </approach>
+
+  <types language="typescript">
+type TrendPeriod = 'hour' | 'day' | 'week' | 'month'
+
+interface TrendDataPoint {
+  period: string          // ISO date or datetime depending on granularity
+  executions: number      // Renamed from "total"
+  passed: number
+  failed: number
+  skipped: number
+  pass_rate: number       // 0-100
+}
+  </types>
+
+  <updated_db_function language="typescript">
+interface TrendOptions {
+  period?: 'hour' | 'day' | 'week' | 'month'
+  count?: number          // Number of periods to look back
+  from?: string           // Explicit start date (ISO 8601)
+  to?: string             // Explicit end date (ISO 8601)
+}
+
+export async function getTrendData(
+  organizationId: number,
+  options: TrendOptions = {}
+): Promise&lt;TrendDataPoint[]&gt; {
+  const sql = getSql()
+  const { period = 'day', count, from, to } = options
+  
+  const conditions = [
+    "completed_at IS NOT NULL",
+    `organization_id = ${organizationId}`
+  ]
+
+  // Determine time filtering
+  if (from) {
+    conditions.push(`started_at >= '${from}'`)
+  } else if (count) {
+    const interval = period === 'hour' ? 'hours' : 
+                     period === 'day' ? 'days' :
+                     period === 'week' ? 'weeks' : 'months'
+    conditions.push(`started_at > NOW() - INTERVAL '${count} ${interval}'`)
+  } else {
+    // Default: last 7 of the period type
+    const interval = period === 'hour' ? 'hours' : 
+                     period === 'day' ? 'days' :
+                     period === 'week' ? 'weeks' : 'months'
+    conditions.push(`started_at > NOW() - INTERVAL '7 ${interval}'`)
+  }
+
+  if (to) {
+    conditions.push(`started_at <= '${to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+  
+  // DATE_TRUNC works for all granularities
+  const truncExpr = period === 'hour' ? "DATE_TRUNC('hour', started_at)" :
+                    period === 'day' ? "DATE_TRUNC('day', started_at)" :
+                    period === 'week' ? "DATE_TRUNC('week', started_at)" :
+                    "DATE_TRUNC('month', started_at)"
+
+  const query = `
+    SELECT
+      ${truncExpr} as period,
+      COUNT(*) as executions,
+      COUNT(*) FILTER (WHERE status = 'success') as passed,
+      COUNT(*) FILTER (WHERE status = 'failure') as failed,
+      COUNT(*) FILTER (WHERE status NOT IN ('success', 'failure')) as skipped,
+      CASE 
+        WHEN COUNT(*) > 0 
+        THEN ROUND(COUNT(*) FILTER (WHERE status = 'success')::decimal / COUNT(*) * 100, 1)
+        ELSE 0
+      END as pass_rate
+    FROM test_executions
+    ${whereClause}
+    GROUP BY ${truncExpr}
+    ORDER BY period ASC
+  `
+
+  const result = await sql.unsafe(query)
+  return result as TrendDataPoint[]
+}
+  </updated_db_function>
+
+  <updated_tool_definition language="typescript">
+{
+  name: "get_trends",
+  description: `Get time-series trend data for pass/fail rates. Supports flexible time granularity.
+
+Fields returned per period:
+- period: ISO datetime - Period start (hour/day/week/month depending on granularity)
+- executions: number - Total runs in this period
+- passed: number - Passed execution count
+- failed: number - Failed execution count
+- skipped: number - Skipped/other execution count
+- pass_rate: number - Success percentage (0-100)
+
+Use 'period' param to control granularity. Use 'from'/'to' for custom date ranges.`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      period: {
+        type: "string",
+        enum: ["hour", "day", "week", "month"],
+        default: "day",
+        description: "Time granularity for aggregation",
+      },
+      count: {
+        type: "number",
+        description: "Number of periods to look back (e.g., count=7 with period=day = last 7 days)",
+      },
+      days: {
+        type: "number",
+        description: "DEPRECATED: Use count + period instead. Number of days to look back.",
+      },
+      from: {
+        type: "string",
+        description: "Start date (ISO 8601). Overrides count/days if specified.",
+      },
+      to: {
+        type: "string",
+        description: "End date (ISO 8601). Defaults to now.",
+      },
+    },
+  },
+}
+  </updated_tool_definition>
+
+  <updated_handler language="typescript">
+case "get_trends": {
+  const input = z.object({
+    period: z.enum(["hour", "day", "week", "month"]).default("day"),
+    count: z.number().min(1).max(100).optional(),
+    days: z.number().min(1).max(90).optional(),      // Deprecated but supported
+    from: z.string().optional(),
+    to: z.string().optional(),
+  }).parse(args)
+
+  // Validate limits per period type
+  const maxCounts: Record&lt;string, number&gt; = {
+    hour: 168,    // 7 days of hours
+    day: 90,      // 90 days
+    week: 52,     // 1 year of weeks
+    month: 24,    // 2 years of months
+  }
+  
+  const effectiveCount = input.count || input.days || 7
+  const maxForPeriod = maxCounts[input.period]
+  
+  if (effectiveCount > maxForPeriod) {
+    return errorResponse(
+      `count exceeds maximum for ${input.period} period (max: ${maxForPeriod})`
+    )
+  }
+
+  const trends = await db.getTrendData(orgId, {
+    period: input.period,
+    count: effectiveCount,
+    from: input.from,
+    to: input.to,
+  })
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    period: input.period,
+    count: trends.length,
+    date_range: {
+      from: input.from || `${effectiveCount} ${input.period}s ago`,
+      to: input.to || "now",
+    },
+    trends,
+  })
+}
+  </updated_handler>
+</solution>
+
+<verification>
+  <test type="manual" description="Test via MCP client">
+    <steps>
+      <step>1. Start dev server: npm run dev</step>
+      <step>2. Call get_trends with no parameters - verify daily data returned</step>
+      <step>3. Call with period="hour" count=24 - verify hourly data</step>
+      <step>4. Call with period="week" count=4 - verify weekly aggregation</step>
+      <step>5. Call with period="month" count=3 - verify monthly aggregation</step>
+      <step>6. Call with explicit from/to range - verify date filtering</step>
+      <step>7. Verify backwards compatibility with days=7 parameter</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API tests">
+    <script language="bash">
+# Test 1: Default behavior (should work as before)
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_trends", "args": {}}'
+
+# Test 2: Hourly granularity
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_trends", "args": {"period": "hour", "count": 24}}'
+
+# Test 3: Weekly aggregation
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_trends", "args": {"period": "week", "count": 4}}'
+
+# Test 4: Explicit date range
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_trends", "args": {"from": "2026-01-01", "to": "2026-01-05"}}'
+
+# Test 5: Backwards compatibility
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_trends", "args": {"days": 14}}'
+    </script>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/db.ts">
+    Create TrendOptions interface and TrendDataPoint type
+  </step>
+  <step number="2" file="lib/db.ts">
+    Update getTrendData function signature and implementation
+  </step>
+  <step number="3" file="lib/mcp/tools.ts">
+    Update get_trends tool definition (around line 181)
+  </step>
+  <step number="4" file="lib/mcp/tools.ts">
+    Update get_trends handler (around line 760)
+  </step>
+  <step number="5">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+  <step number="6">
+    Manual testing with various period/count combinations
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default to period="day" for backwards compatibility</rule>
+    <rule>Validate count limits per period type</rule>
+    <rule>Return pass_rate as 0-100 number in response</rule>
+    <rule>Sort results by period ascending (oldest first)</rule>
+  </always>
+  <never>
+    <rule>Never allow hourly queries beyond 7 days (168 hours)</rule>
+    <rule>Never allow monthly queries beyond 2 years (24 months)</rule>
+    <rule>Never break existing days parameter behavior</rule>
+  </never>
+</behavioral_rules>
+
+<documentation_updates>
+  <description>
+    The MCP documentation page must be updated to reflect the new parameters
+    (period, count, from, to) and updated response fields for get_trends.
+  </description>
+  
+  <file path="app/docs/mcp/page.tsx" description="MCP Tools Documentation Page">
+    <update location="analysisTools array - get_trends entry (lines 132-146)">
+      <current_code language="typescript">
+  {
+    name: "get_trends",
+    description: "Get time-series trend data for pass/fail rates. Useful for charts and tracking health over time.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "days", type: "number", default: "7", description: "Days to look back (1-90)" },
+    ],
+    responseFields: [
+      "date: ISO date (YYYY-MM-DD)",
+      "executions: number - Runs on this day",
+      "passed: number - Passed tests",
+      "failed: number - Failed tests",
+      "pass_rate: number (0-100)",
+    ],
+  },
+      </current_code>
+      <updated_code language="typescript">
+  {
+    name: "get_trends",
+    description: "Get time-series trend data with flexible granularity. Supports hourly, daily, weekly, and monthly aggregation.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "period", type: "string", default: "day", description: "Granularity: hour | day | week | month" },
+      { name: "count", type: "number", description: "Number of periods to look back" },
+      { name: "days", type: "number", description: "DEPRECATED: Use count + period instead" },
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
+    ],
+    responseFields: [
+      "period: ISO datetime - Period start",
+      "executions: number - Total runs",
+      "passed: number - Passed count",
+      "failed: number - Failed count",
+      "skipped: number - Skipped count",
+      "pass_rate: number (0-100)",
+    ],
+    example: `"Show me weekly test trends for the last month"`,
+  },
+      </updated_code>
+    </update>
+  </file>
+
+  <file path="app/docs/api/page.tsx" description="API Documentation Page">
+    <update location="endpoints array - /api/trends entry (lines 63-76)">
+      <note>
+        Update the /api/trends endpoint documentation to include the new 
+        period, count, from, to parameters if the API also exposes these.
+      </note>
+    </update>
+  </file>
+</documentation_updates>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/db.ts - Update getTrendData function with period support</file>
+    <file>lib/mcp/tools.ts - Update tool definition and handler</file>
+    <file>app/docs/mcp/page.tsx - Update analysisTools array (get_trends entry)</file>
+    <file>app/docs/api/page.tsx - Update /api/trends endpoint (if applicable)</file>
+  </files_to_modify>
+  <estimated_lines_changed>~80 lines across all files</estimated_lines_changed>
+  <complexity>Medium - Requires DATE_TRUNC and validation logic</complexity>
+</output_format>

@@ -269,31 +269,47 @@ Fields returned:
     },
   },
 
-  // Artifact Tools
+  // Metadata Tools
   {
     name: "list_branches",
-    description: `Get list of branches with test runs in the last 30 days.
+    description: `Get list of branches with test run statistics.
 
 Fields returned per branch:
 - branch: string - Branch name
-- last_run: ISO datetime
-- execution_count: number - Runs in last 30 days`,
+- last_run: ISO datetime - Most recent execution
+- execution_count: number - Total runs in period
+- pass_rate: number (0-100) - Average success rate
+- last_status: "success" | "failure" | "running" - Most recent execution status`,
     inputSchema: {
       type: "object" as const,
-      properties: {},
+      properties: {
+        days: {
+          type: "number",
+          description: "Only include branches with runs in the last N days (default: 30, max: 365)",
+          default: 30,
+        },
+      },
     },
   },
   {
     name: "list_suites",
-    description: `Get list of test suites with runs in the last 30 days.
+    description: `Get list of test suites with run statistics.
 
 Fields returned per suite:
 - suite: string - Suite name (e.g., "Negotiation")
-- last_run: ISO datetime
-- execution_count: number - Runs in last 30 days`,
+- last_run: ISO datetime - Most recent execution
+- execution_count: number - Total runs in period
+- pass_rate: number (0-100) - Average success rate
+- last_status: "success" | "failure" | "running" - Most recent execution status`,
     inputSchema: {
       type: "object" as const,
-      properties: {},
+      properties: {
+        days: {
+          type: "number",
+          description: "Only include suites with runs in the last N days (default: 30, max: 365)",
+          default: 30,
+        },
+      },
     },
   },
 
@@ -828,19 +844,35 @@ export async function handleToolCall(
       }
 
       case "list_branches": {
-        const branches = await db.getBranches(orgId)
+        const input = z
+          .object({
+            days: z.number().min(1).max(365).default(30),
+          })
+          .parse(args)
+
+        const branches = await db.getBranches(orgId, input.days)
 
         return jsonResponse({
           organization: authContext.organizationSlug,
+          period_days: input.days,
+          count: branches.length,
           branches,
         })
       }
 
       case "list_suites": {
-        const suites = await db.getSuites(orgId)
+        const input = z
+          .object({
+            days: z.number().min(1).max(365).default(30),
+          })
+          .parse(args)
+
+        const suites = await db.getSuites(orgId, input.days)
 
         return jsonResponse({
           organization: authContext.organizationSlug,
+          period_days: input.days,
+          count: suites.length,
           suites,
         })
       }

@@ -24,11 +24,15 @@ export async function GET(request: Request) {
     const dateRange: DateRangeFilter | undefined =
       fromDate || toDate ? { from: fromDate, to: toDate } : undefined
 
-    const [executions, branches, suites] = await Promise.all([
+    const [executions, branchStats, suiteStats] = await Promise.all([
       db.getExecutions(limit, 0, status, branch, dateRange, suite),
       db.getBranches(),
       db.getSuites(),
     ])
+
+    // Extract names for dropdown filters (backwards compatible)
+    const branches = branchStats.map((b) => b.branch)
+    const suites = suiteStats.map((s) => s.suite)
 
     return NextResponse.json({ executions, branches, suites })
   } catch (error) {

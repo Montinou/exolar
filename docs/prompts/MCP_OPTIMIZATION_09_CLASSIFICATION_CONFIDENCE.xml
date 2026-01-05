@@ -1,0 +1,437 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - Medium Priority #9
+  Add Confidence Thresholds and Guidance to classify_failure
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance the `classify_failure` MCP tool to include confidence level interpretation,
+    actionable recommendations, and threshold guidance. Currently returns raw 0-1 
+    confidence score without context on how to interpret it.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The `classify_failure` tool provides AI-assisted triage by classifying test failures
+    as FLAKE, BUG, or UNKNOWN with a confidence score 0.0-1.0. However:
+    
+    - No guidance on what confidence levels mean
+    - AI assistants must interpret thresholds themselves
+    - No recommended actions based on classification
+    
+    Enhancement adds:
+    - confidence_level: "high" (>0.8), "medium" (0.6-0.8), "low" (<0.6)
+    - actionable: boolean indicating if confidence is high enough for automation
+    - recommended_action: Suggested next step based on classification and confidence
+    
+    This makes the tool more useful for automated triage workflows.
+  </background>
+  <audience>
+    - AI assistants auto-triaging failures
+    - CI/CD pipelines making automated decisions
+    - Developers interpreting failure classifications
+  </audience>
+  <impact>
+    MEDIUM - Improves automation capability and reduces interpretation overhead.
+    Critical for teams using AI-driven failure triage.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/tools.ts" description="classify_failure tool definition" start_line="519" end_line="556">
+{
+  name: "classify_failure",
+  description: `Get structured classification data for a test failure to determine if it's a FLAKE vs BUG.
+
+Provides AI-friendly data including:
+- current_failure: Error details, retry count, status
+- historical_metrics: Total runs, flaky runs, flakiness rate, last flaky/passed/failed
+- recent_runs: Last 10 test executions with status and branch
+- classification_signals: Weighted indicators for FLAKE vs BUG
+- suggested_classification: "FLAKE" | "BUG" | "UNKNOWN"
+- confidence: 0.0-1.0 score
+- reasoning: Explanation of the classification
+
+FLAKE indicators: retry_succeeded, high_flakiness_rate, timing_error_type, mixed_recent_results
+BUG indicators: no_retry_success, low_flakiness_rate, assertion_error_type, consistent_failure_pattern
+
+Input: Either test_id (result ID) OR (execution_id + test_name)`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      test_id: { type: "number", description: "Test result ID (from test_results table)" },
+      execution_id: { type: "number", description: "Execution ID (alternative to test_id)" },
+      test_name: { type: "string", description: "Test name (required if using execution_id)" },
+      test_file: { type: "string", description: "Test file path (optional, helps disambiguate)" },
+    },
+  },
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="classify_failure handler" start_line="1242" end_line="1272">
+case "classify_failure": {
+  const input = z.object({
+    test_id: z.number().optional(),
+    execution_id: z.number().optional(),
+    test_name: z.string().optional(),
+    test_file: z.string().optional(),
+  }).parse(args)
+
+  if (!input.test_id &amp;&amp; (!input.execution_id || !input.test_name)) {
+    return errorResponse("Must provide either test_id OR (execution_id + test_name)")
+  }
+
+  const classification = await db.getFailureClassification(orgId, {
+    testId: input.test_id,
+    executionId: input.execution_id,
+    testName: input.test_name,
+    testFile: input.test_file,
+  })
+
+  if (!classification) {
+    return errorResponse("Test not found or no failure data available")
+  }
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    ...classification,
+  })
+}
+  </file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="medium">
+    <description>No semantic confidence level</description>
+    <actual>Returns confidence: 0.72 with no interpretation</actual>
+    <fix>Add confidence_level: "high" | "medium" | "low"</fix>
+  </issue>
+  
+  <issue id="2" severity="medium">
+    <description>No automation guidance</description>
+    <actual>AI must decide what confidence is "good enough"</actual>
+    <fix>Add actionable: boolean based on threshold</fix>
+  </issue>
+
+  <issue id="3" severity="medium">
+    <description>No recommended actions</description>
+    <actual>Classification provided but no next-step guidance</actual>
+    <fix>Add recommended_action based on classification + confidence</fix>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add confidence_level field: "high" (>0.8), "medium" (0.6-0.8), "low" (<0.6)</requirement>
+    <requirement priority="must">Add actionable field: true if confidence >= 0.7</requirement>
+    <requirement priority="must">Add recommended_action field with specific next steps</requirement>
+    <requirement priority="should">Allow configurable action_threshold parameter</requirement>
+    <requirement priority="could">Add severity indicator for the underlying issue</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Compute in handler (no database changes needed)</requirement>
+    <requirement>Keep existing response structure, just add new fields</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Post-process classification result to add new fields
+    2. Use standard thresholds for confidence levels
+    3. Generate recommended actions based on classification + confidence matrix
+    4. Optionally allow threshold customization via parameter
+  </approach>
+
+  <confidence_thresholds>
+    <threshold name="high" range=">= 0.80" actionable="true"/>
+    <threshold name="medium" range="0.60 - 0.79" actionable="conditional"/>
+    <threshold name="low" range="< 0.60" actionable="false"/>
+  </confidence_thresholds>
+
+  <recommended_actions>
+    <action classification="FLAKE" confidence="high">
+      Add @flaky annotation and create tracking issue for root cause investigation.
+    </action>
+    <action classification="FLAKE" confidence="medium">
+      Review recent test history. Consider adding retry or @flaky annotation.
+    </action>
+    <action classification="FLAKE" confidence="low">
+      Manually investigate failure pattern. May require more test runs for clarity.
+    </action>
+    <action classification="BUG" confidence="high">
+      Create high-priority bug report. Test is consistently failing.
+    </action>
+    <action classification="BUG" confidence="medium">
+      Create bug report and monitor for recurrence before prioritizing.
+    </action>
+    <action classification="BUG" confidence="low">
+      Requires manual investigation. Failure pattern is unclear.
+    </action>
+    <action classification="UNKNOWN" confidence="any">
+      Insufficient data for classification. Run more tests or manually investigate.
+    </action>
+  </recommended_actions>
+
+  <updated_tool_definition language="typescript">
+{
+  name: "classify_failure",
+  description: `Get structured classification data for a test failure to determine if it's a FLAKE vs BUG.
+
+Provides AI-friendly data including:
+- current_failure: Error details, retry count, status
+- historical_metrics: Total runs, flaky runs, flakiness rate, last flaky/passed/failed
+- recent_runs: Last 10 test executions with status and branch
+- classification_signals: Weighted indicators for FLAKE vs BUG
+- suggested_classification: "FLAKE" | "BUG" | "UNKNOWN"
+- confidence: 0.0-1.0 score
+- confidence_level: "high" | "medium" | "low" - Interpretation of score
+- actionable: boolean - Whether confidence is high enough for automation
+- recommended_action: string - Suggested next step based on classification
+- reasoning: Explanation of the classification
+
+Confidence Thresholds:
+- high (>= 0.80): Confident enough for automated actions
+- medium (0.60-0.79): Likely correct but may need verification
+- low (< 0.60): Insufficient data, manual review recommended
+
+Input: Either test_id (result ID) OR (execution_id + test_name)`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      test_id: { type: "number", description: "Test result ID (from test_results table)" },
+      execution_id: { type: "number", description: "Execution ID (alternative to test_id)" },
+      test_name: { type: "string", description: "Test name (required if using execution_id)" },
+      test_file: { type: "string", description: "Test file path (optional, helps disambiguate)" },
+      action_threshold: {
+        type: "number",
+        default: 0.7,
+        description: "Minimum confidence for actionable=true (default: 0.7)",
+      },
+    },
+  },
+}
+  </updated_tool_definition>
+
+  <updated_handler language="typescript">
+case "classify_failure": {
+  const input = z.object({
+    test_id: z.number().optional(),
+    execution_id: z.number().optional(),
+    test_name: z.string().optional(),
+    test_file: z.string().optional(),
+    action_threshold: z.number().min(0).max(1).default(0.7),
+  }).parse(args)
+
+  if (!input.test_id &amp;&amp; (!input.execution_id || !input.test_name)) {
+    return errorResponse("Must provide either test_id OR (execution_id + test_name)")
+  }
+
+  const classification = await db.getFailureClassification(orgId, {
+    testId: input.test_id,
+    executionId: input.execution_id,
+    testName: input.test_name,
+    testFile: input.test_file,
+  })
+
+  if (!classification) {
+    return errorResponse("Test not found or no failure data available")
+  }
+
+  // Add confidence interpretation
+  const confidence = classification.confidence
+  const confidence_level = confidence >= 0.8 ? "high" 
+                          : confidence >= 0.6 ? "medium" 
+                          : "low"
+  
+  const actionable = confidence >= input.action_threshold
+
+  // Generate recommended action based on classification + confidence
+  const recommended_action = getRecommendedAction(
+    classification.suggested_classification,
+    confidence_level
+  )
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    ...classification,
+    confidence_level,
+    actionable,
+    action_threshold: input.action_threshold,
+    recommended_action,
+  })
+}
+
+// Helper function (add to tools.ts)
+function getRecommendedAction(
+  classification: "FLAKE" | "BUG" | "UNKNOWN",
+  confidenceLevel: "high" | "medium" | "low"
+): string {
+  const actions: Record&lt;string, Record&lt;string, string&gt;&gt; = {
+    FLAKE: {
+      high: "Add @flaky annotation and create tracking issue for root cause investigation.",
+      medium: "Review recent test history. Consider adding retry or @flaky annotation.",
+      low: "Manually investigate failure pattern. May require more test runs for clarity.",
+    },
+    BUG: {
+      high: "Create high-priority bug report. Test is consistently failing.",
+      medium: "Create bug report and monitor for recurrence before prioritizing.",
+      low: "Requires manual investigation. Failure pattern is unclear.",
+    },
+    UNKNOWN: {
+      high: "Insufficient data for classification. Run more tests or manually investigate.",
+      medium: "Insufficient data for classification. Run more tests or manually investigate.",
+      low: "Insufficient data for classification. Run more tests or manually investigate.",
+    },
+  }
+  
+  return actions[classification]?.[confidenceLevel] 
+    || "Manual investigation required."
+}
+  </updated_handler>
+</solution>
+
+<verification>
+  <test type="manual" description="Test via MCP client">
+    <steps>
+      <step>1. Start dev server: npm run dev</step>
+      <step>2. Call classify_failure for a known flaky test</step>
+      <step>3. Verify confidence_level is one of high/medium/low</step>
+      <step>4. Verify actionable reflects the threshold correctly</step>
+      <step>5. Verify recommended_action is appropriate for classification</step>
+      <step>6. Test with custom action_threshold parameter</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API tests">
+    <script language="bash">
+# Test 1: Default classification
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "classify_failure", "args": {"test_id": 123}}'
+
+# Verify response includes confidence_level, actionable, recommended_action
+
+# Test 2: Custom action threshold
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "classify_failure", "args": {"test_id": 123, "action_threshold": 0.8}}'
+
+# Test 3: Using execution_id + test_name
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "classify_failure", "args": {"execution_id": 1, "test_name": "should login"}}'
+    </script>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/mcp/tools.ts">
+    Add getRecommendedAction helper function
+  </step>
+  <step number="2" file="lib/mcp/tools.ts">
+    Update classify_failure tool definition with new fields
+  </step>
+  <step number="3" file="lib/mcp/tools.ts">
+    Update handler to add action_threshold parameter
+  </step>
+  <step number="4" file="lib/mcp/tools.ts">
+    Add confidence_level, actionable, recommended_action to response
+  </step>
+  <step number="5">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default action_threshold to 0.7 (balanced automation)</rule>
+    <rule>Use consistent threshold boundaries: 0.8 for high, 0.6 for medium</rule>
+    <rule>Provide specific, actionable recommendations</rule>
+    <rule>Include existing classification data unchanged</rule>
+  </always>
+  <never>
+    <rule>Never set actionable=true for UNKNOWN classifications</rule>
+    <rule>Never modify the underlying confidence calculation</rule>
+    <rule>Never break existing response structure</rule>
+  </never>
+</behavioral_rules>
+
+<documentation_updates>
+  <description>
+    The MCP documentation page must be updated to reflect the new confidence interpretation
+    fields (confidence_level, actionable, recommended_action) and the action_threshold parameter.
+  </description>
+  
+  <file path="app/docs/mcp/page.tsx" description="MCP Tools Documentation Page">
+    <update location="autoTriageTools array - classify_failure entry (lines 362-382)">
+      <current_code language="typescript">
+  {
+    name: "classify_failure",
+    description: "Classify a test failure as FLAKE vs BUG. Returns structured data with classification signals, historical metrics, and confidence score.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "test_id", type: "number", description: "Test result ID (from test_results table)" },
+      { name: "execution_id", type: "number", description: "Execution ID (alternative to test_id)" },
+      { name: "test_name", type: "string", description: "Test name (required with execution_id)" },
+      { name: "test_file", type: "string", description: "Test file path (optional, disambiguates)" },
+    ],
+    responseFields: [
+      "current_failure: Error details, retry count, status",
+      "historical_metrics: Total runs, flaky runs, flakiness rate",
+      "recent_runs: Last 10 executions with status",
+      "classification_signals: Weighted FLAKE vs BUG indicators",
+      "suggested_classification: FLAKE | BUG | UNKNOWN",
+      "confidence: 0.0-1.0 score",
+      "reasoning: Explanation of classification",
+    ],
+    example: `"Is this test failure a flake or a real bug?"`,
+  },
+      </current_code>
+      <updated_code language="typescript">
+  {
+    name: "classify_failure",
+    description: "Classify a test failure as FLAKE vs BUG. Returns classification with confidence level and actionable recommendations.",
+    category: "analysis" as const,
+    parameters: [
+      { name: "test_id", type: "number", description: "Test result ID (from test_results table)" },
+      { name: "execution_id", type: "number", description: "Execution ID (alternative to test_id)" },
+      { name: "test_name", type: "string", description: "Test name (required with execution_id)" },
+      { name: "test_file", type: "string", description: "Test file path (optional, disambiguates)" },
+      { name: "action_threshold", type: "number", default: "0.7", description: "Min confidence for actionable=true" },
+    ],
+    responseFields: [
+      "current_failure: Error details, retry count, status",
+      "historical_metrics: Total runs, flaky runs, flakiness rate",
+      "recent_runs: Last 10 executions with status",
+      "classification_signals: Weighted FLAKE vs BUG indicators",
+      "suggested_classification: FLAKE | BUG | UNKNOWN",
+      "confidence: 0.0-1.0 score",
+      "confidence_level: high (>=0.8) | medium (0.6-0.8) | low (<0.6)",
+      "actionable: boolean - Whether confidence is high enough for automation",
+      "recommended_action: string - Suggested next step",
+      "reasoning: Explanation of classification",
+    ],
+    example: `"Is this test failure a flake or a real bug? Should I auto-label it?"`,
+  },
+      </updated_code>
+    </update>
+  </file>
+</documentation_updates>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/mcp/tools.ts - Update tool definition and handler</file>
+    <file>app/docs/mcp/page.tsx - Update autoTriageTools array (classify_failure entry)</file>
+  </files_to_modify>
+  <estimated_lines_changed>~50 lines across both files</estimated_lines_changed>
+  <complexity>Low - Pure handler-side enhancement, no database changes</complexity>
+</output_format>

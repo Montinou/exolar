@@ -511,27 +511,136 @@ export async function getFailureTrendData(
   return result as FailureTrendData[]
 }
 
-export async function getBranches(organizationId: number) {
-  const sql = getSql()
-  const result = await sql`
-    SELECT DISTINCT branch
-    FROM test_executions
-    WHERE organization_id = ${organizationId}
-    ORDER BY branch ASC
-  `
-  return result.map((r) => r.branch) as string[]
+// ============================================
+// Branch/Suite Statistics Functions
+// ============================================
+
+export interface BranchStatistics {
+  branch: string
+  last_run: string | null
+  execution_count: number
+  pass_rate: number
+  last_status: "success" | "failure" | "running" | null
 }
 
-export async function getSuites(organizationId: number) {
+export interface SuiteStatistics {
+  suite: string
+  last_run: string | null
+  execution_count: number
+  pass_rate: number
+  last_status: "success" | "failure" | "running" | null
+}
+
+/**
+ * Get branches with full statistics.
+ * Includes pass_rate, last_status, execution_count, and last_run.
+ * Sorted by most recent activity.
+ */
+export async function getBranches(
+  organizationId: number,
+  days: number = 30
+): Promise<BranchStatistics[]> {
   const sql = getSql()
+
   const result = await sql`
-    SELECT DISTINCT suite
-    FROM test_executions
-    WHERE suite IS NOT NULL
-      AND organization_id = ${organizationId}
-    ORDER BY suite ASC
+    WITH branch_stats AS (
+      SELECT
+        branch,
+        MAX(started_at) as last_run,
+        COUNT(*) as execution_count,
+        ROUND(
+          AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END)::numeric,
+          1
+        ) as pass_rate
+      FROM test_executions
+      WHERE organization_id = ${organizationId}
+        AND started_at > NOW() - MAKE_INTERVAL(days => ${days})
+      GROUP BY branch
+    ),
+    branch_last_status AS (
+      SELECT DISTINCT ON (branch)
+        branch,
+        status as last_status
+      FROM test_executions
+      WHERE organization_id = ${organizationId}
+        AND started_at > NOW() - MAKE_INTERVAL(days => ${days})
+      ORDER BY branch, started_at DESC
+    )
+    SELECT 
+      bs.branch,
+      bs.last_run,
+      bs.execution_count,
+      bs.pass_rate,
+      bls.last_status
+    FROM branch_stats bs
+    LEFT JOIN branch_last_status bls ON bs.branch = bls.branch
+    ORDER BY bs.last_run DESC NULLS LAST
   `
-  return result.map((r) => r.suite) as string[]
+
+  return result.map((r) => ({
+    branch: r.branch as string,
+    last_run: r.last_run ? (r.last_run as Date).toISOString() : null,
+    execution_count: Number(r.execution_count),
+    pass_rate: Number(r.pass_rate) || 0,
+    last_status: r.last_status as BranchStatistics["last_status"],
+  }))
+}
+
+/**
+ * Get suites with full statistics.
+ * Includes pass_rate, last_status, execution_count, and last_run.
+ * Sorted by most recent activity.
+ */
+export async function getSuites(
+  organizationId: number,
+  days: number = 30
+): Promise<SuiteStatistics[]> {
+  const sql = getSql()
+
+  const result = await sql`
+    WITH suite_stats AS (
+      SELECT
+        suite,
+        MAX(started_at) as last_run,
+        COUNT(*) as execution_count,
+        ROUND(
+          AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END)::numeric,
+          1
+        ) as pass_rate
+      FROM test_executions
+      WHERE suite IS NOT NULL
+        AND organization_id = ${organizationId}
+        AND started_at > NOW() - MAKE_INTERVAL(days => ${days})
+      GROUP BY suite
+    ),
+    suite_last_status AS (
+      SELECT DISTINCT ON (suite)
+        suite,
+        status as last_status
+      FROM test_executions
+      WHERE suite IS NOT NULL
+        AND organization_id = ${organizationId}
+        AND started_at > NOW() - MAKE_INTERVAL(days => ${days})
+      ORDER BY suite, started_at DESC
+    )
+    SELECT 
+      ss.suite,
+      ss.last_run,
+      ss.execution_count,
+      ss.pass_rate,
+      sls.last_status
+    FROM suite_stats ss
+    LEFT JOIN suite_last_status sls ON ss.suite = sls.suite
+    ORDER BY ss.last_run DESC NULLS LAST
+  `
+
+  return result.map((r) => ({
+    suite: r.suite as string,
+    last_run: r.last_run ? (r.last_run as Date).toISOString() : null,
+    execution_count: Number(r.execution_count),
+    pass_rate: Number(r.pass_rate) || 0,
+    last_status: r.last_status as SuiteStatistics["last_status"],
+  }))
 }
 
 // ============================================

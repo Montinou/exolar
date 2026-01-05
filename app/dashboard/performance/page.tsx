@@ -29,10 +29,14 @@ async function PerformanceContent({
   const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
 
-  const [branches, suites] = await Promise.all([
+  const [branchStats, suiteStats] = await Promise.all([
     db.getBranches(),
     db.getSuites(),
   ])
+
+  // Extract names for dropdown filters
+  const branches = branchStats.map((b) => b.branch)
+  const suites = suiteStats.map((s) => s.suite)
 
   return (
     <div className="space-y-6">

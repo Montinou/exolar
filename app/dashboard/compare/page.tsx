@@ -33,11 +33,15 @@ async function CompareContent({ searchParams }: CompareContentProps) {
   const params = await searchParams
 
   // Fetch executions for the selector (recent 50)
-  const [executions, branches, suites] = await Promise.all([
+  const [executions, branchStats, suiteStats] = await Promise.all([
     db.getExecutions(50),
     db.getBranches(),
     db.getSuites(),
-  ]) as [TestExecution[], string[], string[]]
+  ])
+
+  // Extract names for dropdowns
+  const branches = branchStats.map((b) => b.branch)
+  const suites = suiteStats.map((s) => s.suite)
 
   // Parse initial execution IDs from URL
   const initialBaseline = params.baseline ? parseInt(params.baseline, 10) : null

@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - Medium Priority #5
+  Add Missing Statistics to list_branches and list_suites
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance the `list_branches` and `list_suites` MCP tools to return additional 
+    statistics including pass rate, last execution status, and execution count.
+    Currently these tools only return branch/suite names in a simple list.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The `list_branches` and `list_suites` tools help AI assistants discover available 
+    branches and test suites. However, they only return names, forcing additional 
+    calls to get_executions or get_dashboard_metrics to understand health status.
+    
+    Enhancing these tools with inline statistics enables:
+    - Quick health assessment without follow-up queries
+    - Better prioritization (e.g., "focus on branches with low pass rate")
+    - Reduced API call overhead for common analysis workflows
+    
+    The optimization analysis suggests adding:
+    - pass_rate: Average pass rate across executions
+    - last_status: Most recent execution status (success/failure)
+    - execution_count: Total runs (already partially supported)
+    - last_run: Most recent execution timestamp
+  </background>
+  <audience>
+    - AI coding assistants analyzing test health
+    - Developers checking branch/suite status
+  </audience>
+  <impact>
+    MEDIUM - Reduces API calls needed for common discovery workflows.
+    Particularly useful for AI triage and branch comparison.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/tools.ts" description="list_branches tool definition" start_line="274" end_line="285">
+{
+  name: "list_branches",
+  description: `Get list of branches with test runs in the last 30 days.
+
+Fields returned per branch:
+- branch: string - Branch name
+- last_run: ISO datetime
+- execution_count: number - Runs in last 30 days`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {},
+  },
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="list_suites tool definition" start_line="287" end_line="298">
+{
+  name: "list_suites",
+  description: `Get list of test suites with runs in the last 30 days.
+
+Fields returned per suite:
+- suite: string - Suite name (e.g., "Negotiation")
+- last_run: ISO datetime
+- execution_count: number - Runs in last 30 days`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {},
+  },
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="list_branches handler" start_line="830" end_line="837">
+case "list_branches": {
+  const branches = await db.getBranches(orgId)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    branches,
+  })
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="list_suites handler" start_line="839" end_line="846">
+case "list_suites": {
+  const suites = await db.getSuites(orgId)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    suites,
+  })
+}
+  </file>
+
+  <file path="lib/db.ts" description="getBranches function" start_line="514" end_line="523">
+export async function getBranches(organizationId: number) {
+  const sql = getSql()
+  const result = await sql`
+    SELECT DISTINCT branch
+    FROM test_executions
+    WHERE organization_id = ${organizationId}
+    ORDER BY branch ASC
+  `
+  return result.map((r) => r.branch) as string[]
+}
+  </file>
+
+  <file path="lib/db.ts" description="getSuites function" start_line="525" end_line="535">
+export async function getSuites(organizationId: number) {
+  const sql = getSql()
+  const result = await sql`
+    SELECT DISTINCT suite
+    FROM test_executions
+    WHERE suite IS NOT NULL
+      AND organization_id = ${organizationId}
+    ORDER BY suite ASC
+  `
+  return result.map((r) => r.suite) as string[]
+}
+  </file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="medium">
+    <description>Tool description claims last_run and execution_count are returned</description>
+    <actual>Database only returns branch/suite names as string array</actual>
+    <fix>Update database functions to return full statistics object</fix>
+  </issue>
+  
+  <issue id="2" severity="medium">
+    <description>Missing pass_rate and last_status fields</description>
+    <impact>Users cannot assess branch/suite health without additional queries</impact>
+  </issue>
+
+  <issue id="3" severity="low">
+    <description>No time filtering option</description>
+    <impact>Always returns all-time data, cannot focus on recent activity</impact>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Return last_run timestamp for each branch/suite</requirement>
+    <requirement priority="must">Return execution_count for each branch/suite</requirement>
+    <requirement priority="must">Add pass_rate field (percentage, 0-100)</requirement>
+    <requirement priority="must">Add last_status field (success/failure/running)</requirement>
+    <requirement priority="should">Add optional days parameter to filter recent activity</requirement>
+    <requirement priority="should">Sort by last_run descending (most recent first)</requirement>
+    <requirement priority="could">Add active_contributors field (unique commit authors)</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Query should use window functions efficiently</requirement>
+    <requirement>No N+1 queries - single database call per tool</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Update database functions to return objects with statistics
+    2. Use aggregation queries with proper filtering
+    3. Update tool definitions with new fields
+    4. Update handlers to return enriched objects
+  </approach>
+
+  <types language="typescript">
+interface BranchStatistics {
+  branch: string
+  last_run: string | null
+  execution_count: number
+  pass_rate: number
+  last_status: "success" | "failure" | "running" | null
+}
+
+interface SuiteStatistics {
+  suite: string
+  last_run: string | null
+  execution_count: number
+  pass_rate: number
+  last_status: "success" | "failure" | "running" | null
+}
+  </types>
+
+  <updated_db_function_branches language="typescript">
+export async function getBranches(
+  organizationId: number,
+  days: number = 30
+): Promise&lt;BranchStatistics[]&gt; {
+  const sql = getSql()
+
+  const result = await sql`
+    WITH branch_stats AS (
+      SELECT
+        branch,
+        MAX(started_at) as last_run,
+        COUNT(*) as execution_count,
+        ROUND(
+          AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END)::numeric,
+          1
+        ) as pass_rate,
+        (
+          SELECT status FROM test_executions te2
+          WHERE te2.branch = te.branch
+            AND te2.organization_id = ${organizationId}
+          ORDER BY started_at DESC
+          LIMIT 1
+        ) as last_status
+      FROM test_executions te
+      WHERE organization_id = ${organizationId}
+        AND started_at > NOW() - INTERVAL '${days} days'
+      GROUP BY branch
+    )
+    SELECT branch, last_run, execution_count, pass_rate, last_status
+    FROM branch_stats
+    ORDER BY last_run DESC NULLS LAST
+  `
+
+  return result as BranchStatistics[]
+}
+  </updated_db_function_branches>
+
+  <updated_db_function_suites language="typescript">
+export async function getSuites(
+  organizationId: number,
+  days: number = 30
+): Promise&lt;SuiteStatistics[]&gt; {
+  const sql = getSql()
+
+  const result = await sql`
+    WITH suite_stats AS (
+      SELECT
+        suite,
+        MAX(started_at) as last_run,
+        COUNT(*) as execution_count,
+        ROUND(
+          AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END)::numeric,
+          1
+        ) as pass_rate,
+        (
+          SELECT status FROM test_executions te2
+          WHERE te2.suite = te.suite
+            AND te2.organization_id = ${organizationId}
+          ORDER BY started_at DESC
+          LIMIT 1
+        ) as last_status
+      FROM test_executions te
+      WHERE suite IS NOT NULL
+        AND organization_id = ${organizationId}
+        AND started_at > NOW() - INTERVAL '${days} days'
+      GROUP BY suite
+    )
+    SELECT suite, last_run, execution_count, pass_rate, last_status
+    FROM suite_stats
+    ORDER BY last_run DESC NULLS LAST
+  `
+
+  return result as SuiteStatistics[]
+}
+  </updated_db_function_suites>
+
+  <updated_tool_definition_branches language="typescript">
+{
+  name: "list_branches",
+  description: `Get list of branches with test run statistics.
+
+Fields returned per branch:
+- branch: string - Branch name
+- last_run: ISO datetime - Most recent execution
+- execution_count: number - Total runs in period
+- pass_rate: number - Average success rate (0-100)
+- last_status: "success" | "failure" | "running" - Most recent execution status`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      days: {
+        type: "number",
+        default: 30,
+        description: "Only include branches with runs in the last N days (default: 30)",
+      },
+    },
+  },
+}
+  </updated_tool_definition_branches>
+
+  <updated_tool_definition_suites language="typescript">
+{
+  name: "list_suites",
+  description: `Get list of test suites with run statistics.
+
+Fields returned per suite:
+- suite: string - Suite name (e.g., "Negotiation")
+- last_run: ISO datetime - Most recent execution
+- execution_count: number - Total runs in period
+- pass_rate: number - Average success rate (0-100)
+- last_status: "success" | "failure" | "running" - Most recent execution status`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      days: {
+        type: "number",
+        default: 30,
+        description: "Only include suites with runs in the last N days (default: 30)",
+      },
+    },
+  },
+}
+  </updated_tool_definition_suites>
+
+  <updated_handlers language="typescript">
+case "list_branches": {
+  const input = z.object({
+    days: z.number().min(1).max(365).default(30),
+  }).parse(args)
+
+  const branches = await db.getBranches(orgId, input.days)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    period_days: input.days,
+    count: branches.length,
+    branches,
+  })
+}
+
+case "list_suites": {
+  const input = z.object({
+    days: z.number().min(1).max(365).default(30),
+  }).parse(args)
+
+  const suites = await db.getSuites(orgId, input.days)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    period_days: input.days,
+    count: suites.length,
+    suites,
+  })
+}
+  </updated_handlers>
+</solution>
+
+<verification>
+  <test type="manual" description="Test via MCP client">
+    <steps>
+      <step>1. Start dev server: npm run dev</step>
+      <step>2. Call list_branches with no parameters - verify statistics returned</step>
+      <step>3. Verify pass_rate is between 0-100</step>
+      <step>4. Verify last_status is one of success/failure/running</step>
+      <step>5. Call list_branches with days=7 - verify filtered results</step>
+      <step>6. Call list_suites - verify same structure</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API tests">
+    <script language="bash">
+# Test 1: Default behavior - branches
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "list_branches", "args": {}}'
+
+# Verify response has pass_rate and last_status fields
+
+# Test 2: With days filter
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "list_branches", "args": {"days": 7}}'
+
+# Test 3: Suites
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "list_suites", "args": {}}'
+    </script>
+  </test>
+
+  <test type="backwards_compatibility">
+    <description>
+      Breaking change: Response structure changes from string[] to object[].
+      Callers expecting string array will need to update.
+      However, tool description already documented object format.
+    </description>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/db.ts">
+    Create BranchStatistics and SuiteStatistics type interfaces
+  </step>
+  <step number="2" file="lib/db.ts">
+    Update getBranches function with aggregation query
+  </step>
+  <step number="3" file="lib/db.ts">
+    Update getSuites function with aggregation query
+  </step>
+  <step number="4" file="lib/mcp/tools.ts">
+    Update list_branches tool definition (around line 274)
+  </step>
+  <step number="5" file="lib/mcp/tools.ts">
+    Update list_suites tool definition (around line 287)
+  </step>
+  <step number="6" file="lib/mcp/tools.ts">
+    Update list_branches handler (around line 830)
+  </step>
+  <step number="7" file="lib/mcp/tools.ts">
+    Update list_suites handler (around line 839)
+  </step>
+  <step number="8">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+  <step number="9">
+    Manual testing with test data
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default days to 30 for reasonable scope</rule>
+    <rule>Sort by last_run descending (most active first)</rule>
+    <rule>Return pass_rate as 0-100 number, not decimal</rule>
+    <rule>Use single efficient query with window functions</rule>
+  </always>
+  <never>
+    <rule>Never allow days > 365 (too expensive)</rule>
+    <rule>Never return null for execution_count (use 0)</rule>
+    <rule>Never make N+1 queries for statistics</rule>
+  </never>
+</behavioral_rules>
+
+<documentation_updates>
+  <description>
+    The MCP documentation page must be updated to reflect the new parameters and 
+    response fields for list_branches and list_suites tools.
+  </description>
+  
+  <file path="app/docs/mcp/page.tsx" description="MCP Tools Documentation Page">
+    <update location="metadataTools array (lines 317-341)">
+      <current_code language="typescript">
+const metadataTools = [
+  {
+    name: "list_branches",
+    description: "Get list of branches with test runs in the last 30 days.",
+    category: "metadata" as const,
+    parameters: [],
+    responseFields: [
+      "branch: string - Branch name",
+      "last_run: ISO datetime",
+      "execution_count: number",
+    ],
+  },
+  {
+    name: "list_suites",
+    description: "Get list of test suites with runs in the last 30 days.",
+    category: "metadata" as const,
+    parameters: [],
+    responseFields: [
+      "suite: string - Suite name",
+      "last_run: ISO datetime",
+      "execution_count: number",
+    ],
+  },
+]
+      </current_code>
+      <updated_code language="typescript">
+const metadataTools = [
+  {
+    name: "list_branches",
+    description: "Get list of branches with test run statistics.",
+    category: "metadata" as const,
+    parameters: [
+      { name: "days", type: "number", default: "30", description: "Include branches with runs in last N days" },
+    ],
+    responseFields: [
+      "branch: string - Branch name",
+      "last_run: ISO datetime - Most recent execution",
+      "execution_count: number - Total runs in period",
+      "pass_rate: number (0-100) - Average success rate",
+      "last_status: success | failure | running - Most recent result",
+    ],
+  },
+  {
+    name: "list_suites",
+    description: "Get list of test suites with run statistics.",
+    category: "metadata" as const,
+    parameters: [
+      { name: "days", type: "number", default: "30", description: "Include suites with runs in last N days" },
+    ],
+    responseFields: [
+      "suite: string - Suite name",
+      "last_run: ISO datetime - Most recent execution",
+      "execution_count: number - Total runs in period",
+      "pass_rate: number (0-100) - Average success rate",
+      "last_status: success | failure | running - Most recent result",
+    ],
+  },
+]
+      </updated_code>
+    </update>
+  </file>
+</documentation_updates>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/db.ts - Update getBranches and getSuites functions</file>
+    <file>lib/mcp/tools.ts - Update tool definitions and handlers</file>
+    <file>app/docs/mcp/page.tsx - Update metadataTools array</file>
+  </files_to_modify>
+  <estimated_lines_changed>~100 lines across all files</estimated_lines_changed>
+  <complexity>Medium - Requires SQL aggregation with subqueries</complexity>
+</output_format>

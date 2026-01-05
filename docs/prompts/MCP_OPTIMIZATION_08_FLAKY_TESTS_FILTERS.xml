@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - Medium Priority #8
+  Add Time Window and Branch Filters to get_flaky_tests
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance the `get_flaky_tests` MCP tool with additional filtering options including
+    time window (since date), branch filter, and include_resolved flag for historical
+    analysis of flaky tests.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The `get_flaky_tests` tool returns tests sorted by flakiness rate, but it only
+    supports basic filtering:
+    - limit: Max results (default 10)
+    - min_runs: Minimum runs to be considered flaky (default 5)
+    
+    Missing filters that would improve usefulness:
+    - since: Only consider flaky runs since a specific date
+    - branch: Filter to see flakiness on specific branches (e.g., main vs feature)
+    - include_resolved: Show tests that were flaky but are now stable
+    
+    These additions enable:
+    - Tracking flakiness trends over time ("Did flakiness improve this week?")
+    - Branch-specific analysis ("Is this test flaky on main or just feature branches?")
+    - Historical review ("What tests were flaky that we fixed?")
+  </background>
+  <audience>
+    - AI assistants triaging flaky tests
+    - Developers debugging intermittent failures
+    - QA teams measuring flakiness reduction
+  </audience>
+  <impact>
+    MEDIUM - Significantly improves flaky test analysis workflows.
+    Critical for teams actively working on reducing test flakiness.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/tools.ts" description="get_flaky_tests tool definition" start_line="238" end_line="256">
+{
+  name: "get_flaky_tests",
+  description: `Get list of flaky tests sorted by flakiness rate. A test is flaky if it sometimes passes after retries.
+
+Fields returned per test:
+- test_signature: string - Unique test identifier
+- test_name: string - Test title
+- test_file: string - Spec file path
+- flakiness_rate: number - Percentage of runs that required retries (0-100)
+- total_runs: number - Total executions
+- flaky_runs: number - Runs with retry
+- last_flaky: ISO datetime`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      limit: { type: "number", description: "Max results", default: 10 },
+      min_runs: { type: "number", description: "Minimum runs to be considered", default: 5 },
+    },
+  },
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="get_flaky_tests handler" start_line="804" end_line="819">
+case "get_flaky_tests": {
+  const input = z.object({
+    limit: z.number().min(1).max(100).default(10),
+    min_runs: z.number().min(1).default(5),
+  }).parse(args)
+
+  const flakyTests = await db.getFlakiestTests(orgId, input.limit, input.min_runs)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    count: flakyTests.length,
+    flaky_tests: flakyTests,
+  })
+}
+  </file>
+
+  <file path="lib/db.ts" description="getFlakiestTests function" start_line="1130" end_line="1148">
+export async function getFlakiestTests(
+  organizationId: number,
+  limit: number = 10,
+  minRuns: number = 5
+): Promise&lt;TestFlakinessHistory[]&gt; {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT *
+    FROM test_flakiness_history
+    WHERE total_runs >= ${minRuns}
+      AND flaky_runs > 0
+      AND organization_id = ${organizationId}
+    ORDER BY flakiness_rate DESC, flaky_runs DESC
+    LIMIT ${limit}
+  `
+
+  return results as TestFlakinessHistory[]
+}
+  </file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="medium">
+    <description>No time window filter</description>
+    <actual>Returns all-time flakiness data</actual>
+    <fix>Add since parameter to filter by recency</fix>
+  </issue>
+  
+  <issue id="2" severity="medium">
+    <description>No branch filtering</description>
+    <actual>Flakiness aggregated across all branches</actual>
+    <fix>Add branch parameter (requires joining with test_executions)</fix>
+  </issue>
+
+  <issue id="3" severity="low">
+    <description>Cannot see resolved flaky tests</description>
+    <actual>Only shows tests with flaky_runs > 0</actual>
+    <fix>Add include_resolved to show tests that became stable</fix>
+  </issue>
+  
+  <issue id="4" severity="low">
+    <description>test_flakiness_history table stores aggregate data</description>
+    <note>Time-based filtering requires different approach - either new table or join with test_results</note>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add since parameter to filter by last_flaky_at date</requirement>
+    <requirement priority="must">Add branch parameter for branch-specific flakiness</requirement>
+    <requirement priority="should">Add include_resolved parameter (default false)</requirement>
+    <requirement priority="should">Return last_branch field showing where test was last flaky</requirement>
+    <requirement priority="could">Add trend indicator (increasing/decreasing flakiness)</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Efficient query - avoid N+1 or full table scans</requirement>
+    <requirement>Backwards compatible - existing calls should work</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Add options object to getFlakiestTests function
+    2. Add since filter using last_flaky_at column
+    3. Add branch filter via subquery or join
+    4. Add include_resolved flag to include flaky_runs = 0
+    5. Update tool definition and handler
+  </approach>
+
+  <interface language="typescript">
+interface GetFlakiestTestsOptions {
+  limit?: number
+  minRuns?: number
+  since?: string          // ISO date - only tests flaky since this date
+  branch?: string         // Filter to specific branch
+  includeResolved?: boolean  // Include tests no longer flaky (default: false)
+}
+  </interface>
+
+  <updated_db_function language="typescript">
+export async function getFlakiestTests(
+  organizationId: number,
+  options: GetFlakiestTestsOptions = {}
+): Promise&lt;TestFlakinessHistory[]&gt; {
+  const sql = getSql()
+  const { 
+    limit = 10, 
+    minRuns = 5, 
+    since, 
+    branch, 
+    includeResolved = false 
+  } = options
+
+  const conditions = [
+    `organization_id = ${organizationId}`,
+    `total_runs >= ${minRuns}`,
+  ]
+
+  // Include or exclude resolved tests
+  if (!includeResolved) {
+    conditions.push("flaky_runs > 0")
+  }
+
+  // Time window filter
+  if (since) {
+    conditions.push(`last_flaky_at >= '${since}'`)
+  }
+
+  // Branch filter - requires subquery to check test_results
+  let branchFilter = ""
+  if (branch) {
+    branchFilter = `
+      AND test_signature IN (
+        SELECT DISTINCT tr.test_signature
+        FROM test_results tr
+        JOIN test_executions te ON tr.execution_id = te.id
+        WHERE te.branch = '${branch}'
+          AND te.organization_id = ${organizationId}
+          AND tr.is_flaky = true
+      )
+    `
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter}`
+
+  const query = `
+    SELECT 
+      tfh.*,
+      (
+        SELECT te.branch 
+        FROM test_results tr 
+        JOIN test_executions te ON tr.execution_id = te.id
+        WHERE tr.test_signature = tfh.test_signature
+          AND tr.is_flaky = true
+          AND te.organization_id = ${organizationId}
+        ORDER BY tr.started_at DESC
+        LIMIT 1
+      ) as last_flaky_branch
+    FROM test_flakiness_history tfh
+    ${whereClause}
+    ORDER BY flakiness_rate DESC, flaky_runs DESC
+    LIMIT ${limit}
+  `
+
+  const results = await sql.unsafe(query)
+  return results as TestFlakinessHistory[]
+}
+  </updated_db_function>
+
+  <updated_tool_definition language="typescript">
+{
+  name: "get_flaky_tests",
+  description: `Get list of flaky tests sorted by flakiness rate. A test is flaky if it sometimes passes after retries.
+
+Supports filtering by time window, branch, and resolution status.
+
+Fields returned per test:
+- test_signature: string - Unique test identifier
+- test_name: string - Test title
+- test_file: string - Spec file path
+- flakiness_rate: number - Percentage of runs that required retries (0-100)
+- total_runs: number - Total executions
+- flaky_runs: number - Runs with retry
+- last_flaky: ISO datetime - When test was last flaky
+- last_flaky_branch: string | null - Branch where test was last flaky`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      limit: { 
+        type: "number", 
+        description: "Max results", 
+        default: 10 
+      },
+      min_runs: { 
+        type: "number", 
+        description: "Minimum runs to be considered", 
+        default: 5 
+      },
+      since: { 
+        type: "string", 
+        description: "Only include tests that have been flaky since this date (ISO 8601)" 
+      },
+      branch: { 
+        type: "string", 
+        description: "Filter to tests that are flaky on this specific branch" 
+      },
+      include_resolved: { 
+        type: "boolean", 
+        default: false,
+        description: "Include tests that are no longer flaky (flaky_runs = 0)" 
+      },
+    },
+  },
+}
+  </updated_tool_definition>
+
+  <updated_handler language="typescript">
+case "get_flaky_tests": {
+  const input = z.object({
+    limit: z.number().min(1).max(100).default(10),
+    min_runs: z.number().min(1).default(5),
+    since: z.string().optional(),
+    branch: z.string().optional(),
+    include_resolved: z.boolean().default(false),
+  }).parse(args)
+
+  const flakyTests = await db.getFlakiestTests(orgId, {
+    limit: input.limit,
+    minRuns: input.min_runs,
+    since: input.since,
+    branch: input.branch,
+    includeResolved: input.include_resolved,
+  })
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    filters: {
+      since: input.since || "all time",
+      branch: input.branch || "all",
+      include_resolved: input.include_resolved,
+    },
+    count: flakyTests.length,
+    flaky_tests: flakyTests,
+  })
+}
+  </updated_handler>
+</solution>
+
+<verification>
+  <test type="manual" description="Test via MCP client">
+    <steps>
+      <step>1. Start dev server: npm run dev</step>
+      <step>2. Call get_flaky_tests with no parameters - verify backwards compatibility</step>
+      <step>3. Call with since="2026-01-01" - verify time filtering</step>
+      <step>4. Call with branch="main" - verify branch filtering</step>
+      <step>5. Call with include_resolved=true - verify resolved tests appear</step>
+      <step>6. Verify last_flaky_branch field is present in response</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API tests">
+    <script language="bash">
+# Test 1: Default behavior (backwards compatible)
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_flaky_tests", "args": {}}'
+
+# Test 2: Time filter
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_flaky_tests", "args": {"since": "2026-01-01"}}'
+
+# Test 3: Branch filter
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_flaky_tests", "args": {"branch": "main"}}'
+
+# Test 4: Include resolved
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_flaky_tests", "args": {"include_resolved": true}}'
+    </script>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/db.ts">
+    Create GetFlakiestTestsOptions interface
+  </step>
+  <step number="2" file="lib/db.ts">
+    Update getFlakiestTests function to accept options
+  </step>
+  <step number="3" file="lib/db.ts">
+    Add since, branch, and includeResolved filtering logic
+  </step>
+  <step number="4" file="lib/db.ts">
+    Add last_flaky_branch subquery
+  </step>
+  <step number="5" file="lib/mcp/tools.ts">
+    Update get_flaky_tests tool definition
+  </step>
+  <step number="6" file="lib/mcp/tools.ts">
+    Update handler with new parameters
+  </step>
+  <step number="7">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default include_resolved to false (most users want active flaky tests)</rule>
+    <rule>Return last_flaky_branch for context on where flakiness occurs</rule>
+    <rule>Maintain existing sorting: flakiness_rate DESC, flaky_runs DESC</rule>
+  </always>
+  <never>
+    <rule>Never return tests below min_runs threshold</rule>
+    <rule>Never break backwards compatibility with existing calls</rule>
+    <rule>Never expose SQL errors to clients</rule>
+  </never>
+</behavioral_rules>
+
+<documentation_updates>
+  <description>
+    The MCP documentation page must be updated to reflect the new filtering parameters
+    (since, branch, include_resolved) and the new last_flaky_branch response field.
+  </description>
+  
+  <file path="app/docs/mcp/page.tsx" description="MCP Tools Documentation Page">
+    <update location="flakinessTools array - get_flaky_tests entry (lines 166-184)">
+      <current_code language="typescript">
+  {
+    name: "get_flaky_tests",
+    description: "Get list of flaky tests sorted by flakiness rate. A test is flaky if it passes after retries.",
+    category: "flakiness" as const,
+    parameters: [
+      { name: "limit", type: "number", default: "10", description: "Max results" },
+      { name: "min_runs", type: "number", default: "5", description: "Minimum runs to be considered" },
+    ],
+    responseFields: [
+      "test_signature: string - Unique identifier",
+      "test_name: string - Test title",
+      "test_file: string - Spec file path",
+      "flakiness_rate: number (0-100)",
+      "total_runs: number",
+      "flaky_runs: number",
+      "last_flaky: ISO datetime",
+    ],
+    example: `"What are our flakiest tests?"`,
+  },
+      </current_code>
+      <updated_code language="typescript">
+  {
+    name: "get_flaky_tests",
+    description: "Get list of flaky tests sorted by flakiness rate. Supports filtering by time window, branch, and resolution status.",
+    category: "flakiness" as const,
+    parameters: [
+      { name: "limit", type: "number", default: "10", description: "Max results" },
+      { name: "min_runs", type: "number", default: "5", description: "Minimum runs to be considered" },
+      { name: "since", type: "string", description: "Only tests flaky since date (ISO 8601)" },
+      { name: "branch", type: "string", description: "Filter to tests flaky on this branch" },
+      { name: "include_resolved", type: "boolean", default: "false", description: "Include tests no longer flaky" },
+    ],
+    responseFields: [
+      "test_signature: string - Unique identifier",
+      "test_name: string - Test title",
+      "test_file: string - Spec file path",
+      "flakiness_rate: number (0-100)",
+      "total_runs: number",
+      "flaky_runs: number",
+      "last_flaky: ISO datetime",
+      "last_flaky_branch: string | null - Branch where last flaky",
+    ],
+    example: `"What tests are flaky on the main branch?"`,
+  },
+      </updated_code>
+    </update>
+  </file>
+
+  <file path="app/docs/api/page.tsx" description="API Documentation Page">
+    <update location="endpoints array - /api/flaky-tests entry (lines 77-85)">
+      <note>
+        Update the /api/flaky-tests endpoint documentation to include the new
+        since, branch, and include_resolved parameters if the API also exposes these.
+      </note>
+    </update>
+  </file>
+</documentation_updates>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/db.ts - Update getFlakiestTests function</file>
+    <file>lib/mcp/tools.ts - Update tool definition and handler</file>
+    <file>app/docs/mcp/page.tsx - Update flakinessTools array (get_flaky_tests entry)</file>
+    <file>app/docs/api/page.tsx - Update /api/flaky-tests endpoint (if applicable)</file>
+  </files_to_modify>
+  <estimated_lines_changed>~70 lines across all files</estimated_lines_changed>
+  <complexity>Medium - Requires subquery for branch filtering</complexity>
+</output_format>

@@ -318,24 +318,32 @@ const performanceTools = [
 const metadataTools = [
   {
     name: "list_branches",
-    description: "Get list of branches with test runs in the last 30 days.",
+    description: "Get list of branches with test run statistics.",
     category: "metadata" as const,
-    parameters: [],
+    parameters: [
+      { name: "days", type: "number", default: "30", description: "Include branches with runs in last N days (max: 365)" },
+    ],
     responseFields: [
       "branch: string - Branch name",
-      "last_run: ISO datetime",
-      "execution_count: number",
+      "last_run: ISO datetime - Most recent execution",
+      "execution_count: number - Total runs in period",
+      "pass_rate: number (0-100) - Average success rate",
+      "last_status: success | failure | running - Most recent result",
     ],
   },
   {
     name: "list_suites",
-    description: "Get list of test suites with runs in the last 30 days.",
+    description: "Get list of test suites with run statistics.",
     category: "metadata" as const,
-    parameters: [],
+    parameters: [
+      { name: "days", type: "number", default: "30", description: "Include suites with runs in last N days (max: 365)" },
+    ],
     responseFields: [
       "suite: string - Suite name",
-      "last_run: ISO datetime",
-      "execution_count: number",
+      "last_run: ISO datetime - Most recent execution",
+      "execution_count: number - Total runs in period",
+      "pass_rate: number (0-100) - Average success rate",
+      "last_status: success | failure | running - Most recent result",
     ],
   },
 ]

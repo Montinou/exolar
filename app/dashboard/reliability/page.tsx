@@ -37,7 +37,7 @@ async function ReliabilityContent({
   const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
 
-  const [score, branches, suites] = await Promise.all([
+  const [score, branchStats, suiteStats] = await Promise.all([
     db.getReliabilityScore({
       from: params.from,
       to: params.to,
@@ -46,7 +46,11 @@ async function ReliabilityContent({
     }),
     db.getBranches(),
     db.getSuites(),
-  ]) as [ReliabilityScore, string[], string[]]
+  ])
+
+  // Extract names for dropdown filters
+  const branches = branchStats.map((b) => b.branch)
+  const suites = suiteStats.map((s) => s.suite)
 
   const getStatusColor = (status: string) => {
     switch (status) {
