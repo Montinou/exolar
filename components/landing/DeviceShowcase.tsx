@@ -37,16 +37,13 @@ const devices = [
 ]
 
 export function DeviceShowcase() {
-  const [activeDevice, setActiveDevice] = useState(devices[1]) // Default to Desktop
-  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [activeDeviceId, setActiveDeviceId] = useState(devices[1].id) // Default to Desktop
 
-  const handleDeviceChange = (device: typeof activeDevice) => {
-    if (device.id === activeDevice.id) return
-    setIsTransitioning(true)
-    setTimeout(() => {
-      setActiveDevice(device)
-      setIsTransitioning(false)
-    }, 350)
+  const activeDevice = devices.find(d => d.id === activeDeviceId) || devices[1]
+
+  const handleDeviceChange = (device: typeof devices[0]) => {
+    if (device.id === activeDeviceId) return
+    setActiveDeviceId(device.id)
   }
 
   return (
@@ -154,38 +151,63 @@ export function DeviceShowcase() {
 
           {/* Image Display Area */}
           <div className="lg:col-span-8 relative h-[350px] sm:h-[450px] md:h-[500px] lg:h-[600px] flex items-center justify-center">
-            <div
-              className={cn(
-                "relative transition-all duration-300 transform",
-                isTransitioning ? "opacity-0 scale-95 translate-y-8" : "opacity-100 scale-100 translate-y-0"
-              )}
-            >
-              <div className="relative group max-w-[85vw] sm:max-w-[400px] md:max-w-[500px] lg:max-w-none">
-                {/* Image with radial mask for seamless edge blending */}
-                <Image
-                  src={activeDevice.image}
-                  alt={activeDevice.name}
-                  width={activeDevice.width}
-                  height={activeDevice.height}
-                  className="rounded-2xl relative z-10 w-full h-auto"
-                  sizes="(max-width: 640px) 85vw, (max-width: 768px) 400px, (max-width: 1024px) 500px, 800px"
-                  style={{
-                    boxShadow: "0 0 80px -10px oklch(0.75 0.15 195 / 0.5)",
-                    maskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
-                    WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
-                  }}
-                />
+            <div className="relative w-full h-full flex items-center justify-center">
+              {/* Stacked images with crossfade transitions */}
+              {devices.map((device) => {
+                const isActive = device.id === activeDeviceId
+                return (
+                  <div
+                    key={device.id}
+                    className={cn(
+                      "absolute inset-0 flex items-center justify-center",
+                      "transition-all duration-500 ease-out",
+                      isActive 
+                        ? "opacity-100 scale-100 blur-0 z-20" 
+                        : "opacity-0 scale-95 blur-sm z-10 pointer-events-none"
+                    )}
+                  >
+                    <div className="relative group max-w-[85vw] sm:max-w-[400px] md:max-w-[500px] lg:max-w-none">
+                      {/* Image with radial mask for seamless edge blending */}
+                      <Image
+                        src={device.image}
+                        alt={device.name}
+                        width={device.width}
+                        height={device.height}
+                        className={cn(
+                          "rounded-2xl relative z-10 w-full h-auto",
+                          "transition-transform duration-500 ease-out"
+                        )}
+                        sizes="(max-width: 640px) 85vw, (max-width: 768px) 400px, (max-width: 1024px) 500px, 800px"
+                        style={{
+                          boxShadow: isActive 
+                            ? "0 0 80px -10px oklch(0.75 0.15 195 / 0.5)" 
+                            : "none",
+                          maskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
+                          WebkitMaskImage: "radial-gradient(ellipse 90% 85% at 50% 50%, black 50%, transparent 100%)",
+                        }}
+                        priority={device.id === "desktop"} // Prioritize default image
+                      />
 
-                {/* Status Badge */}
-                <div className="absolute -top-3 -right-2 sm:-top-6 sm:-right-6 z-30 animate-bounce">
-                  <div className="glass-panel px-2 py-1 sm:px-4 sm:py-2 rounded-full flex items-center gap-1 sm:gap-2 shadow-xl">
-                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-[var(--safety-amber)]" />
-                    <span className="text-[10px] sm:text-xs font-mono font-bold text-[var(--safety-amber)]">
-                      <span className="hidden sm:inline">LATEST BUILD: </span>PASS
-                    </span>
+                      {/* Status Badge - only show on active device */}
+                      {isActive && (
+                        <div 
+                          className="absolute -top-3 -right-2 sm:-top-6 sm:-right-6 z-30 animate-bounce"
+                          style={{
+                            animation: "bounce 2s ease-in-out infinite",
+                          }}
+                        >
+                          <div className="glass-panel px-2 py-1 sm:px-4 sm:py-2 rounded-full flex items-center gap-1 sm:gap-2 shadow-xl">
+                            <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-[var(--safety-amber)]" />
+                            <span className="text-[10px] sm:text-xs font-mono font-bold text-[var(--safety-amber)]">
+                              <span className="hidden sm:inline">LATEST BUILD: </span>PASS
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
+                )
+              })}
             </div>
           </div>
         </div>
