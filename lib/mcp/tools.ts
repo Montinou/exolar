@@ -179,18 +179,42 @@ Fields returned:
   },
   {
     name: "get_trends",
-    description: `Get time-series trend data for pass/fail rates over a period. Useful for tracking test health over time.
+    description: `Get time-series trend data with flexible granularity. Supports hourly, daily, weekly, and monthly aggregation.
 
-Fields returned per day:
-- date: ISO date (YYYY-MM-DD)
-- executions: number - Runs on this day
-- passed: number - Passed tests count
-- failed: number - Failed tests count
-- pass_rate: number - Daily percentage (0-100)`,
+Fields returned per period:
+- period: ISO datetime - Period start (hour/day/week/month depending on granularity)
+- executions: number - Total runs in this period
+- passed: number - Passed execution count
+- failed: number - Failed execution count
+- skipped: number - Skipped/other execution count
+- pass_rate: number - Success percentage (0-100)
+
+Use 'period' param to control granularity. Use 'from'/'to' for custom date ranges.`,
     inputSchema: {
       type: "object" as const,
       properties: {
-        days: { type: "number", description: "Number of days to look back", default: 7 },
+        period: {
+          type: "string",
+          enum: ["hour", "day", "week", "month"],
+          default: "day",
+          description: "Time granularity for aggregation",
+        },
+        count: {
+          type: "number",
+          description: "Number of periods to look back (e.g., count=7 with period=day = last 7 days)",
+        },
+        days: {
+          type: "number",
+          description: "DEPRECATED: Use count + period instead. Number of days to look back.",
+        },
+        from: {
+          type: "string",
+          description: "Start date (ISO 8601). Overrides count/days if specified.",
+        },
+        to: {
+          type: "string",
+          description: "End date (ISO 8601). Defaults to now.",
+        },
       },
     },
   },
@@ -461,7 +485,8 @@ Returns:
 - baseline: Execution metadata (id, branch, commit, status, test counts)
 - current: Execution metadata
 - summary: Pass rate delta, duration delta, test count delta, status change counts
-- tests: Array of test comparisons with diff categories
+- performanceSummary: Count of duration regressions, improvements, and stable tests
+- tests: Array of test comparisons with diff and duration categories
 
 Diff Categories:
 - new_failure: Was passing in baseline, now failing
@@ -470,7 +495,12 @@ Diff Categories:
 - removed_test: Only exists in baseline execution
 - unchanged: Same status in both
 
-Use filter param to focus on specific categories (e.g., filter="new_failure" to see only regressions).`,
+Duration Categories:
+- regression: >threshold% slower than baseline
+- improvement: >threshold% faster than baseline
+- stable: Within threshold
+
+Use filter param to focus on specific categories (e.g., filter="new_failure" or filter="performance_regression").`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -496,8 +526,13 @@ Use filter param to focus on specific categories (e.g., filter="new_failure" to 
         },
         filter: {
           type: "string",
-          enum: ["new_failure", "fixed", "new_test", "removed_test", "all"],
-          description: "Filter results by diff category (default: all)",
+          enum: ["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"],
+          description: "Filter results by category (default: all)",
+        },
+        performance_threshold: {
+          type: "number",
+          default: 20,
+          description: "Percentage change threshold for regression/improvement classification (default: 20%)",
         },
       },
     },
@@ -774,13 +809,46 @@ export async function handleToolCall(
       }
 
       case "get_trends": {
-        const input = z.object({ days: z.number().min(1).max(90).default(7) }).parse(args)
-
-        const trends = await db.getTrendData(orgId, input.days)
-
+        const input = z.object({
+          period: z.enum(["hour", "day", "week", "month"]).default("day"),
+          count: z.number().min(1).max(100).optional(),
+          days: z.number().min(1).max(90).optional(),      // Deprecated but supported
+          from: z.string().optional(),
+          to: z.string().optional(),
+        }).parse(args)
+      
+        // Validate limits per period type
+        const maxCounts: Record<string, number> = {
+          hour: 168,    // 7 days of hours
+          day: 90,      // 90 days
+          week: 52,     // 1 year of weeks
+          month: 24,    // 2 years of months
+        }
+        
+        const effectiveCount = input.count || input.days || 7
+        const maxForPeriod = maxCounts[input.period]
+        
+        if (effectiveCount > maxForPeriod) {
+          return errorResponse(
+            `count exceeds maximum for ${input.period} period (max: ${maxForPeriod})`
+          )
+        }
+      
+        const trends = await db.getTrendData(orgId, {
+          period: input.period,
+          count: effectiveCount,
+          from: input.from,
+          to: input.to,
+        })
+      
         return jsonResponse({
           organization: authContext.organizationSlug,
-          days: input.days,
+          period: input.period,
+          count: trends.length,
+          date_range: {
+            from: input.from || `${effectiveCount} ${input.period}s ago`,
+            to: input.to || "now",
+          },
           trends,
         })
       }
@@ -1114,7 +1182,8 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
             baseline_branch: z.string().optional(),
             current_branch: z.string().optional(),
             suite: z.string().optional(),
-            filter: z.enum(["new_failure", "fixed", "new_test", "removed_test", "all"]).optional(),
+            filter: z.enum(["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"]).optional(),
+            performance_threshold: z.number().min(1).max(100).default(20),
           })
           .parse(args)
 
@@ -1158,16 +1227,28 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           )
         }
 
-        // Get comparison
-        const comparison = await db.compareExecutions(orgId, baselineId, currentId)
+        // Get comparison with performance threshold
+        const comparison = await db.compareExecutions(orgId, baselineId, currentId, {
+          performanceThreshold: input.performance_threshold,
+        })
 
         if (!comparison) {
           return errorResponse("One or both executions not found or access denied")
         }
 
+        // Calculate performance summary
+        const performanceSummary = {
+          regressions: comparison.tests.filter((t) => t.durationCategory === "regression").length,
+          improvements: comparison.tests.filter((t) => t.durationCategory === "improvement").length,
+          stable: comparison.tests.filter((t) => t.durationCategory === "stable").length,
+          threshold_pct: input.performance_threshold,
+        }
+
         // Apply filter if specified
         let filteredTests = comparison.tests
-        if (input.filter && input.filter !== "all") {
+        if (input.filter === "performance_regression") {
+          filteredTests = comparison.tests.filter((t) => t.durationCategory === "regression")
+        } else if (input.filter && input.filter !== "all") {
           filteredTests = comparison.tests.filter((t) => t.diffCategory === input.filter)
         }
 
@@ -1176,6 +1257,7 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           baseline: comparison.baseline,
           current: comparison.current,
           summary: comparison.summary,
+          performanceSummary,
           filter: input.filter || "all",
           tests: filteredTests,
           test_count: filteredTests.length,

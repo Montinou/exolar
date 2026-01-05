@@ -29,7 +29,10 @@ export async function GET(request: Request) {
     const baselineBranch = searchParams.get("baseline_branch")
     const currentBranch = searchParams.get("current_branch")
     const suite = searchParams.get("suite") || undefined
-    const filter = searchParams.get("filter") as TestDiffCategory | "all" | null
+    const filter = searchParams.get("filter") as TestDiffCategory | "performance_regression" | "all" | null
+    const performanceThreshold = searchParams.get("performance_threshold")
+      ? parseInt(searchParams.get("performance_threshold")!, 10)
+      : 20
 
     const db = getQueriesForOrg(context.organizationId)
 
@@ -78,15 +81,30 @@ export async function GET(request: Request) {
       )
     }
 
-    // Get comparison result
-    const comparison = await db.compareExecutions(resolvedBaselineId, resolvedCurrentId)
+    // Get comparison result with performance threshold
+    const comparison = await db.compareExecutions(resolvedBaselineId, resolvedCurrentId, {
+      performanceThreshold,
+    })
+
+    // Calculate performance summary
+    const performanceSummary = {
+      regressions: comparison.tests.filter((t) => t.durationCategory === "regression").length,
+      improvements: comparison.tests.filter((t) => t.durationCategory === "improvement").length,
+      stable: comparison.tests.filter((t) => t.durationCategory === "stable").length,
+      threshold_pct: performanceThreshold,
+    }
 
     // Apply filter if specified
-    if (filter && filter !== "all") {
+    if (filter === "performance_regression") {
+      comparison.tests = comparison.tests.filter((t) => t.durationCategory === "regression")
+    } else if (filter && filter !== "all") {
       comparison.tests = comparison.tests.filter((t) => t.diffCategory === filter)
     }
 
-    return NextResponse.json(comparison)
+    return NextResponse.json({
+      ...comparison,
+      performanceSummary,
+    })
   } catch (error) {
     console.error("[API] Error comparing executions:", error)
     const message = error instanceof Error ? error.message : "Failed to compare executions"

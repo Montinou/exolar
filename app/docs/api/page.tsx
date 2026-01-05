@@ -66,12 +66,15 @@ const endpoints = [
   {
     method: "GET" as const,
     path: "/api/trends",
-    description: "Time-series pass/fail data for charts and trend analysis",
+    description: "Time-series pass/fail data with flexible granularity (hourly, daily, weekly, monthly)",
     parameters: [
       { name: "days", type: "number", default: "14", description: "Number of days to include" },
+      { name: "period", type: "string", default: "day", description: "Granularity: hour | day | week | month" },
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
     ],
     curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
-  "https://your-dashboard.com/api/trends?days=14"`,
+  "https://your-dashboard.com/api/trends?period=week&days=28"`,
   },
   {
     method: "GET" as const,
@@ -87,31 +90,35 @@ const endpoints = [
   {
     method: "GET" as const,
     path: "/api/compare",
-    description: "Compare two executions to identify regressions, improvements, and test changes",
+    description: "Compare two executions to identify regressions, improvements, and performance changes",
     parameters: [
       { name: "baseline", type: "number", description: "Baseline execution ID" },
       { name: "current", type: "number", description: "Current execution ID" },
       { name: "baseline_branch", type: "string", description: "Use latest from this branch as baseline" },
       { name: "current_branch", type: "string", description: "Use latest from this branch as current" },
       { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
-      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | all" },
+      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | performance_regression | all" },
+      { name: "performance_threshold", type: "number", default: "20", description: "% change threshold for regression/improvement" },
     ],
     curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
   "https://your-dashboard.com/api/compare?baseline_branch=main&current_branch=feature-x"`,
     responseExample: `{
-  "success": true,
-  "data": {
-    "baseline": { "id": 123, "branch": "main", ... },
-    "current": { "id": 456, "branch": "feature-x", ... },
-    "summary": {
-      "passRateDelta": -5.2,
-      "newFailures": 3,
-      "fixed": 1
-    },
-    "tests": [
-      { "testName": "Login test", "diffCategory": "new_failure", ... }
-    ]
-  }
+  "baseline": { "id": 123, "branch": "main", ... },
+  "current": { "id": 456, "branch": "feature-x", ... },
+  "summary": {
+    "passRateDelta": -5.2,
+    "newFailures": 3,
+    "fixed": 1
+  },
+  "performanceSummary": {
+    "regressions": 2,
+    "improvements": 5,
+    "stable": 42,
+    "threshold_pct": 20
+  },
+  "tests": [
+    { "testName": "Login test", "diffCategory": "new_failure", "durationCategory": "stable", ... }
+  ]
 }`,
   },
   {

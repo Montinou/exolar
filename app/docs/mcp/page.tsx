@@ -131,18 +131,24 @@ const analysisTools = [
   },
   {
     name: "get_trends",
-    description: "Get time-series trend data for pass/fail rates. Useful for charts and tracking health over time.",
+    description: "Get time-series trend data with flexible granularity. Supports hourly, daily, weekly, and monthly aggregation.",
     category: "analysis" as const,
     parameters: [
-      { name: "days", type: "number", default: "7", description: "Days to look back (1-90)" },
+      { name: "period", type: "string", default: "day", description: "Granularity: hour | day | week | month" },
+      { name: "count", type: "number", description: "Number of periods to look back" },
+      { name: "days", type: "number", description: "DEPRECATED: Use count + period" },
+      { name: "from", type: "string", description: "Start date (ISO 8601)" },
+      { name: "to", type: "string", description: "End date (ISO 8601)" },
     ],
     responseFields: [
-      "date: ISO date (YYYY-MM-DD)",
-      "executions: number - Runs on this day",
-      "passed: number - Passed tests",
-      "failed: number - Failed tests",
+      "period: ISO datetime - Period start",
+      "executions: number - Total runs",
+      "passed: number - Passed count",
+      "failed: number - Failed count",
+      "skipped: number - Skipped count",
       "pass_rate: number (0-100)",
     ],
+    example: `"Show me weekly test trends for the last month"`,
   },
   {
     name: "get_error_distribution",
@@ -294,7 +300,7 @@ const performanceTools = [
   },
   {
     name: "compare_executions",
-    description: "Compare two test executions side-by-side to identify regressions, improvements, and changes.",
+    description: "Compare two test executions side-by-side to identify regressions, improvements, and performance changes.",
     category: "performance" as const,
     parameters: [
       { name: "baseline_id", type: "number", description: "Baseline execution ID" },
@@ -302,15 +308,18 @@ const performanceTools = [
       { name: "baseline_branch", type: "string", description: "Use latest execution from this branch as baseline" },
       { name: "current_branch", type: "string", description: "Use latest execution from this branch as current" },
       { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
-      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | all" },
+      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | performance_regression | all" },
+      { name: "performance_threshold", type: "number", default: "20", description: "% change threshold for regression/improvement" },
     ],
     responseFields: [
       "baseline, current: Execution metadata (id, branch, commit, status)",
       "summary: Pass rate delta, duration delta, test count changes",
-      "tests: Array of test comparisons with diff categories",
+      "performanceSummary: Count of regressions, improvements, stable tests",
+      "tests: Array with diff categories and duration categories",
       "Diff categories: new_failure, fixed, new_test, removed_test, unchanged",
+      "Duration categories: regression, improvement, stable",
     ],
-    example: `"Compare the last two runs on main branch"`,
+    example: `"Compare the last two runs and show performance regressions"`,
   },
 ]
 

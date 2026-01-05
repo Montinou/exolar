@@ -455,6 +455,17 @@ export interface TestComparisonItem {
   durationDeltaMs: number | null
   durationDeltaPercent: number | null
   diffCategory: TestDiffCategory
+  durationCategory: 'regression' | 'improvement' | 'stable' | null
+}
+
+/**
+ * Performance summary for execution comparison
+ */
+export interface PerformanceSummary {
+  regressions: number
+  improvements: number
+  stable: number
+  thresholdPct: number
 }
 
 /**
