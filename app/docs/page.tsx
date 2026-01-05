@@ -113,9 +113,7 @@ export default defineConfig({
             <Link
               key={link.href}
               href={link.href}
-              className={`group p-4 sm:p-6 rounded-xl glass-card hover:glass-card-glow transition-all ${
-                "highlight" in link && link.highlight ? "border-2 border-primary/50" : ""
-              }`}
+              className="group p-4 sm:p-6 rounded-xl glass-card hover:glass-card-glow transition-all"
             >
               <link.icon className="h-6 w-6 sm:h-8 sm:w-8 mb-3 sm:mb-4 text-primary" />
               <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors flex items-center gap-2">
