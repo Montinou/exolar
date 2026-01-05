@@ -85,7 +85,7 @@ async function DashboardContent({
 
         {/* Analysis Row - Flakiest and Slowest Tests */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <FlakiestTestsCard />
+          <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
           <SlowestTestsCard />
         </div>
 

@@ -83,6 +83,9 @@ const endpoints = [
     parameters: [
       { name: "limit", type: "number", default: "20", description: "Max results to return" },
       { name: "days", type: "number", default: "30", description: "Analysis window in days" },
+      { name: "since", type: "string", description: "Only tests flaky since date (ISO 8601)" },
+      { name: "branch", type: "string", description: "Filter to specific branch" },
+      { name: "include_resolved", type: "boolean", default: "false", description: "Include tests no longer flaky" },
     ],
     curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
   "https://your-dashboard.com/api/flaky-tests?limit=10"`,

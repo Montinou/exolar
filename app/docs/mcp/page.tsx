@@ -171,11 +171,14 @@ const analysisTools = [
 const flakinessTools = [
   {
     name: "get_flaky_tests",
-    description: "Get list of flaky tests sorted by flakiness rate. A test is flaky if it passes after retries.",
+    description: "Get list of flaky tests sorted by flakiness rate. Supports filtering by time window, branch, and resolution status.",
     category: "flakiness" as const,
     parameters: [
       { name: "limit", type: "number", default: "10", description: "Max results" },
       { name: "min_runs", type: "number", default: "5", description: "Minimum runs to be considered" },
+      { name: "since", type: "string", description: "Only tests flaky since date (ISO 8601)" },
+      { name: "branch", type: "string", description: "Filter to tests flaky on this branch" },
+      { name: "include_resolved", type: "boolean", default: "false", description: "Include tests no longer flaky" },
     ],
     responseFields: [
       "test_signature: string - Unique identifier",
@@ -185,8 +188,9 @@ const flakinessTools = [
       "total_runs: number",
       "flaky_runs: number",
       "last_flaky: ISO datetime",
+      "last_flaky_branch: string | null - Branch where last flaky",
     ],
-    example: `"What are our flakiest tests?"`,
+    example: `"What tests are flaky on the main branch?"`,
   },
   {
     name: "get_flakiness_summary",

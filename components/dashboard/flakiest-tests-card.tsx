@@ -25,7 +25,13 @@ interface FlakinessData {
   tests: TestFlakinessHistory[]
 }
 
-export function FlakiestTestsCard() {
+export function FlakiestTestsCard({
+  branch,
+  since,
+}: {
+  branch?: string
+  since?: string
+}) {
   const [data, setData] = useState<FlakinessData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +39,11 @@ export function FlakiestTestsCard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const response = await fetch("/api/flakiness?limit=5")
+        const params = new URLSearchParams({ limit: "5" })
+        if (branch) params.append("branch", branch)
+        if (since) params.append("since", since)
+
+        const response = await fetch(`/api/flakiness?${params.toString()}`)
         if (!response.ok) {
           throw new Error("Failed to fetch flakiness data")
         }
@@ -48,7 +58,7 @@ export function FlakiestTestsCard() {
     }
 
     fetchData()
-  }, [])
+  }, [branch, since])
 
   if (loading) {
     return (

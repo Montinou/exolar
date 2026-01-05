@@ -1309,24 +1309,101 @@ export function isTestFlaky(retryCount: number, status: string): boolean {
   return retryCount > 0 && status === "passed"
 }
 
+export interface GetFlakiestTestsOptions {
+  limit?: number
+  minRuns?: number
+  since?: string
+  branch?: string
+  includeResolved?: boolean
+}
+
 export async function getFlakiestTests(
   organizationId: number,
-  limit: number = 10,
-  minRuns: number = 5
+  options: GetFlakiestTestsOptions | number = {} // Support legacy signature (limit as number) for backward compatibility during transistion
 ): Promise<TestFlakinessHistory[]> {
   const sql = getSql()
+  
+  // Handle legacy signature (limit as first arg, minRuns as second - though minRuns isn't passed here)
+  let limit = 10
+  let minRuns = 5
+  let since: string | undefined
+  let branch: string | undefined
+  let includeResolved = false
 
-  const results = await sql`
-    SELECT *
-    FROM test_flakiness_history
-    WHERE total_runs >= ${minRuns}
-      AND flaky_runs > 0
-      AND organization_id = ${organizationId}
+  if (typeof options === 'number') {
+    limit = options
+    // minRuns would be the next argument but we can't easily access it without changing signature entirely
+    // so we'll treat it as default or handle if the caller passes a second arg (which we can't see here easily without ...args)
+    // To be safe and cleaner, let's just support the new object signature primarily, 
+    // but if we want to be strict about "update instead of create", we should fully replace the signature.
+    // However, to avoid breaking other calls immediately, I'll check if the second arg is present in the "arguments" object if I could...
+    // Actually, let's just simplify and say we are changing the signature. I will update all callers.
+  } else {
+    limit = options.limit ?? 10
+    minRuns = options.minRuns ?? 5
+    since = options.since
+    branch = options.branch
+    includeResolved = options.includeResolved ?? false
+  }
+
+  // NOTE: If the function is called with (orgId, limit, minRuns), 'options' will be 'limit'.
+  // We need to handle the 3rd argument 'minRuns' if we want full backward compat without changing call sites immediately.
+  // But the plan is to update call sites involved. Providing a clean migration path:
+  // I will assume for this step I am refactoring the function signature to take an object.
+  // I will check for callers in the next steps to ensure I don't break them.
+  
+  const conditions = [
+    `organization_id = ${organizationId}`,
+    `total_runs >= ${minRuns}`,
+  ]
+
+  if (!includeResolved) {
+    conditions.push("flaky_runs > 0")
+  }
+
+  if (since) {
+    conditions.push(`last_flaky_at >= '${since}'`)
+  }
+
+  let branchFilter = ""
+  if (branch) {
+    // We need to join via test_results and test_executions to filter by branch
+    // Since test_flakiness_history is an aggregate, we check if the test was flaky on this specific branch
+    // We use a subquery to find test_signatures that have flaky results on the given branch
+    branchFilter = `
+      AND test_signature IN (
+        SELECT DISTINCT tr.test_signature
+        FROM test_results tr
+        JOIN test_executions te ON tr.execution_id = te.id
+        WHERE te.branch = '${branch.replace(/'/g, "''")}'
+          AND te.organization_id = ${organizationId}
+          AND tr.is_flaky = true
+      )
+    `
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter}`
+
+  const results = await sql.unsafe(`
+    SELECT 
+      tfh.*,
+      (
+        SELECT te.branch 
+        FROM test_results tr 
+        JOIN test_executions te ON tr.execution_id = te.id
+        WHERE tr.test_signature = tfh.test_signature
+          AND tr.is_flaky = true
+          AND te.organization_id = ${organizationId}
+        ORDER BY tr.started_at DESC
+        LIMIT 1
+      ) as last_flaky_branch
+    FROM test_flakiness_history tfh
+    ${whereClause}
     ORDER BY flakiness_rate DESC, flaky_runs DESC
     LIMIT ${limit}
-  `
+  `)
 
-  return results as TestFlakinessHistory[]
+  return results as unknown as TestFlakinessHistory[]
 }
 
 export async function getFlakinessSummary(organizationId: number): Promise<FlakinessSummary> {
@@ -1341,7 +1418,7 @@ export async function getFlakinessSummary(organizationId: number): Promise<Flaki
       AND organization_id = ${organizationId}
   `
 
-  const topFlaky = await getFlakiestTests(organizationId, 5)
+  const topFlaky = await getFlakiestTests(organizationId, { limit: 5 })
 
   return {
     total_flaky_tests: Number(summaryResult[0].total_flaky_tests),
@@ -2648,8 +2725,8 @@ export function getQueriesForOrg(organizationId: number) {
       getErrorTypeDistribution(organizationId, options),
 
     // Flakiness queries
-    getFlakiestTests: (limit?: number, minRuns?: number) =>
-      getFlakiestTests(organizationId, limit, minRuns),
+    getFlakiestTests: (options?: GetFlakiestTestsOptions | number) =>
+      getFlakiestTests(organizationId, options),
     getFlakinessSummary: () =>
       getFlakinessSummary(organizationId),
     getTestFlakiness: (signature: string) =>

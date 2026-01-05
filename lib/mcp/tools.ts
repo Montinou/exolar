@@ -269,12 +269,16 @@ Fields returned per test:
 - flakiness_rate: number - Percentage of runs that required retries (0-100)
 - total_runs: number - Total executions
 - flaky_runs: number - Runs with retry
-- last_flaky: ISO datetime`,
+- last_flaky: ISO datetime
+- last_flaky_branch: string | null - Branch where test was last flaky`,
     inputSchema: {
       type: "object" as const,
       properties: {
         limit: { type: "number", description: "Max results", default: 10 },
         min_runs: { type: "number", description: "Minimum runs to be considered", default: 5 },
+        since: { type: "string", description: "Only include tests that have been flaky since this date (ISO 8601)" },
+        branch: { type: "string", description: "Filter to tests that are flaky on this specific branch" },
+        include_resolved: { type: "boolean", description: "Include tests that are no longer flaky (flaky_runs = 0)", default: false },
       },
     },
   },
@@ -890,14 +894,28 @@ export async function handleToolCall(
           .object({
             limit: z.number().min(1).max(100).default(10),
             min_runs: z.number().min(1).default(5),
+            since: z.string().optional(),
+            branch: z.string().optional(),
+            include_resolved: z.boolean().default(false),
           })
           .parse(args)
 
-        const flakyTests = await db.getFlakiestTests(orgId, input.limit, input.min_runs)
+        const flakyTests = await db.getFlakiestTests(orgId, {
+          limit: input.limit,
+          minRuns: input.min_runs,
+          since: input.since,
+          branch: input.branch,
+          includeResolved: input.include_resolved,
+        })
 
         return jsonResponse({
           organization: authContext.organizationSlug,
           count: flakyTests.length,
+          filters: {
+            since: input.since || "all time",
+            branch: input.branch || "all",
+            include_resolved: input.include_resolved,
+          },
           flaky_tests: flakyTests,
         })
       }

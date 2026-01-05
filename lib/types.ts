@@ -331,6 +331,7 @@ export interface TestFlakinessHistory {
   last_flaky_at: string | null
   last_passed_at: string | null
   last_failed_at: string | null
+  last_flaky_branch: string | null
   first_seen_at: string
   updated_at: string
 }
