@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - High Priority #2
+  Add Pagination Support to Multiple MCP Tools
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Add pagination support (offset parameter) to MCP tools that currently only support 
+    limit-based queries. This enables AI assistants and clients to efficiently navigate 
+    large datasets without fetching everything at once.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The MCP server exposes tools for querying test execution data. Several tools support 
+    a `limit` parameter but lack `offset` support, making it impossible to paginate through 
+    large result sets. This is particularly problematic for:
+    
+    - Organizations with thousands of test executions
+    - Tests with extensive history (100+ runs)
+    - Search queries that match many tests
+    
+    Without pagination, clients must either:
+    1. Request very large limits (memory/performance issues)
+    2. Accept incomplete data (missing older results)
+  </background>
+  <audience>
+    - AI coding assistants (Claude, Cursor, etc.)
+    - Developers building MCP client integrations
+  </audience>
+  <impact>
+    HIGH - Enables efficient data access patterns for large organizations.
+    Reduces memory usage and improves response times for subsequent pages.
+  </impact>
+</context>
+
+<affected_tools>
+  <tool name="get_executions" priority="high">
+    <current_params>limit, status, branch, suite, from, to</current_params>
+    <missing>offset</missing>
+    <use_case>Browse execution history page by page</use_case>
+  </tool>
+  
+  <tool name="search_tests" priority="high">
+    <current_params>query, limit</current_params>
+    <missing>offset</missing>
+    <use_case>Paginate through search results when many tests match</use_case>
+  </tool>
+  
+  <tool name="get_test_history" priority="high">
+    <current_params>test_signature, limit</current_params>
+    <missing>offset</missing>
+    <use_case>View older runs of a specific test beyond the first page</use_case>
+  </tool>
+  
+  <tool name="get_failed_tests" priority="medium">
+    <current_params>execution_id, error_type, test_file, limit, since</current_params>
+    <missing>offset</missing>
+    <use_case>Paginate through failures when there are many</use_case>
+  </tool>
+</affected_tools>
+
+<existing_code>
+  <file path="lib/db.ts" function="getExecutions" start_line="56" end_line="97">
+export async function getExecutions(
+  organizationId: number,
+  limit = 50,
+  status?: string,
+  branch?: string,
+  dateRange?: DateRangeFilter,
+  suite?: string
+) {
+  const sql = getSql()
+  const conditions = [`organization_id = ${organizationId}`]
+
+  if (status) {
+    conditions.push(`status = '${status}'`)
+  }
+
+  if (branch) {
+    conditions.push(`branch = '${branch}'`)
+  }
+
+  if (suite) {
+    conditions.push(`suite = '${suite}'`)
+  }
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  const result = await sql`
+    SELECT * FROM test_executions
+    ${sql.unsafe(whereClause)}
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `
+
+  return result as TestExecution[]
+}
+  </file>
+
+  <file path="lib/db.ts" function="searchTests" start_line="831" end_line="870">
+export async function searchTests(organizationId: number, query: string, limit = 50): Promise&lt;TestSearchResult[]&gt; {
+  const sql = getSql()
+
+  if (!query || query.length &lt; 2) {
+    return []
+  }
+
+  const searchPattern = `%${query}%`
+
+  const results = await sql`
+    SELECT
+      COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) as test_signature,
+      tr.test_name,
+      tr.test_file,
+      COUNT(*) as run_count,
+      MAX(tr.started_at) as last_run,
+      (
+        SELECT status FROM test_results tr2
+        JOIN test_executions te2 ON tr2.execution_id = te2.id
+        WHERE tr2.test_name = tr.test_name
+          AND tr2.test_file = tr.test_file
+          AND te2.organization_id = ${organizationId}
+        ORDER BY tr2.started_at DESC LIMIT 1
+      ) as last_status,
+      ROUND(
+        COUNT(*) FILTER (WHERE tr.status = 'passed')::decimal
+        / NULLIF(COUNT(*), 0) * 100, 1
+      ) as pass_rate
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE (tr.test_name ILIKE ${searchPattern}
+       OR tr.test_file ILIKE ${searchPattern})
+      AND te.organization_id = ${organizationId}
+    GROUP BY tr.test_name, tr.test_file, tr.test_signature
+    ORDER BY run_count DESC
+    LIMIT ${limit}
+  `
+
+  return results as TestSearchResult[]
+}
+  </file>
+
+  <file path="lib/db.ts" function="getTestHistory" start_line="872" end_line="891">
+export async function getTestHistory(organizationId: number, signature: string, limit = 20): Promise&lt;TestHistoryItem[]&gt; {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT
+      tr.*,
+      te.branch,
+      te.commit_sha,
+      te.status as execution_status
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE (tr.test_signature = ${signature}
+       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature})
+      AND te.organization_id = ${organizationId}
+    ORDER BY tr.started_at DESC
+    LIMIT ${limit}
+  `
+
+  return results as TestHistoryItem[]
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="Tool definitions (partial)">
+// get_executions tool definition
+{
+  name: "get_executions",
+  inputSchema: {
+    properties: {
+      limit: { type: "number", description: "Max results (1-100)", default: 20 },
+      status: { type: "string", enum: ["success", "failure", "running"] },
+      branch: { type: "string", description: "Filter by branch name" },
+      suite: { type: "string", description: "Filter by test suite" },
+      from: { type: "string", description: "Start date (ISO 8601)" },
+      to: { type: "string", description: "End date (ISO 8601)" },
+    },
+  },
+}
+
+// search_tests tool definition
+{
+  name: "search_tests",
+  inputSchema: {
+    properties: {
+      query: { type: "string", description: "Search term (min 2 chars)" },
+      limit: { type: "number", description: "Max results", default: 20 },
+    },
+    required: ["query"],
+  },
+}
+
+// get_test_history tool definition
+{
+  name: "get_test_history",
+  inputSchema: {
+    properties: {
+      test_signature: { type: "string", description: "Test signature (MD5 hash)" },
+      limit: { type: "number", default: 20 },
+    },
+    required: ["test_signature"],
+  },
+}
+  </file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add `offset` parameter to all affected tools</requirement>
+    <requirement priority="must">Default offset to 0 for backwards compatibility</requirement>
+    <requirement priority="must">Update database functions to accept offset parameter</requirement>
+    <requirement priority="must">Modify SQL queries to include OFFSET clause</requirement>
+    <requirement priority="should">Include pagination metadata in responses (has_more, total_count)</requirement>
+    <requirement priority="should">Validate offset is non-negative</requirement>
+    <requirement priority="could">Add cursor-based pagination as alternative (future enhancement)</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Maintain backwards compatibility - existing calls without offset must work</requirement>
+    <requirement>No performance regression for first page queries (offset=0)</requirement>
+    <requirement>Clear documentation of new parameters</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Update database functions (lib/db.ts) to accept optional offset parameter
+    2. Modify SQL queries to include OFFSET clause
+    3. Update tool definitions (lib/mcp/tools.ts) with new offset parameter
+    4. Update tool handlers to pass offset to database functions
+    5. Optionally add pagination metadata to responses
+  </approach>
+
+  <database_changes>
+    <change function="getExecutions">
+      <signature_before>
+getExecutions(organizationId: number, limit?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string)
+      </signature_before>
+      <signature_after>
+getExecutions(organizationId: number, limit?: number, offset?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string)
+      </signature_after>
+      <sql_change>
+-- Before
+LIMIT ${limit}
+
+-- After
+LIMIT ${limit}
+OFFSET ${offset || 0}
+      </sql_change>
+    </change>
+
+    <change function="searchTests">
+      <signature_before>
+searchTests(organizationId: number, query: string, limit?: number)
+      </signature_before>
+      <signature_after>
+searchTests(organizationId: number, query: string, limit?: number, offset?: number)
+      </signature_after>
+      <sql_change>
+-- Before
+LIMIT ${limit}
+
+-- After
+LIMIT ${limit}
+OFFSET ${offset || 0}
+      </sql_change>
+    </change>
+
+    <change function="getTestHistory">
+      <signature_before>
+getTestHistory(organizationId: number, signature: string, limit?: number)
+      </signature_before>
+      <signature_after>
+getTestHistory(organizationId: number, signature: string, limit?: number, offset?: number)
+      </signature_after>
+      <sql_change>
+-- Before
+LIMIT ${limit}
+
+-- After
+LIMIT ${limit}
+OFFSET ${offset || 0}
+      </sql_change>
+    </change>
+  </database_changes>
+
+  <tool_definition_changes>
+    <change tool="get_executions">
+      <add_property>
+offset: { 
+  type: "number", 
+  description: "Skip N results for pagination. Default: 0", 
+  default: 0 
+}
+      </add_property>
+      <update_description>
+Add to description: "Use offset for pagination (e.g., offset=20 with limit=20 shows results 21-40)."
+      </update_description>
+    </change>
+
+    <change tool="search_tests">
+      <add_property>
+offset: { 
+  type: "number", 
+  description: "Skip N results for pagination. Default: 0", 
+  default: 0 
+}
+      </add_property>
+    </change>
+
+    <change tool="get_test_history">
+      <add_property>
+offset: { 
+  type: "number", 
+  description: "Skip N results for pagination. Default: 0", 
+  default: 0 
+}
+      </add_property>
+    </change>
+
+    <change tool="get_failed_tests">
+      <add_property>
+offset: { 
+  type: "number", 
+  description: "Skip N results for pagination. Default: 0", 
+  default: 0 
+}
+      </add_property>
+    </change>
+  </tool_definition_changes>
+
+  <response_enhancement description="Optional - Add pagination metadata">
+    <before>
+{
+  "count": 20,
+  "executions": [...]
+}
+    </before>
+    <after>
+{
+  "count": 20,
+  "pagination": {
+    "offset": 0,
+    "limit": 20,
+    "has_more": true
+  },
+  "executions": [...]
+}
+    </after>
+    <note>
+      has_more can be computed as: results.length === limit
+      If results.length &lt; limit, there are no more results.
+    </note>
+  </response_enhancement>
+
+  <example_fixed_handler tool="get_executions">
+case "get_executions": {
+  const input = z
+    .object({
+      limit: z.number().min(1).max(100).default(20),
+      offset: z.number().min(0).default(0),  // NEW
+      status: z.enum(["success", "failure", "running"]).optional(),
+      branch: z.string().optional(),
+      suite: z.string().optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+    })
+    .parse(args)
+
+  const executions = await db.getExecutions(
+    orgId,
+    input.limit,
+    input.offset,  // NEW
+    input.status,
+    input.branch,
+    input.from &amp;&amp; input.to ? { from: input.from, to: input.to } : undefined,
+    input.suite
+  )
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    count: executions.length,
+    pagination: {
+      offset: input.offset,
+      limit: input.limit,
+      has_more: executions.length === input.limit,
+    },
+    executions,
+  })
+}
+  </example_fixed_handler>
+</solution>
+
+<verification>
+  <test type="unit" description="No existing unit tests for MCP tools">
+    No dedicated unit tests exist. Consider adding in future iteration.
+  </test>
+
+  <test type="manual" description="Test pagination via MCP client">
+    <steps>
+      <step>1. Start development server: `npm run dev`</step>
+      <step>2. Use Claude Code or MCP client to call get_executions with limit=5</step>
+      <step>3. Note the results and verify count is 5</step>
+      <step>4. Call get_executions with limit=5, offset=5</step>
+      <step>5. Verify results are different (next page)</step>
+      <step>6. Verify has_more is true if 5 results returned</step>
+      <step>7. Continue with offset=10, etc. until has_more is false</step>
+    </steps>
+    <expected>
+      Each page shows different results. Last page has has_more=false.
+    </expected>
+  </test>
+
+  <test type="api" description="Direct API pagination test">
+    <script language="bash">
+# First page
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_executions", "args": {"limit": 5, "offset": 0}}'
+
+# Second page
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_executions", "args": {"limit": 5, "offset": 5}}'
+
+# Verify different IDs in each response
+    </script>
+  </test>
+
+  <test type="backwards_compatibility" description="Ensure old calls still work">
+    <steps>
+      <step>1. Call get_executions without offset parameter</step>
+      <step>2. Verify it defaults to offset=0</step>
+      <step>3. Verify response structure is compatible (has count, executions)</step>
+    </steps>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/db.ts">
+    Update getExecutions function signature and SQL query to accept offset
+  </step>
+  <step number="2" file="lib/db.ts">
+    Update searchTests function signature and SQL query
+  </step>
+  <step number="3" file="lib/db.ts">
+    Update getTestHistory function signature and SQL query
+  </step>
+  <step number="4" file="lib/mcp/tools.ts">
+    Add offset parameter to tool definitions (allTools array)
+  </step>
+  <step number="5" file="lib/mcp/tools.ts">
+    Update tool handlers to validate and pass offset parameter
+  </step>
+  <step number="6" file="lib/mcp/tools.ts">
+    Add pagination metadata to responses (optional enhancement)
+  </step>
+  <step number="7">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+  <step number="8">
+    Manual testing with MCP client
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default offset to 0 for backwards compatibility</rule>
+    <rule>Validate offset is non-negative</rule>
+    <rule>Keep limit validation (1-100 range)</rule>
+    <rule>Preserve existing response fields</rule>
+  </always>
+  <never>
+    <rule>Never make offset a required parameter</rule>
+    <rule>Never change the order of existing function parameters</rule>
+    <rule>Never remove existing response fields</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/db.ts - Update 3 database functions</file>
+    <file>lib/mcp/tools.ts - Update 4 tool definitions and handlers</file>
+  </files_to_modify>
+  <estimated_lines_changed>~60 lines across both files</estimated_lines_changed>
+</output_format>

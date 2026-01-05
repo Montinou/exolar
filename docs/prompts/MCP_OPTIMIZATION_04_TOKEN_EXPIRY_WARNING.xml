@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - High Priority #4
+  Add Token Expiry Warning to MCP Responses
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance MCP authentication to detect tokens nearing expiration and include 
+    warning metadata in tool responses. This helps AI assistants and users proactively 
+    refresh tokens before they expire, preventing authentication failures.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with JWT authentication</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Authentication</project_type>
+  <background>
+    MCP tokens have a 30-day validity period. Currently, when a token is close to 
+    expiration (e.g., 3 days remaining), users are not warned until the token 
+    actually expires. This leads to:
+    
+    - Unexpected authentication failures during CI/CD workflows
+    - User frustration when MCP tools suddenly stop working
+    - Extra troubleshooting time to diagnose "token expired" errors
+    
+    The JWT already contains an `exp` claim (set during token generation), but this 
+    information is not exposed to clients. The solution is to:
+    1. Extract expiration time during token validation
+    2. Include expiry metadata in MCPAuthContext
+    3. Add warning metadata to tool responses when token is near expiry
+  </background>
+  <audience>
+    - AI coding assistants (Claude, Cursor, etc.)
+    - Developers using MCP tools programmatically
+    - CI/CD pipelines with automated MCP integrations
+  </audience>
+  <impact>
+    HIGH - Prevents authentication failures and improves user experience.
+    Enables proactive token refresh before expiration.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/auth.ts" description="MCPAuthContext interface">
+export interface MCPAuthContext {
+  userId: number
+  email: string
+  organizationId: number
+  organizationSlug: string
+  orgRole: "owner" | "admin" | "viewer"
+  userRole: "admin" | "viewer"
+}
+  </file>
+
+  <file path="lib/mcp/auth.ts" description="Token validation (MCP tokens)" start_line="67" end_line="112">
+async function validateMCPGeneratedToken(token: string): Promise&lt;MCPAuthContext | null&gt; {
+  try {
+    const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
+
+    const { payload } = await jose.jwtVerify(token, secret, {
+      issuer: "exolar-qa",
+      audience: "mcp-client",
+    })
+
+    // Check if it's our MCP token
+    if (payload.type !== "mcp") {
+      return null
+    }
+
+    const userId = parseInt(payload.sub as string, 10)
+    const email = payload.email as string
+    const organizationId = payload.org_id as number
+    const organizationSlug = payload.org_slug as string
+    const orgRole = payload.org_role as "owner" | "admin" | "viewer"
+
+    if (!userId || !email || !organizationId) {
+      console.error("[mcp-auth] MCP token missing required claims")
+      return null
+    }
+
+    // Get user role from database (not stored in token for security)
+    const sql = getSql()
+    const result = await sql`
+      SELECT role as user_role FROM dashboard_users WHERE id = ${userId}
+    `
+
+    const userRole = result.length > 0 ? (result[0].user_role as "admin" | "viewer") : "viewer"
+
+    return {
+      userId,
+      email,
+      organizationId,
+      organizationSlug,
+      orgRole,
+      userRole,
+    }
+  } catch {
+    // Not a valid MCP token, will try Neon Auth next
+    return null
+  }
+}
+  </file>
+
+  <file path="app/api/auth/mcp-token/route.ts" description="Token generation">
+// Token validity: 30 days
+const TOKEN_VALIDITY_DAYS = 30
+
+// ...
+
+const expiresAt = new Date(Date.now() + TOKEN_VALIDITY_DAYS * 24 * 60 * 60 * 1000)
+
+const token = await new jose.SignJWT({
+  sub: context.userId.toString(),
+  email: context.email,
+  org_id: context.organizationId,
+  org_slug: context.organizationSlug,
+  org_role: context.orgRole,
+  type: "mcp",
+})
+  .setProtectedHeader({ alg: "HS256" })
+  .setIssuedAt()
+  .setExpirationTime(expiresAt)
+  .setIssuer("exolar-qa")
+  .setAudience("mcp-client")
+  .sign(secret)
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="jsonResponse helper">
+function jsonResponse(data: unknown): ToolResponse {
+  return {
+    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+  }
+}
+  </file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Extract token expiration from JWT payload during validation</requirement>
+    <requirement priority="must">Add tokenExpiresAt and tokenRefreshWarning to MCPAuthContext</requirement>
+    <requirement priority="must">Add warning metadata to responses when token expires within 7 days</requirement>
+    <requirement priority="should">Define constants for warning threshold (7 days) and critical threshold (3 days)</requirement>
+    <requirement priority="should">Include refresh command in warning message</requirement>
+    <requirement priority="could">Log warning on server when token is near expiry</requirement>
+  </functional>
+  <non_functional>
+    <requirement>No performance impact - expiry check is O(1)</requirement>
+    <requirement>Backwards compatible - new fields are optional additions</requirement>
+    <requirement>Clear, actionable warning messages</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Extend MCPAuthContext interface with expiry fields
+    2. Modify validateMCPGeneratedToken to extract and calculate expiry info
+    3. Create helper function to check if refresh is needed
+    4. Optionally modify jsonResponse to include _meta warnings
+  </approach>
+
+  <updated_interface language="typescript">
+// Constants for expiry thresholds
+const TOKEN_WARNING_DAYS = 7   // Start warning 7 days before expiry
+const TOKEN_CRITICAL_DAYS = 3  // Critical warning 3 days before expiry
+
+export interface MCPAuthContext {
+  userId: number
+  email: string
+  organizationId: number
+  organizationSlug: string
+  orgRole: "owner" | "admin" | "viewer"
+  userRole: "admin" | "viewer"
+  // NEW: Token expiry information
+  tokenExpiresAt?: Date | null
+  tokenExpiresInDays?: number | null
+  tokenRefreshWarning?: 'none' | 'warning' | 'critical' | null
+}
+  </updated_interface>
+
+  <updated_validation_function language="typescript">
+async function validateMCPGeneratedToken(token: string): Promise&lt;MCPAuthContext | null&gt; {
+  try {
+    const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
+
+    const { payload } = await jose.jwtVerify(token, secret, {
+      issuer: "exolar-qa",
+      audience: "mcp-client",
+    })
+
+    // Check if it's our MCP token
+    if (payload.type !== "mcp") {
+      return null
+    }
+
+    const userId = parseInt(payload.sub as string, 10)
+    const email = payload.email as string
+    const organizationId = payload.org_id as number
+    const organizationSlug = payload.org_slug as string
+    const orgRole = payload.org_role as "owner" | "admin" | "viewer"
+
+    if (!userId || !email || !organizationId) {
+      console.error("[mcp-auth] MCP token missing required claims")
+      return null
+    }
+
+    // Get user role from database
+    const sql = getSql()
+    const result = await sql`
+      SELECT role as user_role FROM dashboard_users WHERE id = ${userId}
+    `
+    const userRole = result.length > 0 ? (result[0].user_role as "admin" | "viewer") : "viewer"
+
+    // NEW: Extract and calculate token expiry info
+    let tokenExpiresAt: Date | null = null
+    let tokenExpiresInDays: number | null = null
+    let tokenRefreshWarning: 'none' | 'warning' | 'critical' | null = null
+
+    if (payload.exp) {
+      tokenExpiresAt = new Date(payload.exp * 1000)  // JWT exp is in seconds
+      const now = new Date()
+      const msRemaining = tokenExpiresAt.getTime() - now.getTime()
+      tokenExpiresInDays = Math.floor(msRemaining / (1000 * 60 * 60 * 24))
+
+      if (tokenExpiresInDays <= TOKEN_CRITICAL_DAYS) {
+        tokenRefreshWarning = 'critical'
+        console.warn(`[mcp-auth] Token expires in ${tokenExpiresInDays} days (CRITICAL) for user ${email}`)
+      } else if (tokenExpiresInDays <= TOKEN_WARNING_DAYS) {
+        tokenRefreshWarning = 'warning'
+        console.warn(`[mcp-auth] Token expires in ${tokenExpiresInDays} days for user ${email}`)
+      } else {
+        tokenRefreshWarning = 'none'
+      }
+    }
+
+    return {
+      userId,
+      email,
+      organizationId,
+      organizationSlug,
+      orgRole,
+      userRole,
+      tokenExpiresAt,
+      tokenExpiresInDays,
+      tokenRefreshWarning,
+    }
+  } catch {
+    return null
+  }
+}
+  </updated_validation_function>
+
+  <helper_function language="typescript">
+/**
+ * Get token expiry warning metadata for tool responses
+ */
+export function getTokenExpiryMeta(context: MCPAuthContext): object | null {
+  if (!context.tokenRefreshWarning || context.tokenRefreshWarning === 'none') {
+    return null
+  }
+
+  const refreshCommand = 'npx @exolar-qa/mcp-server --login'
+
+  if (context.tokenRefreshWarning === 'critical') {
+    return {
+      _warning: {
+        type: 'token_expiry',
+        severity: 'critical',
+        message: `Token expires in ${context.tokenExpiresInDays} day(s). Run: ${refreshCommand}`,
+        expiresAt: context.tokenExpiresAt?.toISOString(),
+        expiresInDays: context.tokenExpiresInDays,
+        refreshCommand,
+      }
+    }
+  }
+
+  return {
+    _warning: {
+      type: 'token_expiry',
+      severity: 'warning',
+      message: `Token expires in ${context.tokenExpiresInDays} days. Consider refreshing soon.`,
+      expiresAt: context.tokenExpiresAt?.toISOString(),
+      expiresInDays: context.tokenExpiresInDays,
+      refreshCommand,
+    }
+  }
+}
+  </helper_function>
+
+  <updated_json_response language="typescript">
+// Option A: Modify jsonResponse to accept authContext and add warnings
+function jsonResponse(data: unknown, authContext?: MCPAuthContext): ToolResponse {
+  const response: Record&lt;string, unknown&gt; = data as Record&lt;string, unknown&gt;
+  
+  // Add expiry warning if applicable
+  if (authContext) {
+    const expiryMeta = getTokenExpiryMeta(authContext)
+    if (expiryMeta) {
+      Object.assign(response, expiryMeta)
+    }
+  }
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+  }
+}
+
+// Then in handleToolCall, pass authContext to jsonResponse:
+// return jsonResponse({ ... }, authContext)
+  </updated_json_response>
+
+  <alternative_approach description="Wrapper approach - less invasive">
+// Alternative: Create a wrapper that adds warnings without modifying jsonResponse
+function withExpiryWarning(response: unknown, authContext: MCPAuthContext): unknown {
+  if (typeof response !== 'object' || response === null) {
+    return response
+  }
+  
+  const expiryMeta = getTokenExpiryMeta(authContext)
+  if (!expiryMeta) {
+    return response
+  }
+
+  return { ...response, ...expiryMeta }
+}
+
+// Usage in handleToolCall:
+const result = { organization: authContext.organizationSlug, ... }
+return jsonResponse(withExpiryWarning(result, authContext))
+  </alternative_approach>
+</solution>
+
+<example_responses>
+  <response type="normal" description="Token not near expiry">
+{
+  "organization": "acme-corp",
+  "count": 10,
+  "executions": [...]
+}
+  </response>
+
+  <response type="warning" description="Token expires in 5 days">
+{
+  "organization": "acme-corp",
+  "count": 10,
+  "executions": [...],
+  "_warning": {
+    "type": "token_expiry",
+    "severity": "warning",
+    "message": "Token expires in 5 days. Consider refreshing soon.",
+    "expiresAt": "2026-01-10T03:00:00.000Z",
+    "expiresInDays": 5,
+    "refreshCommand": "npx @exolar-qa/mcp-server --login"
+  }
+}
+  </response>
+
+  <response type="critical" description="Token expires in 2 days">
+{
+  "organization": "acme-corp",
+  "count": 10,
+  "executions": [...],
+  "_warning": {
+    "type": "token_expiry",
+    "severity": "critical",
+    "message": "Token expires in 2 day(s). Run: npx @exolar-qa/mcp-server --login",
+    "expiresAt": "2026-01-07T03:00:00.000Z",
+    "expiresInDays": 2,
+    "refreshCommand": "npx @exolar-qa/mcp-server --login"
+  }
+}
+  </response>
+</example_responses>
+
+<verification>
+  <test type="unit" description="No existing unit tests">
+    No dedicated unit tests exist for auth module.
+  </test>
+
+  <test type="manual" description="Test with near-expiry token">
+    <steps>
+      <step>1. Temporarily modify TOKEN_VALIDITY_DAYS to 1 day</step>
+      <step>2. Generate a new token via the settings page</step>
+      <step>3. Wait a few hours OR manually adjust the test to check 7-day threshold</step>
+      <step>4. Call any MCP tool with the token</step>
+      <step>5. Verify _warning field is present in response</step>
+      <step>6. Verify warning severity matches days remaining</step>
+      <step>7. Reset TOKEN_VALIDITY_DAYS to 30</step>
+    </steps>
+    <alternative>
+      For faster testing, temporarily modify the threshold constants:
+      - Set TOKEN_WARNING_DAYS = 30 (always warn)
+      - Test any MCP tool call
+      - Verify warning appears
+      - Reset constants
+    </alternative>
+  </test>
+
+  <test type="integration" description="End-to-end token refresh flow">
+    <steps>
+      <step>1. Observe warning in MCP tool response</step>
+      <step>2. Run: npx @exolar-qa/mcp-server --login</step>
+      <step>3. Authenticate in browser</step>
+      <step>4. Call MCP tool again with new token</step>
+      <step>5. Verify warning is gone (30 days remaining)</step>
+    </steps>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/mcp/auth.ts">
+    Add TOKEN_WARNING_DAYS and TOKEN_CRITICAL_DAYS constants
+  </step>
+  <step number="2" file="lib/mcp/auth.ts">
+    Extend MCPAuthContext interface with optional expiry fields
+  </step>
+  <step number="3" file="lib/mcp/auth.ts">
+    Modify validateMCPGeneratedToken to extract exp and calculate warning level
+  </step>
+  <step number="4" file="lib/mcp/auth.ts">
+    Add getTokenExpiryMeta helper function (export it)
+  </step>
+  <step number="5" file="lib/mcp/tools.ts">
+    Import getTokenExpiryMeta from auth module
+  </step>
+  <step number="6" file="lib/mcp/tools.ts">
+    Modify jsonResponse or create wrapper to include warnings
+  </step>
+  <step number="7" file="lib/mcp/tools.ts">
+    Update all return statements in handleToolCall to include authContext
+  </step>
+  <step number="8">
+    TypeScript compilation: npx tsc --noEmit
+  </step>
+  <step number="9">
+    Manual testing with modified thresholds
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Use underscore prefix for metadata fields (_warning) to distinguish from data</rule>
+    <rule>Include actionable refresh command in warning message</rule>
+    <rule>Log warnings server-side for monitoring</rule>
+  </always>
+  <never>
+    <rule>Never block requests due to expiry warnings (only actual expiry blocks)</rule>
+    <rule>Never expose sensitive token data in warnings</rule>
+    <rule>Never change existing response structure (only add optional fields)</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/mcp/auth.ts - Add interface fields, modify validation, add helper</file>
+    <file>lib/mcp/tools.ts - Import helper, modify jsonResponse/handlers</file>
+  </files_to_modify>
+  <estimated_lines_changed>~50 lines in auth.ts, ~30 lines in tools.ts</estimated_lines_changed>
+</output_format>

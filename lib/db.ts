@@ -2178,12 +2178,12 @@ export async function getFailureClassification(
     `
   }
 
-  const failureResult = await sql.unsafe(failureQuery)
+  const failureResult = (await sql.unsafe(failureQuery)) as unknown as Record<string, unknown>[]
   if (!failureResult || failureResult.length === 0) {
     return null
   }
 
-  const failure = failureResult[0]
+  const failure = failureResult[0] as Record<string, unknown>
   const testSignature = failure.test_signature as string
 
   // Step 2: Get historical metrics from test_flakiness_history
@@ -2257,9 +2257,7 @@ export async function getFailureClassification(
     LIMIT 10
   `
 
-  const recentRuns: RecentRun[] = (
-    Array.isArray(recentRunsResult) ? recentRunsResult : Array.from(recentRunsResult || [])
-  ).map((r) => ({
+  const recentRuns: RecentRun[] = (recentRunsResult as Record<string, unknown>[]).map((r) => ({
     execution_id: Number(r.execution_id),
     status: r.status as string,
     retry_count: Number(r.retry_count),

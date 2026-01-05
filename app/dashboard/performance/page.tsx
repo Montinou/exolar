@@ -154,6 +154,7 @@ export default async function PerformancePage({
 
       <div className="container mx-auto px-4 py-4 sm:py-8">
         <Suspense fallback={<PerformanceSkeleton />}>
+          {/* @ts-expect-error Async Server Component */}
           <PerformanceContent searchParams={searchParams} />
         </Suspense>
       </div>

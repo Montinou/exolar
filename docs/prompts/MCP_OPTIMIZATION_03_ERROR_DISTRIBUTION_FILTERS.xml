@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - High Priority #3
+  Add Missing Filters and Grouping Options to get_error_distribution
+  Created: 2026-01-05
+-->
+
+<task type="modify">
+  <objective>
+    Enhance the `get_error_distribution` MCP tool with additional filtering options 
+    (branch, suite, limit) and flexible grouping capabilities. Also fix inconsistency 
+    between tool description and actual response fields.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The `get_error_distribution` tool provides breakdown of error types from failed tests.
+    Currently it only supports a `since` date filter, which is insufficient for targeted 
+    analysis. Users often need to:
+    
+    - Analyze errors for a specific branch (e.g., feature branch vs main)
+    - Focus on a particular test suite
+    - Limit results to top N error types
+    - Group errors by file path instead of error type
+    
+    Additionally, there's a documentation mismatch: the tool description promises 
+    `percentage` and `example_message` fields that the database function doesn't 
+    actually return.
+  </background>
+  <audience>
+    - AI coding assistants analyzing test failures
+    - Developers investigating error patterns
+  </audience>
+  <impact>
+    MEDIUM - Enables more targeted analysis and fixes misleading documentation.
+    Particularly useful for CI/CD failure triage and QA analysis workflows.
+  </impact>
+</context>
+
+<existing_code>
+  <file path="lib/mcp/tools.ts" description="Tool definition" start_line="193" end_line="208">
+{
+  name: "get_error_distribution",
+  description: `Get breakdown of error types from failed tests. Shows which error types are most common.
+
+Fields returned per error type:
+- error_type: string - Error category (e.g., "TimeoutError", "AssertionError")
+- count: number - Number of occurrences
+- percentage: number - Share of total failures (0-100)
+- example_message: string - Sample error message`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      since: { type: "string", description: "Only count errors since this date (ISO 8601)" },
+    },
+  },
+}
+  </file>
+
+  <file path="lib/mcp/tools.ts" description="Tool handler" start_line="721" end_line="731">
+case "get_error_distribution": {
+  const input = z.object({ since: z.string().optional() }).parse(args)
+
+  const distribution = await db.getErrorTypeDistribution(orgId, input.since)
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    since: input.since || "all time",
+    distribution,
+  })
+}
+  </file>
+
+  <file path="lib/db.ts" description="Database function" start_line="988" end_line="1019">
+export async function getErrorTypeDistribution(
+  organizationId: number,
+  since?: string
+): Promise&lt;Array&lt;{ error_type: string; count: number }&gt;&gt; {
+  const sql = getSql()
+
+  const conditions = [
+    "tr.ai_context IS NOT NULL",
+    "tr.status IN ('failed', 'timedout')",
+    `te.organization_id = ${organizationId}`,
+  ]
+
+  if (since) {
+    conditions.push(`tr.created_at >= '${since}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  const query = `
+    SELECT
+      tr.ai_context->'error'->>'type' as error_type,
+      COUNT(*) as count
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    ${whereClause}
+    GROUP BY tr.ai_context->'error'->>'type'
+    ORDER BY count DESC
+  `
+
+  const result = await sql.unsafe(query)
+  return result as unknown as Array&lt;{ error_type: string; count: number }&gt;
+}
+  </file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="medium">
+    <description>Tool description claims percentage and example_message are returned</description>
+    <actual>Database only returns error_type and count</actual>
+    <fix>Either update description OR enhance DB function to return these fields</fix>
+  </issue>
+  
+  <issue id="2" severity="medium">
+    <description>No branch or suite filtering</description>
+    <impact>Cannot analyze errors for specific branches or test suites</impact>
+  </issue>
+
+  <issue id="3" severity="low">
+    <description>No limit parameter</description>
+    <impact>Returns all error types, which may be verbose for analysis</impact>
+  </issue>
+
+  <issue id="4" severity="low">
+    <description>No grouping flexibility</description>
+    <impact>Can only group by error_type, not by file or other dimensions</impact>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add branch filter parameter</requirement>
+    <requirement priority="must">Add suite filter parameter</requirement>
+    <requirement priority="must">Add limit parameter with default 10</requirement>
+    <requirement priority="must">Fix description/response mismatch - add percentage and example_message</requirement>
+    <requirement priority="should">Add group_by parameter (error_type, file, branch)</requirement>
+    <requirement priority="should">Maintain backwards compatibility (new params optional)</requirement>
+    <requirement priority="could">Add include_stack_trace option for debugging</requirement>
+  </functional>
+  <non_functional>
+    <requirement>No performance degradation for simple queries</requirement>
+    <requirement>Clear parameter documentation</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Update database function signature to accept additional filters
+    2. Modify SQL query to include branch/suite conditions and return percentage/example
+    3. Update tool definition with new parameters
+    4. Update tool handler to pass new parameters
+  </approach>
+
+  <updated_db_function language="typescript">
+interface ErrorDistributionOptions {
+  since?: string
+  branch?: string
+  suite?: string
+  limit?: number
+  groupBy?: 'error_type' | 'file' | 'branch'
+}
+
+interface ErrorDistributionItem {
+  error_type: string
+  count: number
+  percentage: number
+  example_message: string | null
+  files_affected?: string[]  // Only when groupBy !== 'file'
+}
+
+export async function getErrorTypeDistribution(
+  organizationId: number,
+  options: ErrorDistributionOptions = {}
+): Promise&lt;ErrorDistributionItem[]&gt; {
+  const sql = getSql()
+  const { since, branch, suite, limit = 10, groupBy = 'error_type' } = options
+
+  const conditions = [
+    "tr.status IN ('failed', 'timedout')",
+    `te.organization_id = ${organizationId}`,
+  ]
+
+  // AI context is only required when grouping by error_type
+  if (groupBy === 'error_type') {
+    conditions.push("tr.ai_context IS NOT NULL")
+  }
+
+  if (since) {
+    conditions.push(`tr.created_at >= '${since}'`)
+  }
+
+  if (branch) {
+    conditions.push(`te.branch = '${branch}'`)
+  }
+
+  if (suite) {
+    conditions.push(`te.suite = '${suite}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  // Determine grouping column
+  let groupColumn: string
+  let selectColumn: string
+  
+  switch (groupBy) {
+    case 'file':
+      groupColumn = 'tr.test_file'
+      selectColumn = 'tr.test_file as error_type'  // Reuse field name for consistency
+      break
+    case 'branch':
+      groupColumn = 'te.branch'
+      selectColumn = 'te.branch as error_type'
+      break
+    case 'error_type':
+    default:
+      groupColumn = "tr.ai_context->'error'->>'type'"
+      selectColumn = "tr.ai_context->'error'->>'type' as error_type"
+  }
+
+  // Query with percentage and example_message
+  const query = `
+    WITH total_count AS (
+      SELECT COUNT(*) as total
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${whereClause}
+    ),
+    grouped AS (
+      SELECT
+        ${selectColumn},
+        COUNT(*) as count,
+        (SELECT error_message FROM test_results tr2 
+         JOIN test_executions te2 ON tr2.execution_id = te2.id
+         WHERE ${groupBy === 'error_type' 
+           ? "tr2.ai_context->'error'->>'type' = " + groupColumn 
+           : groupColumn + " = " + groupColumn}
+           AND te2.organization_id = ${organizationId}
+         ORDER BY tr2.created_at DESC LIMIT 1
+        ) as example_message
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${whereClause}
+      GROUP BY ${groupColumn}
+      ORDER BY count DESC
+      LIMIT ${limit}
+    )
+    SELECT 
+      g.error_type,
+      g.count,
+      ROUND((g.count::decimal / NULLIF(tc.total, 0)) * 100, 1) as percentage,
+      g.example_message
+    FROM grouped g, total_count tc
+  `
+
+  const result = await sql.unsafe(query)
+  return result as unknown as ErrorDistributionItem[]
+}
+  </updated_db_function>
+
+  <updated_tool_definition language="typescript">
+{
+  name: "get_error_distribution",
+  description: `Get breakdown of error types from failed tests. Shows which error types are most common.
+
+Supports filtering by branch, suite, and date range.
+
+Fields returned per error type:
+- error_type: string - Error category (e.g., "TimeoutError", "AssertionError")
+- count: number - Number of occurrences
+- percentage: number - Share of total failures (0-100)
+- example_message: string | null - Sample error message from most recent occurrence`,
+  inputSchema: {
+    type: "object" as const,
+    properties: {
+      since: { 
+        type: "string", 
+        description: "Only count errors since this date (ISO 8601)" 
+      },
+      branch: { 
+        type: "string", 
+        description: "Filter by branch name" 
+      },
+      suite: { 
+        type: "string", 
+        description: "Filter by test suite" 
+      },
+      limit: { 
+        type: "number", 
+        default: 10,
+        description: "Max error types to return (default: 10)" 
+      },
+      group_by: {
+        type: "string",
+        enum: ["error_type", "file", "branch"],
+        description: "How to group errors. Default: error_type",
+      },
+    },
+  },
+}
+  </updated_tool_definition>
+
+  <updated_tool_handler language="typescript">
+case "get_error_distribution": {
+  const input = z
+    .object({
+      since: z.string().optional(),
+      branch: z.string().optional(),
+      suite: z.string().optional(),
+      limit: z.number().min(1).max(100).default(10),
+      group_by: z.enum(["error_type", "file", "branch"]).default("error_type"),
+    })
+    .parse(args)
+
+  const distribution = await db.getErrorTypeDistribution(orgId, {
+    since: input.since,
+    branch: input.branch,
+    suite: input.suite,
+    limit: input.limit,
+    groupBy: input.group_by,
+  })
+
+  return jsonResponse({
+    organization: authContext.organizationSlug,
+    filters: {
+      since: input.since || "all time",
+      branch: input.branch || "all",
+      suite: input.suite || "all",
+    },
+    group_by: input.group_by,
+    total_types: distribution.length,
+    distribution,
+  })
+}
+  </updated_tool_handler>
+</solution>
+
+<verification>
+  <test type="manual" description="Test via MCP client">
+    <steps>
+      <step>1. Start dev server: npm run dev</step>
+      <step>2. Call get_error_distribution with no parameters - verify default behavior</step>
+      <step>3. Call with branch="main" - verify filtering works</step>
+      <step>4. Call with limit=5 - verify only 5 results returned</step>
+      <step>5. Call with group_by="file" - verify grouping by test file</step>
+      <step>6. Verify percentage field adds up (approximately) to 100%</step>
+      <step>7. Verify example_message is present for each error type</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API tests">
+    <script language="bash">
+# Test 1: Default behavior
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_error_distribution", "args": {}}'
+
+# Verify response has percentage and example_message fields
+
+# Test 2: Branch filter
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_error_distribution", "args": {"branch": "main", "limit": 5}}'
+
+# Test 3: Group by file
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MCP_TOKEN" \
+  -d '{"tool": "get_error_distribution", "args": {"group_by": "file"}}'
+    </script>
+  </test>
+
+  <test type="backwards_compatibility">
+    <description>
+      Ensure calls without new parameters still work and return same structure.
+      Only change is additional fields in response (percentage, example_message).
+    </description>
+  </test>
+</verification>
+
+<implementation_order>
+  <step number="1" file="lib/db.ts">
+    Create ErrorDistributionOptions interface
+  </step>
+  <step number="2" file="lib/db.ts">
+    Update getErrorTypeDistribution function signature
+  </step>
+  <step number="3" file="lib/db.ts">
+    Modify SQL query to:
+    - Add branch and suite conditions
+    - Calculate percentage using CTE
+    - Fetch example_message from most recent occurrence
+    - Add LIMIT clause
+    - Support different GROUP BY columns
+  </step>
+  <step number="4" file="lib/mcp/tools.ts">
+    Update tool definition (around line 193)
+  </step>
+  <step number="5" file="lib/mcp/tools.ts">
+    Update tool handler (around line 721)
+  </step>
+  <step number="6">
+    Run TypeScript compilation: npx tsc --noEmit
+  </step>
+  <step number="7">
+    Manual testing with test data
+  </step>
+</implementation_order>
+
+<behavioral_rules>
+  <always>
+    <rule>Default limit to 10 for performance</rule>
+    <rule>Default group_by to "error_type" for backwards compatibility</rule>
+    <rule>Include percentage in response as documented</rule>
+    <rule>Use parameterized queries to prevent SQL injection</rule>
+  </always>
+  <never>
+    <rule>Never return more than 100 error types (hard limit)</rule>
+    <rule>Never break backwards compatibility with existing callers</rule>
+    <rule>Never expose raw SQL errors to clients</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <files_to_modify>
+    <file>lib/db.ts - Update getErrorTypeDistribution function</file>
+    <file>lib/mcp/tools.ts - Update tool definition and handler</file>
+  </files_to_modify>
+  <estimated_lines_changed>~70 lines across both files</estimated_lines_changed>
+  <complexity>Medium - SQL query requires CTE for percentage calculation</complexity>
+</output_format>

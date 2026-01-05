@@ -142,6 +142,7 @@ export default async function ComparePage({
 
       <div className="container mx-auto px-4 py-4 sm:py-8">
         <Suspense fallback={<CompareSkeleton />}>
+          {/* @ts-expect-error Async Server Component */}
           <CompareContent searchParams={searchParams} />
         </Suspense>
       </div>

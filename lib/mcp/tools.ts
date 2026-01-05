@@ -595,19 +595,18 @@ export async function handleToolCall(
           return errorResponse("Execution not found or access denied")
         }
 
-        let results = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+        // Single database call - store reference before any filtering
+        const allResults = await db.getTestResultsByExecutionId(orgId, input.execution_id)
 
-        // Filter by status if specified
-        if (input.status !== "all") {
-          results = results.filter((r) => r.status === input.status)
-        }
+        // Filter by status if specified (in-memory filtering)
+        const filteredResults = input.status === "all"
+          ? allResults
+          : allResults.filter((r) => r.status === input.status)
 
         // Optionally strip artifacts to reduce response size
         const outputResults = input.include_artifacts
-          ? results
-          : results.map((r) => ({ ...r, artifacts: null }))
-
-        const allResults = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+          ? filteredResults
+          : filteredResults.map((r) => ({ ...r, artifacts: null }))
 
         return jsonResponse({
           execution,

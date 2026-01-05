@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MCP Tools Optimization - High Priority #1
+  Fix Double Database Query in get_execution_details
+  Created: 2026-01-05
+  Status: ✅ COMPLETED (2026-01-05)
+-->
+
+<task type="modify">
+  <objective>
+    Eliminate redundant database query in the `get_execution_details` MCP tool handler.
+    The current implementation calls `db.getTestResultsByExecutionId()` twice with identical 
+    parameters, causing unnecessary database load and latency.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - MCP Server Tools</project_type>
+  <background>
+    The MCP (Model Context Protocol) server exposes 20 tools for AI coding assistants 
+    to query test execution data. The `get_execution_details` tool is a core tool that 
+    retrieves detailed information about a specific test execution including all test 
+    results and artifacts.
+    
+    This tool is frequently called by AI assistants to analyze test failures, making 
+    performance optimization critical.
+  </background>
+  <audience>
+    - AI coding assistants (Claude, Cursor, etc.)
+    - Developers querying test data programmatically
+  </audience>
+  <impact>
+    HIGH - Eliminates 1 database query per tool call. The query involves JOINs with 
+    test_executions, test_results, and test_artifacts tables with JSON aggregation.
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="lib/mcp/tools.ts" start_line="583" end_line="624">
+case "get_execution_details": {
+  const input = z
+    .object({
+      execution_id: z.number(),
+      status: z.enum(["passed", "failed", "skipped", "all"]).default("all"),
+      include_artifacts: z.boolean().default(true),
+    })
+    .parse(args)
+
+  const execution = await db.getExecutionById(orgId, input.execution_id)
+
+  if (!execution) {
+    return errorResponse("Execution not found or access denied")
+  }
+
+  let results = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+
+  // Filter by status if specified
+  if (input.status !== "all") {
+    results = results.filter((r) => r.status === input.status)
+  }
+
+  // Optionally strip artifacts to reduce response size
+  const outputResults = input.include_artifacts
+    ? results
+    : results.map((r) => ({ ...r, artifacts: null }))
+
+  const allResults = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+
+  return jsonResponse({
+    execution,
+    filter: { status: input.status, include_artifacts: input.include_artifacts },
+    test_results: outputResults,
+    summary: {
+      total: allResults.length,
+      passed: allResults.filter((r) => r.status === "passed").length,
+      failed: allResults.filter((r) => r.status === "failed").length,
+      skipped: allResults.filter((r) => r.status === "skipped").length,
+      filtered_count: outputResults.length,
+    },
+  })
+}
+</file>
+
+<file path="lib/db.ts" description="Referenced database function">
+export async function getTestResultsByExecutionId(organizationId: number, executionId: number) {
+  const sql = getSql()
+  const results = await sql`
+    SELECT tr.*, 
+           json_agg(
+             json_build_object(
+               'id', ta.id,
+               'test_result_id', ta.test_result_id,
+               'type', ta.type,
+               'r2_key', ta.r2_key,
+               'r2_url', ta.r2_url,
+               'file_size_bytes', ta.file_size_bytes,
+               'mime_type', ta.mime_type,
+               'created_at', ta.created_at
+             )
+           ) FILTER (WHERE ta.id IS NOT NULL) as artifacts
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    LEFT JOIN test_artifacts ta ON ta.test_result_id = tr.id
+    WHERE tr.execution_id = ${executionId}
+      AND te.organization_id = ${organizationId}
+    GROUP BY tr.id
+    ORDER BY tr.started_at ASC
+  `
+
+  return results as TestResult[]
+}
+</file>
+</existing_code>
+
+<problem_analysis>
+  <issue id="1" severity="high">
+    <description>
+      The function calls `db.getTestResultsByExecutionId()` twice on lines 598 and 610 
+      with identical parameters (orgId, input.execution_id).
+    </description>
+    <root_cause>
+      The first call (line 598) fetches results for filtering.
+      The second call (line 610) is intended to get the "full" results for summary counts.
+      However, both calls return the same data since the filtering is done in-memory.
+    </root_cause>
+    <waste>
+      - Redundant database round-trip
+      - Redundant query execution (JOIN + JSON aggregation)
+      - Doubled network latency
+      - Doubled database CPU usage
+    </waste>
+  </issue>
+</problem_analysis>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Eliminate the duplicate database call</requirement>
+    <requirement priority="must">Preserve the same response structure and values</requirement>
+    <requirement priority="must">Summary counts must still reflect ALL results (not filtered)</requirement>
+    <requirement priority="must">Filtered results must still respect the status parameter</requirement>
+    <requirement priority="should">Do not change the public API or response format</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Reduce database queries from 2 to 1 per tool call</requirement>
+    <requirement>No change to memory footprint</requirement>
+    <requirement>Maintain code readability</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    Store the initial query result, use it for both filtering (to produce outputResults) 
+    and for summary calculations. The key insight is that `allResults` should be a 
+    reference to the same data that was fetched initially, before any in-memory filtering.
+  </approach>
+  
+  <fixed_code language="typescript">
+case "get_execution_details": {
+  const input = z
+    .object({
+      execution_id: z.number(),
+      status: z.enum(["passed", "failed", "skipped", "all"]).default("all"),
+      include_artifacts: z.boolean().default(true),
+    })
+    .parse(args)
+
+  const execution = await db.getExecutionById(orgId, input.execution_id)
+
+  if (!execution) {
+    return errorResponse("Execution not found or access denied")
+  }
+
+  // Single database call - store reference before any filtering
+  const allResults = await db.getTestResultsByExecutionId(orgId, input.execution_id)
+
+  // Filter by status if specified (in-memory filtering)
+  const filteredResults = input.status === "all"
+    ? allResults
+    : allResults.filter((r) => r.status === input.status)
+
+  // Optionally strip artifacts to reduce response size
+  const outputResults = input.include_artifacts
+    ? filteredResults
+    : filteredResults.map((r) => ({ ...r, artifacts: null }))
+
+  return jsonResponse({
+    execution,
+    filter: { status: input.status, include_artifacts: input.include_artifacts },
+    test_results: outputResults,
+    summary: {
+      total: allResults.length,
+      passed: allResults.filter((r) => r.status === "passed").length,
+      failed: allResults.filter((r) => r.status === "failed").length,
+      skipped: allResults.filter((r) => r.status === "skipped").length,
+      filtered_count: outputResults.length,
+    },
+  })
+}
+  </fixed_code>
+
+  <changes>
+    <change type="modified" line="598">
+      Renamed `results` to `allResults` and moved it to be the single source of truth
+    </change>
+    <change type="added" line="601-603">
+      Created intermediate `filteredResults` variable for status filtering
+    </change>
+    <change type="removed" line="610">
+      Eliminated the redundant second call to `getTestResultsByExecutionId`
+    </change>
+    <change type="modified" line="606-608">
+      Updated to use `filteredResults` instead of `results` for artifact stripping
+    </change>
+  </changes>
+</solution>
+
+<verification>
+  <test type="unit" command="N/A - no existing unit tests for MCP tools">
+    No dedicated unit tests exist for MCP tool handlers.
+  </test>
+  
+  <test type="manual" description="Verify via MCP tool call">
+    <steps>
+      <step>1. Start the development server: `npm run dev`</step>
+      <step>2. Use Claude Code or another MCP client to call `get_execution_details`</step>
+      <step>3. Verify the response structure matches expected format</step>
+      <step>4. Test with different status filters: "all", "passed", "failed", "skipped"</step>
+      <step>5. Verify summary.total always equals total results regardless of filter</step>
+      <step>6. Verify summary.filtered_count equals length of test_results array</step>
+    </steps>
+  </test>
+
+  <test type="api" description="Direct API call test">
+    <curl>
+curl -X POST http://localhost:3000/api/mcp/tools \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_MCP_TOKEN" \
+  -d '{
+    "tool": "get_execution_details",
+    "args": {
+      "execution_id": 1,
+      "status": "failed",
+      "include_artifacts": true
+    }
+  }'
+    </curl>
+    <expected_response>
+      - summary.total should equal total tests in execution (not just failed)
+      - test_results array should only contain failed tests
+      - summary.filtered_count should equal test_results.length
+    </expected_response>
+  </test>
+
+  <test type="performance" description="Verify query reduction">
+    <method>
+      Add console.log timing before and after the fix to measure improvement.
+      The fix should approximately halve the database query time for this handler.
+    </method>
+  </test>
+</verification>
+
+<behavioral_rules>
+  <always>
+    <rule>Maintain backwards compatibility with existing MCP clients</rule>
+    <rule>Preserve the exact response format and field names</rule>
+    <rule>Keep summary counts accurate regardless of filter</rule>
+  </always>
+  <never>
+    <rule>Never change the external API contract</rule>
+    <rule>Never remove required response fields</rule>
+    <rule>Never modify the database function signature</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    Apply the fix to lib/mcp/tools.ts in the get_execution_details case handler.
+    The change is localized to lines 583-624 (approximately 40 lines).
+  </structure>
+  <validation>
+    After applying the fix, verify:
+    1. TypeScript compilation succeeds: `npx tsc --noEmit`
+    2. No runtime errors when calling the tool
+    3. Response format is identical to before
+  </validation>
+</output_format>

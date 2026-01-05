@@ -339,6 +339,7 @@ export default async function ReliabilityPage({
 
       <div className="container mx-auto px-4 py-4 sm:py-8">
         <Suspense fallback={<ReliabilitySkeleton />}>
+          {/* @ts-expect-error Async Server Component */}
           <ReliabilityContent searchParams={searchParams} />
         </Suspense>
       </div>
