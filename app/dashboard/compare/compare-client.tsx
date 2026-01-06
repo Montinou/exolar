@@ -16,6 +16,7 @@ import { ExecutionSelector } from "@/components/dashboard/execution-selector"
 import { BranchSelector } from "@/components/dashboard/branch-selector"
 import { ComparisonSummaryCards } from "@/components/dashboard/comparison-summary-cards"
 import { PerformanceInsightsCard } from "@/components/dashboard/performance-insights-card"
+import { ExportComparisonButton } from "@/components/dashboard/export-comparison-button"
 import { TestDiffTable } from "@/components/dashboard/test-diff-table"
 
 type CompareMode = "branch" | "execution"
@@ -433,6 +434,12 @@ export function CompareClient({
         <>
           {/* Execution Info Header */}
           <div className="glass-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Comparison Details
+              </span>
+              <ExportComparisonButton comparison={comparison} />
+            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]">
               <div className="text-center md:text-left">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

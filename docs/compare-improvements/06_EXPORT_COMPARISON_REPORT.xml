@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compare Page Improvement - Task 06
+  Export Comparison Report as Markdown or JSON
+  Created: 2026-01-06
+  Priority: P3 (Low)
+  Status: Not Started
+  Depends on: 04_BRANCH_COMPARISON_MODE.xml
+  
+  PRODUCTION-READY: This prompt includes:
+  - Proper TypeScript types from lib/types.ts
+  - Error handling for clipboard operations
+  - Secure file download implementation
+  - Accessibility attributes
+  - User feedback for copy operations
+-->
+
+<task type="generate">
+  <objective>
+    Add export functionality to the comparison results that allows users to download
+    the comparison as Markdown (for PR comments) or JSON (for CI pipeline consumption).
+    This enables sharing comparison results outside the dashboard.
+  </objective>
+  <language>TypeScript/React</language>
+  <framework>Next.js with React hooks</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - Compare Page Enhancement</project_type>
+  <background>
+    Users often want to share comparison results:
+    1. In GitHub PR comments to show test impact of their changes
+    2. In Slack/Teams for team visibility
+    3. In CI pipelines to make decisions based on comparison data
+    
+    The current implementation displays results only in the dashboard UI.
+    There is no way to export or share the comparison data.
+    
+    The Markdown format should render nicely in GitHub, using:
+    - GitHub Flavored Markdown tables
+    - Collapsible details sections for long lists
+    - Emojis for visual indicators
+  </background>
+  <audience>
+    - Developers wanting to add comparison to PR descriptions
+    - CI/CD systems consuming comparison data
+    - Teams reviewing test status in Slack/Teams
+  </audience>
+  <impact>
+    LOW - Nice-to-have feature for power users and CI integration
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="lib/types.ts" start_line="505" end_line="520" description="ComparisonResult and related types">
+export interface ComparisonResult {
+  baseline: ComparisonExecutionInfo
+  current: ComparisonExecutionInfo
+  summary: ComparisonSummary
+  tests: TestComparisonItem[]
+  performanceSummary?: {
+    regressions: number
+    improvements: number
+    stable: number
+    threshold_pct: number
+  }
+}
+
+export interface ComparisonExecutionInfo {
+  id: number
+  branch: string
+  commitSha: string
+  startedAt: string
+  totalTests: number
+  passed: number
+  failed: number
+}
+</file>
+
+<file path="lib/types.ts" start_line="475" end_line="491" description="ComparisonSummary type">
+export interface ComparisonSummary {
+  baselinePassRate: number
+  currentPassRate: number
+  passRateDelta: number
+  baselineTotalTests: number
+  currentTotalTests: number
+  testCountDelta: number
+  baselineAvgDurationMs: number
+  currentAvgDurationMs: number
+  durationDeltaMs: number
+  durationDeltaPercent: number
+  newFailures: number
+  fixed: number
+  newTests: number
+  removedTests: number
+  unchanged: number
+}
+</file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add "Export" dropdown button in comparison results</requirement>
+    <requirement priority="must">Support Markdown format export (for GitHub/Slack)</requirement>
+    <requirement priority="must">Support JSON format export (for CI pipelines)</requirement>
+    <requirement priority="must">Include all summary statistics in exports</requirement>
+    <requirement priority="must">Include list of changed tests (new failures, fixed, etc.)</requirement>
+    <requirement priority="must">Add "Copy to Clipboard" functionality with user feedback</requirement>
+    <requirement priority="must">Handle clipboard API errors gracefully</requirement>
+    <requirement priority="should">Generate collapsible details sections in Markdown</requirement>
+    <requirement priority="should">Add proper ARIA attributes</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Markdown should render nicely in GitHub comments</requirement>
+    <requirement>JSON should be valid and parseable</requirement>
+    <requirement>Download should work across browsers</requirement>
+    <requirement>Show clear feedback for copy operations</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Create utility functions to convert ComparisonResult to Markdown and JSON
+    2. Create ExportComparisonButton component with dropdown menu
+    3. Use browser download API with proper cleanup
+    4. Add clipboard API with fallback and error handling
+    5. Show toast/feedback for copy success/failure
+  </approach>
+  
+  <new_file path="lib/export-comparison.ts">
+import type { ComparisonResult, TestComparisonItem } from "./types"
+
+/**
+ * Escape special Markdown characters in text
+ */
+function escapeMarkdown(text: string): string {
+  return text.replace(/[|`*_{}[\]()#+\-.!&lt;&gt;]/g, "\\$&amp;")
+}
+
+/**
+ * Convert comparison result to Markdown format suitable for GitHub PR comments
+ */
+export function comparisonToMarkdown(comparison: ComparisonResult): string {
+  const { baseline, current, summary, tests, performanceSummary } = comparison
+  
+  const newFailures = tests.filter((t) => t.diffCategory === "new_failure")
+  const fixed = tests.filter((t) => t.diffCategory === "fixed")
+  const newTests = tests.filter((t) => t.diffCategory === "new_test")
+  const removed = tests.filter((t) => t.diffCategory === "removed_test")
+
+  let md = `## 📊 Test Comparison Report\n\n`
+  
+  // Comparison metadata table
+  md += `| | Baseline | Current |\n`
+  md += `|---|---|---|\n`
+  md += `| **Branch** | \`${baseline.branch}\` | \`${current.branch}\` |\n`
+  md += `| **Commit** | \`${baseline.commitSha.slice(0, 7)}\` | \`${current.commitSha.slice(0, 7)}\` |\n`
+  md += `| **Date** | ${new Date(baseline.startedAt).toLocaleString()} | ${new Date(current.startedAt).toLocaleString()} |\n`
+  md += `| **Tests** | ${baseline.totalTests} | ${current.totalTests} |\n`
+  md += `\n`
+
+  // Summary section
+  md += `### Summary\n\n`
+  
+  const passRateEmoji = summary.passRateDelta > 0 ? "📈" : summary.passRateDelta &lt; 0 ? "📉" : "➡️"
+  const passRateSign = summary.passRateDelta > 0 ? "+" : ""
+  md += `- ${passRateEmoji} **Pass Rate**: ${summary.baselinePassRate.toFixed(1)}% → ${summary.currentPassRate.toFixed(1)}% (${passRateSign}${summary.passRateDelta.toFixed(1)}%)\n`
+  
+  if (summary.newFailures > 0) {
+    md += `- 🔴 **New Failures**: ${summary.newFailures}\n`
+  }
+  if (summary.fixed > 0) {
+    md += `- 🟢 **Fixed**: ${summary.fixed}\n`
+  }
+  if (summary.newTests > 0) {
+    md += `- 🆕 **New Tests**: ${summary.newTests}\n`
+  }
+  if (summary.removedTests > 0) {
+    md += `- ⛔ **Removed Tests**: ${summary.removedTests}\n`
+  }
+  
+  // Performance summary if available
+  if (performanceSummary) {
+    md += `\n### Performance\n\n`
+    const durationSign = summary.durationDeltaPercent > 0 ? "+" : ""
+    md += `- **Duration Change**: ${durationSign}${summary.durationDeltaPercent.toFixed(1)}%\n`
+    if (performanceSummary.regressions > 0) {
+      md += `- 🐢 **Regressions**: ${performanceSummary.regressions} tests >${performanceSummary.threshold_pct}% slower\n`
+    }
+    if (performanceSummary.improvements > 0) {
+      md += `- 🚀 **Improvements**: ${performanceSummary.improvements} tests >${performanceSummary.threshold_pct}% faster\n`
+    }
+  }
+  md += `\n`
+
+  // New failures details (collapsible)
+  if (newFailures.length > 0) {
+    md += `### 🔴 New Failures (${newFailures.length})\n\n`
+    md += `&lt;details&gt;\n&lt;summary&gt;Click to expand&lt;/summary&gt;\n\n`
+    md += `| Test | File |\n`
+    md += `|---|---|\n`
+    newFailures.slice(0, 20).forEach((t) => {
+      md += `| ${escapeMarkdown(t.testName)} | \`${t.testFile}\` |\n`
+    })
+    if (newFailures.length > 20) {
+      md += `\n*... and ${newFailures.length - 20} more*\n`
+    }
+    md += `\n&lt;/details&gt;\n\n`
+  }
+
+  // Fixed tests details (collapsible)
+  if (fixed.length > 0) {
+    md += `### 🟢 Fixed (${fixed.length})\n\n`
+    md += `&lt;details&gt;\n&lt;summary&gt;Click to expand&lt;/summary&gt;\n\n`
+    md += `| Test | File |\n`
+    md += `|---|---|\n`
+    fixed.slice(0, 20).forEach((t) => {
+      md += `| ${escapeMarkdown(t.testName)} | \`${t.testFile}\` |\n`
+    })
+    if (fixed.length > 20) {
+      md += `\n*... and ${fixed.length - 20} more*\n`
+    }
+    md += `\n&lt;/details&gt;\n\n`
+  }
+
+  // New tests (collapsible)
+  if (newTests.length > 0) {
+    md += `### 🆕 New Tests (${newTests.length})\n\n`
+    md += `&lt;details&gt;\n&lt;summary&gt;Click to expand&lt;/summary&gt;\n\n`
+    md += `| Test | File |\n`
+    md += `|---|---|\n`
+    newTests.slice(0, 20).forEach((t) => {
+      md += `| ${escapeMarkdown(t.testName)} | \`${t.testFile}\` |\n`
+    })
+    if (newTests.length > 20) {
+      md += `\n*... and ${newTests.length - 20} more*\n`
+    }
+    md += `\n&lt;/details&gt;\n\n`
+  }
+
+  // Footer
+  md += `---\n`
+  md += `*Generated by [Exolar E2E Dashboard](https://exolar.io) at ${new Date().toISOString()}*\n`
+
+  return md
+}
+
+/**
+ * Convert comparison result to JSON format for CI/programmatic use
+ */
+export function comparisonToJSON(comparison: ComparisonResult): string {
+  const { baseline, current, summary, tests, performanceSummary } = comparison
+  
+  return JSON.stringify({
+    generated_at: new Date().toISOString(),
+    baseline: {
+      branch: baseline.branch,
+      commit_sha: baseline.commitSha,
+      started_at: baseline.startedAt,
+      total_tests: baseline.totalTests,
+      passed: baseline.passed,
+      failed: baseline.failed,
+    },
+    current: {
+      branch: current.branch,
+      commit_sha: current.commitSha,
+      started_at: current.startedAt,
+      total_tests: current.totalTests,
+      passed: current.passed,
+      failed: current.failed,
+    },
+    summary: {
+      pass_rate_delta: summary.passRateDelta,
+      new_failures: summary.newFailures,
+      fixed: summary.fixed,
+      new_tests: summary.newTests,
+      removed_tests: summary.removedTests,
+      duration_delta_percent: summary.durationDeltaPercent,
+    },
+    performance: performanceSummary ? {
+      regressions: performanceSummary.regressions,
+      improvements: performanceSummary.improvements,
+      stable: performanceSummary.stable,
+      threshold_pct: performanceSummary.threshold_pct,
+    } : null,
+    changes: {
+      new_failures: tests
+        .filter((t) => t.diffCategory === "new_failure")
+        .map((t) => ({ name: t.testName, file: t.testFile })),
+      fixed: tests
+        .filter((t) => t.diffCategory === "fixed")
+        .map((t) => ({ name: t.testName, file: t.testFile })),
+      new_tests: tests
+        .filter((t) => t.diffCategory === "new_test")
+        .map((t) => ({ name: t.testName, file: t.testFile })),
+      removed_tests: tests
+        .filter((t) => t.diffCategory === "removed_test")
+        .map((t) => ({ name: t.testName, file: t.testFile })),
+    },
+  }, null, 2)
+}
+
+/**
+ * Trigger file download in browser
+ * Creates a temporary anchor element and clicks it
+ */
+export function downloadFile(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  
+  try {
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    link.style.display = "none"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } finally {
+    // Clean up the object URL after a delay to ensure download starts
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+}
+
+/**
+ * Copy text to clipboard with fallback for older browsers
+ * @returns true if successful, false if failed
+ */
+export async function copyToClipboard(text: string): Promise&lt;boolean&gt; {
+  // Modern Clipboard API
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch (err) {
+      console.warn("Clipboard API failed, trying fallback:", err)
+    }
+  }
+  
+  // Fallback for older browsers or when Clipboard API fails
+  try {
+    const textArea = document.createElement("textarea")
+    textArea.value = text
+    textArea.style.position = "fixed"
+    textArea.style.left = "-9999px"
+    textArea.style.top = "-9999px"
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    const success = document.execCommand("copy")
+    document.body.removeChild(textArea)
+    return success
+  } catch (err) {
+    console.error("Fallback copy also failed:", err)
+    return false
+  }
+}
+  </new_file>
+
+  <new_file path="components/dashboard/export-comparison-button.tsx">
+"use client"
+
+import { useState, useRef, useEffect, useCallback } from "react"
+import {
+  Download,
+  ChevronDown,
+  FileText,
+  FileJson,
+  Copy,
+  Check,
+  AlertCircle,
+} from "lucide-react"
+import type { ComparisonResult } from "@/lib/types"
+import {
+  comparisonToMarkdown,
+  comparisonToJSON,
+  downloadFile,
+  copyToClipboard,
+} from "@/lib/export-comparison"
+
+interface ExportComparisonButtonProps {
+  /** The comparison result to export */
+  comparison: ComparisonResult
+}
+
+type CopyState = "idle" | "copying" | "success" | "error"
+
+export function ExportComparisonButton({ comparison }: ExportComparisonButtonProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [copyState, setCopyState] = useState&lt;{ md: CopyState; json: CopyState }&gt;({
+    md: "idle",
+    json: "idle",
+  })
+  const dropdownRef = useRef&lt;HTMLDivElement&gt;(null)
+  const timeoutRef = useRef&lt;NodeJS.Timeout | null&gt;(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
+
+  const resetCopyState = useCallback((format: "md" | "json") => {
+    timeoutRef.current = setTimeout(() => {
+      setCopyState((prev) => ({ ...prev, [format]: "idle" }))
+    }, 2000)
+  }, [])
+
+  const handleExportMarkdown = useCallback(() => {
+    const md = comparisonToMarkdown(comparison)
+    const filename = `comparison-${comparison.baseline.commitSha.slice(0, 7)}-vs-${comparison.current.commitSha.slice(0, 7)}.md`
+    downloadFile(md, filename, "text/markdown;charset=utf-8")
+    setIsOpen(false)
+  }, [comparison])
+
+  const handleExportJSON = useCallback(() => {
+    const json = comparisonToJSON(comparison)
+    const filename = `comparison-${comparison.baseline.commitSha.slice(0, 7)}-vs-${comparison.current.commitSha.slice(0, 7)}.json`
+    downloadFile(json, filename, "application/json;charset=utf-8")
+    setIsOpen(false)
+  }, [comparison])
+
+  const handleCopyMarkdown = useCallback(async () => {
+    setCopyState((prev) => ({ ...prev, md: "copying" }))
+    const md = comparisonToMarkdown(comparison)
+    const success = await copyToClipboard(md)
+    setCopyState((prev) => ({ ...prev, md: success ? "success" : "error" }))
+    resetCopyState("md")
+  }, [comparison, resetCopyState])
+
+  const handleCopyJSON = useCallback(async () => {
+    setCopyState((prev) => ({ ...prev, json: "copying" }))
+    const json = comparisonToJSON(comparison)
+    const success = await copyToClipboard(json)
+    setCopyState((prev) => ({ ...prev, json: success ? "success" : "error" }))
+    resetCopyState("json")
+  }, [comparison, resetCopyState])
+
+  const getCopyIcon = (state: CopyState) => {
+    switch (state) {
+      case "success":
+        return &lt;Check className="h-4 w-4 text-green-400" aria-hidden="true" /&gt;
+      case "error":
+        return &lt;AlertCircle className="h-4 w-4 text-red-400" aria-hidden="true" /&gt;
+      default:
+        return &lt;Copy className="h-4 w-4" aria-hidden="true" /&gt;
+    }
+  }
+
+  const getCopyText = (state: CopyState, format: string) => {
+    switch (state) {
+      case "copying":
+        return "Copying..."
+      case "success":
+        return "Copied!"
+      case "error":
+        return "Failed to copy"
+      default:
+        return `Copy as ${format}`
+    }
+  }
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+        className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+      >
+        <Download className="h-4 w-4" aria-hidden="true" />
+        Export
+        <ChevronDown 
+          className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} 
+          aria-hidden="true" 
+        />
+      </button>
+
+      {isOpen && (
+        <div 
+          className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-border bg-background shadow-lg"
+          role="menu"
+          aria-label="Export options"
+        >
+          <div className="p-1">
+            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Download
+            </p>
+            <button
+              onClick={handleExportMarkdown}
+              role="menuitem"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors"
+            >
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              Markdown (.md)
+            </button>
+            <button
+              onClick={handleExportJSON}
+              role="menuitem"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors"
+            >
+              <FileJson className="h-4 w-4" aria-hidden="true" />
+              JSON (.json)
+            </button>
+          </div>
+          
+          <div className="border-t border-border/50 p-1">
+            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Copy to Clipboard
+            </p>
+            <button
+              onClick={handleCopyMarkdown}
+              role="menuitem"
+              disabled={copyState.md === "copying"}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-50"
+            >
+              {getCopyIcon(copyState.md)}
+              {getCopyText(copyState.md, "Markdown")}
+            </button>
+            <button
+              onClick={handleCopyJSON}
+              role="menuitem"
+              disabled={copyState.json === "copying"}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors disabled:opacity-50"
+            >
+              {getCopyIcon(copyState.json)}
+              {getCopyText(copyState.json, "JSON")}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+  </new_file>
+
+  <modification path="app/dashboard/compare/compare-client.tsx" description="Add export button to comparison header">
+    Add import at top:
+    import { ExportComparisonButton } from "@/components/dashboard/export-comparison-button"
+    
+    In the execution info header section, add the export button:
+    
+    &lt;div className="glass-card p-4"&gt;
+      &lt;div className="flex items-center justify-between mb-3"&gt;
+        &lt;span className="text-xs font-medium uppercase tracking-wide text-muted-foreground"&gt;
+          Comparison Details
+        &lt;/span&gt;
+        &lt;ExportComparisonButton comparison={comparison} /&gt;
+      &lt;/div&gt;
+      &lt;div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]"&gt;
+        {/* ... rest of header ... */}
+      &lt;/div&gt;
+    &lt;/div&gt;
+  </modification>
+</solution>
+
+<verification>
+  <test type="manual" description="Test Markdown export">
+    <steps>
+      <step>1. Compare two executions</step>
+      <step>2. Click "Export" dropdown</step>
+      <step>3. Click "Markdown (.md)"</step>
+      <step>4. Verify file downloads with .md extension</step>
+      <step>5. Open file and verify valid Markdown structure</step>
+      <step>6. Paste into GitHub PR comment and verify it renders nicely</step>
+      <step>7. Verify collapsible sections work in GitHub</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test JSON export">
+    <steps>
+      <step>1. Compare two executions</step>
+      <step>2. Click "Export" → "JSON (.json)"</step>
+      <step>3. Verify file downloads with .json extension</step>
+      <step>4. Open file and verify it's valid JSON (try JSON.parse)</step>
+      <step>5. Verify structure matches expected schema</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test copy to clipboard">
+    <steps>
+      <step>1. Click "Export" → "Copy as Markdown"</step>
+      <step>2. Verify loading state ("Copying...")</step>
+      <step>3. Verify success state ("Copied!" with checkmark)</step>
+      <step>4. Paste into text editor and verify content</step>
+      <step>5. Repeat for JSON format</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test clipboard error handling">
+    <steps>
+      <step>1. Open page in incognito or with clipboard permissions denied</step>
+      <step>2. Try to copy</step>
+      <step>3. Verify error state shows ("Failed to copy")</step>
+      <step>4. Verify download still works as fallback</step>
+    </steps>
+  </test>
+
+  <test type="accessibility" description="Test keyboard navigation">
+    <steps>
+      <step>1. Tab to Export button</step>
+      <step>2. Press Enter to open menu</step>
+      <step>3. Use arrow keys to navigate</step>
+      <step>4. Press Enter to select</step>
+      <step>5. Press Escape to close</step>
+    </steps>
+  </test>
+
+  <test type="build" description="Verify TypeScript compilation">
+    <command>npx tsc --noEmit</command>
+    <expected>No type errors</expected>
+  </test>
+</verification>
+
+<behavioral_rules>
+  <always>
+    <rule>Import types from lib/types.ts</rule>
+    <rule>Include timestamp in JSON export for traceability</rule>
+    <rule>Use collapsible sections in Markdown for long lists</rule>
+    <rule>Escape special characters in Markdown content</rule>
+    <rule>Show visual feedback for copy operations</rule>
+    <rule>Clean up object URLs after download</rule>
+    <rule>Provide fallback for clipboard API</rule>
+  </always>
+  <never>
+    <rule>Never include sensitive data in exports</rule>
+    <rule>Never generate invalid Markdown or JSON</rule>
+    <rule>Never leave object URLs without cleanup</rule>
+    <rule>Never ignore clipboard errors silently</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    1. Create `lib/export-comparison.ts` with utility functions
+    2. Create `components/dashboard/export-comparison-button.tsx`
+    3. Update `app/dashboard/compare/compare-client.tsx` to include export button
+  </structure>
+  <validation>
+    After implementation:
+    1. Verify exports are valid and render correctly
+    2. Test in GitHub PR comment for Markdown visibility
+    3. Parse JSON with jq or similar to verify validity
+    4. Test clipboard in different browsers
+  </validation>
+</output_format>

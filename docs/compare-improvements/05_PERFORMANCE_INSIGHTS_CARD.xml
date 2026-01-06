@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compare Page Improvement - Task 05
+  Add Performance Insights Section to Comparison Results
+  Created: 2026-01-06
+  Priority: P2 (Medium)
+  Status: Not Started
+  Depends on: 04_BRANCH_COMPARISON_MODE.xml
+  
+  PRODUCTION-READY: This prompt includes:
+  - Proper TypeScript types from lib/types.ts
+  - Memoization for performance
+  - Accessibility attributes
+  - Collapsed by default to not overwhelm users
+-->
+
+<task type="modify">
+  <objective>
+    Add a dedicated "Performance Impact" section to the comparison results that highlights
+    tests with significant duration changes (regressions and improvements). This surfaces
+    performance insights that are currently buried in the test diff table.
+  </objective>
+  <language>TypeScript/React</language>
+  <framework>Next.js with React hooks</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - Compare Page Enhancement</project_type>
+  <background>
+    The compare API already returns performance data for each test:
+    - durationDeltaMs: change in milliseconds
+    - durationDeltaPercent: percentage change
+    - durationCategory: "regression" | "improvement" | "stable" | null
+    
+    The API also returns a performanceSummary in the response:
+    - regressions: count of tests with significant slowdown
+    - improvements: count of tests with significant speedup
+    - stable: count of tests with stable duration
+    - threshold_pct: the threshold used (default 20%)
+    
+    Currently this data is available but not prominently displayed.
+    Users need to see at a glance: "This branch made 3 tests slower, 5 tests faster"
+  </background>
+  <audience>
+    - Developers monitoring performance impact of changes
+    - QA engineers reviewing branch quality
+  </audience>
+  <impact>
+    MEDIUM - Surfaces valuable performance data that's currently hidden
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="app/api/compare/route.ts" start_line="89" end_line="107" description="API returns performanceSummary">
+    // Calculate performance summary
+    const performanceSummary = {
+      regressions: comparison.tests.filter((t) => t.durationCategory === "regression").length,
+      improvements: comparison.tests.filter((t) => t.durationCategory === "improvement").length,
+      stable: comparison.tests.filter((t) => t.durationCategory === "stable").length,
+      threshold_pct: performanceThreshold,
+    }
+
+    return NextResponse.json({
+      ...comparison,
+      performanceSummary,
+    })
+</file>
+
+<file path="lib/types.ts" start_line="448" end_line="460" description="TestComparisonItem with duration data">
+export interface TestComparisonItem {
+  testSignature: string
+  testName: string
+  testFile: string
+  baselineStatus: 'passed' | 'failed' | 'skipped' | null
+  currentStatus: 'passed' | 'failed' | 'skipped' | null
+  baselineDurationMs: number | null
+  currentDurationMs: number | null
+  durationDeltaMs: number | null
+  durationDeltaPercent: number | null
+  diffCategory: TestDiffCategory
+  durationCategory: 'regression' | 'improvement' | 'stable' | null
+}
+</file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Create PerformanceInsightsCard component</requirement>
+    <requirement priority="must">Show count of regressions, improvements, stable tests</requirement>
+    <requirement priority="must">Color-code: red for regressions, green for improvements</requirement>
+    <requirement priority="must">Collapsible section showing specific tests</requirement>
+    <requirement priority="must">Show top 5 worst regressions with duration delta</requirement>
+    <requirement priority="must">Show top 5 best improvements with duration delta</requirement>
+    <requirement priority="must">Add ARIA attributes for accessibility</requirement>
+    <requirement priority="should">Collapsed by default if no significant changes</requirement>
+    <requirement priority="could">Add filter button to show only performance regressions</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Match existing glass-card aesthetic</requirement>
+    <requirement>Memoize sorting and filtering</requirement>
+    <requirement>Responsive on mobile</requirement>
+    <requirement>Clear visual hierarchy</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Create new PerformanceInsightsCard component
+    2. Import TestComparisonItem from lib/types.ts
+    3. Memoize filtered and sorted tests
+    4. Filter tests by durationCategory to find regressions/improvements
+    5. Sort by durationDeltaPercent to show worst/best first
+    6. Add collapsible sections with ARIA attributes
+    7. Integrate into compare-client.tsx after ComparisonSummaryCards
+  </approach>
+  
+  <new_file path="components/dashboard/performance-insights-card.tsx">
+"use client"
+
+import { useState, useMemo } from "react"
+import {
+  Zap,
+  TrendingUp,
+  TrendingDown,
+  ChevronDown,
+  ChevronRight,
+  AlertTriangle,
+  CheckCircle,
+} from "lucide-react"
+import type { TestComparisonItem } from "@/lib/types"
+
+interface PerformanceSummary {
+  regressions: number
+  improvements: number
+  stable: number
+  threshold_pct: number
+}
+
+interface PerformanceInsightsCardProps {
+  /** Array of test comparison results */
+  tests: TestComparisonItem[]
+  /** Performance summary from API */
+  performanceSummary: PerformanceSummary
+  /** Callback to filter test diff table to show only regressions */
+  onFilterRegressions?: () => void
+}
+
+/**
+ * Format duration in human-readable form
+ */
+function formatDuration(ms: number | null): string {
+  if (ms === null || ms === undefined) return "—"
+  if (ms &lt; 1000) return `${Math.round(ms)}ms`
+  if (ms &lt; 60000) return `${(ms / 1000).toFixed(1)}s`
+  return `${(ms / 60000).toFixed(1)}m`
+}
+
+/**
+ * Format percentage delta with sign
+ */
+function formatDelta(percent: number | null): string {
+  if (percent === null || percent === undefined) return "—"
+  const sign = percent > 0 ? "+" : ""
+  return `${sign}${Math.round(percent)}%`
+}
+
+export function PerformanceInsightsCard({
+  tests,
+  performanceSummary,
+  onFilterRegressions,
+}: PerformanceInsightsCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  // Get tests with performance changes (memoized and sorted)
+  const regressions = useMemo(() => 
+    tests
+      .filter((t) => t.durationCategory === "regression")
+      .sort((a, b) => (b.durationDeltaPercent || 0) - (a.durationDeltaPercent || 0)),
+    [tests]
+  )
+  
+  const improvements = useMemo(() =>
+    tests
+      .filter((t) => t.durationCategory === "improvement")
+      .sort((a, b) => (a.durationDeltaPercent || 0) - (b.durationDeltaPercent || 0)),
+    [tests]
+  )
+
+  const hasChanges = regressions.length > 0 || improvements.length > 0
+
+  // Auto-expand if there are regressions (important to surface)
+  const shouldAutoExpand = regressions.length > 0
+
+  // Use auto-expand state for initial render, but allow manual toggle
+  const effectiveExpanded = isExpanded || (shouldAutoExpand && !isExpanded)
+
+  // Don't render if no significant changes
+  if (!hasChanges) {
+    return (
+      <div className="glass-card p-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Zap className="h-4 w-4" aria-hidden="true" />
+          <span className="text-sm">No significant performance changes detected</span>
+          <span className="text-xs">
+            (threshold: ±{performanceSummary.threshold_pct}%)
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  const panelId = "performance-insights-panel"
+  const headingId = "performance-insights-heading"
+
+  return (
+    <div className="glass-card overflow-hidden">
+      {/* Header - clickable to expand/collapse */}
+      <button
+        onClick={() => setIsExpanded(!effectiveExpanded || !isExpanded ? !isExpanded : false)}
+        aria-expanded={effectiveExpanded}
+        aria-controls={panelId}
+        className="flex w-full items-center justify-between p-4 text-left hover:bg-muted/10 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Zap className="h-5 w-5 text-[oklch(0.75_0.15_195)]" aria-hidden="true" />
+          <div>
+            <h3 id={headingId} className="font-medium">Performance Impact</h3>
+            <p className="text-sm text-muted-foreground">
+              {regressions.length > 0 && (
+                <span className="text-red-400">
+                  {regressions.length} regression{regressions.length !== 1 ? "s" : ""}
+                </span>
+              )}
+              {regressions.length > 0 && improvements.length > 0 && " • "}
+              {improvements.length > 0 && (
+                <span className="text-green-400">
+                  {improvements.length} improvement{improvements.length !== 1 ? "s" : ""}
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Quick stats badges */}
+          <div className="flex items-center gap-2">
+            {regressions.length > 0 && (
+              <div 
+                className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-1"
+                aria-label={`${regressions.length} performance regressions`}
+              >
+                <TrendingUp className="h-3 w-3 text-red-400" aria-hidden="true" />
+                <span className="text-sm font-medium text-red-400">
+                  {regressions.length}
+                </span>
+              </div>
+            )}
+            {improvements.length > 0 && (
+              <div 
+                className="flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-1"
+                aria-label={`${improvements.length} performance improvements`}
+              >
+                <TrendingDown className="h-3 w-3 text-green-400" aria-hidden="true" />
+                <span className="text-sm font-medium text-green-400">
+                  {improvements.length}
+                </span>
+              </div>
+            )}
+          </div>
+          {effectiveExpanded ? (
+            <ChevronDown className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
+      </button>
+
+      {/* Expanded Content */}
+      {effectiveExpanded && (
+        <div 
+          id={panelId}
+          role="region"
+          aria-labelledby={headingId}
+          className="border-t border-border/50"
+        >
+          {/* Regressions Section */}
+          {regressions.length > 0 && (
+            <div className="p-4 border-b border-border/30">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="h-4 w-4 text-red-400" aria-hidden="true" />
+                <h4 className="font-medium text-red-400">
+                  Slowest Tests ({regressions.length} tests slower by ≥{performanceSummary.threshold_pct}%)
+                </h4>
+              </div>
+              <div className="space-y-2" role="list">
+                {regressions.slice(0, 5).map((test) => (
+                  <div
+                    key={test.testSignature}
+                    role="listitem"
+                    className="flex items-center justify-between rounded-md bg-red-500/5 p-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{test.testName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {test.testFile}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">
+                          {formatDuration(test.baselineDurationMs)} → {formatDuration(test.currentDurationMs)}
+                        </p>
+                      </div>
+                      <span 
+                        className="rounded bg-red-500/20 px-2 py-0.5 text-sm font-medium text-red-400"
+                        aria-label={`${formatDelta(test.durationDeltaPercent)} slower`}
+                      >
+                        {formatDelta(test.durationDeltaPercent)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {regressions.length > 5 && (
+                  <p className="text-center text-xs text-muted-foreground pt-2">
+                    +{regressions.length - 5} more regressions
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Improvements Section */}
+          {improvements.length > 0 && (
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="h-4 w-4 text-green-400" aria-hidden="true" />
+                <h4 className="font-medium text-green-400">
+                  Fastest Improvements ({improvements.length} tests faster by ≥{performanceSummary.threshold_pct}%)
+                </h4>
+              </div>
+              <div className="space-y-2" role="list">
+                {improvements.slice(0, 5).map((test) => (
+                  <div
+                    key={test.testSignature}
+                    role="listitem"
+                    className="flex items-center justify-between rounded-md bg-green-500/5 p-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{test.testName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {test.testFile}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">
+                          {formatDuration(test.baselineDurationMs)} → {formatDuration(test.currentDurationMs)}
+                        </p>
+                      </div>
+                      <span 
+                        className="rounded bg-green-500/20 px-2 py-0.5 text-sm font-medium text-green-400"
+                        aria-label={`${formatDelta(test.durationDeltaPercent)} faster`}
+                      >
+                        {formatDelta(test.durationDeltaPercent)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {improvements.length > 5 && (
+                  <p className="text-center text-xs text-muted-foreground pt-2">
+                    +{improvements.length - 5} more improvements
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Filter button */}
+          {regressions.length > 0 && onFilterRegressions && (
+            <div className="border-t border-border/50 p-3">
+              <button
+                onClick={onFilterRegressions}
+                className="w-full rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors"
+              >
+                Show only performance regressions in diff table
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+  </new_file>
+
+  <modification path="app/dashboard/compare/compare-client.tsx" description="Add PerformanceInsightsCard after ComparisonSummaryCards">
+    Add import at top:
+    import { PerformanceInsightsCard } from "@/components/dashboard/performance-insights-card"
+    
+    In the comparison results section, add after ComparisonSummaryCards:
+    
+    {/* Performance Insights */}
+    {comparison.performanceSummary && (
+      &lt;PerformanceInsightsCard
+        tests={comparison.tests}
+        performanceSummary={comparison.performanceSummary}
+      /&gt;
+    )}
+  </modification>
+</solution>
+
+<verification>
+  <test type="manual" description="Test performance insights display">
+    <steps>
+      <step>1. Navigate to /dashboard/compare</step>
+      <step>2. Compare two executions that have performance differences</step>
+      <step>3. Verify Performance Impact section appears</step>
+      <step>4. If regressions exist, verify section is auto-expanded</step>
+      <step>5. Verify regressions sorted by severity (worst first)</step>
+      <step>6. Verify duration values and percentages are formatted correctly</step>
+      <step>7. Verify color coding (red for regressions, green for improvements)</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test no changes state">
+    <steps>
+      <step>1. Compare two identical or very similar executions</step>
+      <step>2. Verify "No significant performance changes" message appears</step>
+      <step>3. Verify threshold is displayed</step>
+    </steps>
+  </test>
+
+  <test type="accessibility" description="Test screen reader">
+    <steps>
+      <step>1. Navigate to performance insights section with screen reader</step>
+      <step>2. Verify badge counts are announced with context</step>
+      <step>3. Verify expand/collapse button announces state</step>
+      <step>4. Verify test list items are navigable</step>
+    </steps>
+  </test>
+
+  <test type="build" description="Verify TypeScript compilation">
+    <command>npx tsc --noEmit</command>
+    <expected>No type errors</expected>
+  </test>
+</verification>
+
+<behavioral_rules>
+  <always>
+    <rule>Import types from lib/types.ts (don't redefine)</rule>
+    <rule>Memoize sorting and filtering operations</rule>
+    <rule>Show threshold percentage for context</rule>
+    <rule>Sort regressions by severity (worst first)</rule>
+    <rule>Limit to top 5 items to avoid overwhelming</rule>
+    <rule>Include file path for context</rule>
+    <rule>Auto-expand when regressions exist (important to surface)</rule>
+  </always>
+  <never>
+    <rule>Never redefine types that exist in lib/types.ts</rule>
+    <rule>Never hide the threshold information</rule>
+    <rule>Never show empty sections (hide if no data)</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    1. Create `components/dashboard/performance-insights-card.tsx`
+    2. Update `app/dashboard/compare/compare-client.tsx` to import and render
+  </structure>
+  <validation>
+    After implementation:
+    1. Verify component renders without errors
+    2. Test with various comparison results
+    3. Verify collapsed/expanded states work
+    4. Test accessibility with screen reader
+  </validation>
+</output_format>

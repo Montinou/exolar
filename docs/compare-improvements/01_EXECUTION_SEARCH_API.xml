@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compare Page Improvement - Task 01
+  Add Server-Side Execution Search API
+  Created: 2026-01-06
+  Priority: P0 (High)
+  Status: Not Started
+  
+  PRODUCTION-READY: This prompt follows existing codebase patterns for:
+  - SQL query construction using sql.unsafe() for dynamic WHERE clauses
+  - Input validation and sanitization
+  - Error handling
+  - Type safety with TypeScript
+-->
+
+<task type="generate">
+  <objective>
+    Create a new API endpoint `/api/executions/search` that performs server-side search 
+    across test executions by branch name, commit SHA, or suite name. This enables the 
+    compare page to find executions beyond the initial 50 loaded on page.
+  </objective>
+  <language>TypeScript</language>
+  <framework>Next.js with Neon PostgreSQL (postgres.js driver)</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - Compare Page Enhancement</project_type>
+  <background>
+    The current compare page loads only 50 executions on page load and performs client-side 
+    search filtering. This means users cannot find executions that aren't in the initial 50
+    results. For example, if a user wants to compare against a commit from 2 weeks ago,
+    they cannot find it through the current search.
+    
+    The existing `/api/executions/route.ts` supports filtering by branch, suite, status, 
+    and date range, but doesn't support free-text search across multiple fields.
+    
+    The existing `/api/search/route.ts` searches TEST names, not executions.
+    
+    EXISTING PATTERN: The codebase uses `sql.unsafe()` for dynamic SQL with string-built
+    WHERE clauses. User input must be sanitized by escaping single quotes.
+  </background>
+  <audience>
+    - Dashboard users comparing test runs
+    - Developers investigating regressions across commits
+  </audience>
+  <impact>
+    HIGH - Enables finding any execution in the database through search, removing the 
+    current limitation of only accessing the most recent 50 executions.
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="lib/db.ts" start_line="56" end_line="99" description="Existing pattern: getExecutions uses sql.unsafe for dynamic WHERE">
+export async function getExecutions(
+  organizationId: number,
+  limit = 50,
+  offset = 0,
+  status?: string,
+  branch?: string,
+  dateRange?: DateRangeFilter,
+  suite?: string
+) {
+  const sql = getSql()
+  const conditions = [`organization_id = ${organizationId}`]
+
+  if (status) {
+    conditions.push(`status = '${status}'`)
+  }
+
+  if (branch) {
+    conditions.push(`branch = '${branch}'`)
+  }
+
+  if (suite) {
+    conditions.push(`suite = '${suite}'`)
+  }
+
+  if (dateRange?.from) {
+    conditions.push(`started_at >= '${dateRange.from}'`)
+  }
+
+  if (dateRange?.to) {
+    conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  const result = await sql`
+    SELECT * FROM test_executions
+    ${sql.unsafe(whereClause)}
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `
+
+  return result as TestExecution[]
+}
+</file>
+
+<file path="lib/db.ts" start_line="1015" end_line="1055" description="Existing pattern: searchTests uses parameterized ILIKE">
+export async function searchTests(organizationId: number, query: string, limit = 50, offset = 0): Promise<TestSearchResult[]> {
+  const sql = getSql()
+
+  if (!query || query.length < 2) {
+    return []
+  }
+
+  const searchPattern = `%${query}%`
+
+  const results = await sql`
+    SELECT
+      COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) as test_signature,
+      tr.test_name,
+      tr.test_file,
+      COUNT(*) as run_count,
+      MAX(tr.started_at) as last_run,
+      ...
+    FROM test_results tr
+    JOIN test_executions te ON tr.execution_id = te.id
+    WHERE (tr.test_name ILIKE ${searchPattern}
+       OR tr.test_file ILIKE ${searchPattern})
+      AND te.organization_id = ${organizationId}
+    GROUP BY tr.test_name, tr.test_file, tr.test_signature
+    ORDER BY run_count DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `
+
+  return results as TestSearchResult[]
+}
+</file>
+
+<file path="lib/db.ts" start_line="2683" end_line="2695" description="getQueriesForOrg pattern for adding new functions">
+    getExecutions: (limit?: number, offset?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string) =>
+      getExecutions(organizationId, limit, offset, status, branch, dateRange, suite),
+    ...
+    getExecutionsGroupedByBranch: (dateRange?: DateRangeFilter, maxRunsPerSuite?: number) =>
+      getExecutionsGroupedByBranch(organizationId, dateRange, maxRunsPerSuite),
+</file>
+
+<file path="lib/types.ts" start_line="60" end_line="78" description="TestExecution type for reference">
+export interface TestExecution {
+  id: number
+  run_id: string
+  branch: string
+  commit_sha: string
+  commit_message: string | null
+  triggered_by: string
+  workflow_name: string
+  suite: string | null
+  status: "success" | "failure" | "running"
+  total_tests: number
+  passed: number
+  failed: number
+  skipped: number
+  duration_ms: number | null
+  started_at: string
+  completed_at: string | null
+  created_at: string
+}
+</file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Create new API endpoint: GET /api/executions/search</requirement>
+    <requirement priority="must">Search across branch name, commit_sha, and suite fields</requirement>
+    <requirement priority="must">Support `q` query parameter for search term (minimum 2 chars)</requirement>
+    <requirement priority="must">Support `limit` parameter (default 20, max 50)</requirement>
+    <requirement priority="must">Sanitize user input to prevent SQL injection (escape single quotes)</requirement>
+    <requirement priority="should">Return executions sorted by started_at DESC (most recent first)</requirement>
+    <requirement priority="should">Use ILIKE for case-insensitive partial matching</requirement>
+    <requirement priority="could">Support optional `branch` filter to scope search within a branch</requirement>
+    <requirement priority="could">Support optional `suite` filter to scope search within a suite</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Follow existing codebase patterns (sql.unsafe for dynamic WHERE)</requirement>
+    <requirement>Return quickly (search should complete in &lt;200ms for most queries)</requirement>
+    <requirement>Include proper TypeScript types</requirement>
+    <requirement>Handle edge cases (empty query, special characters, null values)</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Create a new `searchExecutions()` function in `lib/db.ts` following the existing pattern
+    2. Use ILIKE for case-insensitive search across branch, commit_sha, and suite
+    3. Sanitize user input by escaping single quotes (matching existing pattern in codebase)
+    4. Create a new API route at `app/api/executions/search/route.ts`
+    5. Add the function to the `getQueriesForOrg` export
+  </approach>
+  
+  <new_function path="lib/db.ts" description="Add after getExecutions function (around line 100)">
+/**
+ * Search executions by branch, commit SHA, or suite name.
+ * Uses ILIKE for case-insensitive partial matching.
+ * 
+ * @param organizationId - Organization to search within (multi-tenant isolation)
+ * @param query - Search term (minimum 2 characters)
+ * @param limit - Maximum results to return (default 20, max 50)
+ * @param branch - Optional: scope search to specific branch
+ * @param suite - Optional: scope search to specific suite
+ * @returns Array of matching executions, sorted by most recent first
+ */
+export async function searchExecutions(
+  organizationId: number,
+  query: string,
+  limit = 20,
+  branch?: string,
+  suite?: string
+): Promise&lt;TestExecution[]&gt; {
+  const sql = getSql()
+
+  // Validate minimum query length
+  if (!query || query.length &lt; 2) {
+    return []
+  }
+
+  // Sanitize user input by escaping single quotes (prevent SQL injection)
+  const sanitizedQuery = query.replace(/'/g, "''")
+  const searchPattern = `%${sanitizedQuery}%`
+
+  // Build conditions array following existing pattern
+  const conditions = [`organization_id = ${organizationId}`]
+
+  // Add search condition: match branch, commit_sha, or suite
+  // Using ILIKE for case-insensitive search (PostgreSQL)
+  conditions.push(`(
+    branch ILIKE '${searchPattern}'
+    OR commit_sha ILIKE '${searchPattern}'
+    OR COALESCE(suite, '') ILIKE '${searchPattern}'
+  )`)
+
+  // Optional filters to scope the search
+  if (branch) {
+    const sanitizedBranch = branch.replace(/'/g, "''")
+    conditions.push(`branch = '${sanitizedBranch}'`)
+  }
+
+  if (suite) {
+    const sanitizedSuite = suite.replace(/'/g, "''")
+    conditions.push(`suite = '${sanitizedSuite}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  // Ensure limit is within bounds (1-50)
+  const safeLimit = Math.min(Math.max(1, limit), 50)
+
+  const result = await sql`
+    SELECT * FROM test_executions
+    ${sql.unsafe(whereClause)}
+    ORDER BY started_at DESC
+    LIMIT ${safeLimit}
+  `
+
+  return result as TestExecution[]
+}
+  </new_function>
+
+  <modification path="lib/db.ts" line="~2690" description="Add to getQueriesForOrg export object">
+    // Add after getExecutions entry:
+    searchExecutions: (query: string, limit?: number, branch?: string, suite?: string) =>
+      searchExecutions(organizationId, query, limit, branch, suite),
+  </modification>
+
+  <new_file path="app/api/executions/search/route.ts" description="New API endpoint for execution search">
+import { NextRequest, NextResponse } from "next/server"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
+
+export const dynamic = "force-dynamic"
+
+/**
+ * Search test executions by branch, commit SHA, or suite name.
+ * 
+ * Query params:
+ * - q: Search query (required, minimum 2 characters)
+ * - limit: Maximum results (default 20, max 50)
+ * - branch: Optional filter to scope search within a branch
+ * - suite: Optional filter to scope search within a suite
+ * 
+ * @example
+ * GET /api/executions/search?q=main&limit=10
+ * GET /api/executions/search?q=c60e951
+ * GET /api/executions/search?q=feature&suite=My%20Referral
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const context = await getSessionContext()
+    if (!context) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const db = getQueriesForOrg(context.organizationId)
+
+    const { searchParams } = new URL(request.url)
+    const query = searchParams.get("q") || ""
+    const limitParam = searchParams.get("limit")
+    const limit = limitParam ? Math.min(Math.max(1, parseInt(limitParam, 10) || 20), 50) : 20
+    const branch = searchParams.get("branch") || undefined
+    const suite = searchParams.get("suite") || undefined
+
+    // Validate query length
+    if (query.length &lt; 2) {
+      return NextResponse.json({
+        executions: [],
+        query,
+        total: 0,
+        message: "Query must be at least 2 characters",
+      })
+    }
+
+    const executions = await db.searchExecutions(query, limit, branch, suite)
+
+    return NextResponse.json({ 
+      executions,
+      query,
+      total: executions.length,
+    })
+  } catch (error) {
+    console.error("[API] Execution search error:", error)
+    return NextResponse.json(
+      { error: "Failed to search executions" },
+      { status: 500 }
+    )
+  }
+}
+  </new_file>
+</solution>
+
+<verification>
+  <test type="api" description="Test search API endpoint with branch name">
+    <curl>
+curl -X GET "http://localhost:3000/api/executions/search?q=main&amp;limit=5" \
+  -H "Cookie: YOUR_SESSION_COOKIE"
+    </curl>
+    <expected_response>
+      - Status 200
+      - Response includes `executions` array with matching results
+      - Each execution has branch containing "main"
+      - Results sorted by started_at DESC
+      - Response includes `total` count
+    </expected_response>
+  </test>
+
+  <test type="api" description="Test commit SHA search (partial match)">
+    <curl>
+curl -X GET "http://localhost:3000/api/executions/search?q=c60e951" \
+  -H "Cookie: YOUR_SESSION_COOKIE"
+    </curl>
+    <expected_response>
+      - Returns executions with commit_sha containing "c60e951"
+    </expected_response>
+  </test>
+
+  <test type="api" description="Test case-insensitive search">
+    <curl>
+curl -X GET "http://localhost:3000/api/executions/search?q=MAIN" \
+  -H "Cookie: YOUR_SESSION_COOKIE"
+    </curl>
+    <expected_response>
+      - Returns same results as search for "main" (ILIKE is case-insensitive)
+    </expected_response>
+  </test>
+
+  <test type="api" description="Test minimum query length validation">
+    <curl>
+curl -X GET "http://localhost:3000/api/executions/search?q=a" \
+  -H "Cookie: YOUR_SESSION_COOKIE"
+    </curl>
+    <expected_response>
+      - Status 200
+      - Returns empty executions array
+      - Includes message about minimum 2 characters
+    </expected_response>
+  </test>
+
+  <test type="api" description="Test SQL injection prevention">
+    <curl>
+curl -X GET "http://localhost:3000/api/executions/search?q=test'--" \
+  -H "Cookie: YOUR_SESSION_COOKIE"
+    </curl>
+    <expected_response>
+      - Status 200 (no SQL error)
+      - Returns empty array or matching results (single quote is escaped)
+      - No database error
+    </expected_response>
+  </test>
+
+  <test type="api" description="Test with scoped branch filter">
+    <curl>
+curl -X GET "http://localhost:3000/api/executions/search?q=referral&amp;branch=main" \
+  -H "Cookie: YOUR_SESSION_COOKIE"
+    </curl>
+    <expected_response>
+      - Returns only executions on "main" branch matching "referral"
+    </expected_response>
+  </test>
+
+  <test type="build" description="Verify TypeScript compilation">
+    <command>npx tsc --noEmit</command>
+    <expected>No type errors</expected>
+  </test>
+
+  <test type="lint" description="Verify ESLint passes">
+    <command>npm run lint -- --quiet</command>
+    <expected>No lint errors</expected>
+  </test>
+</verification>
+
+<edge_cases>
+  <case description="Empty query string">
+    Returns empty array immediately without database call
+  </case>
+  <case description="Single character query">
+    Returns empty array with message, not a database query
+  </case>
+  <case description="Query with special SQL characters">
+    Single quotes are escaped: ' becomes ''
+    Other special characters are safe with ILIKE pattern matching
+  </case>
+  <case description="Very long query string">
+    Still works but may return fewer results; no truncation needed
+  </case>
+  <case description="Query matching null suite">
+    COALESCE(suite, '') ensures null suites don't cause issues
+  </case>
+  <case description="Unauthorized request">
+    Returns 401 before any database access
+  </case>
+  <case description="Limit exceeds maximum">
+    Capped at 50 to prevent excessive results
+  </case>
+  <case description="Invalid limit parameter">
+    Falls back to default of 20
+  </case>
+</edge_cases>
+
+<behavioral_rules>
+  <always>
+    <rule>Validate query length before executing database query</rule>
+    <rule>Sanitize user input by escaping single quotes</rule>
+    <rule>Return consistent response shape (executions array, even if empty)</rule>
+    <rule>Respect organization boundaries (multi-tenant isolation)</rule>
+    <rule>Follow existing codebase patterns for SQL construction</rule>
+  </always>
+  <never>
+    <rule>Never expose executions from other organizations</rule>
+    <rule>Never allow unlimited results (cap at 50)</rule>
+    <rule>Never execute search with empty or 1-character query</rule>
+    <rule>Never trust user input without sanitization</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    1. Add `searchExecutions` function to `lib/db.ts` (after `getExecutions`, around line 100)
+    2. Add export to `getQueriesForOrg` object (around line 2690)
+    3. Create `app/api/executions/search/route.ts` (new file)
+  </structure>
+  <validation>
+    After implementation:
+    1. Run `npx tsc --noEmit` to verify TypeScript compiles
+    2. Run `npm run lint` to verify no lint errors
+    3. Run `npm run dev` and test the API endpoints with curl commands above
+    4. Specifically test SQL injection case to verify sanitization works
+  </validation>
+</output_format>

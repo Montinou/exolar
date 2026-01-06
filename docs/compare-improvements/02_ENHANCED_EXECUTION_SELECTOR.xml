@@ -1,0 +1,709 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compare Page Improvement - Task 02
+  Enhance ExecutionSelector with Server-Side Search
+  Created: 2026-01-06
+  Priority: P0 (High)
+  Status: Not Started
+  Depends on: 01_EXECUTION_SEARCH_API.xml
+  
+  PRODUCTION-READY: This prompt includes:
+  - Proper error handling with try/catch
+  - AbortController for request cancellation
+  - Loading states for user feedback
+  - Accessibility attributes
+  - Memoization for performance
+-->
+
+<task type="modify">
+  <objective>
+    Modify the ExecutionSelector component to use the new server-side search API instead 
+    of only filtering the pre-loaded 50 executions client-side. Add debounced search input 
+    that fetches results from `/api/executions/search` and shows "Load more" functionality.
+  </objective>
+  <language>TypeScript/React</language>
+  <framework>Next.js with React hooks</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - Compare Page Enhancement</project_type>
+  <background>
+    The current ExecutionSelector component has these limitations:
+    1. Filters only from 50 pre-fetched executions passed as props
+    2. Shows maximum 5 executions per branch (hardcoded slice)
+    3. No indication of total execution count per branch
+    4. Search happens entirely client-side, cannot find older executions
+    
+    Users have reported that "search is not actually working" because they cannot
+    find commits that aren't in the top 50 most recent executions.
+  </background>
+  <audience>
+    - Dashboard users comparing test runs
+    - Developers looking for specific commits or branches
+  </audience>
+  <impact>
+    HIGH - Makes the search functionality actually useful by searching the full database
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="components/dashboard/execution-selector.tsx" start_line="1" end_line="68" description="Current component - client-side filtering only">
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import {
+  ChevronDown,
+  GitBranch,
+  Check,
+  X,
+  Calendar,
+} from "lucide-react"
+import type { TestExecution } from "@/lib/types"
+
+interface ExecutionSelectorProps {
+  label: string
+  value: number | null
+  onChange: (executionId: number | null) => void
+  executions: TestExecution[]
+  disabled?: boolean
+}
+
+export function ExecutionSelector({
+  label,
+  value,
+  onChange,
+  executions,
+  disabled = false,
+}: ExecutionSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const dropdownRef = useRef&lt;HTMLDivElement&gt;(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const selectedExecution = executions.find((e) => e.id === value)
+
+  // Group executions by branch
+  const executionsByBranch = executions.reduce(
+    (acc, exec) => {
+      const branch = exec.branch
+      if (!acc[branch]) acc[branch] = []
+      acc[branch].push(exec)
+      return acc
+    },
+    {} as Record&lt;string, TestExecution[]&gt;
+  )
+
+  // Filter by search term (CLIENT-SIDE ONLY - the problem!)
+  const filteredBranches = Object.entries(executionsByBranch).filter(([branch, execs]) => {
+    if (!search) return true
+    const searchLower = search.toLowerCase()
+    return (
+      branch.toLowerCase().includes(searchLower) ||
+      execs.some(
+        (e) =>
+          e.commit_sha.toLowerCase().includes(searchLower) ||
+          e.suite?.toLowerCase().includes(searchLower)
+      )
+    )
+  })
+</file>
+
+<file path="components/dashboard/execution-selector.tsx" start_line="127" end_line="165" description="Dropdown rendering with hardcoded slice(0, 5)">
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background shadow-lg">
+          {/* Search input */}
+          <div className="border-b border-border p-2">
+            <input
+              type="text"
+              placeholder="Search branches, commits..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-md bg-muted/30 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-[oklch(0.75_0.15_195)]"
+              autoFocus
+            />
+          </div>
+
+          {/* Execution list */}
+          <div className="max-h-72 overflow-y-auto p-1">
+            {filteredBranches.length === 0 ? (
+              <p className="p-4 text-center text-sm text-muted-foreground">
+                No executions found
+              </p>
+            ) : (
+              filteredBranches.map(([branch, branchExecutions]) => (
+                <div key={branch} className="mb-2">
+                  <div className="flex items-center gap-2 px-2 py-1">
+                    <GitBranch className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {branch}
+                    </span>
+                  </div>
+                  {/* PROBLEM: Only shows first 5 executions per branch */}
+                  {branchExecutions.slice(0, 5).map((exec) => (
+                    &lt;button ... /&gt;
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+</file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Call /api/executions/search when user types (debounced 300ms)</requirement>
+    <requirement priority="must">Cancel pending requests when search term changes (AbortController)</requirement>
+    <requirement priority="must">Show server-side search results merged with local results</requirement>
+    <requirement priority="must">Add visual loading indicator while searching</requirement>
+    <requirement priority="must">Show total execution count per branch in header</requirement>
+    <requirement priority="must">Handle API errors gracefully with error state</requirement>
+    <requirement priority="should">Add "Load more" button per branch to fetch additional executions</requirement>
+    <requirement priority="should">Add proper ARIA attributes for accessibility</requirement>
+    <requirement priority="could">Highlight matching text in search results</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Debounce search input to avoid excessive API calls</requirement>
+    <requirement>Show results within 500ms of user stopping typing</requirement>
+    <requirement>Maintain same visual design and glass-card aesthetic</requirement>
+    <requirement>Memoize expensive computations (grouping, filtering)</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Add new state for searchResults, isSearching, searchError
+    2. Create useEffect with debounced search and AbortController for cleanup
+    3. Use useMemo for expensive grouping/filtering operations
+    4. Merge searchResults with local executions (deduplicate by id)
+    5. Update rendering to show loading state, error state, and "Load more" buttons
+    6. Keep local filtering as fallback for instant feedback
+    7. Add ARIA attributes for accessibility
+  </approach>
+  
+  <fixed_code language="typescript">
+"use client"
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import {
+  ChevronDown,
+  GitBranch,
+  Check,
+  X,
+  Calendar,
+  Loader2,
+  Search,
+  AlertCircle,
+} from "lucide-react"
+import type { TestExecution } from "@/lib/types"
+
+interface ExecutionSelectorProps {
+  label: string
+  value: number | null
+  onChange: (executionId: number | null) => void
+  executions: TestExecution[]
+  disabled?: boolean
+}
+
+/**
+ * Custom hook for debounced server-side search with request cancellation.
+ * Returns search results, loading state, and error state.
+ */
+function useExecutionSearch(searchQuery: string, minLength = 2, debounceMs = 300) {
+  const [results, setResults] = useState&lt;TestExecution[]&gt;([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [error, setError] = useState&lt;string | null&gt;(null)
+  const abortControllerRef = useRef&lt;AbortController | null&gt;(null)
+
+  useEffect(() => {
+    // Reset if query too short
+    if (searchQuery.length &lt; minLength) {
+      setResults([])
+      setIsSearching(false)
+      setError(null)
+      return
+    }
+
+    // Set debouncing state immediately
+    setIsSearching(true)
+    setError(null)
+
+    const timeoutId = setTimeout(async () => {
+      // Cancel any pending request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      
+      // Create new abort controller for this request
+      abortControllerRef.current = new AbortController()
+      
+      try {
+        const response = await fetch(
+          `/api/executions/search?q=${encodeURIComponent(searchQuery)}&limit=30`,
+          { signal: abortControllerRef.current.signal }
+        )
+        
+        if (!response.ok) {
+          throw new Error(`Search failed: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        setResults(data.executions || [])
+        setError(null)
+      } catch (err) {
+        // Ignore abort errors (expected when cancelling)
+        if (err instanceof Error && err.name === "AbortError") {
+          return
+        }
+        console.error("Search error:", err)
+        setError("Search failed. Please try again.")
+        setResults([])
+      } finally {
+        setIsSearching(false)
+      }
+    }, debounceMs)
+
+    // Cleanup: clear timeout and cancel request
+    return () => {
+      clearTimeout(timeoutId)
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [searchQuery, minLength, debounceMs])
+
+  return { results, isSearching, error }
+}
+
+export function ExecutionSelector({
+  label,
+  value,
+  onChange,
+  executions,
+  disabled = false,
+}: ExecutionSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [expandedBranches, setExpandedBranches] = useState&lt;Set&lt;string&gt;&gt;(new Set())
+  const dropdownRef = useRef&lt;HTMLDivElement&gt;(null)
+  const searchInputRef = useRef&lt;HTMLInputElement&gt;(null)
+
+  // Server-side search hook
+  const { results: searchResults, isSearching, error: searchError } = useExecutionSearch(search)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+    }
+  }, [isOpen])
+
+  const selectedExecution = useMemo(
+    () => executions.find((e) => e.id === value),
+    [executions, value]
+  )
+
+  // Merge local executions with search results (deduplicate by id)
+  const allExecutions = useMemo(() => {
+    const executionMap = new Map&lt;number, TestExecution&gt;()
+    
+    // Add local executions first
+    executions.forEach((e) => executionMap.set(e.id, e))
+    
+    // Add search results (may include executions not in local list)
+    searchResults.forEach((e) => executionMap.set(e.id, e))
+    
+    return Array.from(executionMap.values())
+  }, [executions, searchResults])
+
+  // Group executions by branch (memoized for performance)
+  const executionsByBranch = useMemo(() => {
+    const grouped = allExecutions.reduce(
+      (acc, exec) => {
+        const branch = exec.branch
+        if (!acc[branch]) acc[branch] = []
+        acc[branch].push(exec)
+        return acc
+      },
+      {} as Record&lt;string, TestExecution[]&gt;
+    )
+    
+    // Sort executions within each branch by date (most recent first)
+    Object.values(grouped).forEach((execs) => {
+      execs.sort((a, b) => 
+        new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+      )
+    })
+    
+    return grouped
+  }, [allExecutions])
+
+  // Filter branches by search term (instant client-side filter for better UX)
+  const filteredBranches = useMemo(() => {
+    if (!search) return Object.entries(executionsByBranch)
+    
+    const searchLower = search.toLowerCase()
+    return Object.entries(executionsByBranch).filter(([branch, execs]) => 
+      branch.toLowerCase().includes(searchLower) ||
+      execs.some(
+        (e) =>
+          e.commit_sha.toLowerCase().includes(searchLower) ||
+          e.suite?.toLowerCase().includes(searchLower)
+      )
+    )
+  }, [executionsByBranch, search])
+
+  // Toggle expanded state for a branch
+  const toggleBranchExpand = useCallback((branch: string) => {
+    setExpandedBranches((prev) => {
+      const next = new Set(prev)
+      if (next.has(branch)) {
+        next.delete(branch)
+      } else {
+        next.add(branch)
+      }
+      return next
+    })
+  }, [])
+
+  // Determine how many executions to show per branch
+  const getVisibleExecutions = useCallback((branch: string, execs: TestExecution[]) => {
+    const isExpanded = expandedBranches.has(branch)
+    return isExpanded ? execs : execs.slice(0, 5)
+  }, [expandedBranches])
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const handleSelect = useCallback((execId: number) => {
+    onChange(execId)
+    setIsOpen(false)
+    setSearch("")
+  }, [onChange])
+
+  const isLoading = isSearching
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <label 
+        id={`${label}-label`}
+        className="mb-2 block text-sm font-medium text-muted-foreground"
+      >
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-labelledby={`${label}-label`}
+        className={`flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50 ${
+          disabled ? "cursor-not-allowed opacity-50" : ""
+        } ${isOpen ? "ring-2 ring-[oklch(0.75_0.15_195)]" : ""}`}
+      >
+        {selectedExecution ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {selectedExecution.branch}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {selectedExecution.commit_sha.slice(0, 7)} • {formatDate(selectedExecution.started_at)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">Select an execution...</span>
+        )}
+        <div className="flex items-center gap-1">
+          {value && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onChange(null)
+              }}
+              aria-label="Clear selection"
+              className="rounded p-1 hover:bg-muted/50"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground transition-transform ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div 
+          className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background shadow-lg"
+          role="listbox"
+          aria-labelledby={`${label}-label`}
+        >
+          {/* Search input with loading indicator */}
+          <div className="border-b border-border p-2">
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search branches, commits..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search executions"
+                className="w-full rounded-md bg-muted/30 pl-9 pr-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-[oklch(0.75_0.15_195)]"
+              />
+              <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+                ) : (
+                  <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                )}
+              </div>
+            </div>
+            {search.length > 0 && search.length < 2 && (
+              <p className="mt-1 text-xs text-muted-foreground" role="status">
+                Type at least 2 characters to search
+              </p>
+            )}
+          </div>
+
+          {/* Error state */}
+          {searchError && (
+            <div className="flex items-center gap-2 p-3 text-sm text-red-400">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              <span role="alert">{searchError}</span>
+            </div>
+          )}
+
+          {/* Execution list with expandable branches */}
+          <div className="max-h-72 overflow-y-auto p-1">
+            {filteredBranches.length === 0 ? (
+              <p className="p-4 text-center text-sm text-muted-foreground" role="status">
+                {isLoading ? "Searching..." : "No executions found"}
+              </p>
+            ) : (
+              filteredBranches.map(([branch, branchExecutions]) => {
+                const visible = getVisibleExecutions(branch, branchExecutions)
+                const hasMore = branchExecutions.length > visible.length
+                const hiddenCount = branchExecutions.length - 5
+                
+                return (
+                  <div key={branch} className="mb-2">
+                    <div className="flex items-center justify-between px-2 py-1">
+                      <div className="flex items-center gap-2">
+                        <GitBranch className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {branch}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {branchExecutions.length} runs
+                      </span>
+                    </div>
+                    {visible.map((exec) => (
+                      <button
+                        key={exec.id}
+                        type="button"
+                        role="option"
+                        aria-selected={exec.id === value}
+                        onClick={() => handleSelect(exec.id)}
+                        className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/50 ${
+                          exec.id === value ? "bg-muted/30" : ""
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {exec.commit_sha.slice(0, 7)}
+                            </span>
+                            <span
+                              className={`h-2 w-2 rounded-full ${
+                                exec.status === "success"
+                                  ? "bg-green-500"
+                                  : exec.status === "failure"
+                                  ? "bg-red-500"
+                                  : "bg-yellow-500"
+                              }`}
+                              aria-label={`Status: ${exec.status}`}
+                            />
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" aria-hidden="true" />
+                            <span>{formatDate(exec.started_at)}</span>
+                            {exec.suite && (
+                              <>
+                                <span>•</span>
+                                <span>{exec.suite}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        {exec.id === value && (
+                          <Check className="h-4 w-4 text-[oklch(0.75_0.15_195)]" aria-hidden="true" />
+                        )}
+                      </button>
+                    ))}
+                    {hasMore && (
+                      <button
+                        type="button"
+                        onClick={() => toggleBranchExpand(branch)}
+                        className="w-full px-3 py-1.5 text-xs text-[oklch(0.75_0.15_195)] hover:underline"
+                        aria-expanded={expandedBranches.has(branch)}
+                      >
+                        {expandedBranches.has(branch)
+                          ? "Show less"
+                          : `Load ${hiddenCount} more...`}
+                      </button>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+  </fixed_code>
+
+  <changes>
+    <change type="added" description="Import useMemo, useCallback for memoization" />
+    <change type="added" description="Import Loader2, Search, AlertCircle icons" />
+    <change type="added" description="Add useExecutionSearch custom hook with AbortController" />
+    <change type="added" description="Add searchResults, isSearching, searchError state via hook" />
+    <change type="added" description="Add expandedBranches state for Load More functionality" />
+    <change type="added" description="Add searchInputRef for auto-focus on open" />
+    <change type="modified" description="Memoize selectedExecution, allExecutions, executionsByBranch, filteredBranches" />
+    <change type="modified" description="Memoize callbacks with useCallback" />
+    <change type="added" description="Add loading indicator in search input" />
+    <change type="added" description="Add error state display" />
+    <change type="added" description="Add execution count badge per branch" />
+    <change type="added" description="Add 'Load more' button per branch with toggle expand logic" />
+    <change type="modified" description="Replace hardcoded slice(0, 5) with getVisibleExecutions function" />
+    <change type="added" description="Add ARIA attributes: role, aria-label, aria-expanded, aria-selected" />
+  </changes>
+</solution>
+
+<verification>
+  <test type="manual" description="Test search functionality">
+    <steps>
+      <step>1. Navigate to /dashboard/compare</step>
+      <step>2. Click on "Select an execution..." dropdown</step>
+      <step>3. Type "main" in search box - verify loading spinner appears briefly</step>
+      <step>4. Verify results include executions matching "main" branch</step>
+      <step>5. Type a commit SHA like "c60e951" - verify matching commits appear</step>
+      <step>6. Type single character "a" - verify "Type at least 2 characters" message</step>
+      <step>7. Verify "X runs" count appears next to each branch name</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test Load more functionality">
+    <steps>
+      <step>1. Open execution selector dropdown</step>
+      <step>2. Find a branch with more than 5 executions</step>
+      <step>3. Click "Load X more..." button</step>
+      <step>4. Verify additional executions appear</step>
+      <step>5. Click "Show less" to collapse back to 5</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test request cancellation">
+    <steps>
+      <step>1. Open Network tab in DevTools</step>
+      <step>2. Type "main" quickly followed by "test"</step>
+      <step>3. Verify the "main" request is cancelled (red/cancelled status)</step>
+      <step>4. Only the final "test" request should complete</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test error handling">
+    <steps>
+      <step>1. Simulate network error (DevTools > Network > Offline)</step>
+      <step>2. Search for something</step>
+      <step>3. Verify error message appears: "Search failed. Please try again."</step>
+      <step>4. Re-enable network, search again, verify it works</step>
+    </steps>
+  </test>
+
+  <test type="accessibility" description="Test keyboard navigation">
+    <steps>
+      <step>1. Tab to the execution selector</step>
+      <step>2. Press Enter/Space to open dropdown</step>
+      <step>3. Verify search input is focused</step>
+      <step>4. Navigate with arrow keys through results</step>
+      <step>5. Press Escape to close</step>
+    </steps>
+  </test>
+
+  <test type="build" description="Verify TypeScript compilation">
+    <command>npx tsc --noEmit</command>
+    <expected>No type errors</expected>
+  </test>
+</verification>
+
+<behavioral_rules>
+  <always>
+    <rule>Show instant client-side filter results for responsive UX</rule>
+    <rule>Merge server results with local results (don't replace completely)</rule>
+    <rule>Debounce API calls to prevent excessive requests</rule>
+    <rule>Cancel pending requests when search term changes</rule>
+    <rule>Show loading state while searching</rule>
+    <rule>Handle errors gracefully with user-friendly message</rule>
+  </always>
+  <never>
+    <rule>Never make API call with less than 2 characters</rule>
+    <rule>Never block UI while waiting for search results</rule>
+    <rule>Never lose the selected execution when search returns no results</rule>
+    <rule>Never leave pending requests when component unmounts</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    Modify `components/dashboard/execution-selector.tsx` with the enhanced search logic.
+    The component maintains backwards compatibility with the same props interface.
+  </structure>
+  <validation>
+    After implementation:
+    1. Verify component renders without errors
+    2. Test search with various queries
+    3. Confirm debouncing works (network tab shows delayed requests)
+    4. Confirm request cancellation works (cancelled requests in network tab)
+    5. Verify "Load more" expands to show all executions
+    6. Test accessibility with screen reader or keyboard
+  </validation>
+</output_format>

@@ -1,0 +1,863 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compare Page Improvement - Task 04
+  Add Branch Comparison Mode with Tab Switcher
+  Created: 2026-01-06
+  Priority: P0 (High)
+  Status: Not Started
+  Depends on: 03_BRANCH_SELECTOR_COMPONENT.xml
+  
+  PRODUCTION-READY: This prompt includes:
+  - Proper TypeScript types
+  - URL state management with Next.js
+  - Error handling for API calls
+  - Loading states
+  - Accessibility attributes
+  - Backwards compatibility with existing URL params
+-->
+
+<task type="modify">
+  <objective>
+    Add a tabbed interface to the compare page that allows switching between "Branch Mode" 
+    (select two branches for automatic latest-run comparison) and "Execution Mode" (existing 
+    behavior of selecting individual executions). Branch Mode is the primary workflow and 
+    should be the default.
+  </objective>
+  <language>TypeScript/React</language>
+  <framework>Next.js with React hooks</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - Compare Page Enhancement</project_type>
+  <background>
+    The current compare page only supports "Execution Mode" where users must manually select 
+    individual executions. The most common use case is "compare my feature branch against main" 
+    which requires finding specific executions.
+    
+    The API already supports branch-based comparison via `baseline_branch` and `current_branch` 
+    parameters (see app/api/compare/route.ts lines 44-64), but this capability is not exposed 
+    in the UI.
+    
+    Branch Mode should:
+    1. Let users select two branches
+    2. Optionally filter by suite
+    3. Automatically use the latest execution from each branch
+    4. Show which executions were selected for transparency
+    
+    IMPORTANT: The existing URL params (?baseline=123&current=456) must continue to work
+    for backwards compatibility and shareable links.
+  </background>
+  <audience>
+    - Developers comparing feature branches against main/master
+    - QA engineers reviewing branch stability before merge
+  </audience>
+  <impact>
+    VERY HIGH - This is the most valuable improvement, reducing comparison workflow from 
+    ~30 seconds to ~5 seconds (2 clicks instead of searching + scrolling)
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="app/dashboard/compare/compare-client.tsx" start_line="1" end_line="45" description="Current CompareClient imports and props">
+"use client"
+
+import { useState, useEffect, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import {
+  GitCompare,
+  ArrowLeftRight,
+  Loader2,
+  AlertCircle,
+} from "lucide-react"
+import type { TestExecution, ComparisonResult } from "@/lib/types"
+import { ExecutionSelector } from "@/components/dashboard/execution-selector"
+import { ComparisonSummaryCards } from "@/components/dashboard/comparison-summary-cards"
+import { TestDiffTable } from "@/components/dashboard/test-diff-table"
+
+interface CompareClientProps {
+  executions: TestExecution[]
+  branches: string[]
+  suites: string[]
+  initialBaseline: number | null
+  initialCurrent: number | null
+  initialBaselineBranch?: string
+  initialCurrentBranch?: string
+  initialSuite?: string
+}
+
+export function CompareClient({
+  executions,
+  branches,
+  suites,
+  initialBaseline,
+  initialCurrent,
+  initialBaselineBranch,
+  initialCurrentBranch,
+  initialSuite,
+}: CompareClientProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  const [baselineId, setBaselineId] = useState&lt;number | null&gt;(initialBaseline)
+  const [currentId, setCurrentId] = useState&lt;number | null&gt;(initialCurrent)
+  const [comparison, setComparison] = useState&lt;ComparisonResult | null&gt;(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState&lt;string | null&gt;(null)
+</file>
+
+<file path="app/api/compare/route.ts" start_line="44" end_line="64" description="API already supports branch params">
+    // If branch names provided, resolve to latest execution IDs
+    if (baselineBranch && !resolvedBaselineId) {
+      const baselineExecution = await db.getLatestExecutionByBranch(baselineBranch, suite)
+      if (!baselineExecution) {
+        return NextResponse.json(
+          { error: `No execution found for baseline branch: ${baselineBranch}` },
+          { status: 404 }
+        )
+      }
+      resolvedBaselineId = baselineExecution.id
+    }
+
+    if (currentBranch && !resolvedCurrentId) {
+      const currentExecution = await db.getLatestExecutionByBranch(currentBranch, suite)
+      if (!currentExecution) {
+        return NextResponse.json(
+          { error: `No execution found for current branch: ${currentBranch}` },
+          { status: 404 }
+        )
+      }
+      resolvedCurrentId = currentExecution.id
+    }
+</file>
+
+<file path="app/dashboard/compare/page.tsx" start_line="1" end_line="60" description="Page component fetches data">
+import { Suspense } from "react"
+import { CompareClient } from "./compare-client"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
+import { redirect } from "next/navigation"
+
+export const dynamic = "force-dynamic"
+
+interface ComparePageProps {
+  searchParams: Promise&lt;{
+    baseline?: string
+    current?: string
+    baseline_branch?: string
+    current_branch?: string
+    suite?: string
+  }&gt;
+}
+
+async function CompareContent({ searchParams }: ComparePageProps) {
+  const context = await getSessionContext()
+  if (!context) {
+    redirect("/auth/signin")
+  }
+
+  const db = getQueriesForOrg(context.organizationId)
+  const params = await searchParams
+
+  const [executions, branchStats, suiteStats] = await Promise.all([
+    db.getExecutions(50),
+    db.getBranches(),
+    db.getSuites(),
+  ])
+
+  // Extract names for backwards compatibility
+  const branches = branchStats.map((b) =&gt; b.branch)
+  const suites = suiteStats.map((s) =&gt; s.suite)
+
+  const initialBaseline = params.baseline ? parseInt(params.baseline, 10) : null
+  const initialCurrent = params.current ? parseInt(params.current, 10) : null
+
+  return (
+    &lt;CompareClient
+      executions={executions}
+      branches={branches}
+      suites={suites}
+      initialBaseline={initialBaseline}
+      initialCurrent={initialCurrent}
+      initialBaselineBranch={params.baseline_branch}
+      initialCurrentBranch={params.current_branch}
+      initialSuite={params.suite}
+    /&gt;
+  )
+}
+</file>
+
+<file path="lib/types.ts" start_line="26" end_line="33" description="BranchStatistics type">
+export interface BranchStatistics {
+  branch: string
+  last_run: string | null
+  execution_count: number
+  pass_rate: number
+  last_status: "success" | "failure" | "running" | null
+}
+</file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Add mode toggle tabs: "Branch Mode" and "Execution Mode"</requirement>
+    <requirement priority="must">Branch Mode shows BranchSelector components for baseline and current</requirement>
+    <requirement priority="must">Branch Mode includes optional suite filter dropdown</requirement>
+    <requirement priority="must">Branch Mode calls API with baseline_branch and current_branch params</requirement>
+    <requirement priority="must">Show resolved execution details in comparison header</requirement>
+    <requirement priority="must">Support URL params: ?mode=branch or ?mode=execution</requirement>
+    <requirement priority="must">Preserve backwards compatibility with existing ?baseline=&current= URLs</requirement>
+    <requirement priority="should">Set Branch Mode as default when no params present</requirement>
+    <requirement priority="should">Add proper error handling for branch not found</requirement>
+    <requirement priority="should">Add ARIA attributes for accessibility</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Smooth transition between modes</requirement>
+    <requirement>Preserve existing Execution Mode behavior exactly</requirement>
+    <requirement>Match existing glass-card aesthetic</requirement>
+    <requirement>Memoize callbacks to prevent unnecessary re-renders</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Update page.tsx to pass branchStats (full statistics) to CompareClient
+    2. Add CompareMode type and mode state (determine from URL params)
+    3. Add state for branch selection: baselineBranch, currentBranch, selectedSuite
+    4. Create mode toggle tabs at top of selection section
+    5. Render BranchSelector when in branch mode, ExecutionSelector when in execution mode
+    6. Modify fetchComparison to use branch params when in branch mode
+    7. Update URL params based on mode and selection
+  </approach>
+
+  <modification path="app/dashboard/compare/page.tsx" description="Pass branchStats to CompareClient">
+import { Suspense } from "react"
+import { CompareClient } from "./compare-client"
+import { getSessionContext } from "@/lib/session-context"
+import { getQueriesForOrg } from "@/lib/db"
+import { redirect } from "next/navigation"
+
+export const dynamic = "force-dynamic"
+
+interface ComparePageProps {
+  searchParams: Promise&lt;{
+    baseline?: string
+    current?: string
+    baseline_branch?: string
+    current_branch?: string
+    suite?: string
+    mode?: string
+  }&gt;
+}
+
+async function CompareContent({ searchParams }: ComparePageProps) {
+  const context = await getSessionContext()
+  if (!context) {
+    redirect("/auth/signin")
+  }
+
+  const db = getQueriesForOrg(context.organizationId)
+  const params = await searchParams
+
+  const [executions, branchStats, suiteStats] = await Promise.all([
+    db.getExecutions(50),
+    db.getBranches(),
+    db.getSuites(),
+  ])
+
+  // Extract names for backwards compatibility
+  const branches = branchStats.map((b) =&gt; b.branch)
+  const suites = suiteStats.map((s) =&gt; s.suite)
+
+  const initialBaseline = params.baseline ? parseInt(params.baseline, 10) : null
+  const initialCurrent = params.current ? parseInt(params.current, 10) : null
+  
+  // Determine initial mode from URL params
+  // If explicit execution IDs provided, use execution mode for backwards compat
+  // If branch params provided, use branch mode
+  // Otherwise default to branch mode
+  let initialMode: "branch" | "execution" = "branch"
+  if (params.mode === "execution" || (initialBaseline !== null && initialCurrent !== null)) {
+    initialMode = "execution"
+  } else if (params.mode === "branch" || params.baseline_branch || params.current_branch) {
+    initialMode = "branch"
+  }
+
+  return (
+    &lt;CompareClient
+      executions={executions}
+      branches={branches}
+      branchStats={branchStats}  {/* NEW: pass full stats */}
+      suites={suites}
+      initialBaseline={initialBaseline}
+      initialCurrent={initialCurrent}
+      initialBaselineBranch={params.baseline_branch}
+      initialCurrentBranch={params.current_branch}
+      initialSuite={params.suite}
+      initialMode={initialMode}  {/* NEW: pass initial mode */}
+    /&gt;
+  )
+}
+
+// ... rest of file (export, Suspense wrapper, etc.)
+  </modification>
+  
+  <fixed_code path="app/dashboard/compare/compare-client.tsx" language="typescript">
+"use client"
+
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import {
+  GitCompare,
+  ArrowLeftRight,
+  Loader2,
+  AlertCircle,
+  GitBranch,
+  List,
+} from "lucide-react"
+import type { TestExecution, ComparisonResult, BranchStatistics } from "@/lib/types"
+import { ExecutionSelector } from "@/components/dashboard/execution-selector"
+import { BranchSelector } from "@/components/dashboard/branch-selector"
+import { ComparisonSummaryCards } from "@/components/dashboard/comparison-summary-cards"
+import { TestDiffTable } from "@/components/dashboard/test-diff-table"
+
+type CompareMode = "branch" | "execution"
+
+interface CompareClientProps {
+  executions: TestExecution[]
+  branches: string[]
+  branchStats: BranchStatistics[]  // NEW: full branch statistics
+  suites: string[]
+  initialBaseline: number | null
+  initialCurrent: number | null
+  initialBaselineBranch?: string
+  initialCurrentBranch?: string
+  initialSuite?: string
+  initialMode?: CompareMode
+}
+
+export function CompareClient({
+  executions,
+  branches,
+  branchStats,
+  suites,
+  initialBaseline,
+  initialCurrent,
+  initialBaselineBranch,
+  initialCurrentBranch,
+  initialSuite,
+  initialMode = "branch",
+}: CompareClientProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Mode state
+  const [mode, setMode] = useState&lt;CompareMode&gt;(initialMode)
+
+  // Execution mode state
+  const [baselineId, setBaselineId] = useState&lt;number | null&gt;(initialBaseline)
+  const [currentId, setCurrentId] = useState&lt;number | null&gt;(initialCurrent)
+
+  // Branch mode state
+  const [baselineBranch, setBaselineBranch] = useState&lt;string | null&gt;(
+    initialBaselineBranch || null
+  )
+  const [currentBranch, setCurrentBranch] = useState&lt;string | null&gt;(
+    initialCurrentBranch || null
+  )
+  const [selectedSuite, setSelectedSuite] = useState&lt;string | null&gt;(
+    initialSuite || null
+  )
+
+  // Shared state
+  const [comparison, setComparison] = useState&lt;ComparisonResult | null&gt;(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState&lt;string | null&gt;(null)
+
+  // Update URL when selection changes (memoized to prevent recreations)
+  const updateUrl = useCallback(
+    (params: {
+      baseline?: number | null
+      current?: number | null
+      baselineBranch?: string | null
+      currentBranch?: string | null
+      suite?: string | null
+      mode?: CompareMode
+    }) => {
+      const urlParams = new URLSearchParams()
+      
+      if (params.mode) urlParams.set("mode", params.mode)
+      
+      if (params.mode === "execution") {
+        if (params.baseline) urlParams.set("baseline", params.baseline.toString())
+        if (params.current) urlParams.set("current", params.current.toString())
+      } else {
+        if (params.baselineBranch) urlParams.set("baseline_branch", params.baselineBranch)
+        if (params.currentBranch) urlParams.set("current_branch", params.currentBranch)
+        if (params.suite) urlParams.set("suite", params.suite)
+      }
+      
+      router.push(`/dashboard/compare?${urlParams.toString()}`, { scroll: false })
+    },
+    [router]
+  )
+
+  // Fetch comparison based on mode
+  const fetchComparison = useCallback(async () => {
+    // Branch mode: need both branches
+    if (mode === "branch") {
+      if (!baselineBranch || !currentBranch) {
+        setComparison(null)
+        setError(null)
+        return
+      }
+      
+      if (baselineBranch === currentBranch) {
+        setError("Cannot compare a branch with itself")
+        setComparison(null)
+        return
+      }
+    } else {
+      // Execution mode: need both IDs
+      if (!baselineId || !currentId) {
+        setComparison(null)
+        setError(null)
+        return
+      }
+      
+      if (baselineId === currentId) {
+        setError("Cannot compare an execution with itself")
+        setComparison(null)
+        return
+      }
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      // Build URL based on mode
+      const params = new URLSearchParams()
+      
+      if (mode === "branch") {
+        params.set("baseline_branch", baselineBranch!)
+        params.set("current_branch", currentBranch!)
+        if (selectedSuite) {
+          params.set("suite", selectedSuite)
+        }
+      } else {
+        params.set("baseline", baselineId!.toString())
+        params.set("current", currentId!.toString())
+      }
+
+      const res = await fetch(`/api/compare?${params.toString()}`)
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to compare")
+      }
+
+      setComparison(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred")
+      setComparison(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [mode, baselineBranch, currentBranch, selectedSuite, baselineId, currentId])
+
+  // Fetch comparison when dependencies change
+  useEffect(() => {
+    fetchComparison()
+  }, [fetchComparison])
+
+  // Handle mode switch
+  const handleModeChange = useCallback((newMode: CompareMode) => {
+    setMode(newMode)
+    setComparison(null)
+    setError(null)
+    updateUrl({ mode: newMode })
+  }, [updateUrl])
+
+  // Handle branch selection
+  const handleBaselineBranchChange = useCallback((branch: string | null) => {
+    setBaselineBranch(branch)
+    updateUrl({ 
+      mode, 
+      baselineBranch: branch, 
+      currentBranch, 
+      suite: selectedSuite 
+    })
+  }, [mode, currentBranch, selectedSuite, updateUrl])
+
+  const handleCurrentBranchChange = useCallback((branch: string | null) => {
+    setCurrentBranch(branch)
+    updateUrl({ 
+      mode, 
+      baselineBranch, 
+      currentBranch: branch, 
+      suite: selectedSuite 
+    })
+  }, [mode, baselineBranch, selectedSuite, updateUrl])
+
+  // Handle execution selection
+  const handleBaselineChange = useCallback((id: number | null) => {
+    setBaselineId(id)
+    updateUrl({ mode, baseline: id, current: currentId })
+  }, [mode, currentId, updateUrl])
+
+  const handleCurrentChange = useCallback((id: number | null) => {
+    setCurrentId(id)
+    updateUrl({ mode, baseline: baselineId, current: id })
+  }, [mode, baselineId, updateUrl])
+
+  // Swap branches or executions
+  const handleSwap = useCallback(() => {
+    if (mode === "branch") {
+      const temp = baselineBranch
+      setBaselineBranch(currentBranch)
+      setCurrentBranch(temp)
+      updateUrl({ mode, baselineBranch: currentBranch, currentBranch: temp, suite: selectedSuite })
+    } else {
+      const temp = baselineId
+      setBaselineId(currentId)
+      setCurrentId(temp)
+      updateUrl({ mode, baseline: currentId, current: temp })
+    }
+  }, [mode, baselineBranch, currentBranch, baselineId, currentId, selectedSuite, updateUrl])
+
+  // Check if comparison can be made
+  const canCompare = useMemo(() => {
+    if (mode === "branch") {
+      return baselineBranch && currentBranch && baselineBranch !== currentBranch
+    }
+    return baselineId && currentId && baselineId !== currentId
+  }, [mode, baselineBranch, currentBranch, baselineId, currentId])
+
+  return (
+    <div className="space-y-6">
+      {/* Mode Toggle Tabs */}
+      <div 
+        className="flex gap-1 p-1 bg-muted/30 rounded-lg w-fit"
+        role="tablist"
+        aria-label="Comparison mode"
+      >
+        <button
+          role="tab"
+          aria-selected={mode === "branch"}
+          aria-controls="branch-mode-panel"
+          onClick={() => handleModeChange("branch")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            mode === "branch"
+              ? "bg-[oklch(0.75_0.15_195)] text-white"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
+          <GitBranch className="h-4 w-4" aria-hidden="true" />
+          Branch Mode
+        </button>
+        <button
+          role="tab"
+          aria-selected={mode === "execution"}
+          aria-controls="execution-mode-panel"
+          onClick={() => handleModeChange("execution")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            mode === "execution"
+              ? "bg-[oklch(0.75_0.15_195)] text-white"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
+          <List className="h-4 w-4" aria-hidden="true" />
+          Execution Mode
+        </button>
+      </div>
+
+      {/* Selection Section */}
+      {mode === "branch" ? (
+        <div 
+          id="branch-mode-panel"
+          role="tabpanel"
+          aria-labelledby="branch-mode-tab"
+          className="space-y-4"
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1fr_auto_1fr]">
+            {/* Baseline Branch Selector */}
+            <BranchSelector
+              label="Baseline Branch (Before)"
+              value={baselineBranch}
+              onChange={handleBaselineBranchChange}
+              branches={branchStats}
+            />
+
+            {/* Swap Button */}
+            <div className="hidden items-center justify-center lg:flex">
+              <button
+                onClick={handleSwap}
+                disabled={!baselineBranch || !currentBranch}
+                aria-label="Swap baseline and current branches"
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArrowLeftRight className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Current Branch Selector */}
+            <BranchSelector
+              label="Current Branch (After)"
+              value={currentBranch}
+              onChange={handleCurrentBranchChange}
+              branches={branchStats}
+            />
+          </div>
+
+          {/* Suite Filter (optional) */}
+          <div className="flex items-center gap-3">
+            <label 
+              htmlFor="suite-filter"
+              className="text-sm text-muted-foreground"
+            >
+              Filter by suite:
+            </label>
+            <select
+              id="suite-filter"
+              value={selectedSuite || ""}
+              onChange={(e) => {
+                const value = e.target.value || null
+                setSelectedSuite(value)
+                updateUrl({ mode, baselineBranch, currentBranch, suite: value })
+              }}
+              className="rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[oklch(0.75_0.15_195)]"
+            >
+              <option value="">All Suites</option>
+              {suites.map((suite) => (
+                <option key={suite} value={suite}>
+                  {suite}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Comparison Info */}
+          {baselineBranch && currentBranch && (
+            <div className="glass-card p-3 text-sm text-muted-foreground" role="status">
+              <p>
+                Comparing <span className="font-medium text-foreground">{baselineBranch}</span>'s 
+                latest run with <span className="font-medium text-foreground">{currentBranch}</span>'s 
+                latest run
+                {selectedSuite && (
+                  <> (filtered to <span className="font-medium">{selectedSuite}</span> suite)</>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Execution Mode - existing selectors */
+        <div 
+          id="execution-mode-panel"
+          role="tabpanel"
+          aria-labelledby="execution-mode-tab"
+          className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-[1fr_auto_1fr]"
+        >
+          <ExecutionSelector
+            label="Baseline (Before)"
+            value={baselineId}
+            onChange={handleBaselineChange}
+            executions={executions}
+          />
+          <div className="hidden items-center justify-center lg:flex">
+            <button
+              onClick={handleSwap}
+              disabled={!baselineId || !currentId}
+              aria-label="Swap baseline and current executions"
+              className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowLeftRight className="h-5 w-5" />
+            </button>
+          </div>
+          <ExecutionSelector
+            label="Current (After)"
+            value={currentId}
+            onChange={handleCurrentChange}
+            executions={executions}
+          />
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12" role="status" aria-live="polite">
+          <Loader2 className="h-8 w-8 animate-spin text-[oklch(0.75_0.15_195)]" aria-hidden="true" />
+          <span className="sr-only">Loading comparison...</span>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <div className="glass-card p-6" role="alert">
+          <div className="flex items-center gap-3 text-red-400">
+            <AlertCircle className="h-5 w-5" aria-hidden="true" />
+            <p>{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && !comparison && (
+        <div className="glass-card p-12 text-center">
+          <GitCompare className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden="true" />
+          <h3 className="mt-4 text-lg font-medium">
+            {mode === "branch" ? "Select Two Branches" : "Select Two Executions"}
+          </h3>
+          <p className="mt-2 text-muted-foreground">
+            {mode === "branch"
+              ? "Choose baseline and current branches to compare their latest test results."
+              : "Choose a baseline and current execution to compare their test results."}
+          </p>
+        </div>
+      )}
+
+      {/* Comparison Results */}
+      {!loading && !error && comparison && (
+        <>
+          {/* Execution Info Header */}
+          <div className="glass-card p-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]">
+              <div className="text-center md:text-left">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Baseline
+                </p>
+                <p className="mt-1 font-mono text-sm">
+                  {comparison.baseline.branch} •{" "}
+                  <span className="text-muted-foreground">
+                    {comparison.baseline.commitSha.slice(0, 7)}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(comparison.baseline.startedAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center justify-center">
+                <ArrowLeftRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+              </div>
+              <div className="text-center md:text-right">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Current
+                </p>
+                <p className="mt-1 font-mono text-sm">
+                  {comparison.current.branch} •{" "}
+                  <span className="text-muted-foreground">
+                    {comparison.current.commitSha.slice(0, 7)}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(comparison.current.startedAt).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <ComparisonSummaryCards summary={comparison.summary} />
+
+          {/* Test Diff Table */}
+          <TestDiffTable tests={comparison.tests} />
+        </>
+      )}
+    </div>
+  )
+}
+  </fixed_code>
+</solution>
+
+<verification>
+  <test type="manual" description="Test Branch Mode default">
+    <steps>
+      <step>1. Navigate to /dashboard/compare (no params)</step>
+      <step>2. Verify "Branch Mode" tab is active by default</step>
+      <step>3. Verify BranchSelector components are shown</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test Branch Mode comparison">
+    <steps>
+      <step>1. Select "main" as baseline branch</step>
+      <step>2. Select a feature branch as current</step>
+      <step>3. Verify URL updates to ?mode=branch&baseline_branch=main&current_branch=feature</step>
+      <step>4. Verify comparison loads automatically</step>
+      <step>5. Verify execution info header shows correct branches and commits</step>
+      <step>6. Test suite filter dropdown</step>
+      <step>7. Test swap button</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test Execution Mode">
+    <steps>
+      <step>1. Click "Execution Mode" tab</step>
+      <step>2. Verify ExecutionSelector components appear</step>
+      <step>3. Select two executions</step>
+      <step>4. Verify URL updates to ?mode=execution&baseline=123&current=456</step>
+      <step>5. Verify comparison works as before</step>
+    </steps>
+  </test>
+
+  <test type="url" description="Test backwards compatibility">
+    <steps>
+      <step>1. Navigate to /dashboard/compare?baseline=1&current=2</step>
+      <step>2. Verify it opens in Execution Mode with those IDs selected</step>
+      <step>3. Verify comparison loads correctly</step>
+    </steps>
+  </test>
+
+  <test type="url" description="Test branch URL params">
+    <steps>
+      <step>1. Navigate to /dashboard/compare?baseline_branch=main&current_branch=feature</step>
+      <step>2. Verify it opens in Branch Mode with those branches selected</step>
+      <step>3. Verify comparison loads correctly</step>
+    </steps>
+  </test>
+
+  <test type="error" description="Test error handling">
+    <steps>
+      <step>1. Select a branch with no executions</step>
+      <step>2. Verify error message appears: "No execution found for branch: X"</step>
+      <step>3. Select same branch for both baseline and current</step>
+      <step>4. Verify error: "Cannot compare a branch with itself"</step>
+    </steps>
+  </test>
+
+  <test type="build" description="Verify TypeScript compilation">
+    <command>npx tsc --noEmit</command>
+    <expected>No type errors</expected>
+  </test>
+</verification>
+
+<behavioral_rules>
+  <always>
+    <rule>Default to Branch Mode for new users (no URL params)</rule>
+    <rule>Preserve backwards compatibility with ?baseline=&current= URLs</rule>
+    <rule>Update URL params for deep linking and sharing</rule>
+    <rule>Show clear feedback about what's being compared</rule>
+    <rule>Memoize callbacks to prevent unnecessary re-renders</rule>
+    <rule>Handle API errors gracefully</rule>
+  </always>
+  <never>
+    <rule>Never break existing Execution Mode functionality</rule>
+    <rule>Never break existing URL param support</rule>
+    <rule>Never hide the mode toggle (users should always be able to switch)</rule>
+    <rule>Never auto-compare without both branches/executions selected</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    1. Modify `app/dashboard/compare/page.tsx` to pass branchStats and initialMode props
+    2. Modify `app/dashboard/compare/compare-client.tsx` with mode toggle and branch selection
+  </structure>
+  <validation>
+    After implementation:
+    1. Test both modes work independently
+    2. Verify URL params persist across page refreshes
+    3. Verify backwards compatibility with old URLs
+    4. Verify comparison results match whether using branch or execution mode
+  </validation>
+</output_format>

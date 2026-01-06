@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Compare Page Improvement - Task 03
+  Create Branch Selector Component with Statistics
+  Created: 2026-01-06
+  Priority: P1 (Medium-High)
+  Status: Not Started
+  
+  PRODUCTION-READY: This prompt includes:
+  - Proper TypeScript types imported from lib/types.ts
+  - Memoization for performance
+  - Accessibility attributes
+  - Error boundaries consideration
+  - date-fns for reliable date formatting
+-->
+
+<task type="generate">
+  <objective>
+    Create a new BranchSelector component that displays branches with their statistics 
+    (pass rate, last run, execution count) and enables quick branch selection for the 
+    branch-first comparison workflow. This component is simpler than ExecutionSelector 
+    and focused on selecting branches rather than individual executions.
+  </objective>
+  <language>TypeScript/React</language>
+  <framework>Next.js with React hooks</framework>
+</task>
+
+<context>
+  <project_type>E2E Test Dashboard - Compare Page Enhancement</project_type>
+  <background>
+    The branch-first comparison workflow requires users to select two branches (baseline 
+    and current) rather than individual executions. The system then automatically uses 
+    the latest execution from each branch for comparison.
+    
+    The existing `getBranches()` function already returns statistics for each branch:
+    - branch: string (branch name)
+    - last_run: string | null (ISO timestamp of most recent execution)
+    - execution_count: number (total executions on this branch)
+    - pass_rate: number (0-100 percentage)
+    - last_status: "success" | "failure" | "running" | null
+    
+    This data is already available via the `/api/executions` endpoint which returns
+    `branches` (names only) and the full `branchStats` can be exposed.
+    
+    NOTE: The BranchStatistics type already exists in lib/types.ts
+  </background>
+  <audience>
+    - Dashboard users comparing branches
+    - Developers wanting quick "compare my branch vs main" workflow
+  </audience>
+  <impact>
+    MEDIUM - Provides the UI foundation for branch-first comparison mode
+  </impact>
+</context>
+
+<existing_code language="typescript">
+<file path="lib/types.ts" start_line="26" end_line="33" description="BranchStatistics type already exists">
+export interface BranchStatistics {
+  branch: string
+  last_run: string | null
+  execution_count: number
+  pass_rate: number
+  last_status: "success" | "failure" | "running" | null
+}
+</file>
+
+<file path="lib/db.ts" start_line="607" end_line="660" description="getBranches function returns full statistics">
+export async function getBranches(
+  organizationId: number,
+  days: number = 30
+): Promise&lt;BranchStatistics[]&gt; {
+  // ... returns array with branch, last_run, execution_count, pass_rate, last_status
+}
+</file>
+
+<file path="app/api/executions/route.ts" start_line="27" end_line="37" description="API already fetches branchStats">
+    const [executions, branchStats, suiteStats] = await Promise.all([
+      db.getExecutions(limit, 0, status, branch, dateRange, suite),
+      db.getBranches(),
+      db.getSuites(),
+    ])
+
+    // Extract names for dropdown filters (backwards compatible)
+    const branches = branchStats.map((b) => b.branch)
+    const suites = suiteStats.map((s) => s.suite)
+
+    return NextResponse.json({ executions, branches, suites })
+</file>
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">Create searchable dropdown for branch selection</requirement>
+    <requirement priority="must">Import BranchStatistics from lib/types.ts (don't redefine)</requirement>
+    <requirement priority="must">Display pass rate as colored badge (green ≥80%, yellow 50-79%, red &lt;50%)</requirement>
+    <requirement priority="must">Show last run timestamp formatted as relative time (e.g., "2 hours ago")</requirement>
+    <requirement priority="must">Show execution count per branch</requirement>
+    <requirement priority="must">Show last_status indicator (colored dot)</requirement>
+    <requirement priority="must">Add ARIA attributes for accessibility</requirement>
+    <requirement priority="should">Support keyboard navigation (arrow keys, Enter to select)</requirement>
+    <requirement priority="should">Highlight "main" or "master" branch as primary option</requirement>
+    <requirement priority="could">Add "Quick compare with main" shortcut button</requirement>
+  </functional>
+  <non_functional>
+    <requirement>Match glass-card aesthetic of existing components</requirement>
+    <requirement>Filter instantly on client-side (branches are already loaded)</requirement>
+    <requirement>Memoize filtering and sorting for performance</requirement>
+    <requirement>Handle empty/null values gracefully</requirement>
+  </non_functional>
+</requirements>
+
+<solution>
+  <approach>
+    1. Create a new BranchSelector component similar to ExecutionSelector
+    2. Import BranchStatistics type from lib/types.ts
+    3. Accept branches array with statistics as prop
+    4. Use date-fns formatDistanceToNow for relative time
+    5. Memoize filtered and sorted branches
+    6. Add ARIA attributes for accessibility
+    7. Add keyboard navigation support
+  </approach>
+  
+  <new_file path="components/dashboard/branch-selector.tsx">
+"use client"
+
+import { useState, useEffect, useRef, useMemo, useCallback, KeyboardEvent } from "react"
+import {
+  ChevronDown,
+  GitBranch,
+  Check,
+  X,
+  Clock,
+  Hash,
+} from "lucide-react"
+import { formatDistanceToNow } from "date-fns"
+import type { BranchStatistics } from "@/lib/types"
+
+interface BranchSelectorProps {
+  /** Label for the selector (e.g., "Baseline Branch") */
+  label: string
+  /** Currently selected branch name, or null if none selected */
+  value: string | null
+  /** Callback when selection changes */
+  onChange: (branch: string | null) => void
+  /** Array of branches with their statistics */
+  branches: BranchStatistics[]
+  /** Whether the selector is disabled */
+  disabled?: boolean
+  /** Show "Quick compare with main" button */
+  showQuickCompare?: boolean
+  /** Callback for quick compare action */
+  onQuickCompareWithMain?: () => void
+}
+
+const STATUS_COLORS: Record&lt;string, string&gt; = {
+  success: "bg-green-500",
+  failure: "bg-red-500",
+  running: "bg-yellow-500",
+}
+
+/**
+ * Get appropriate color classes for pass rate badge
+ */
+function getPassRateColor(passRate: number): string {
+  if (passRate >= 80) return "text-green-400 bg-green-500/10"
+  if (passRate >= 50) return "text-yellow-400 bg-yellow-500/10"
+  return "text-red-400 bg-red-500/10"
+}
+
+/**
+ * Format last run time as human-readable relative time
+ */
+function formatLastRun(lastRun: string | null): string {
+  if (!lastRun) return "No runs"
+  try {
+    return formatDistanceToNow(new Date(lastRun), { addSuffix: true })
+  } catch {
+    return "Unknown"
+  }
+}
+
+export function BranchSelector({
+  label,
+  value,
+  onChange,
+  branches,
+  disabled = false,
+  showQuickCompare = false,
+  onQuickCompareWithMain,
+}: BranchSelectorProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const dropdownRef = useRef&lt;HTMLDivElement&gt;(null)
+  const searchInputRef = useRef&lt;HTMLInputElement&gt;(null)
+  const listRef = useRef&lt;HTMLDivElement&gt;(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+        setHighlightedIndex(-1)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      searchInputRef.current.focus()
+      setHighlightedIndex(-1)
+    }
+  }, [isOpen])
+
+  // Get the selected branch's statistics
+  const selectedBranch = useMemo(
+    () => branches.find((b) => b.branch === value),
+    [branches, value]
+  )
+
+  // Filter branches by search term (memoized)
+  const filteredBranches = useMemo(() => {
+    if (!search) return branches
+    const searchLower = search.toLowerCase()
+    return branches.filter((b) => 
+      b.branch.toLowerCase().includes(searchLower)
+    )
+  }, [branches, search])
+
+  // Sort: "main" or "master" first, then by last_run (memoized)
+  const sortedBranches = useMemo(() => {
+    return [...filteredBranches].sort((a, b) => {
+      const isAMain = a.branch === "main" || a.branch === "master"
+      const isBMain = b.branch === "main" || b.branch === "master"
+      if (isAMain && !isBMain) return -1
+      if (!isAMain && isBMain) return 1
+      
+      // Then sort by last_run (most recent first)
+      if (!a.last_run) return 1
+      if (!b.last_run) return -1
+      return new Date(b.last_run).getTime() - new Date(a.last_run).getTime()
+    })
+  }, [filteredBranches])
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback((e: KeyboardEvent&lt;HTMLInputElement&gt;) => {
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault()
+        setHighlightedIndex((prev) => 
+          prev &lt; sortedBranches.length - 1 ? prev + 1 : prev
+        )
+        break
+      case "ArrowUp":
+        e.preventDefault()
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev))
+        break
+      case "Enter":
+        e.preventDefault()
+        if (highlightedIndex >= 0 && highlightedIndex &lt; sortedBranches.length) {
+          handleSelect(sortedBranches[highlightedIndex].branch)
+        }
+        break
+      case "Escape":
+        e.preventDefault()
+        setIsOpen(false)
+        setHighlightedIndex(-1)
+        break
+    }
+  }, [sortedBranches, highlightedIndex])
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && listRef.current) {
+      const items = listRef.current.querySelectorAll('[role="option"]')
+      items[highlightedIndex]?.scrollIntoView({ block: "nearest" })
+    }
+  }, [highlightedIndex])
+
+  const handleSelect = useCallback((branch: string) => {
+    onChange(branch)
+    setIsOpen(false)
+    setSearch("")
+    setHighlightedIndex(-1)
+  }, [onChange])
+
+  const handleClear = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    onChange(null)
+  }, [onChange])
+
+  const labelId = `branch-selector-${label.replace(/\s+/g, "-").toLowerCase()}-label`
+  const listboxId = `branch-selector-${label.replace(/\s+/g, "-").toLowerCase()}-listbox`
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <label 
+        id={labelId}
+        className="mb-2 block text-sm font-medium text-muted-foreground"
+      >
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-labelledby={labelId}
+        aria-controls={isOpen ? listboxId : undefined}
+        className={`flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50 ${
+          disabled ? "cursor-not-allowed opacity-50" : ""
+        } ${isOpen ? "ring-2 ring-[oklch(0.75_0.15_195)]" : ""}`}
+      >
+        {selectedBranch ? (
+          <div className="flex items-center gap-2 min-w-0">
+            <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-medium">{selectedBranch.branch}</p>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-xs font-medium ${getPassRateColor(
+                    selectedBranch.pass_rate
+                  )}`}
+                  aria-label={`Pass rate: ${selectedBranch.pass_rate}%`}
+                >
+                  {selectedBranch.pass_rate}%
+                </span>
+              </div>
+              <p className="truncate text-xs text-muted-foreground">
+                {selectedBranch.execution_count} runs • {formatLastRun(selectedBranch.last_run)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">Select a branch...</span>
+        )}
+        <div className="flex items-center gap-1">
+          {value && (
+            <button
+              type="button"
+              onClick={handleClear}
+              aria-label="Clear selection"
+              className="rounded p-1 hover:bg-muted/50"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground transition-transform ${
+              isOpen ? "rotate-180" : ""
+            }`}
+            aria-hidden="true"
+          />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div 
+          className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-background shadow-lg"
+        >
+          {/* Search input */}
+          <div className="border-b border-border p-2">
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search branches..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setHighlightedIndex(-1)
+              }}
+              onKeyDown={handleKeyDown}
+              aria-label="Search branches"
+              aria-controls={listboxId}
+              aria-activedescendant={
+                highlightedIndex >= 0 
+                  ? `branch-option-${sortedBranches[highlightedIndex]?.branch}` 
+                  : undefined
+              }
+              className="w-full rounded-md bg-muted/30 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-[oklch(0.75_0.15_195)]"
+            />
+          </div>
+
+          {/* Quick compare button */}
+          {showQuickCompare && onQuickCompareWithMain && (
+            <div className="border-b border-border p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onQuickCompareWithMain()
+                  setIsOpen(false)
+                }}
+                className="w-full rounded-md bg-[oklch(0.75_0.15_195)]/10 px-3 py-2 text-sm text-[oklch(0.75_0.15_195)] hover:bg-[oklch(0.75_0.15_195)]/20 transition-colors"
+              >
+                Quick compare with main
+              </button>
+            </div>
+          )}
+
+          {/* Branch list */}
+          <div 
+            ref={listRef}
+            id={listboxId}
+            role="listbox"
+            aria-labelledby={labelId}
+            className="max-h-72 overflow-y-auto p-1"
+          >
+            {sortedBranches.length === 0 ? (
+              <p className="p-4 text-center text-sm text-muted-foreground" role="status">
+                No branches found
+              </p>
+            ) : (
+              sortedBranches.map((branch, index) => (
+                <button
+                  key={branch.branch}
+                  id={`branch-option-${branch.branch}`}
+                  type="button"
+                  role="option"
+                  aria-selected={branch.branch === value}
+                  onClick={() => handleSelect(branch.branch)}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left transition-colors ${
+                    branch.branch === value 
+                      ? "bg-muted/30" 
+                      : index === highlightedIndex 
+                        ? "bg-muted/20" 
+                        : "hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    {/* Status indicator */}
+                    <div
+                      className={`h-2 w-2 rounded-full shrink-0 ${
+                        branch.last_status
+                          ? STATUS_COLORS[branch.last_status]
+                          : "bg-gray-500"
+                      }`}
+                      aria-label={`Last status: ${branch.last_status || "unknown"}`}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm truncate">
+                          {branch.branch}
+                        </span>
+                        {(branch.branch === "main" || branch.branch === "master") && (
+                          <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                            default
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Hash className="h-3 w-3" aria-hidden="true" />
+                          <span>{branch.execution_count} runs</span>
+                        </div>
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" aria-hidden="true" />
+                          <span>{formatLastRun(branch.last_run)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Pass rate badge */}
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-xs font-medium ${getPassRateColor(
+                        branch.pass_rate
+                      )}`}
+                    >
+                      {branch.pass_rate}%
+                    </span>
+                    {branch.branch === value && (
+                      <Check className="h-4 w-4 text-[oklch(0.75_0.15_195)]" aria-hidden="true" />
+                    )}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+  </new_file>
+</solution>
+
+<verification>
+  <test type="manual" description="Test branch selector visual">
+    <steps>
+      <step>1. Import BranchSelector into the compare page</step>
+      <step>2. Pass branchStats from API response</step>
+      <step>3. Verify dropdown opens on click</step>
+      <step>4. Verify pass rate badges have correct colors (green/yellow/red)</step>
+      <step>5. Verify "main" or "master" appears first with "default" badge</step>
+      <step>6. Verify last run shows relative time format ("2 hours ago")</step>
+      <step>7. Verify status dot colors match branch status</step>
+    </steps>
+  </test>
+
+  <test type="manual" description="Test search functionality">
+    <steps>
+      <step>1. Open dropdown</step>
+      <step>2. Type in search box</step>
+      <step>3. Verify branches are filtered correctly</step>
+      <step>4. Clear search, verify all branches return</step>
+    </steps>
+  </test>
+
+  <test type="accessibility" description="Test keyboard navigation">
+    <steps>
+      <step>1. Tab to selector, press Enter to open</step>
+      <step>2. Use ArrowDown/ArrowUp to navigate</step>
+      <step>3. Verify highlighted item scrolls into view</step>
+      <step>4. Press Enter to select</step>
+      <step>5. Press Escape to close without selecting</step>
+    </steps>
+  </test>
+
+  <test type="build" description="Verify TypeScript compilation">
+    <command>npx tsc --noEmit</command>
+    <expected>No type errors</expected>
+  </test>
+</verification>
+
+<behavioral_rules>
+  <always>
+    <rule>Import BranchStatistics from lib/types.ts (don't redefine)</rule>
+    <rule>Show "main" or "master" branch as primary option at top</rule>
+    <rule>Display pass rate with appropriate color coding</rule>
+    <rule>Format timestamps as human-readable relative time</rule>
+    <rule>Match existing glass-card aesthetic</rule>
+    <rule>Memoize expensive computations</rule>
+    <rule>Include ARIA attributes for accessibility</rule>
+  </always>
+  <never>
+    <rule>Never redefine types that already exist in lib/types.ts</rule>
+    <rule>Never show branches without statistics</rule>
+    <rule>Never make the dropdown difficult to close</rule>
+    <rule>Never break keyboard navigation</rule>
+  </never>
+</behavioral_rules>
+
+<output_format>
+  <structure>
+    Create new file: `components/dashboard/branch-selector.tsx`
+    The component is self-contained and reusable.
+  </structure>
+  <validation>
+    After implementation:
+    1. Import and render in compare page
+    2. Verify styling matches ExecutionSelector
+    3. Test search and selection functionality
+    4. Test keyboard navigation
+    5. Run with screen reader to verify accessibility
+  </validation>
+</output_format>
