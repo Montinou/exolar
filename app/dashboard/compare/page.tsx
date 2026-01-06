@@ -20,6 +20,7 @@ interface CompareContentProps {
     baseline_branch?: string
     current_branch?: string
     suite?: string
+    mode?: string
   }>
 }
 
@@ -47,16 +48,29 @@ async function CompareContent({ searchParams }: CompareContentProps) {
   const initialBaseline = params.baseline ? parseInt(params.baseline, 10) : null
   const initialCurrent = params.current ? parseInt(params.current, 10) : null
 
+  // Determine initial mode from URL params
+  // If explicit execution IDs provided, use execution mode for backwards compat
+  // If branch params provided, use branch mode
+  // Otherwise default to branch mode
+  let initialMode: "branch" | "execution" = "branch"
+  if (params.mode === "execution" || (initialBaseline !== null && initialCurrent !== null)) {
+    initialMode = "execution"
+  } else if (params.mode === "branch" || params.baseline_branch || params.current_branch) {
+    initialMode = "branch"
+  }
+
   return (
     <CompareClient
       executions={executions}
       branches={branches}
+      branchStats={branchStats}
       suites={suites}
       initialBaseline={initialBaseline}
       initialCurrent={initialCurrent}
       initialBaselineBranch={params.baseline_branch}
       initialCurrentBranch={params.current_branch}
       initialSuite={params.suite}
+      initialMode={initialMode}
     />
   )
 }
