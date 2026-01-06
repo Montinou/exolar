@@ -60,7 +60,8 @@ export async function getExecutions(
   status?: string,
   branch?: string,
   dateRange?: DateRangeFilter,
-  suite?: string
+  suite?: string,
+  runId?: string
 ) {
   const sql = getSql()
   const conditions = [`organization_id = ${organizationId}`]
@@ -75,6 +76,10 @@ export async function getExecutions(
 
   if (suite) {
     conditions.push(`suite = '${suite}'`)
+  }
+
+  if (runId) {
+    conditions.push(`run_id = '${runId}'`)
   }
 
   if (dateRange?.from) {
@@ -1188,10 +1193,11 @@ export async function getFailuresWithAIContext(
     since?: string
     executionId?: number
     requireAIContext?: boolean
+    runId?: string
   } = {}
 ): Promise<TestResult[]> {
   const sql = getSql()
-  const { errorType, testFile, limit = 50, offset = 0, since, executionId, requireAIContext = false } = options
+  const { errorType, testFile, limit = 50, offset = 0, since, executionId, requireAIContext = false, runId } = options
 
   const conditions = [
     "tr.status IN ('failed', 'timedout')",
@@ -1217,6 +1223,10 @@ export async function getFailuresWithAIContext(
 
   if (executionId) {
     conditions.push(`tr.execution_id = ${executionId}`)
+  }
+
+  if (runId) {
+    conditions.push(`te.run_id = '${runId}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`

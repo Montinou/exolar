@@ -5,12 +5,12 @@
 // - R2_SECRET_ACCESS_KEY
 // - R2_BUCKET_NAME
 
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 let r2Client: S3Client | null = null
 
-function getR2Client() {
+export function getR2Client() {
   if (r2Client) return r2Client
 
   const accountId = process.env.R2_ACCOUNT_ID
@@ -106,3 +106,37 @@ export function generateArtifactKey(
 
   return `artifacts/${executionId}/${sanitizedSignature}/${type}/${filename}`
 }
+
+/**
+ * Delete a file or multiple files from R2
+ * @param keys Single key or array of keys to delete
+ */
+export async function deleteFromR2(keys: string | string[]): Promise<void> {
+  const client = getR2Client()
+  const bucketName = process.env.R2_BUCKET_NAME
+
+  if (!bucketName) {
+    throw new Error("Missing R2_BUCKET_NAME environment variable")
+  }
+
+  const keysArray = Array.isArray(keys) ? keys : [keys]
+  
+  if (keysArray.length === 0) return
+
+  // Delete in batches of 1000 (S3 limit)
+  const batchSize = 1000
+  for (let i = 0; i < keysArray.length; i += batchSize) {
+    const batch = keysArray.slice(i, i + batchSize)
+    
+    const command = new DeleteObjectsCommand({
+      Bucket: bucketName,
+      Delete: {
+        Objects: batch.map(key => ({ Key: key })),
+        Quiet: true
+      }
+    })
+
+    await client.send(command)
+  }
+}
+

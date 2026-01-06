@@ -43,6 +43,7 @@ Fields returned per execution:
         suite: { type: "string", description: "Filter by test suite" },
         from: { type: "string", description: "Start date (ISO 8601)" },
         to: { type: "string", description: "End date (ISO 8601)" },
+        run_id: { type: "string", description: "Filter by CI run ID (e.g., GitHub Actions run ID)" },
       },
     },
   },
@@ -154,6 +155,7 @@ Returns per test:
         limit: { type: "number", default: 20 },
         offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
         since: { type: "string", description: "Only failures since this date (ISO 8601)" },
+        run_id: { type: "string", description: "Filter by CI run ID" },
       },
     },
   },
@@ -643,6 +645,7 @@ export async function handleToolCall(
             suite: z.string().optional(),
             from: z.string().optional(),
             to: z.string().optional(),
+            run_id: z.string().optional(),
           })
           .parse(args)
 
@@ -653,7 +656,8 @@ export async function handleToolCall(
           input.status,
           input.branch,
           input.from && input.to ? { from: input.from, to: input.to } : undefined,
-          input.suite
+          input.suite,
+          input.run_id
         )
 
         return jsonResponse({
@@ -765,6 +769,7 @@ export async function handleToolCall(
             limit: z.number().min(1).max(100).default(20),
             offset: z.number().min(0).default(0),
             since: z.string().optional(),
+            run_id: z.string().optional(),
           })
           .parse(args)
 
@@ -775,6 +780,7 @@ export async function handleToolCall(
           limit: input.limit,
           offset: input.offset,
           since: input.since,
+          runId: input.run_id,
           // Only require AI context if filtering by error_type
           requireAIContext: !!input.error_type,
         })
