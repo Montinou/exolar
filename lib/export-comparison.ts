@@ -175,13 +175,21 @@ export function comparisonToJSON(comparison: ComparisonResult): string {
  * Creates a temporary anchor element and clicks it
  */
 export function downloadFile(content: string, filename: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
+  // Use File constructor if available for better filename handling
+  let url: string
+  try {
+    const file = new File([content], filename, { type: mimeType.split(';')[0] })
+    url = URL.createObjectURL(file)
+  } catch (e) {
+    // Fallback for environments where File constructor might have issues
+    const blob = new Blob([content], { type: mimeType.split(';')[0] })
+    url = URL.createObjectURL(blob)
+  }
   
   try {
     const link = document.createElement("a")
     link.href = url
-    link.download = filename
+    link.setAttribute("download", filename)
     link.style.display = "none"
     document.body.appendChild(link)
     link.click()

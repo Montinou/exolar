@@ -2201,10 +2201,14 @@ export async function compareExecutions(
       c.status as "currentStatus",
       b.duration_ms as "baselineDurationMs",
       c.duration_ms as "currentDurationMs",
-      (c.duration_ms - b.duration_ms) as "durationDeltaMs",
       CASE
-        WHEN b.duration_ms > 0 THEN
-          ROUND(((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100))::integer
+        WHEN b.duration_ms IS NOT NULL AND c.duration_ms IS NOT NULL THEN
+          (c.duration_ms::bigint - b.duration_ms::bigint)
+        ELSE NULL
+      END as "durationDeltaMs",
+      CASE
+        WHEN b.duration_ms IS NOT NULL AND b.duration_ms > 0 AND c.duration_ms IS NOT NULL THEN
+          ROUND(((c.duration_ms::float - b.duration_ms::float) / b.duration_ms::float * 100))::integer
         ELSE NULL
       END as "durationDeltaPercent",
       CASE
@@ -2217,9 +2221,9 @@ export async function compareExecutions(
       CASE
         WHEN b.test_signature IS NULL THEN NULL
         WHEN c.test_signature IS NULL THEN NULL
-        WHEN b.duration_ms IS NULL OR b.duration_ms = 0 THEN NULL
-        WHEN ((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100) > ${threshold} THEN 'regression'
-        WHEN ((c.duration_ms - b.duration_ms)::float / b.duration_ms * 100) < -${threshold} THEN 'improvement'
+        WHEN b.duration_ms IS NULL OR b.duration_ms = 0 OR c.duration_ms IS NULL THEN NULL
+        WHEN ((c.duration_ms::float - b.duration_ms::float) / b.duration_ms::float * 100) > ${threshold}::float THEN 'regression'
+        WHEN ((c.duration_ms::float - b.duration_ms::float) / b.duration_ms::float * 100) < (0::float - ${threshold}::float) THEN 'improvement'
         ELSE 'stable'
       END as "durationCategory"
     FROM baseline_tests b

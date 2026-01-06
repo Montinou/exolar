@@ -224,15 +224,21 @@ export function ExecutionSelector({
       >
         {label}
       </label>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+        onKeyDown={(e) => {
+          if (!disabled && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault()
+            setIsOpen(!isOpen)
+          }
+        }}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-labelledby={`${label}-label`}
-        className={`flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50 ${
-          disabled ? "cursor-not-allowed opacity-50" : ""
+        className={`flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50 cursor-pointer ${
+          disabled ? "cursor-not-allowed opacity-50 pointer-events-none" : ""
         } ${isOpen ? "ring-2 ring-[oklch(0.75_0.15_195)]" : ""}`}
       >
         {selectedExecution ? (
@@ -270,7 +276,7 @@ export function ExecutionSelector({
             }`}
           />
         </div>
-      </button>
+      </div>
 
       {isOpen && (
         <div 

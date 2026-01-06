@@ -107,7 +107,33 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("[API] Error comparing executions:", error)
-    const message = error instanceof Error ? error.message : "Failed to compare executions"
-    return NextResponse.json({ error: message }, { status: 500 })
+    
+    // Provide more specific error messages
+    let message = "Failed to compare executions"
+    let details: string | undefined
+    
+    if (error instanceof Error) {
+      message = error.message
+      
+      // Add context for common database errors
+      if (message.includes("operator is not unique")) {
+        message = "Database type error in comparison query"
+        details = "A SQL operator could not resolve type ambiguity. This is a bug - please report it."
+      } else if (message.includes("not found")) {
+        // Execution not found errors are already clear
+      } else if (message.includes("connection")) {
+        message = "Database connection error"
+        details = "Could not connect to the database. Please try again later."
+      }
+    }
+    
+    return NextResponse.json(
+      { 
+        error: message, 
+        details,
+        timestamp: new Date().toISOString()
+      }, 
+      { status: 500 }
+    )
   }
 }
