@@ -12,6 +12,7 @@ const coreTools = [
     category: "core" as const,
     parameters: [
       { name: "limit", type: "number", default: "20", description: "Max results (1-100)" },
+      { name: "offset", type: "number", default: "0", description: "Skip N results" },
       { name: "status", type: "string", description: "Filter: success | failure | running" },
       { name: "branch", type: "string", description: "Filter by branch name" },
       { name: "suite", type: "string", description: "Filter by test suite" },
@@ -59,6 +60,7 @@ const coreTools = [
     parameters: [
       { name: "query", type: "string", required: true, description: "Search term (min 2 chars)" },
       { name: "limit", type: "number", default: "20", description: "Max results" },
+      { name: "offset", type: "number", default: "0", description: "Skip N results" },
     ],
     responseFields: [
       "test_signature: string - Unique test identifier",
@@ -78,6 +80,7 @@ const coreTools = [
     parameters: [
       { name: "test_signature", type: "string", required: true, description: "Test signature (MD5 hash of file::name)" },
       { name: "limit", type: "number", default: "20", description: "Max results" },
+      { name: "offset", type: "number", default: "0", description: "Skip N results" },
     ],
     responseFields: [
       "execution_id: number - Parent execution ID",
@@ -103,6 +106,7 @@ const analysisTools = [
       { name: "error_type", type: "string", description: "Filter by error type (e.g., TimeoutError)" },
       { name: "test_file", type: "string", description: "Filter by file path (partial match)" },
       { name: "limit", type: "number", default: "20", description: "Max results" },
+      { name: "offset", type: "number", default: "0", description: "Skip N results" },
       { name: "since", type: "string", description: "Only failures since date (ISO 8601)" },
       { name: "run_id", type: "string", description: "Filter by CI run ID" },
     ],
@@ -160,6 +164,10 @@ const analysisTools = [
     category: "analysis" as const,
     parameters: [
       { name: "since", type: "string", description: "Only count errors since date (ISO 8601)" },
+      { name: "branch", type: "string", description: "Filter by branch name" },
+      { name: "suite", type: "string", description: "Filter by test suite" },
+      { name: "limit", type: "number", default: "10", description: "Max error types" },
+      { name: "group_by", type: "string", default: "error_type", description: "Group: error_type | file | branch" },
     ],
     responseFields: [
       "error_type: string - Error category",
