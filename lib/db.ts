@@ -98,6 +98,72 @@ export async function getExecutions(
   return result as TestExecution[]
 }
 
+/**
+ * Search executions by branch, commit SHA, or suite name.
+ * Uses ILIKE for case-insensitive partial matching.
+ * 
+ * @param organizationId - Organization to search within (multi-tenant isolation)
+ * @param query - Search term (minimum 2 characters)
+ * @param limit - Maximum results to return (default 20, max 50)
+ * @param branch - Optional: scope search to specific branch
+ * @param suite - Optional: scope search to specific suite
+ * @returns Array of matching executions, sorted by most recent first
+ */
+export async function searchExecutions(
+  organizationId: number,
+  query: string,
+  limit = 20,
+  branch?: string,
+  suite?: string
+): Promise<TestExecution[]> {
+  const sql = getSql()
+
+  // Validate minimum query length
+  if (!query || query.length < 2) {
+    return []
+  }
+
+  // Sanitize user input by escaping single quotes (prevent SQL injection)
+  const sanitizedQuery = query.replace(/'/g, "''")
+  const searchPattern = `%${sanitizedQuery}%`
+
+  // Build conditions array following existing pattern
+  const conditions = [`organization_id = ${organizationId}`]
+
+  // Add search condition: match branch, commit_sha, or suite
+  // Using ILIKE for case-insensitive search (PostgreSQL)
+  conditions.push(`(
+    branch ILIKE '${searchPattern}'
+    OR commit_sha ILIKE '${searchPattern}'
+    OR COALESCE(suite, '') ILIKE '${searchPattern}'
+  )`)
+
+  // Optional filters to scope the search
+  if (branch) {
+    const sanitizedBranch = branch.replace(/'/g, "''")
+    conditions.push(`branch = '${sanitizedBranch}'`)
+  }
+
+  if (suite) {
+    const sanitizedSuite = suite.replace(/'/g, "''")
+    conditions.push(`suite = '${sanitizedSuite}'`)
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  // Ensure limit is within bounds (1-50)
+  const safeLimit = Math.min(Math.max(1, limit), 50)
+
+  const result = await sql`
+    SELECT * FROM test_executions
+    ${sql.unsafe(whereClause)}
+    ORDER BY started_at DESC
+    LIMIT ${safeLimit}
+  `
+
+  return result as TestExecution[]
+}
+
 export async function getExecutionById(organizationId: number, id: number) {
   const sql = getSql()
   const result = await sql`SELECT * FROM test_executions WHERE id = ${id} AND organization_id = ${organizationId}`
@@ -2713,6 +2779,8 @@ export function getQueriesForOrg(organizationId: number) {
     // Search and history queries
     searchTests: (query: string, limit?: number, offset?: number) =>
       searchTests(organizationId, query, limit, offset),
+    searchExecutions: (query: string, limit?: number, branch?: string, suite?: string) =>
+      searchExecutions(organizationId, query, limit, branch, suite),
     getTestHistory: (signature: string, limit?: number, offset?: number) =>
       getTestHistory(organizationId, signature, limit, offset),
     getTestStatistics: (signature: string) =>
