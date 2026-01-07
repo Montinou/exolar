@@ -222,6 +222,11 @@ import {
   insertExecution,
   insertTestResults,
 } from "./ingestion"
+import {
+  getOrganizationMembers,
+  getOrgInvites,
+  isUserMemberOfOrg,
+} from "./orgs"
 
 /**
  * Create org-bound query functions.
@@ -325,5 +330,10 @@ export function getQueriesForOrg(organizationId: number) {
     // Failure classification (auto-triage)
     getFailureClassification: (options: ClassificationOptions) =>
       getFailureClassification(organizationId, options),
+
+    // Organization queries (org-bound)
+    getOrganizationMembers: () => getOrganizationMembers(organizationId),
+    getOrgInvites: () => getOrgInvites(organizationId),
+    isUserMemberOfOrg: (userId: number) => isUserMemberOfOrg(userId, organizationId),
   }
 }
