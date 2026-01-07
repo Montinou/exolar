@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 2: Migrate lib/db-wishlist.ts
+  Feature: remaining-db-refactoring
+  Phase: 02_migrate_wishlist
+
+  Goal: Move wishlist operations to lib/db/wishlist.ts
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Remaining Database Refactoring</name>
+    <folder>docs/prompts/remaining-db-refactoring</folder>
+    <phase>02_migrate_wishlist</phase>
+    <prompt_file>phases/02_migrate_wishlist.xml</prompt_file>
+  </feature>
+
+  <context>
+    <analysis_reference>investigation/analysis.md</analysis_reference>
+    <previous_phase>phases/01_migrate_orgs.xml</previous_phase>
+    <source_file>lib/db-wishlist.ts</source_file>
+    <target_file>lib/db/wishlist.ts</target_file>
+    <line_count>77</line_count>
+    <consumer_count>1</consumer_count>
+  </context>
+
+  <task>
+    <objective>Migrate lib/db-wishlist.ts to lib/db/wishlist.ts</objective>
+
+    <steps>
+      <step number="1" action="create">
+        <description>Create lib/db/wishlist.ts</description>
+        <details>
+          Copy contents from lib/db-wishlist.ts with these changes:
+          - Change import: `import { getSql } from "./connection"` (was "./db")
+          - Keep all functions exactly as-is
+        </details>
+        <code_template>
+          ```typescript
+          import { getSql } from "./connection"
+
+          /**
+           * Add an email to the wishlist
+           * Returns { success: true } if added, { success: false, reason: string } if failed
+           */
+          export async function addToWishlist(
+            email: string,
+            name?: string
+          ): Promise&lt;{ success: true } | { success: false; reason: string }&gt; {
+            // ... existing implementation
+          }
+
+          // ... rest of functions
+          ```
+        </code_template>
+      </step>
+
+      <step number="2" action="update">
+        <description>Update lib/db/index.ts exports</description>
+        <details>
+          Add these exports:
+          ```typescript
+          // Wishlist operations
+          export {
+            addToWishlist,
+            isEmailInWishlist,
+            getWishlistEntries,
+            getWishlistCount,
+          } from "./wishlist"
+          ```
+        </details>
+      </step>
+
+      <step number="3" action="update">
+        <description>Update consumer imports</description>
+        <consumers>
+          <consumer file="app/api/wishlist/route.ts">
+            Change: `import { addToWishlist } from "@/lib/db-wishlist"`
+            To: `import { addToWishlist } from "@/lib/db"`
+          </consumer>
+        </consumers>
+      </step>
+
+      <step number="4" action="verify">
+        <description>Run build to verify</description>
+        <command>npm run build</command>
+        <expected>Build succeeds with no errors</expected>
+      </step>
+
+      <step number="5" action="delete">
+        <description>Delete original file</description>
+        <file>lib/db-wishlist.ts</file>
+        <precondition>Build must pass first</precondition>
+      </step>
+
+      <step number="6" action="verify">
+        <description>Final build verification</description>
+        <command>npm run build</command>
+        <expected>Build succeeds with no errors</expected>
+      </step>
+    </steps>
+
+    <constraints>
+      <constraint>Keep all function signatures identical</constraint>
+      <constraint>No functional changes - pure structural refactoring</constraint>
+      <constraint>Build must pass before deleting original file</constraint>
+    </constraints>
+
+    <success_criteria>
+      - lib/db/wishlist.ts created with correct import
+      - All exports added to lib/db/index.ts
+      - Consumer import updated (1 file)
+      - lib/db-wishlist.ts deleted
+      - Build passes
+    </success_criteria>
+  </task>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+    </description>
+
+    <action>
+      After completing all steps, UPDATE the file:
+      docs/prompts/remaining-db-refactoring/status.md
+
+      with:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Prompt: phases/02_migrate_wishlist.xml
+      - Phase: 02 - Migrate Wishlist
+      - Status: completed | partial | blocked
+      - Summary of what was done
+      - Any issues encountered
+      - Next: phases/03_migrate_users.xml
+    </action>
+  </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(remaining-db-refactoring): phase-02 - Migrate lib/db-wishlist.ts to lib/db/wishlist.ts
+    </commit_format>
+    <action>
+      1. Stage: git add lib/db/ app/ docs/prompts/remaining-db-refactoring/
+      2. Commit with format above
+    </action>
+  </mandatory_commit_step>
+</phase_prompt>

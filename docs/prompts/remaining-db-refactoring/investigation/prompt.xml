@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Initial Investigation: Remaining Database Refactoring
+  Feature: remaining-db-refactoring
+  Phase: investigation
+
+  Goal: Refactor lib/db-orgs.ts, lib/db-wishlist.ts, and lib/db-users.ts into lib/db/
+-->
+
+<investigation_prompt>
+  <feature>
+    <name>Remaining Database Refactoring</name>
+    <folder>docs/prompts/remaining-db-refactoring</folder>
+    <phase>investigation</phase>
+    <prompt_file>investigation/prompt.xml</prompt_file>
+  </feature>
+
+  <task>
+    <objective>Complete database layer abstraction by migrating remaining standalone db files into the modular lib/db/ structure</objective>
+    <background>
+      The project has partially abstracted database operations into lib/db/ with modules like:
+      - connection.ts (shared SQL connection via getSql())
+      - executions.ts, results.ts, metrics.ts, etc.
+      - index.ts (exports all functions with getQueriesForOrg helper)
+
+      However, three files remain outside this structure:
+      - lib/db-orgs.ts (266 lines) - Organization CRUD, members, invites
+      - lib/db-wishlist.ts (77 lines) - Wishlist operations
+      - lib/db-users.ts (281 lines) - User management, invites, auth checks
+
+      CRITICAL ISSUE: lib/db-users.ts defines its own getSql() using @neondatabase/serverless
+      directly instead of using the shared connection from lib/db/connection.ts.
+    </background>
+
+    <mandatory_requirements>
+      <requirement priority="critical">
+        All three files must be migrated to lib/db/ as separate modules
+      </requirement>
+      <requirement priority="critical">
+        All modules must use getSql() from lib/db/connection.ts (fix db-users.ts duplicate)
+      </requirement>
+      <requirement priority="critical">
+        Update lib/db/index.ts to export all new functions
+      </requirement>
+      <requirement priority="critical">
+        Update all imports throughout the codebase to use @/lib/db
+      </requirement>
+      <requirement priority="critical">
+        Delete original files after migration (lib/db-orgs.ts, lib/db-wishlist.ts, lib/db-users.ts)
+      </requirement>
+      <requirement priority="high">
+        Consider adding org-bound query variants to getQueriesForOrg() where applicable
+      </requirement>
+    </mandatory_requirements>
+
+    <constraints>
+      <constraint>Keep solution minimal - preserve existing function signatures</constraint>
+      <constraint>Maintain backwards compatibility for all consumers</constraint>
+      <constraint>No functional changes - pure structural refactoring</constraint>
+      <constraint>Follow existing patterns in lib/db/ modules</constraint>
+    </constraints>
+
+    <success_criteria>
+      - All three db-*.ts files migrated to lib/db/
+      - lib/db-users.ts duplicate getSql() removed
+      - lib/db/index.ts exports all functions
+      - All imports updated across codebase
+      - Original files deleted
+      - Build passes without errors
+    </success_criteria>
+  </task>
+
+  <investigation_steps>
+    <step priority="high">
+      <name>File Analysis</name>
+      <action>
+        Analyze each file to understand its functions and dependencies:
+
+        1. lib/db-orgs.ts:
+           - Uses getSql() from "./db" (correct)
+           - Functions: createOrganization, getOrganizationById, getOrganizationBySlug,
+             updateOrganization, deleteOrganization, getAllOrganizations,
+             getOrganizationMembers, addOrganizationMember, updateMemberRole,
+             removeMember, getUserOrganizations, isUserMemberOfOrg,
+             createOrgInvite, getOrgInvites
+           - Types: Organization, OrganizationMember, OrganizationWithRole
+
+        2. lib/db-wishlist.ts:
+           - Uses getSql() from "./db" (correct)
+           - Functions: addToWishlist, isEmailInWishlist, getWishlistEntries, getWishlistCount
+
+        3. lib/db-users.ts:
+           - DEFINES OWN getSql() - MUST BE FIXED
+           - Functions: getUserByEmail, getAllUsers, createUser, updateUserRole,
+             deleteUser, getInviteByEmail, getAllInvites, createInvite,
+             markInviteAsUsedById, markInviteAsUsed, deleteInvite,
+             getDefaultOrgId, createUserFromInvite, checkUserAccess, isAdmin
+           - Types: DashboardUser, Invite
+      </action>
+      <output>
+        Document in investigation/analysis.md:
+        - Complete function inventory per file
+        - Import dependencies
+        - Types defined
+        - Consumers of each file
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Consumer Analysis</name>
+      <action>
+        Find all files that import from these modules:
+
+        Search patterns:
+        - import.*from.*["']@/lib/db-orgs["']
+        - import.*from.*["']@/lib/db-users["']
+        - import.*from.*["']@/lib/db-wishlist["']
+        - import.*from.*["'].*\/lib\/db-orgs["']
+        - import.*from.*["'].*\/lib\/db-users["']
+        - import.*from.*["'].*\/lib\/db-wishlist["']
+
+        For each consumer:
+        - Document which functions are imported
+        - Note if any restructuring is needed
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - List of consumer files per module
+        - Import statements to update
+        - Any special considerations
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Target Structure Design</name>
+      <action>
+        Design the new module structure in lib/db/:
+
+        New files:
+        - lib/db/orgs.ts - Organization operations
+        - lib/db/wishlist.ts - Wishlist operations
+        - lib/db/users.ts - User and invite operations
+
+        Types placement:
+        - Move types to lib/db/types.ts OR keep inline in modules
+        - Follow existing pattern (check current types.ts)
+
+        Index.ts updates:
+        - Add exports for all new functions
+        - Consider which functions belong in getQueriesForOrg()
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - New file structure diagram
+        - Types placement decision
+        - Index.ts modification plan
+      </output>
+    </step>
+
+    <step priority="medium">
+      <name>Multi-Tenancy Consideration</name>
+      <action>
+        Evaluate if any functions should be org-bound:
+
+        - Organization functions: Already operate on specific orgs by ID
+        - User functions: Some are global (by email), some could be org-scoped
+        - Wishlist: Likely global (marketing/waitlist feature)
+
+        Decision: Which functions should be added to getQueriesForOrg()?
+        - getOrganizationMembers(orgId) - Already org-specific
+        - getUserOrganizations(userId) - User-specific, not org-specific
+        - isUserMemberOfOrg(userId, orgId) - Could be useful in org context
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - Functions to add to getQueriesForOrg()
+        - Rationale for each decision
+      </output>
+    </step>
+
+    <step priority="medium">
+      <name>Create Phase Prompts</name>
+      <action>
+        Break implementation into logical phases:
+
+        Phase 1: Migrate lib/db-orgs.ts
+        - Create lib/db/orgs.ts
+        - Update imports (getSql from ./connection)
+        - Export from lib/db/index.ts
+        - Update consumers
+        - Delete original file
+
+        Phase 2: Migrate lib/db-wishlist.ts
+        - Create lib/db/wishlist.ts
+        - Update imports
+        - Export from lib/db/index.ts
+        - Update consumers
+        - Delete original file
+
+        Phase 3: Migrate lib/db-users.ts
+        - Create lib/db/users.ts
+        - CRITICAL: Remove duplicate getSql(), use ./connection
+        - Export from lib/db/index.ts
+        - Update consumers
+        - Delete original file
+
+        Phase 4: Final Cleanup &amp; Verification
+        - Verify all imports work
+        - Run build to check for errors
+        - Update any documentation if needed
+      </action>
+      <output>
+        - phases/01_migrate_orgs.xml
+        - phases/02_migrate_wishlist.xml
+        - phases/03_migrate_users.xml
+        - phases/04_cleanup_verification.xml
+      </output>
+    </step>
+  </investigation_steps>
+
+  <output_deliverables>
+    <deliverable>investigation/analysis.md - Full analysis with function inventory, consumers, and design decisions</deliverable>
+    <deliverable>phases/01_migrate_orgs.xml - Organizations module migration prompt</deliverable>
+    <deliverable>phases/02_migrate_wishlist.xml - Wishlist module migration prompt</deliverable>
+    <deliverable>phases/03_migrate_users.xml - Users module migration prompt</deliverable>
+    <deliverable>phases/04_cleanup_verification.xml - Final cleanup and verification prompt</deliverable>
+  </output_deliverables>
+
+  <migration_summary>
+    <file source="lib/db-orgs.ts" target="lib/db/orgs.ts">
+      <status>correct imports</status>
+      <functions>14</functions>
+      <types>3</types>
+    </file>
+    <file source="lib/db-wishlist.ts" target="lib/db/wishlist.ts">
+      <status>correct imports</status>
+      <functions>4</functions>
+      <types>0</types>
+    </file>
+    <file source="lib/db-users.ts" target="lib/db/users.ts">
+      <status>HAS DUPLICATE getSql() - MUST FIX</status>
+      <functions>14</functions>
+      <types>2</types>
+    </file>
+  </migration_summary>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+      This step is MANDATORY and must be executed after all other steps.
+    </description>
+
+    <action>
+      After completing all investigation steps, UPDATE the file:
+      docs/prompts/remaining-db-refactoring/status.md
+
+      with the following information:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Prompt: investigation/prompt.xml
+      - Phase: Investigation
+      - Status: completed | partial | blocked
+      - Summary of findings
+      - List of deliverables created
+      - Next steps (link to first phase prompt)
+      - Any blockers encountered
+    </action>
+
+    <rules>
+      <rule>ALWAYS update status.md as the LAST action</rule>
+      <rule>Include actual datetime from system</rule>
+      <rule>Be specific about files created and decisions made</rule>
+      <rule>Link to phases/01_migrate_orgs.xml as next step</rule>
+    </rules>
+  </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <description>
+      Commit all changes with a structured message identifying feature and phase.
+    </description>
+    <commit_format>
+      feat(remaining-db-refactoring): investigation - {description}
+
+      Example: feat(remaining-db-refactoring): investigation - Analysis and phase planning complete
+    </commit_format>
+    <action>
+      After updating status.md, commit all changes:
+      1. Stage: git add docs/prompts/remaining-db-refactoring/
+      2. Commit with format: feat(remaining-db-refactoring): investigation - {description}
+    </action>
+  </mandatory_commit_step>
+</investigation_prompt>

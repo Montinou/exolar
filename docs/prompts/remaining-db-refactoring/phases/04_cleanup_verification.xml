@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 4: Final Cleanup and Verification
+  Feature: remaining-db-refactoring
+  Phase: 04_cleanup_verification
+
+  Goal: Add org-bound functions and final verification
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Remaining Database Refactoring</name>
+    <folder>docs/prompts/remaining-db-refactoring</folder>
+    <phase>04_cleanup_verification</phase>
+    <prompt_file>phases/04_cleanup_verification.xml</prompt_file>
+  </feature>
+
+  <context>
+    <analysis_reference>investigation/analysis.md</analysis_reference>
+    <previous_phase>phases/03_migrate_users.xml</previous_phase>
+    <description>
+      All three files have been migrated. This phase adds org-bound query variants
+      and performs final verification.
+    </description>
+  </context>
+
+  <task>
+    <objective>Add org-bound functions to getQueriesForOrg() and final verification</objective>
+
+    <steps>
+      <step number="1" action="update">
+        <description>Add org-bound functions to getQueriesForOrg() in lib/db/index.ts</description>
+        <details>
+          Import the new functions:
+          ```typescript
+          import {
+            getOrganizationMembers,
+            getOrgInvites,
+            isUserMemberOfOrg,
+          } from "./orgs"
+          ```
+
+          Add to the return object of getQueriesForOrg():
+          ```typescript
+          // Organization queries (org-bound)
+          getOrganizationMembers: () => getOrganizationMembers(organizationId),
+          getOrgInvites: () => getOrgInvites(organizationId),
+          isUserMemberOfOrg: (userId: number) => isUserMemberOfOrg(userId, organizationId),
+          ```
+        </details>
+      </step>
+
+      <step number="2" action="verify">
+        <description>Verify no old imports remain</description>
+        <command>grep -r "db-orgs\|db-users\|db-wishlist" --include="*.ts" --include="*.tsx" app/ components/ lib/ | grep -v node_modules | grep -v ".xml"</command>
+        <expected>No results (all old imports should be gone)</expected>
+      </step>
+
+      <step number="3" action="verify">
+        <description>Verify no duplicate getSql() exists</description>
+        <command>grep -r "function getSql\|const getSql" --include="*.ts" lib/</command>
+        <expected>Only one result: lib/db/connection.ts</expected>
+      </step>
+
+      <step number="4" action="verify">
+        <description>Verify original files are deleted</description>
+        <command>ls -la lib/db-*.ts 2>/dev/null || echo "All db-*.ts files deleted"</command>
+        <expected>"All db-*.ts files deleted"</expected>
+      </step>
+
+      <step number="5" action="verify">
+        <description>Final build verification</description>
+        <command>npm run build</command>
+        <expected>Build succeeds with no errors</expected>
+      </step>
+
+      <step number="6" action="update">
+        <description>Update lib/db structure in CLAUDE.md (if needed)</description>
+        <details>
+          If the CLAUDE.md mentions the lib/ structure, update to include:
+          - lib/db/orgs.ts
+          - lib/db/wishlist.ts
+          - lib/db/users.ts
+        </details>
+      </step>
+    </steps>
+
+    <verification_checklist>
+      <item>lib/db/orgs.ts exists and exports all org functions</item>
+      <item>lib/db/wishlist.ts exists and exports all wishlist functions</item>
+      <item>lib/db/users.ts exists and exports all user functions</item>
+      <item>lib/db/types.ts includes Organization, OrganizationMember, OrganizationWithRole, DashboardUser, Invite</item>
+      <item>lib/db/index.ts exports all new functions</item>
+      <item>getQueriesForOrg() includes org-bound variants</item>
+      <item>No imports from @/lib/db-orgs, @/lib/db-users, @/lib/db-wishlist exist</item>
+      <item>Only one getSql() definition exists (in connection.ts)</item>
+      <item>lib/db-orgs.ts deleted</item>
+      <item>lib/db-wishlist.ts deleted</item>
+      <item>lib/db-users.ts deleted</item>
+      <item>Build passes</item>
+    </verification_checklist>
+
+    <success_criteria>
+      - All verification checks pass
+      - Org-bound functions added to getQueriesForOrg()
+      - No old file references remain
+      - Build passes
+      - Feature complete
+    </success_criteria>
+  </task>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with FINAL completion status.
+    </description>
+
+    <action>
+      After completing all steps, UPDATE the file:
+      docs/prompts/remaining-db-refactoring/status.md
+
+      with:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Prompt: phases/04_cleanup_verification.xml
+      - Phase: 04 - Final Cleanup &amp; Verification
+      - Status: completed
+      - Mark feature as COMPLETE
+      - Summary:
+        - 3 files migrated to lib/db/
+        - 5 types added to types.ts
+        - 32 functions now exported from lib/db
+        - 3 org-bound functions added to getQueriesForOrg()
+        - Duplicate getSql() removed
+        - All old files deleted
+    </action>
+  </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(remaining-db-refactoring): phase-04 - Complete database abstraction with org-bound queries
+    </commit_format>
+    <action>
+      1. Stage: git add lib/db/ docs/prompts/remaining-db-refactoring/
+      2. Commit with format above
+      3. Feature is now complete!
+    </action>
+  </mandatory_commit_step>
+</phase_prompt>

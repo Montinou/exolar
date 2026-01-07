@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 3: Migrate lib/db-users.ts (CRITICAL)
+  Feature: remaining-db-refactoring
+  Phase: 03_migrate_users
+
+  Goal: Move user operations to lib/db/users.ts and FIX DUPLICATE getSql()
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Remaining Database Refactoring</name>
+    <folder>docs/prompts/remaining-db-refactoring</folder>
+    <phase>03_migrate_users</phase>
+    <prompt_file>phases/03_migrate_users.xml</prompt_file>
+  </feature>
+
+  <context>
+    <analysis_reference>investigation/analysis.md</analysis_reference>
+    <previous_phase>phases/02_migrate_wishlist.xml</previous_phase>
+    <source_file>lib/db-users.ts</source_file>
+    <target_file>lib/db/users.ts</target_file>
+    <line_count>281</line_count>
+    <consumer_count>6</consumer_count>
+  </context>
+
+  <critical_issue>
+    <description>
+      lib/db-users.ts DEFINES ITS OWN getSql() function:
+
+      ```typescript
+      import { neon } from "@neondatabase/serverless"
+
+      function getSql() {
+        return neon(process.env.DATABASE_URL!)
+      }
+      ```
+
+      This MUST be removed. The new file must import from ./connection.
+    </description>
+    <fix>
+      Replace the above with:
+      ```typescript
+      import { getSql } from "./connection"
+      ```
+    </fix>
+  </critical_issue>
+
+  <task>
+    <objective>Migrate lib/db-users.ts to lib/db/users.ts, removing duplicate getSql()</objective>
+
+    <steps>
+      <step number="1" action="update">
+        <description>Add types to lib/db/types.ts</description>
+        <details>
+          Add these type exports:
+          ```typescript
+          export interface DashboardUser {
+            id: number
+            email: string
+            role: "admin" | "viewer"
+            invited_by: number | null
+            default_org_id: number | null
+            created_at: string
+            updated_at: string
+          }
+
+          export interface Invite {
+            id: number
+            email: string
+            role: "admin" | "viewer"
+            invited_by: number
+            organization_id: number | null
+            used: boolean
+            created_at: string
+          }
+          ```
+        </details>
+      </step>
+
+      <step number="2" action="create">
+        <description>Create lib/db/users.ts</description>
+        <details>
+          Copy contents from lib/db-users.ts with these CRITICAL changes:
+
+          1. REMOVE the local getSql() function and neon import
+          2. ADD: `import { getSql } from "./connection"`
+          3. IMPORT types from "./types": `import type { DashboardUser, Invite } from "./types"`
+          4. Keep all functions exactly as-is (they use getSql() internally which now comes from connection)
+
+          The file should start like:
+          ```typescript
+          import { getSql } from "./connection"
+          import type { DashboardUser, Invite } from "./types"
+
+          // Re-export types for convenience
+          export type { DashboardUser, Invite }
+
+          // ============================================
+          // User Queries
+          // ============================================
+          // ... rest of code
+          ```
+        </details>
+      </step>
+
+      <step number="3" action="update">
+        <description>Update lib/db/index.ts exports</description>
+        <details>
+          Add these exports:
+          ```typescript
+          // User operations
+          export {
+            getUserByEmail,
+            getAllUsers,
+            createUser,
+            updateUserRole,
+            deleteUser,
+            getInviteByEmail,
+            getAllInvites,
+            createInvite,
+            markInviteAsUsedById,
+            markInviteAsUsed,
+            deleteInvite,
+            checkUserAccess,
+            isAdmin,
+          } from "./users"
+
+          // Types - add to existing type exports
+          export type {
+            DashboardUser,
+            Invite,
+          } from "./types"
+          ```
+        </details>
+      </step>
+
+      <step number="4" action="update">
+        <description>Update consumer imports</description>
+        <consumers>
+          <consumer file="app/admin/page.tsx">
+            Change: `import type { DashboardUser, Invite } from "@/lib/db-users"`
+            To: `import type { DashboardUser, Invite } from "@/lib/db"`
+          </consumer>
+          <consumer file="app/api/organizations/[id]/members/route.ts">
+            Change: `import { getUserByEmail } from "@/lib/db-users"`
+            To: `import { getUserByEmail } from "@/lib/db"`
+            Note: May already import from @/lib/db, consolidate imports
+          </consumer>
+          <consumer file="app/api/admin/invites/route.ts">
+            Change: `import { isAdmin, getAllInvites, createInvite, deleteInvite, getUserByEmail, createUser } from "@/lib/db-users"`
+            To: `import { isAdmin, getAllInvites, createInvite, deleteInvite, getUserByEmail, createUser } from "@/lib/db"`
+            Note: May already import from @/lib/db-orgs, consolidate both into single @/lib/db import
+          </consumer>
+          <consumer file="components/auth/access-context.tsx">
+            Change: `import type { DashboardUser } from "@/lib/db-users"`
+            To: `import type { DashboardUser } from "@/lib/db"`
+          </consumer>
+          <consumer file="app/api/admin/users/route.ts">
+            Change: `import { isAdmin, getAllUsers, updateUserRole, deleteUser, getUserByEmail } from "@/lib/db-users"`
+            To: `import { isAdmin, getAllUsers, updateUserRole, deleteUser, getUserByEmail } from "@/lib/db"`
+          </consumer>
+          <consumer file="app/api/auth/check-access/route.ts">
+            Change: `import { checkUserAccess } from "@/lib/db-users"`
+            To: `import { checkUserAccess } from "@/lib/db"`
+          </consumer>
+        </consumers>
+      </step>
+
+      <step number="5" action="verify">
+        <description>Run build to verify</description>
+        <command>npm run build</command>
+        <expected>Build succeeds with no errors</expected>
+      </step>
+
+      <step number="6" action="delete">
+        <description>Delete original file</description>
+        <file>lib/db-users.ts</file>
+        <precondition>Build must pass first</precondition>
+      </step>
+
+      <step number="7" action="verify">
+        <description>Final build verification</description>
+        <command>npm run build</command>
+        <expected>Build succeeds with no errors</expected>
+      </step>
+    </steps>
+
+    <constraints>
+      <constraint>MUST remove duplicate getSql() definition</constraint>
+      <constraint>Keep all function signatures identical</constraint>
+      <constraint>No functional changes - pure structural refactoring</constraint>
+      <constraint>Build must pass before deleting original file</constraint>
+    </constraints>
+
+    <success_criteria>
+      - lib/db/users.ts created using getSql from connection.ts (NOT local definition)
+      - Types added to lib/db/types.ts
+      - All exports added to lib/db/index.ts
+      - All 6 consumer imports updated
+      - lib/db-users.ts deleted
+      - Build passes
+      - No duplicate getSql() exists in codebase
+    </success_criteria>
+  </task>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+    </description>
+
+    <action>
+      After completing all steps, UPDATE the file:
+      docs/prompts/remaining-db-refactoring/status.md
+
+      with:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Prompt: phases/03_migrate_users.xml
+      - Phase: 03 - Migrate Users (Critical Fix)
+      - Status: completed | partial | blocked
+      - Summary of what was done
+      - CONFIRM: Duplicate getSql() removed
+      - Any issues encountered
+      - Next: phases/04_cleanup_verification.xml
+    </action>
+  </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(remaining-db-refactoring): phase-03 - Migrate lib/db-users.ts and fix duplicate getSql()
+    </commit_format>
+    <action>
+      1. Stage: git add lib/db/ app/ components/ docs/prompts/remaining-db-refactoring/
+      2. Commit with format above
+    </action>
+  </mandatory_commit_step>
+</phase_prompt>
