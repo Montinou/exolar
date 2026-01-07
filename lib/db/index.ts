@@ -130,6 +130,14 @@ export {
   insertArtifacts,
 } from "./ingestion"
 
+// Wishlist operations
+export {
+  addToWishlist,
+  isEmailInWishlist,
+  getWishlistEntries,
+  getWishlistCount,
+} from "./wishlist"
+
 // ============================================
 // Org-Bound Query Helper
 // ============================================

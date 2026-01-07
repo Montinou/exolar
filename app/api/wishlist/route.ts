@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { addToWishlist } from "@/lib/db-wishlist"
+import { addToWishlist } from "@/lib/db"
 
 // Validation schema for wishlist submission
 const wishlistSchema = z.object({

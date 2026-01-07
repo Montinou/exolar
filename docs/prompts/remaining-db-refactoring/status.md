@@ -4,13 +4,13 @@
 
 Refactor remaining standalone database files (`lib/db-orgs.ts`, `lib/db-wishlist.ts`, `lib/db-users.ts`) into the modular `lib/db/` structure.
 
-## Current Status: **Phase 1 Complete**
+## Current Status: **Phase 2 Complete**
 
 | Phase | Status | Prompt | Last Updated |
 |-------|--------|--------|--------------|
 | Investigation | **completed** | [investigation/prompt.xml](investigation/prompt.xml) | 2026-01-07T20:01:17Z |
 | Phase 1: Migrate Orgs | **completed** | [phases/01_migrate_orgs.xml](phases/01_migrate_orgs.xml) | 2026-01-07T20:06:44Z |
-| Phase 2: Migrate Wishlist | pending | [phases/02_migrate_wishlist.xml](phases/02_migrate_wishlist.xml) | - |
+| Phase 2: Migrate Wishlist | **completed** | [phases/02_migrate_wishlist.xml](phases/02_migrate_wishlist.xml) | 2026-01-07T20:11:43Z |
 | Phase 3: Migrate Users | pending | [phases/03_migrate_users.xml](phases/03_migrate_users.xml) | - |
 | Phase 4: Cleanup & Verify | pending | [phases/04_cleanup_verification.xml](phases/04_cleanup_verification.xml) | - |
 
@@ -19,7 +19,7 @@ Refactor remaining standalone database files (`lib/db-orgs.ts`, `lib/db-wishlist
 | Source | Target | Lines | Functions | Types | Status |
 |--------|--------|-------|-----------|-------|--------|
 | `lib/db-orgs.ts` | `lib/db/orgs.ts` | 266 | 14 | 3 | **completed** |
-| `lib/db-wishlist.ts` | `lib/db/wishlist.ts` | 77 | 4 | 0 | pending |
+| `lib/db-wishlist.ts` | `lib/db/wishlist.ts` | 77 | 4 | 0 | **completed** |
 | `lib/db-users.ts` | `lib/db/users.ts` | 281 | 14 | 2 | pending |
 
 ## Critical Issues
@@ -36,11 +36,35 @@ Refactor remaining standalone database files (`lib/db-orgs.ts`, `lib/db-wishlist
 
 ## Next Action
 
-Execute **[phases/02_migrate_wishlist.xml](phases/02_migrate_wishlist.xml)** to migrate wishlist operations to `lib/db/wishlist.ts`.
+Execute **[phases/03_migrate_users.xml](phases/03_migrate_users.xml)** to migrate user operations to `lib/db/users.ts`. **Note:** This phase requires a critical fix to remove the duplicate `getSql()` function.
 
 ---
 
 ## Execution Log
+
+### 2026-01-07T20:11:43Z - Phase 2: Migrate Wishlist
+
+**Prompt**: `phases/02_migrate_wishlist.xml`
+**Status**: completed
+
+**Deliverables**:
+- Created `lib/db/wishlist.ts` with 4 functions (import path fixed to `./connection`)
+- Updated `lib/db/index.ts` with exports for all wishlist functions
+- Updated 1 consumer file to import from `@/lib/db`
+- Deleted `lib/db-wishlist.ts`
+
+**Consumer Files Updated**:
+1. `app/api/wishlist/route.ts` - import changed from `@/lib/db-wishlist` to `@/lib/db`
+
+**Functions Migrated**:
+- `addToWishlist(email, name?)` - Add email to wishlist with duplicate check
+- `isEmailInWishlist(email)` - Check if email exists
+- `getWishlistEntries()` - Get all entries (admin)
+- `getWishlistCount()` - Get total count
+
+**Verification**: Build passed before and after deletion of original file
+
+---
 
 ### 2026-01-07T20:06:44Z - Phase 1: Migrate Organizations
 

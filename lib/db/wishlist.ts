@@ -1,4 +1,4 @@
-import { getSql } from "./db"
+import { getSql } from "./connection"
 
 /**
  * Add an email to the wishlist
