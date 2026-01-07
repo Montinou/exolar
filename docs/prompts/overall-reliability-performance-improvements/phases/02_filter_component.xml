@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 2: Filter Component Update
+  Feature: overall-reliability-performance-improvements
+  Priority: High
+
+  Goal: Add "Historic Summary" checkbox to Filters component
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Overall Reliability &amp; Performance Improvements</name>
+    <folder>docs/prompts/overall-reliability-performance-improvements</folder>
+    <phase>02_filter_component</phase>
+  </feature>
+
+  <task>
+    <objective>Add "Historic Summary" checkbox that appears when branch/suite filter is applied</objective>
+
+    <context>
+      Current filter behavior:
+      - Filters exist for branch, suite, status, dateRange
+      - Data always shows aggregated results regardless of filter state
+
+      Target behavior:
+      - No filter → Show ALL runs (current default)
+      - Filter applied → Show LAST RUN only for that filter
+      - Filter + Historic checked → Show ALL runs for that filter
+    </context>
+
+    <behavior_matrix>
+      <scenario>No filters → Historic hidden, all runs shown</scenario>
+      <scenario>Branch selected → Historic visible+unchecked, last run only</scenario>
+      <scenario>Suite selected → Historic visible+unchecked, last run only</scenario>
+      <scenario>Both selected → Historic visible+unchecked, last run only</scenario>
+      <scenario>Filter + Historic checked → All runs for filter</scenario>
+    </behavior_matrix>
+  </task>
+
+  <implementation_steps>
+    <step>
+      <file>components/dashboard/filters.tsx</file>
+      <changes>
+        <change>
+          <description>Add Checkbox and Label imports</description>
+          <add_import>
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+          </add_import>
+        </change>
+        <change>
+          <description>Add historic param handling</description>
+          <location>After other param reads (around line 30)</location>
+          <add>
+const currentHistoric = searchParams.get("historic") === "true"
+          </add>
+        </change>
+        <change>
+          <description>Add hasFilter computed value</description>
+          <add>
+const hasFilter = !!(currentBranch || currentSuite)
+          </add>
+        </change>
+        <change>
+          <description>Add Historic checkbox UI</description>
+          <location>After the last Select component, before Clear button</location>
+          <add>
+{hasFilter &amp;&amp; (
+  &lt;div className="flex items-center gap-2"&gt;
+    &lt;Checkbox
+      id="historic"
+      checked={currentHistoric}
+      onCheckedChange={(checked) =&gt; {
+        if (checked) {
+          updateFilter("historic", "true")
+        } else {
+          const newParams = new URLSearchParams(searchParams.toString())
+          newParams.delete("historic")
+          router.push(`${basePath}?${newParams.toString()}`)
+        }
+      }}
+    /&gt;
+    &lt;Label htmlFor="historic" className="text-sm cursor-pointer"&gt;
+      Historic Summary
+    &lt;/Label&gt;
+  &lt;/div&gt;
+)}
+          </add>
+        </change>
+        <change>
+          <description>Update clearFilters to also clear historic</description>
+          <location>In clearFilters function</location>
+          <action>Ensure historic param is cleared when filters are cleared</action>
+        </change>
+      </changes>
+    </step>
+  </implementation_steps>
+
+  <testing>
+    <test>No filter: Historic checkbox NOT visible</test>
+    <test>Branch selected: Historic checkbox visible and unchecked</test>
+    <test>Suite selected: Historic checkbox visible and unchecked</test>
+    <test>Check Historic: URL shows ?historic=true</test>
+    <test>Uncheck Historic: URL removes historic param</test>
+    <test>Clear filters: Historic checkbox disappears, param removed</test>
+    <test>Run: npm run build (no TypeScript errors)</test>
+  </testing>
+
+  <mandatory_final_step priority="critical">
+    <action>
+      Update status.md with phase completion:
+      - Date: Get from system
+      - Phase: 02_filter_component
+      - Status: completed
+    </action>
+  </mandatory_final_step>
+
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(overall-reliability-performance-improvements): phase-02 - Add Historic Summary checkbox to filters
+    </commit_format>
+  </mandatory_commit_step>
+</phase_prompt>

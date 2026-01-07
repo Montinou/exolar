@@ -1,6 +1,12 @@
-import { CheckCircle2, XCircle, Clock, AlertTriangle } from "lucide-react"
+import { CheckCircle2, XCircle, Clock, AlertTriangle, Info } from "lucide-react"
 import type { DashboardMetrics } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface StatsCardsProps {
   metrics: DashboardMetrics
@@ -16,6 +22,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
     icon: typeof CheckCircle2
     trend: "positive" | "negative" | "neutral"
     type: StatType
+    tooltip?: string
   }> = [
     {
       label: "Pass Rate",
@@ -24,6 +31,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       icon: CheckCircle2,
       trend: metrics.pass_rate >= 90 ? "positive" : metrics.pass_rate >= 75 ? "neutral" : "negative",
       type: "passRate",
+      tooltip: "Pass Rate = Passed ÷ (Passed + Failed). Skipped tests are excluded.",
     },
     {
       label: "Failure Rate",
@@ -68,41 +76,55 @@ export function StatsCards({ metrics }: StatsCardsProps) {
   }
 
   return (
-    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => {
-        const Icon = stat.icon
-        return (
-          <div
-            key={stat.label}
-            className="glass-card glass-card-glow p-6"
-          >
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">{stat.label}</span>
-                <Icon
-                  className="h-5 w-5"
-                  style={{
-                    color: stat.trend === "positive"
-                      ? "var(--status-success)"
-                      : stat.trend === "negative"
-                        ? "var(--status-error)"
-                        : "var(--exolar-cyan)"
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className={cn(
-                  "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
-                  getValueClass(stat.type, stat.trend)
-                )}>
-                  {stat.value}
-                </p>
-                <p className="text-xs text-muted-foreground">{stat.description}</p>
+    <TooltipProvider>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => {
+          const Icon = stat.icon
+          return (
+            <div
+              key={stat.label}
+              className="glass-card glass-card-glow p-6"
+            >
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                    {stat.label}
+                    {stat.tooltip && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{stat.tooltip}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </span>
+                  <Icon
+                    className="h-5 w-5"
+                    style={{
+                      color: stat.trend === "positive"
+                        ? "var(--status-success)"
+                        : stat.trend === "negative"
+                          ? "var(--status-error)"
+                          : "var(--exolar-cyan)"
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <p className={cn(
+                    "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight",
+                    getValueClass(stat.type, stat.trend)
+                  )}>
+                    {stat.value}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{stat.description}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+    </TooltipProvider>
   )
 }

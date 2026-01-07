@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Initial Investigation: Overall Reliability & Performance Improvements
+  Feature: overall-reliability-performance-improvements
+  Phase: initial-investigation
+  Last Updated: January 2026
+
+  Goals:
+  1. Implement unified filter behavior with "Historic Summary" toggle
+  2. Fix chart data consistency across ALL dashboard pages
+  3. Ensure all visualizations show properly filtered, non-overlapping data
+-->
+
+<investigation_prompt>
+  <feature>
+    <name>Overall Reliability &amp; Performance Improvements</name>
+    <folder>docs/prompts/overall-reliability-performance-improvements</folder>
+    <phase>initial-investigation</phase>
+    <prompt_file>investigation/prompt.xml</prompt_file>
+  </feature>
+
+  <task>
+    <objective>Research and plan comprehensive improvements for dashboard data consistency and filter behavior across ALL pages</objective>
+
+    <background>
+      The dashboard has two critical issues requiring unified resolution:
+
+      ISSUE 1: Filter Behavior Inconsistency
+      - Pages affected: /dashboard/reliability, /dashboard/performance, main dashboard (/)
+      - Current: Filters exist but data always shows aggregated results regardless of filter state
+      - Target: Filter selection should change data scope (last run vs all runs)
+
+      ISSUE 2: Chart Data Consistency Problem
+      - Example from main dashboard showing incorrect visualization:
+        * Total: 23 tests
+        * Top bar: 22 passed (96%), 0 failed (0%), 12 flaky (52%)
+        * Donut chart: Passed 95.7%, Flaky 52.2% shown as pie slices
+        * Problem: Percentages don't add to 100% because passed/flaky are OVERLAPPING categories
+      - A test can be BOTH "passed" (in current execution) AND "flaky" (historically unreliable)
+      - Pie charts imply mutually exclusive categories but the data is overlapping
+      - This creates user confusion and misrepresents the data
+    </background>
+
+    <success_criteria>
+      <criterion>Clear understanding of all affected pages and components</criterion>
+      <criterion>Identified all charts with overlapping category issues</criterion>
+      <criterion>Defined proper data representation for each chart type</criterion>
+      <criterion>Identified database queries that need modification</criterion>
+      <criterion>Created phase prompts for incremental implementation</criterion>
+      <criterion>All filter and chart requirements mapped to code changes</criterion>
+    </success_criteria>
+  </task>
+
+  <mandatory_requirements>
+    <!-- Filter Behavior Requirements -->
+    <requirement priority="critical" category="filters">
+      No filter applied → Show ALL runs data (historical aggregate)
+    </requirement>
+    <requirement priority="critical" category="filters">
+      Filter applied (branch/suite) → Show LAST RUN data only for that filter
+    </requirement>
+    <requirement priority="critical" category="filters">
+      Add "Historic Summary" checkbox:
+      - Only visible when branch OR suite is selected
+      - UNCHECKED by default
+      - When checked, shows ALL runs for selected filter
+    </requirement>
+    <requirement priority="critical" category="filters">
+      This logic applies to ALL components on ALL dashboard pages
+    </requirement>
+
+    <!-- Chart Consistency Requirements -->
+    <requirement priority="critical" category="charts">
+      Pie/donut charts MUST show mutually exclusive categories that add to 100%
+    </requirement>
+    <requirement priority="critical" category="charts">
+      Donut chart should show: Passed / Failed / Skipped (mutually exclusive)
+    </requirement>
+    <requirement priority="critical" category="charts">
+      Flaky indicator should be SEPARATE from the pie chart (badge, icon, or secondary metric)
+    </requirement>
+    <requirement priority="critical" category="charts">
+      All charts on a page MUST use the same filtered dataset - no discrepancies
+    </requirement>
+    <requirement priority="critical" category="charts">
+      Top summary bar and detailed charts MUST show consistent numbers
+    </requirement>
+
+    <!-- Documentation Requirements -->
+    <requirement priority="critical" category="docs">
+      Update ALL documentation pages to reflect new behavior
+    </requirement>
+  </mandatory_requirements>
+
+  <constraints>
+    <constraint>Keep solution minimal - avoid over-engineering</constraint>
+    <constraint>Preserve existing API signatures where possible</constraint>
+    <constraint>Maintain backwards compatibility for MCP tools</constraint>
+    <constraint>Use existing shadcn components (Checkbox, Label, Badge)</constraint>
+  </constraints>
+
+  <investigation_steps>
+    <step priority="high">
+      <name>Dashboard Page Inventory</name>
+      <action>
+        Identify ALL pages and components affected by these changes:
+
+        1. Main Dashboard (/):
+           - StatusDistributionChart (donut) - CRITICAL: shows overlapping data
+           - StatusSummaryBar (horizontal bar)
+           - Stats cards (pass rate, failure rate, etc.)
+           - FlakiestTestsCard
+           - SlowestTestsCard
+
+        2. Reliability Page (/dashboard/reliability):
+           - ReliabilityScoreCard
+           - FlakiestTestsCard
+           - Score Breakdown cards
+           - Raw Metrics cards
+
+        3. Performance Page (/dashboard/performance):
+           - PerformanceAlertsCard
+           - SlowestTestsCard
+           - FailureRateChart
+
+        4. Shared Components:
+           - Filters component (needs "Historic Summary" checkbox)
+           - Any shared chart components
+
+        For each component:
+        - Document current data source
+        - Note which props control filtering
+        - Identify if it shows overlapping vs mutually exclusive data
+      </action>
+      <output>
+        Document in investigation/analysis.md:
+        - Complete component list per page
+        - Data flow diagram (simplified)
+        - Chart type and data category analysis
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Chart Data Analysis</name>
+      <action>
+        Analyze each chart for correct data representation:
+
+        1. StatusDistributionChart (donut):
+           - Current: Shows passed + flaky as pie slices (WRONG)
+           - Target: Show passed/failed/skipped only, flaky as separate indicator
+
+        2. StatusSummaryBar:
+           - Verify it shows mutually exclusive categories
+           - Check if flaky count is additive or overlapping
+
+        3. All other charts:
+           - Identify data categories used
+           - Check if categories are mutually exclusive
+           - Document fixes needed
+
+        Key insight:
+        - Test status (passed/failed/skipped) = mutually exclusive
+        - Flaky flag = orthogonal attribute that can apply to any status
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - Chart-by-chart analysis
+        - Current vs target data representation
+        - Proposed visualization changes
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Database Query Analysis</name>
+      <action>
+        Analyze database functions that need modification:
+
+        1. Read lib/db/performance.ts - getPerformanceRegressions
+        2. Read lib/db/metrics.ts - getReliabilityScore
+        3. Read lib/db/index.ts - getExecutions, getTestResults
+        4. Read other relevant queries in lib/db/
+
+        For each query:
+        - Document current filtering behavior
+        - Identify WHERE clause modifications for "lastRunOnly"
+        - Determine how to properly separate passed/failed/flaky counts
+
+        Key insight: "last run" = most recent execution_id for filtered branch/suite
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - List of database functions to modify
+        - SQL pattern for "last run only" filtering
+        - Correct data aggregation patterns
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Filter State Design</name>
+      <action>
+        Design "Historic Summary" toggle integration:
+
+        Option A: URL Query Parameter (RECOMMENDED)
+        - Add ?historic=true to URL params
+        - Pros: Shareable URLs, SSR friendly
+        - Cons: URL gets longer
+
+        Option B: Client State Only
+        - useState in Filters component
+        - Pros: Cleaner URLs
+        - Cons: Not shareable, resets on navigation
+
+        UI Design:
+        - Checkbox appears inline with other filters
+        - Only visible when branch OR suite is selected
+        - Label: "Historic Summary" or "Show All Runs"
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - Chosen approach with rationale
+        - Filters component modification plan
+        - URL parameter name and behavior
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>API Endpoints Analysis</name>
+      <action>
+        Check API endpoints for needed updates:
+
+        1. /api/reliability-score - lastRunOnly support?
+        2. /api/executions - filtering support?
+        3. /api/metrics - proper data separation?
+        4. /api/mcp - MCP tools parameter updates
+        5. Any endpoint returning chart data
+
+        For each endpoint:
+        - Check current parameter support
+        - Document needed additions
+        - Verify data returned is properly categorized
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - API endpoints requiring changes
+        - New parameters to add
+        - MCP tool compatibility notes
+      </output>
+    </step>
+
+    <step priority="medium">
+      <name>Documentation Audit</name>
+      <action>
+        Identify all documentation needing updates:
+
+        1. CLAUDE.md - Main project documentation
+        2. docs/MCP_INTEGRATION.md - MCP tools docs
+        3. docs/MODERN_DASHBOARD_FEATURES.md - Feature documentation
+        4. Any README files in relevant directories
+        5. In-page documentation (info cards on pages)
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - List of documentation files to update
+        - Key sections requiring changes
+      </output>
+    </step>
+
+    <step priority="medium">
+      <name>Create Phase Prompts</name>
+      <action>
+        Break implementation into logical phases:
+
+        Phase 1: Chart Data Fixes
+        - Fix StatusDistributionChart to show only passed/failed/skipped
+        - Add separate flaky indicator (badge or secondary metric)
+        - Ensure all charts use consistent data
+
+        Phase 2: Filter Component Update
+        - Add "Historic Summary" checkbox to Filters
+        - Only show when branch/suite selected
+        - Add URL parameter support
+
+        Phase 3: Database Query Updates
+        - Add lastRunOnly parameter to relevant queries
+        - Implement "most recent execution" logic
+        - Ensure proper data separation
+
+        Phase 4: Page Integration
+        - Update all dashboard pages with new filter logic
+        - Pass new params to all child components
+        - Test behavior variations
+
+        Phase 5: Documentation &amp; Testing
+        - Update all identified documentation
+        - Verify MCP tool compatibility
+        - Final testing across all scenarios
+      </action>
+      <output>
+        - phases/01_chart_data_fixes.xml
+        - phases/02_filter_component.xml
+        - phases/03_database_queries.xml
+        - phases/04_page_integration.xml
+        - phases/05_documentation.xml
+      </output>
+    </step>
+  </investigation_steps>
+
+  <output_deliverables>
+    <deliverable>investigation/analysis.md - Full analysis with component inventory, chart analysis, query analysis, and design decisions</deliverable>
+    <deliverable>phases/01_chart_data_fixes.xml - Chart visualization fixes prompt</deliverable>
+    <deliverable>phases/02_filter_component.xml - Filter UI update prompt</deliverable>
+    <deliverable>phases/03_database_queries.xml - Database layer changes prompt</deliverable>
+    <deliverable>phases/04_page_integration.xml - All pages integration prompt</deliverable>
+    <deliverable>phases/05_documentation.xml - Documentation updates prompt</deliverable>
+  </output_deliverables>
+
+  <behavior_matrix>
+    <scenario id="1">
+      <condition>No filters applied (default state)</condition>
+      <historic_checkbox>Hidden</historic_checkbox>
+      <data_shown>All runs data (aggregated historical)</data_shown>
+      <charts>Show aggregate across all executions</charts>
+    </scenario>
+    <scenario id="2">
+      <condition>Branch selected, suite not selected</condition>
+      <historic_checkbox>Visible, unchecked by default</historic_checkbox>
+      <data_shown>Last run only for selected branch</data_shown>
+      <charts>Show data from most recent execution on that branch</charts>
+    </scenario>
+    <scenario id="3">
+      <condition>Suite selected, branch not selected</condition>
+      <historic_checkbox>Visible, unchecked by default</historic_checkbox>
+      <data_shown>Last run only for selected suite</data_shown>
+      <charts>Show data from most recent execution of that suite</charts>
+    </scenario>
+    <scenario id="4">
+      <condition>Both branch AND suite selected</condition>
+      <historic_checkbox>Visible, unchecked by default</historic_checkbox>
+      <data_shown>Last run only for selected branch+suite</data_shown>
+      <charts>Show data from most recent matching execution</charts>
+    </scenario>
+    <scenario id="5">
+      <condition>Filter applied + Historic checkbox checked</condition>
+      <historic_checkbox>Visible, checked</historic_checkbox>
+      <data_shown>All runs for selected filter(s)</data_shown>
+      <charts>Show aggregate for filtered executions</charts>
+    </scenario>
+  </behavior_matrix>
+
+  <chart_data_rules>
+    <rule name="donut_chart">
+      <description>StatusDistributionChart (donut/pie)</description>
+      <categories>Passed, Failed, Skipped</categories>
+      <must_equal_100_percent>true</must_equal_100_percent>
+      <flaky_handling>Separate badge/indicator, NOT a pie slice</flaky_handling>
+    </rule>
+    <rule name="summary_bar">
+      <description>StatusSummaryBar (horizontal bar)</description>
+      <categories>Passed, Failed, Flaky (if shown as segment)</categories>
+      <note>If flaky is shown, clarify it's a subset/overlap indicator</note>
+    </rule>
+    <rule name="consistency">
+      <description>Cross-chart consistency</description>
+      <rule>All charts on same page MUST use identical filtered dataset</rule>
+      <rule>Numbers in summary cards MUST match numbers in charts</rule>
+      <rule>Tooltips should clarify any overlapping categories</rule>
+    </rule>
+  </chart_data_rules>
+
+  <!-- MANDATORY: Update status after execution -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+      This step is MANDATORY and must be executed after all other steps.
+    </description>
+
+    <action>
+      After completing all investigation steps, UPDATE the file:
+      docs/prompts/overall-reliability-performance-improvements/status.md
+
+      with the following information:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Prompt: investigation/prompt.xml
+      - Phase: Investigation
+      - Status: completed | partial | blocked
+      - Summary of findings
+      - List of deliverables created
+      - Next steps (link to first phase prompt)
+      - Any blockers encountered
+    </action>
+
+    <rules>
+      <rule>ALWAYS update status.md as the LAST action</rule>
+      <rule>Include actual datetime from system</rule>
+      <rule>Be specific about files created and decisions made</rule>
+      <rule>Link to phases/01_chart_data_fixes.xml as next step</rule>
+    </rules>
+  </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <description>
+      Commit all changes with a structured message identifying feature and phase.
+    </description>
+    <commit_format>
+      feat(overall-reliability-performance-improvements): investigation - {{BRIEF_DESCRIPTION}}
+
+      Example: feat(overall-reliability-performance-improvements): investigation - Chart consistency and filter analysis complete
+    </commit_format>
+    <action>
+      After updating status.md, commit all changes:
+      1. Stage: git add docs/prompts/overall-reliability-performance-improvements/
+      2. Commit with format: feat(overall-reliability-performance-improvements): investigation - {description}
+    </action>
+  </mandatory_commit_step>
+</investigation_prompt>

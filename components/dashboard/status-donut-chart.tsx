@@ -5,26 +5,30 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 interface StatusDonutChartProps {
   passRate: number
   failRate: number
-  flakyRate: number
+  skippedRate?: number
+  flakyCount?: number
   title?: string
 }
 
 const COLORS = {
   passed: "var(--status-success)",
   failed: "var(--status-error)",
-  flaky: "var(--status-warning)",
+  skipped: "var(--status-muted)",
 }
 
 export function StatusDonutChart({
   passRate,
   failRate,
-  flakyRate,
+  skippedRate = 0,
+  flakyCount,
   title = "Test Status Distribution",
 }: StatusDonutChartProps) {
+  // Data shows only mutually exclusive categories: Passed/Failed/Skipped
+  // Flaky is shown as a separate badge (a test can be both passed AND flaky)
   const data = [
     { name: "Passed", value: passRate, color: COLORS.passed },
     { name: "Failed", value: failRate, color: COLORS.failed },
-    { name: "Flaky", value: flakyRate, color: COLORS.flaky },
+    { name: "Skipped", value: skippedRate, color: COLORS.skipped },
   ].filter((item) => item.value > 0)
 
   // If no data, show empty state
@@ -103,6 +107,19 @@ export function StatusDonutChart({
           </div>
         ))}
       </div>
+
+      {/* Flaky badge - shown separately as flaky is orthogonal to pass/fail status */}
+      {flakyCount !== undefined && flakyCount > 0 && (
+        <div className="flex justify-center mt-3">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-warning/20 text-warning flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ background: "var(--status-warning)" }}
+            />
+            {flakyCount} Flaky Test{flakyCount !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

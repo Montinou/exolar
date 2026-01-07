@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 5: Documentation & Testing
+  Feature: overall-reliability-performance-improvements
+  Priority: Medium
+
+  Goal: Update all documentation and verify MCP compatibility
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Overall Reliability &amp; Performance Improvements</name>
+    <folder>docs/prompts/overall-reliability-performance-improvements</folder>
+    <phase>05_documentation</phase>
+  </feature>
+
+  <task>
+    <objective>Update all documentation to reflect new filter behavior and chart changes</objective>
+  </task>
+
+  <implementation_steps>
+    <step>
+      <file>CLAUDE.md</file>
+      <changes>
+        <change>
+          <description>Add filter behavior documentation</description>
+          <section>Key Features → Implemented</section>
+          <add>
+- **Smart Filter Behavior** - When branch/suite selected:
+  - Default: Shows last run only for that filter
+  - Historic Summary checkbox: Shows all runs for filter
+  - No filter: Shows all runs (aggregate)
+- **Chart Data Consistency** - Donut shows passed/failed only, flaky as separate badge
+          </add>
+        </change>
+        <change>
+          <description>Update MCP tools section if needed</description>
+          <action>Add lastRunOnly param to tool descriptions</action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>docs/MCP_INTEGRATION.md</file>
+      <changes>
+        <change>
+          <description>Add lastRunOnly parameter to tools table</description>
+          <add>
+| `get_dashboard_metrics` | ... | lastRunOnly (bool) |
+| `get_reliability_score` | ... | lastRunOnly (bool) |
+          </add>
+        </change>
+        <change>
+          <description>Add usage example</description>
+          <add>
+### Filter Behavior
+
+When using tools with filters:
+- `lastRunOnly: true` - Returns metrics from most recent execution matching filter
+- `lastRunOnly: false` (default) - Returns aggregated metrics across all executions
+
+Example:
+```json
+{
+  "tool": "get_reliability_score",
+  "args": {
+    "branch": "main",
+    "lastRunOnly": true
+  }
+}
+```
+          </add>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>docs/MODERN_DASHBOARD_FEATURES.md</file>
+      <changes>
+        <change>
+          <description>Update feature list</description>
+          <add>
+## Smart Filter Behavior
+
+The dashboard now provides intelligent data scoping based on filter selection:
+
+| Filter State | Data Shown |
+|-------------|------------|
+| No filter | All runs (historical aggregate) |
+| Branch/Suite selected | Last run only for that filter |
+| Filter + "Historic Summary" | All runs for that filter |
+
+## Chart Consistency
+
+All charts now properly represent data categories:
+
+- **Donut Chart**: Shows only mutually exclusive categories (Passed/Failed/Skipped)
+- **Flaky Indicator**: Displayed as separate badge below chart
+- **Summary Bar**: Shows Passed/Failed segments only
+          </add>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>lib/mcp/tools.ts</file>
+      <changes>
+        <change>
+          <description>Update MCP tool definitions to include lastRunOnly</description>
+          <action>
+            Add to relevant tools:
+            {
+              name: "lastRunOnly",
+              type: "boolean",
+              description: "When true, return metrics from most recent execution only",
+              required: false
+            }
+          </action>
+        </change>
+      </changes>
+    </step>
+  </implementation_steps>
+
+  <testing>
+    <test>All documentation is accurate and up-to-date</test>
+    <test>MCP tools accept lastRunOnly parameter</test>
+    <test>MCP tools return correct data with lastRunOnly=true</test>
+    <test>No broken links in documentation</test>
+    <test>Run: npm run build (no errors)</test>
+    <test>Visual verification of all dashboard pages</test>
+  </testing>
+
+  <final_verification>
+    <check>Main dashboard donut shows passed/failed only</check>
+    <check>Flaky badge appears below donut chart</check>
+    <check>Summary bar excludes flaky from segments</check>
+    <check>Historic checkbox appears when filter applied</check>
+    <check>Data changes correctly based on filter state</check>
+    <check>All three pages (/, /reliability, /performance) work correctly</check>
+    <check>MCP tools work with new parameters</check>
+    <check>Documentation is complete</check>
+  </final_verification>
+
+  <mandatory_final_step priority="critical">
+    <action>
+      Update status.md with feature completion:
+      - Date: Get from system
+      - Phase: 05_documentation
+      - Status: completed
+      - Mark feature as COMPLETE
+    </action>
+  </mandatory_final_step>
+
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(overall-reliability-performance-improvements): phase-05 - Update documentation and verify MCP compatibility
+    </commit_format>
+  </mandatory_commit_step>
+</phase_prompt>

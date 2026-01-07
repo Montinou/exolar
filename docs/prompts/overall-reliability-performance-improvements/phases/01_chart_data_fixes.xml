@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 1: Chart Data Fixes
+  Feature: overall-reliability-performance-improvements
+  Priority: Critical
+
+  Goal: Fix chart visualizations to show mutually exclusive data
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Overall Reliability &amp; Performance Improvements</name>
+    <folder>docs/prompts/overall-reliability-performance-improvements</folder>
+    <phase>01_chart_data_fixes</phase>
+  </feature>
+
+  <task>
+    <objective>Fix StatusDonutChart and TestSummaryBar to correctly represent overlapping flaky data</objective>
+
+    <context>
+      The donut chart currently shows flaky as a pie slice alongside passed/failed.
+      This is incorrect because:
+      - Passed/Failed/Skipped are mutually exclusive (a test has one status)
+      - Flaky is an orthogonal attribute (a test can be passed AND flaky)
+      - Showing them as pie slices creates percentages that don't add to 100%
+    </context>
+
+    <user_decisions>
+      - Flaky indicator: Badge below chart (separate from pie)
+      - Summary bar: Remove flaky from bar segments, keep as count badge
+    </user_decisions>
+  </task>
+
+  <implementation_steps>
+    <step>
+      <file>components/dashboard/status-donut-chart.tsx</file>
+      <changes>
+        <change>
+          <description>Update interface to replace flakyRate with flakyCount</description>
+          <before>
+interface StatusDonutChartProps {
+  passRate: number
+  failRate: number
+  flakyRate: number
+  title?: string
+}
+          </before>
+          <after>
+interface StatusDonutChartProps {
+  passRate: number
+  failRate: number
+  flakyCount?: number
+  title?: string
+}
+          </after>
+        </change>
+        <change>
+          <description>Remove flaky from pie data array</description>
+          <before>
+const data = [
+  { name: "Passed", value: passRate, color: COLORS.passed },
+  { name: "Failed", value: failRate, color: COLORS.failed },
+  { name: "Flaky", value: flakyRate, color: COLORS.flaky },
+].filter((item) => item.value > 0)
+          </before>
+          <after>
+const data = [
+  { name: "Passed", value: passRate, color: COLORS.passed },
+  { name: "Failed", value: failRate, color: COLORS.failed },
+].filter((item) => item.value > 0)
+          </after>
+        </change>
+        <change>
+          <description>Add flaky badge below legend</description>
+          <location>After the legend div (line ~105)</location>
+          <add>
+{flakyCount !== undefined &amp;&amp; flakyCount > 0 &amp;&amp; (
+  &lt;div className="flex justify-center mt-2"&gt;
+    &lt;span className="text-xs px-2 py-1 rounded-full bg-warning/20 text-warning flex items-center gap-1"&gt;
+      &lt;span className="h-2 w-2 rounded-full" style={{ background: "var(--status-warning)" }} /&gt;
+      {flakyCount} Flaky Tests
+    &lt;/span&gt;
+  &lt;/div&gt;
+)}
+          </add>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>components/dashboard/test-summary-bar.tsx</file>
+      <changes>
+        <change>
+          <description>Remove flaky from progress bar segments</description>
+          <location>Lines 94-102 (progress bar)</location>
+          <action>Remove the flaky segment from the progress bar div</action>
+        </change>
+        <change>
+          <description>Add tooltip to flaky count in header</description>
+          <location>Lines 58-70 (flaky count badge)</location>
+          <action>
+            Wrap flaky badge with Tooltip component:
+            "Flaky tests may also be counted as passed"
+          </action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>app/dashboard/page.tsx</file>
+      <changes>
+        <change>
+          <description>Update StatusDonutChart props</description>
+          <before>
+&lt;StatusDonutChart
+  passRate={totalTests > 0 ? (passedTests / totalTests) * 100 : 0}
+  failRate={totalTests > 0 ? (failedTests / totalTests) * 100 : 0}
+  flakyRate={totalTests > 0 ? (flakyTests / totalTests) * 100 : 0}
+/&gt;
+          </before>
+          <after>
+&lt;StatusDonutChart
+  passRate={totalTests > 0 ? (passedTests / totalTests) * 100 : 0}
+  failRate={totalTests > 0 ? (failedTests / totalTests) * 100 : 0}
+  flakyCount={flakyTests}
+/&gt;
+          </after>
+        </change>
+      </changes>
+    </step>
+  </implementation_steps>
+
+  <testing>
+    <test>Verify donut chart shows only passed/failed slices</test>
+    <test>Verify flaky badge appears below chart when flakyCount > 0</test>
+    <test>Verify summary bar shows passed/failed segments only</test>
+    <test>Verify flaky count still visible in header with tooltip</test>
+    <test>Run: npm run build (no TypeScript errors)</test>
+    <test>Visual check on main dashboard</test>
+  </testing>
+
+  <mandatory_final_step priority="critical">
+    <action>
+      Update status.md with phase completion:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Phase: 01_chart_data_fixes
+      - Status: completed
+      - Files modified list
+    </action>
+  </mandatory_final_step>
+
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(overall-reliability-performance-improvements): phase-01 - Fix chart data to show mutually exclusive categories
+    </commit_format>
+  </mandatory_commit_step>
+</phase_prompt>

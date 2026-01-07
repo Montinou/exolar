@@ -55,6 +55,7 @@ async function DashboardContent({
   const totalTests = metrics.latestPassRate?.total_tests ?? 0
   const passedTests = metrics.latestPassRate?.passed_tests ?? 0
   const failedTests = metrics.latestPassRate?.failed_tests ?? 0
+  const skippedTests = metrics.latestPassRate?.skipped_tests ?? 0
   const flakyTests = metrics.flakyTests ?? 0
 
   return (
@@ -68,6 +69,7 @@ async function DashboardContent({
           total={totalTests}
           passed={passedTests}
           failed={failedTests}
+          skipped={skippedTests}
           flaky={flakyTests}
         />
 
@@ -77,7 +79,8 @@ async function DashboardContent({
           <StatusDonutChart
             passRate={totalTests > 0 ? (passedTests / totalTests) * 100 : 0}
             failRate={totalTests > 0 ? (failedTests / totalTests) * 100 : 0}
-            flakyRate={totalTests > 0 ? (flakyTests / totalTests) * 100 : 0}
+            skippedRate={totalTests > 0 ? (skippedTests / totalTests) * 100 : 0}
+            flakyCount={flakyTests}
           />
           <FailureRateChart dateFrom={params.from} dateTo={params.to} />
           <ErrorDistributionChart />

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 3: Database Query Updates
+  Feature: overall-reliability-performance-improvements
+  Priority: High
+
+  Goal: Add lastRunOnly parameter to database queries
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Overall Reliability &amp; Performance Improvements</name>
+    <folder>docs/prompts/overall-reliability-performance-improvements</folder>
+    <phase>03_database_queries</phase>
+  </feature>
+
+  <task>
+    <objective>Add lastRunOnly parameter to database functions to support "last run" filtering</objective>
+
+    <context>
+      Current state:
+      - All queries aggregate ALL executions in time range
+      - No function supports lastRunOnly parameter
+
+      Target state:
+      - When lastRunOnly=true, filter metrics to most recent execution
+      - Most recent execution determined by branch/suite filter
+    </context>
+  </task>
+
+  <implementation_steps>
+    <step>
+      <file>lib/db/metrics.ts</file>
+      <changes>
+        <change>
+          <description>Add getLatestExecutionId helper function</description>
+          <add>
+/**
+ * Get the ID of the most recent execution matching filters
+ */
+export async function getLatestExecutionId(
+  organizationId: number,
+  branch?: string,
+  suite?: string
+): Promise&lt;number | null&gt; {
+  const sql = getSql()
+
+  const conditions = [`organization_id = ${organizationId}`]
+  if (branch) conditions.push(`branch = '${branch}'`)
+  if (suite) conditions.push(`suite = '${suite}'`)
+
+  const whereClause = conditions.join(" AND ")
+
+  const result = await sql`
+    SELECT id FROM test_executions
+    WHERE ${sql.unsafe(whereClause)}
+      AND completed_at IS NOT NULL
+    ORDER BY started_at DESC
+    LIMIT 1
+  `
+
+  return result[0]?.id ?? null
+}
+          </add>
+        </change>
+        <change>
+          <description>Update getDashboardMetrics to support lastRunOnly</description>
+          <before>
+export async function getDashboardMetrics(
+  organizationId: number,
+  dateRange?: DateRangeFilter
+): Promise&lt;DashboardMetrics&gt;
+          </before>
+          <after>
+interface DashboardMetricsOptions extends DateRangeFilter {
+  lastRunOnly?: boolean
+  branch?: string
+  suite?: string
+}
+
+export async function getDashboardMetrics(
+  organizationId: number,
+  options?: DashboardMetricsOptions
+): Promise&lt;DashboardMetrics&gt;
+          </after>
+          <action>
+            Inside the function:
+            1. Extract lastRunOnly, branch, suite from options
+            2. If lastRunOnly=true, call getLatestExecutionId(orgId, branch, suite)
+            3. Add WHERE execution_id = latestId to relevant queries
+          </action>
+        </change>
+        <change>
+          <description>Update getReliabilityScore to support lastRunOnly</description>
+          <action>
+            1. Add lastRunOnly to ReliabilityScoreOptions interface
+            2. When lastRunOnly=true, filter to latest execution
+          </action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>lib/db/flakiness.ts</file>
+      <changes>
+        <change>
+          <description>Add executionId filter to getFlakiestTests</description>
+          <action>
+            1. Add executionId?: number to options
+            2. When executionId provided, filter to that execution's results
+            3. Calculate flakiness from test_results instead of aggregate table
+          </action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>lib/db/index.ts</file>
+      <changes>
+        <change>
+          <description>Export new helper and update getQueriesForOrg</description>
+          <action>
+            1. Export getLatestExecutionId
+            2. Add lastRunOnly support to wrapped functions in getQueriesForOrg
+          </action>
+        </change>
+      </changes>
+    </step>
+  </implementation_steps>
+
+  <sql_patterns>
+    <pattern name="last_run_filter">
+WITH latest_execution AS (
+  SELECT id FROM test_executions
+  WHERE organization_id = $1
+    AND ($2::text IS NULL OR branch = $2)
+    AND ($3::text IS NULL OR suite = $3)
+    AND completed_at IS NOT NULL
+  ORDER BY started_at DESC
+  LIMIT 1
+)
+SELECT ... FROM test_results tr
+WHERE tr.execution_id = (SELECT id FROM latest_execution)
+    </pattern>
+  </sql_patterns>
+
+  <testing>
+    <test>getLatestExecutionId returns correct ID for branch filter</test>
+    <test>getLatestExecutionId returns correct ID for suite filter</test>
+    <test>getLatestExecutionId returns null when no matches</test>
+    <test>getDashboardMetrics with lastRunOnly=true returns single execution data</test>
+    <test>getDashboardMetrics with lastRunOnly=false returns aggregated data</test>
+    <test>getReliabilityScore with lastRunOnly=true works correctly</test>
+    <test>Run: npm run build (no TypeScript errors)</test>
+  </testing>
+
+  <mandatory_final_step priority="critical">
+    <action>
+      Update status.md with phase completion
+    </action>
+  </mandatory_final_step>
+
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(overall-reliability-performance-improvements): phase-03 - Add lastRunOnly parameter to database queries
+    </commit_format>
+  </mandatory_commit_step>
+</phase_prompt>

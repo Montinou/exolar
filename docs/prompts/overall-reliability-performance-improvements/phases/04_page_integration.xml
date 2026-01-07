@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 4: Page Integration
+  Feature: overall-reliability-performance-improvements
+  Priority: Medium
+
+  Goal: Integrate filter logic into all dashboard pages
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Overall Reliability &amp; Performance Improvements</name>
+    <folder>docs/prompts/overall-reliability-performance-improvements</folder>
+    <phase>04_page_integration</phase>
+  </feature>
+
+  <task>
+    <objective>Update all dashboard pages to use lastRunOnly based on filter state</objective>
+
+    <context>
+      Filter behavior:
+      - No filter → lastRunOnly = false (show all)
+      - Filter applied, historic unchecked → lastRunOnly = true
+      - Filter applied, historic checked → lastRunOnly = false
+
+      Logic: lastRunOnly = hasFilter &amp;&amp; !historic
+    </context>
+  </task>
+
+  <implementation_steps>
+    <step>
+      <file>app/dashboard/page.tsx</file>
+      <changes>
+        <change>
+          <description>Read historic param from searchParams</description>
+          <add>
+const historic = params.historic === "true"
+const hasFilter = !!(params.branch || params.suite)
+const lastRunOnly = hasFilter &amp;&amp; !historic
+          </add>
+        </change>
+        <change>
+          <description>Pass lastRunOnly to getDashboardMetrics</description>
+          <before>
+const metrics = await db.getDashboardMetrics(dateRange)
+          </before>
+          <after>
+const metrics = await db.getDashboardMetrics({
+  from: dateRange?.from,
+  to: dateRange?.to,
+  branch: params.branch,
+  suite: params.suite,
+  lastRunOnly,
+})
+          </after>
+        </change>
+        <change>
+          <description>Pass lastRunOnly to other queries as needed</description>
+          <action>Update all db calls that support lastRunOnly</action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>app/dashboard/reliability/page.tsx</file>
+      <changes>
+        <change>
+          <description>Add same filter logic</description>
+          <add>
+const historic = params.historic === "true"
+const hasFilter = !!(params.branch || params.suite)
+const lastRunOnly = hasFilter &amp;&amp; !historic
+          </add>
+        </change>
+        <change>
+          <description>Pass to getReliabilityScore</description>
+          <before>
+const score = await db.getReliabilityScore({
+  from: params.from,
+  to: params.to,
+  branch: params.branch,
+  suite: params.suite,
+})
+          </before>
+          <after>
+const score = await db.getReliabilityScore({
+  from: params.from,
+  to: params.to,
+  branch: params.branch,
+  suite: params.suite,
+  lastRunOnly,
+})
+          </after>
+        </change>
+        <change>
+          <description>Update ReliabilityScoreCard props</description>
+          <action>Pass lastRunOnly to client component if it fetches data</action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>app/dashboard/performance/page.tsx</file>
+      <changes>
+        <change>
+          <description>Add same filter logic</description>
+          <add>
+const historic = params.historic === "true"
+const hasFilter = !!(params.branch || params.suite)
+const lastRunOnly = hasFilter &amp;&amp; !historic
+          </add>
+        </change>
+        <change>
+          <description>Pass to PerformanceAlertsCard</description>
+          <action>Add lastRunOnly prop to component</action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>components/dashboard/reliability-score.tsx</file>
+      <changes>
+        <change>
+          <description>Add lastRunOnly to API fetch if component fetches data</description>
+          <action>
+            Update useEffect fetch to include lastRunOnly param:
+            if (lastRunOnly) params.set("lastRunOnly", "true")
+          </action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>app/api/reliability-score/route.ts</file>
+      <changes>
+        <change>
+          <description>Add lastRunOnly param support</description>
+          <action>
+            Read lastRunOnly from searchParams
+            Pass to getReliabilityScore options
+          </action>
+        </change>
+      </changes>
+    </step>
+  </implementation_steps>
+
+  <testing>
+    <test>Main dashboard: No filter → shows all runs data</test>
+    <test>Main dashboard: Branch filter → shows last run only</test>
+    <test>Main dashboard: Branch + Historic → shows all runs for branch</test>
+    <test>Reliability page: Same behavior as main dashboard</test>
+    <test>Performance page: Same behavior as main dashboard</test>
+    <test>All charts update correctly on filter change</test>
+    <test>Run: npm run build (no TypeScript errors)</test>
+  </testing>
+
+  <mandatory_final_step priority="critical">
+    <action>
+      Update status.md with phase completion
+    </action>
+  </mandatory_final_step>
+
+  <mandatory_commit_step priority="critical">
+    <commit_format>
+      feat(overall-reliability-performance-improvements): phase-04 - Integrate filter logic into all dashboard pages
+    </commit_format>
+  </mandatory_commit_step>
+</phase_prompt>
