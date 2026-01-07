@@ -1,32 +1,10 @@
-import { getSql } from "./db"
+import { getSql } from "./connection"
 
-// ============================================
-// Types
-// ============================================
-
-export interface Organization {
-  id: number
-  name: string
-  slug: string
-  created_by: number | null
-  created_at: string
-  updated_at: string
-}
-
-export interface OrganizationMember {
-  id: number
-  organization_id: number
-  user_id: number
-  role: "owner" | "admin" | "viewer"
-  joined_at: string
-  // Joined fields
-  user_email?: string
-  user_name?: string
-}
-
-export interface OrganizationWithRole extends Organization {
-  user_role?: "owner" | "admin" | "viewer"
-}
+import type {
+  Organization,
+  OrganizationMember,
+  OrganizationWithRole,
+} from "./types"
 
 // ============================================
 // Organization CRUD

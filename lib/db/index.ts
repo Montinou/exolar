@@ -10,6 +10,11 @@ export { generateTestSignature, isTestFlaky } from "./utils"
 
 // Types
 export type {
+  // Organization types
+  Organization,
+  OrganizationMember,
+  OrganizationWithRole,
+  // Query types
   DateRangeFilter,
   FailedTestResult,
   ExecutionSummary,
@@ -29,6 +34,24 @@ export type {
   ErrorDistributionOptions,
   ErrorDistributionItem,
 } from "./types"
+
+// Organization operations
+export {
+  createOrganization,
+  getOrganizationById,
+  getOrganizationBySlug,
+  updateOrganization,
+  deleteOrganization,
+  getAllOrganizations,
+  getOrganizationMembers,
+  addOrganizationMember,
+  updateMemberRole,
+  removeMember,
+  getUserOrganizations,
+  isUserMemberOfOrg,
+  createOrgInvite,
+  getOrgInvites,
+} from "./orgs"
 
 // Execution queries
 export {

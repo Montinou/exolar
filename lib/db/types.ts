@@ -2,6 +2,37 @@
 // Local type definitions for db module
 // Note: Main types are still imported from lib/types.ts
 
+// ============================================
+// Organization Types
+// ============================================
+
+export interface Organization {
+  id: number
+  name: string
+  slug: string
+  created_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OrganizationMember {
+  id: number
+  organization_id: number
+  user_id: number
+  role: "owner" | "admin" | "viewer"
+  joined_at: string
+  user_email?: string
+  user_name?: string
+}
+
+export interface OrganizationWithRole extends Organization {
+  user_role?: "owner" | "admin" | "viewer"
+}
+
+// ============================================
+// Query Types
+// ============================================
+
 export interface DateRangeFilter {
   from?: string // ISO date string
   to?: string // ISO date string

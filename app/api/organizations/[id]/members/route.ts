@@ -5,7 +5,7 @@ import {
   addOrganizationMember,
   createOrgInvite,
   getOrgInvites,
-} from "@/lib/db-orgs"
+} from "@/lib/db"
 import { getUserByEmail } from "@/lib/db-users"
 
 export const dynamic = "force-dynamic"

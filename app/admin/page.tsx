@@ -15,8 +15,7 @@ import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building } fr
 import { BrandLogo } from "@/components/ui/brand-logo"
 import Link from "next/link"
 import type { DashboardUser, Invite } from "@/lib/db-users"
-import type { Organization } from "@/lib/db-orgs" // We need Organization type. I assume it's exported from db-orgs or I define it locally if types are messy.
-// Actually I'll use `any` or define narrow type locally to avoid import issues if verify fails, but `db-orgs` exports it.
+import type { Organization } from "@/lib/db"
 
 export default function AdminPage() {
   const router = useRouter()

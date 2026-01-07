@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireSystemAdmin } from "@/lib/session-context"
-import { getAllOrganizations } from "@/lib/db-orgs"
+import { getAllOrganizations } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 

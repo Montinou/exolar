@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireOrgAdmin } from "@/lib/session-context"
-import { updateMemberRole, removeMember } from "@/lib/db-orgs"
+import { updateMemberRole, removeMember } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { authServer } from "@/lib/auth/server"
 import { isAdmin, getAllInvites, createInvite, deleteInvite, getUserByEmail, createUser } from "@/lib/db-users"
-import { addOrganizationMember } from "@/lib/db-orgs"
+import { addOrganizationMember } from "@/lib/db"
 
 /**
  * GET /api/admin/invites - List all invites
