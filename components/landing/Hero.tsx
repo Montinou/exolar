@@ -4,10 +4,12 @@ import Link from "next/link"
 import Image from "next/image"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { WishlistForm } from "./WishlistForm"
+import { BrandLogo } from "@/components/ui/brand-logo"
+import { FadeInOnScroll } from "@/components/ui/fade-in-on-scroll"
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden grid-pattern">
+    <section className="relative min-h-screen flex flex-col overflow-hidden grid-pattern">
       {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -16,16 +18,14 @@ export function Hero() {
         }}
       />
 
-      {/* Content */}
-      <div className="relative z-10 container mx-auto px-4 py-20">
-        <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          {/* Logo */}
-          <div className="flex justify-center">
-            <div className="relative w-20 h-20 rounded-full overflow-hidden glass-panel shadow-2xl">
-               <Image src="/branding/logo-icon.png" alt="Exolar QA Logo" fill className="object-contain" />
-            </div>
-          </div>
+      {/* Full-width Header Banner */}
+      <div className="relative z-10 w-full animate-in fade-in duration-1000">
+        <BrandLogo variant="header" />
+      </div>
 
+      {/* Content */}
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-panel text-sm">
             <Sparkles className="w-4 h-4" style={{ color: "var(--safety-amber)" }} />
@@ -83,73 +83,79 @@ export function Hero() {
         </div>
 
         {/* Visual: Playwright <-> AI Connection */}
-        <div className="mt-20 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300">
+        <div className="mt-20 max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
             {/* Playwright Trace */}
-            <div className="glass-panel p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ background: "var(--exolar-cyan)" }}
-                />
-                <span className="font-mono text-sm text-muted-foreground">playwright-trace.json</span>
+            <FadeInOnScroll direction="left">
+              <div className="glass-panel p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: "var(--exolar-cyan)" }}
+                  />
+                  <span className="font-mono text-sm text-muted-foreground">playwright-trace.json</span>
+                </div>
+                <div className="space-y-2 font-mono text-xs" style={{ color: "oklch(0.6 0 0)" }}>
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: "oklch(0.5 0.15 0)" }}>FAIL</span>
+                    <span>login.spec.ts:42</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: "oklch(0.5 0.15 0)" }}>FAIL</span>
+                    <span>checkout.spec.ts:89</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: "oklch(0.65 0.15 140)" }}>PASS</span>
+                    <span>home.spec.ts:15</span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2 font-mono text-xs" style={{ color: "oklch(0.6 0 0)" }}>
-                <div className="flex items-center gap-2">
-                  <span style={{ color: "oklch(0.5 0.15 0)" }}>FAIL</span>
-                  <span>login.spec.ts:42</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span style={{ color: "oklch(0.5 0.15 0)" }}>FAIL</span>
-                  <span>checkout.spec.ts:89</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span style={{ color: "oklch(0.65 0.15 140)" }}>PASS</span>
-                  <span>home.spec.ts:15</span>
-                </div>
-              </div>
-            </div>
+            </FadeInOnScroll>
 
             {/* Connection Glow */}
-            <div className="hidden md:flex items-center justify-center">
-              <div className="relative">
-                <div
-                  className="w-24 h-1 rounded-full animate-pulse"
-                  style={{
-                    background: "linear-gradient(90deg, var(--exolar-cyan), var(--safety-amber))",
-                    boxShadow: "0 0 20px oklch(0.6 0.2 260 / 0.5)",
-                  }}
-                />
-                <div
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-mono"
-                  style={{ color: "var(--safety-amber)" }}
-                >
-                  MCP
+            <FadeInOnScroll direction="up" delay={150}>
+              <div className="hidden md:flex items-center justify-center">
+                <div className="relative">
+                  <div
+                    className="w-24 h-1 rounded-full animate-pulse"
+                    style={{
+                      background: "linear-gradient(90deg, var(--exolar-cyan), var(--safety-amber))",
+                      boxShadow: "0 0 20px oklch(0.6 0.2 260 / 0.5)",
+                    }}
+                  />
+                  <div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-mono"
+                    style={{ color: "var(--safety-amber)" }}
+                  >
+                    MCP
+                  </div>
                 </div>
               </div>
-            </div>
+            </FadeInOnScroll>
 
             {/* AI Agent Terminal */}
-            <div className="glass-panel p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ background: "var(--safety-amber)" }}
-                />
-                <span className="font-mono text-sm text-muted-foreground">claude-agent</span>
+            <FadeInOnScroll direction="right" delay={300}>
+              <div className="glass-panel p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ background: "var(--safety-amber)" }}
+                  />
+                  <span className="font-mono text-sm text-muted-foreground">claude-agent</span>
+                </div>
+                <div className="space-y-2 font-mono text-xs" style={{ color: "oklch(0.7 0 0)" }}>
+                  <div>
+                    <span style={{ color: "var(--safety-amber)" }}>&gt;</span> Analyzing failures...
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--exolar-cyan)" }}>i</span> Found flaky test pattern
+                  </div>
+                  <div>
+                    <span style={{ color: "oklch(0.65 0.15 140)" }}>+</span> Suggested fix: add wait
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2 font-mono text-xs" style={{ color: "oklch(0.7 0 0)" }}>
-                <div>
-                  <span style={{ color: "var(--safety-amber)" }}>&gt;</span> Analyzing failures...
-                </div>
-                <div>
-                  <span style={{ color: "var(--exolar-cyan)" }}>i</span> Found flaky test pattern
-                </div>
-                <div>
-                  <span style={{ color: "oklch(0.65 0.15 140)" }}>+</span> Suggested fix: add wait
-                </div>
-              </div>
-            </div>
+            </FadeInOnScroll>
           </div>
         </div>
       </div>

@@ -2,19 +2,35 @@ import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 interface BrandLogoProps {
-  variant?: "icon" | "full"
+  variant?: "icon" | "full" | "header"
   className?: string
   width?: number
   height?: number
 }
 
-export function BrandLogo({ 
-  variant = "icon", 
+export function BrandLogo({
+  variant = "icon",
   className,
   width,
-  height 
+  height
 }: BrandLogoProps) {
-  // Default sizes
+  // Header variant - full width banner (scales to fit, shows complete image)
+  if (variant === "header") {
+    return (
+      <div className={cn("relative w-full", className)}>
+        <Image
+          src="/branding/logo-header.png"
+          alt="Exolar E2E Dashboard"
+          width={1200}
+          height={300}
+          className="w-full h-auto object-contain"
+          priority
+        />
+      </div>
+    )
+  }
+
+  // Default sizes for icon and full variants
   const defaultSize = variant === "icon" ? 32 : 120
   const w = width || defaultSize
   const h = height || (variant === "icon" ? defaultSize : defaultSize / 3) // approximate aspect ratio for full logo
