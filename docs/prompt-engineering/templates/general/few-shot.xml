@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Few-Shot Learning Template
+  Use for: Classification, formatting, pattern following
+  Last Updated: January 2026
+-->
+
+<task>{{TASK_DESCRIPTION}}</task>
+
+<examples>
+  <example id="1">
+    <input>{{EXAMPLE_INPUT_1}}</input>
+    <output>{{EXPECTED_OUTPUT_1}}</output>
+    <explanation>{{WHY_THIS_OUTPUT}}</explanation>
+  </example>
+
+  <example id="2">
+    <input>{{EXAMPLE_INPUT_2}}</input>
+    <output>{{EXPECTED_OUTPUT_2}}</output>
+    <explanation>{{WHY_THIS_OUTPUT}}</explanation>
+  </example>
+
+  <example id="3">
+    <input>{{EXAMPLE_INPUT_3}}</input>
+    <output>{{EXPECTED_OUTPUT_3}}</output>
+    <explanation>{{WHY_THIS_OUTPUT}}</explanation>
+  </example>
+</examples>
+
+<instructions>
+Follow the pattern demonstrated in the examples above.
+Provide output in the same format.
+</instructions>
+
+<input_to_process>
+{{ACTUAL_INPUT}}
+</input_to_process>

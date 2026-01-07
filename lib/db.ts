@@ -1,5 +1,3 @@
-import { neon } from "@neondatabase/serverless"
-import { createHash } from "crypto"
 import type {
   TestExecution,
   TestResult,
@@ -31,27 +29,53 @@ import type {
   ClassificationOptions,
 } from "./types"
 
-export function getSql() {
-  return neon(process.env.DATABASE_URL!)
-}
+// Import from new modular files
+import { getSql, setServiceAccountContext } from "./db/connection"
+import { generateTestSignature, isTestFlaky } from "./db/utils"
+import type {
+  DateRangeFilter,
+  FailedTestResult,
+  ExecutionSummary,
+  TrendPeriod,
+  TrendOptions,
+  TrendDataPoint,
+  BranchStatistics,
+  SuiteStatistics,
+  GetFlakiestTestsOptions,
+  GetFlakinessSummaryOptions,
+  SlowestTest,
+  SuitePassRate,
+  OrgApiKey,
+  OrgApiKeyWithHash,
+  ReliabilityScoreOptions,
+  PerformanceRegressionsOptions,
+  ErrorDistributionOptions,
+  ErrorDistributionItem,
+} from "./db/types"
 
-/**
- * Set service account context for RLS bypass.
- * Call this at the start of API routes that use API key auth (not user sessions).
- * This allows CI/CD to write data without triggering RLS policies.
- * 
- * Note: This sets a session variable that the is_service_account() 
- * PostgreSQL function checks in RLS policies.
- */
-export async function setServiceAccountContext() {
-  const sql = getSql()
-  await sql`SET LOCAL app.is_service_account = 'true'`
-}
-
-export interface DateRangeFilter {
-  from?: string // ISO date string
-  to?: string // ISO date string
-}
+// Re-export for backwards compatibility
+export { getSql, setServiceAccountContext } from "./db/connection"
+export { generateTestSignature, isTestFlaky } from "./db/utils"
+export type {
+  DateRangeFilter,
+  FailedTestResult,
+  ExecutionSummary,
+  TrendPeriod,
+  TrendOptions,
+  TrendDataPoint,
+  BranchStatistics,
+  SuiteStatistics,
+  GetFlakiestTestsOptions,
+  GetFlakinessSummaryOptions,
+  SlowestTest,
+  SuitePassRate,
+  OrgApiKey,
+  OrgApiKeyWithHash,
+  ReliabilityScoreOptions,
+  PerformanceRegressionsOptions,
+  ErrorDistributionOptions,
+  ErrorDistributionItem,
+} from "./db/types"
 
 export async function getExecutions(
   organizationId: number,
@@ -206,29 +230,6 @@ export async function getTestResultsByExecutionId(organizationId: number, execut
 // ============================================
 // Execution Analysis Functions (MCP Aggregation)
 // ============================================
-
-export interface FailedTestResult {
-  test_name: string
-  test_file: string
-  error_message: string | null
-  duration_ms: number
-  retry_count: number
-  stack_trace?: string | null
-}
-
-export interface ExecutionSummary {
-  execution: TestExecution
-  summary: {
-    total: number
-    passed: number
-    failed: number
-    skipped: number
-    pass_rate: number
-    duration_ms: number
-  }
-  error_distribution: Array<{ error_pattern: string; count: number }>
-  files_affected: Array<{ file: string; failed: number; passed: number }>
-}
 
 /**
  * Get only failed tests from an execution (much smaller than full results)
@@ -512,25 +513,6 @@ export async function getDashboardMetrics(organizationId: number, dateRange?: Da
   } as DashboardMetrics
 }
 
-export type TrendPeriod = 'hour' | 'day' | 'week' | 'month'
-
-export interface TrendOptions {
-  period?: TrendPeriod
-  count?: number          // Number of periods to look back
-  days?: number           // Deprecated: use count + period instead
-  from?: string           // Explicit start date (ISO 8601)
-  to?: string             // Explicit end date (ISO 8601)
-}
-
-export interface TrendDataPoint {
-  period: string          // ISO date or datetime depending on granularity
-  executions: number      // Total runs in this period
-  passed: number
-  failed: number
-  skipped: number
-  pass_rate: number       // 0-100
-}
-
 /**
  * Get trend data with flexible time granularity.
  * Supports hourly, daily, weekly, and monthly aggregation.
@@ -658,22 +640,6 @@ export async function getFailureTrendData(
 // ============================================
 // Branch/Suite Statistics Functions
 // ============================================
-
-export interface BranchStatistics {
-  branch: string
-  last_run: string | null
-  execution_count: number
-  pass_rate: number
-  last_status: "success" | "failure" | "running" | null
-}
-
-export interface SuiteStatistics {
-  suite: string
-  last_run: string | null
-  execution_count: number
-  pass_rate: number
-  last_status: "success" | "failure" | "running" | null
-}
 
 /**
  * Get branches with full statistics.
@@ -906,14 +872,6 @@ export async function getExecutionsGroupedByBranch(
 // ============================================
 // Insert Functions for Data Ingestion
 // ============================================
-
-/**
- * Generate MD5 hash signature for test identification
- * Format: MD5(test_file::test_name)
- */
-export function generateTestSignature(testFile: string, testName: string): string {
-  return createHash("md5").update(`${testFile}::${testName}`).digest("hex")
-}
 
 export async function insertExecution(organizationId: number, data: ExecutionRequest): Promise<number> {
   const sql = getSql()
@@ -1253,21 +1211,6 @@ export async function getFailuresWithAIContext(
 // Error Distribution Types and Options
 // ============================================
 
-export interface ErrorDistributionOptions {
-  since?: string
-  branch?: string
-  suite?: string
-  limit?: number
-  groupBy?: 'error_type' | 'file' | 'branch'
-}
-
-export interface ErrorDistributionItem {
-  error_type: string
-  count: number
-  percentage: number
-  example_message: string | null
-}
-
 export async function getErrorTypeDistribution(
   organizationId: number,
   options: ErrorDistributionOptions | string = {}
@@ -1377,23 +1320,6 @@ export async function getErrorTypeDistribution(
 // Flakiness Detection Functions (Phase 06)
 // ============================================
 
-/**
- * Check if a test result is flaky based on retry count and status
- * A test is flaky if it passed after at least one retry
- */
-export function isTestFlaky(retryCount: number, status: string): boolean {
-  return retryCount > 0 && status === "passed"
-}
-
-export interface GetFlakiestTestsOptions {
-  limit?: number
-  minRuns?: number
-  since?: string
-  branch?: string
-  suite?: string
-  includeResolved?: boolean
-}
-
 export async function getFlakiestTests(
   organizationId: number,
   options: GetFlakiestTestsOptions | number = {} // Support legacy signature (limit as number) for backward compatibility during transistion
@@ -1476,8 +1402,6 @@ export async function getFlakiestTests(
     `
   }
 
-  const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter} ${suiteFilter}`
-
   // When branch or suite filter is active, calculate filtered stats
   // Otherwise return overall stats from test_flakiness_history
   const hasFilters = branch || suite
@@ -1488,7 +1412,14 @@ export async function getFlakiestTests(
     const filterConditions = []
     if (branch) filterConditions.push(`te_filtered.branch = '${branch.replace(/'/g, "''")}'`)
     if (suite) filterConditions.push(`te_filtered.suite = '${suite.replace(/'/g, "''")}'`)
-    const filterWhere = filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : ""
+    if (since) filterConditions.push(`tr_filtered.started_at >= '${since}'`)
+    const filterWhere = filterConditions.join(" AND ")
+
+    // Build WHERE clause for filtered query (without the subquery filters)
+    const filteredConditions = [`tfh.organization_id = ${organizationId}`]
+    if (!includeResolved) {
+      filteredConditions.push("tfh.flaky_runs > 0")
+    }
 
     results = await sql`
       SELECT
@@ -1516,14 +1447,16 @@ export async function getFlakiestTests(
       JOIN test_results tr_filtered ON tfh.test_signature = tr_filtered.test_signature
       JOIN test_executions te_filtered ON tr_filtered.execution_id = te_filtered.id
         AND te_filtered.organization_id = ${organizationId}
-        ${sql.unsafe(filterWhere)}
-      ${sql.unsafe(whereClause)}
+        AND ${sql.unsafe(filterWhere)}
+      WHERE ${sql.unsafe(filteredConditions.join(" AND "))}
       GROUP BY tfh.test_signature, tfh.test_name, tfh.test_file
       HAVING COUNT(*) FILTER (WHERE tr_filtered.is_flaky = true) > 0
       ORDER BY flakiness_rate DESC, flaky_runs DESC
       LIMIT ${limit}
     `
   } else {
+    // Build WHERE clause for unfiltered query (with subquery filters)
+    const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter} ${suiteFilter}`
     results = await sql`
       SELECT
         tfh.*,
@@ -1545,12 +1478,6 @@ export async function getFlakiestTests(
   }
 
   return results as unknown as TestFlakinessHistory[]
-}
-
-export interface GetFlakinessSummaryOptions {
-  branch?: string
-  suite?: string
-  since?: string
 }
 
 export async function getFlakinessSummary(
@@ -1701,14 +1628,6 @@ export async function getTestFlakiness(
 // Dashboard Analytics Queries
 // ============================================
 
-export interface SlowestTest {
-  test_signature: string
-  test_name: string
-  test_file: string
-  avg_duration_ms: number
-  run_count: number
-}
-
 export async function getSlowestTests(
   organizationId: number,
   limit: number = 5,
@@ -1736,12 +1655,6 @@ export async function getSlowestTests(
   return result as SlowestTest[]
 }
 
-export interface SuitePassRate {
-  suite: string
-  total_runs: number
-  pass_rate: number
-}
-
 export async function getSuitePassRates(organizationId: number): Promise<SuitePassRate[]> {
   const sql = getSql()
 
@@ -1764,22 +1677,6 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
 // ============================================
 // Organization API Key Functions
 // ============================================
-
-export interface OrgApiKey {
-  id: number
-  organization_id: number
-  name: string
-  key_prefix: string
-  created_by: number | null
-  created_at: string
-  last_used_at: string | null
-  expires_at: string | null
-  revoked_at: string | null
-}
-
-export interface OrgApiKeyWithHash extends OrgApiKey {
-  key_hash: string
-}
 
 /**
  * Create a new API key for an organization
@@ -1887,13 +1784,6 @@ export async function updateApiKeyLastUsed(keyId: number): Promise<void> {
 // ============================================
 // Reliability Score
 // ============================================
-
-export interface ReliabilityScoreOptions {
-  from?: string
-  to?: string
-  branch?: string
-  suite?: string
-}
 
 /**
  * Calculate overall test suite reliability score (0-100)
@@ -2054,15 +1944,6 @@ export async function updatePerformanceBaselines(organizationId: number): Promis
   `
 
   return result.length
-}
-
-export interface PerformanceRegressionsOptions {
-  threshold?: number // Default 0.20 (20%)
-  hours?: number // Default 24
-  branch?: string
-  suite?: string
-  limit?: number // Default 20
-  sortBy?: "regression" | "duration" | "name" // Default 'regression'
 }
 
 /**

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Data Extraction Template
+  Use for: Parsing unstructured text into structured data
+  Last Updated: January 2026
+-->
+
+<task>Extract structured data from unstructured content</task>
+
+<source_content type="{{email|article|form|log}}">
+{{RAW_CONTENT_TO_PARSE}}
+</source_content>
+
+<extraction_schema>
+  <field name="{{FIELD_1}}" type="string" required="true">
+    <description>{{WHAT_THIS_FIELD_REPRESENTS}}</description>
+    <format>{{EXPECTED_FORMAT}}</format>
+  </field>
+  <field name="{{FIELD_2}}" type="date" required="true">
+    <description>{{WHAT_THIS_FIELD_REPRESENTS}}</description>
+    <format>YYYY-MM-DD</format>
+  </field>
+  <field name="{{FIELD_3}}" type="number" required="false">
+    <description>{{WHAT_THIS_FIELD_REPRESENTS}}</description>
+  </field>
+  <field name="{{FIELD_4}}" type="array" required="false">
+    <description>{{WHAT_THIS_FIELD_REPRESENTS}}</description>
+    <item_type>string</item_type>
+  </field>
+</extraction_schema>
+
+<instructions>
+  <rule>Extract only information explicitly present in the source</rule>
+  <rule>Use "NOT_FOUND" for required fields that cannot be located</rule>
+  <rule>Omit optional fields if not present</rule>
+  <rule>Normalize dates to specified format</rule>
+  <rule>Include confidence level for each extraction</rule>
+</instructions>
+
+<output_format>
+  <extracted_data>
+    <{{FIELD_1}} confidence="high">extracted value</{{FIELD_1}}>
+    <{{FIELD_2}} confidence="medium">2026-01-07</{{FIELD_2}}>
+    <{{FIELD_3}} confidence="low">42</{{FIELD_3}}>
+    <{{FIELD_4}}>
+      <item>value1</item>
+      <item>value2</item>
+    </{{FIELD_4}}>
+  </extracted_data>
+  <extraction_notes>
+    Any ambiguities, assumptions, or issues encountered
+  </extraction_notes>
+</output_format>

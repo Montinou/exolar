@@ -4,7 +4,7 @@ This directory contains structured XML prompts for implementing each phase of th
 
 ## Usage
 
-Each XML prompt follows the template defined in [XML_PROMPT_TEMPLATE.xml](../../XML_PROMPT_TEMPLATE.xml) and provides:
+Each XML prompt follows templates from [prompt-engineering/templates/](../../../prompt-engineering/templates/) and provides:
 
 1. **System Context**: Role, expertise, and communication style
 2. **Task Definition**: Objectives and success criteria

@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 3: Extract Domain Files
+  Feature: db-abstraction-refactor
+
+  Goal: Extract domain-specific query functions to separate files
+  Risk: Medium - Functions have internal dependencies
+-->
+
+<implementation_prompt>
+  <feature>
+    <name>Database Module Reorganization</name>
+    <folder>docs/prompts/db-abstraction-refactor</folder>
+    <phase>03_extract_domains</phase>
+    <prompt_file>phases/03_extract_domains.xml</prompt_file>
+  </feature>
+
+  <context>
+    <previous_phase>02_extract_utilities</previous_phase>
+    <prerequisite>connection.ts, utils.ts, types.ts exist</prerequisite>
+  </context>
+
+  <task>
+    <objective>Extract query functions into domain-specific files</objective>
+    <motivation>
+      Domain separation makes it easy to find and modify related queries.
+      Each file should be under 400 lines and focused on a single domain.
+    </motivation>
+    <constraints>
+      <constraint>Extract one domain at a time, verify build after each</constraint>
+      <constraint>Follow dependency order (lowest deps first)</constraint>
+      <constraint>Maintain all exports through lib/db.ts during migration</constraint>
+      <constraint>Keep internal functions (extractErrorType, etc.) with their consumers</constraint>
+    </constraints>
+  </task>
+
+  <extraction_order>
+    <note>
+      Extract in this order to minimize dependency issues.
+      Run `npm run build` after each extraction.
+    </note>
+
+    <domain order="1" risk="low">
+      <name>api-keys.ts</name>
+      <lines>~130</lines>
+      <functions>
+        - createApiKey
+        - getApiKeysByOrg
+        - getApiKeyByHash
+        - revokeApiKey
+        - updateApiKeyLastUsed
+      </functions>
+      <dependencies>connection.ts (getSql)</dependencies>
+      <reason>Standalone, no internal function dependencies</reason>
+    </domain>
+
+    <domain order="2" risk="low">
+      <name>search.ts</name>
+      <lines>~200</lines>
+      <functions>
+        - searchTests
+        - getTestHistory
+        - getTestStatistics
+        - getFailuresWithAIContext
+        - getErrorTypeDistribution
+      </functions>
+      <dependencies>connection.ts (getSql), types.ts</dependencies>
+      <reason>Standalone query functions</reason>
+    </domain>
+
+    <domain order="3" risk="low">
+      <name>metrics.ts</name>
+      <lines>~400</lines>
+      <functions>
+        - getDashboardMetrics
+        - getTrendData
+        - getFailureTrendData
+        - getBranches
+        - getSuites
+        - getSlowestTests
+        - getSuitePassRates
+        - getReliabilityScore
+      </functions>
+      <dependencies>connection.ts (getSql), types.ts</dependencies>
+      <reason>All metric queries, used by dashboard</reason>
+    </domain>
+
+    <domain order="4" risk="low">
+      <name>performance.ts</name>
+      <lines>~250</lines>
+      <functions>
+        - updatePerformanceBaselines
+        - getPerformanceRegressions
+        - getTestDurationHistory
+      </functions>
+      <dependencies>connection.ts (getSql), types.ts</dependencies>
+      <reason>Standalone performance queries</reason>
+    </domain>
+
+    <domain order="5" risk="medium">
+      <name>executions.ts</name>
+      <lines>~300</lines>
+      <functions>
+        - getExecutions
+        - searchExecutions
+        - getExecutionById
+        - getExecutionsGroupedByBranch
+      </functions>
+      <dependencies>connection.ts (getSql), types.ts</dependencies>
+      <reason>Core execution queries, used by other domains</reason>
+    </domain>
+
+    <domain order="6" risk="medium">
+      <name>results.ts</name>
+      <lines>~250</lines>
+      <functions>
+        - getTestResultsByExecutionId
+        - getFailedTestsByExecutionId
+        - getExecutionSummary
+        - getErrorDistributionByExecution
+      </functions>
+      <dependencies>
+        - connection.ts (getSql)
+        - executions.ts (getExecutionById)
+      </dependencies>
+      <reason>Depends on executions.ts</reason>
+    </domain>
+
+    <domain order="7" risk="medium">
+      <name>flakiness.ts</name>
+      <lines>~350</lines>
+      <functions>
+        - getFlakiestTests
+        - getFlakinessSummary
+        - updateFlakinessHistory
+        - getTestFlakiness
+      </functions>
+      <dependencies>
+        - connection.ts (getSql)
+        - utils.ts (isTestFlaky)
+        - types.ts
+      </dependencies>
+      <reason>Self-referential (getFlakinessSummary calls getFlakiestTests)</reason>
+    </domain>
+
+    <domain order="8" risk="medium">
+      <name>comparison.ts</name>
+      <lines>~220</lines>
+      <functions>
+        - getLatestExecutionByBranch
+        - compareExecutions
+      </functions>
+      <dependencies>
+        - connection.ts (getSql)
+        - executions.ts (getExecutionById)
+        - types.ts
+      </dependencies>
+      <reason>Depends on executions.ts</reason>
+    </domain>
+
+    <domain order="9" risk="medium">
+      <name>classification.ts</name>
+      <lines>~450</lines>
+      <functions>
+        - getFailureClassification (exported)
+        - extractErrorType (internal)
+        - calculateClassificationSignals (internal)
+      </functions>
+      <dependencies>connection.ts (getSql), types.ts</dependencies>
+      <reason>
+        Contains internal functions that must stay with getFailureClassification.
+        Self-contained once extracted.
+      </reason>
+    </domain>
+
+    <domain order="10" risk="high">
+      <name>ingestion.ts</name>
+      <lines>~200</lines>
+      <functions>
+        - insertExecution
+        - insertTestResults
+        - insertArtifacts
+      </functions>
+      <dependencies>
+        - connection.ts (getSql)
+        - utils.ts (generateTestSignature, isTestFlaky)
+        - flakiness.ts (updateFlakinessHistory)
+      </dependencies>
+      <reason>
+        Multiple dependencies including flakiness.ts.
+        Extract last to avoid circular deps.
+      </reason>
+    </domain>
+  </extraction_order>
+
+  <implementation_steps>
+    <step priority="high">
+      <name>Extract Each Domain</name>
+      <action>
+        For each domain file (in order above):
+
+        1. Create the new file in lib/db/
+        2. Copy relevant functions from lib/db.ts
+        3. Add required imports at top
+        4. Export all public functions
+        5. In lib/db.ts:
+           - Add import from new file
+           - Add re-export: `export { fn1, fn2 } from "./db/filename"`
+           - Keep the original function (for now)
+        6. Run `npm run build`
+        7. If build passes, remove original function from lib/db.ts
+        8. Run `npm run build` again
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Example: Extract api-keys.ts</name>
+      <action>
+        ```typescript
+        // lib/db/api-keys.ts
+        import { getSql } from "./connection"
+        import type { OrgApiKey, OrgApiKeyWithHash } from "./types"
+
+        export async function createApiKey(
+          organizationId: number,
+          name: string,
+          keyHash: string,
+          keyPrefix: string,
+          createdBy: number | null
+        ): Promise&lt;OrgApiKey&gt; {
+          const sql = getSql()
+          // ... function body
+        }
+
+        export async function getApiKeysByOrg(organizationId: number): Promise&lt;OrgApiKey[]&gt; {
+          // ... function body
+        }
+
+        // ... rest of functions
+        ```
+
+        Then in lib/db.ts:
+        ```typescript
+        // Add re-export
+        export {
+          createApiKey,
+          getApiKeysByOrg,
+          getApiKeyByHash,
+          revokeApiKey,
+          updateApiKeyLastUsed,
+        } from "./db/api-keys"
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Handle Internal Functions</name>
+      <action>
+        For classification.ts, keep internal functions in the same file:
+
+        ```typescript
+        // lib/db/classification.ts
+
+        // Internal - not exported
+        function extractErrorType(...) { ... }
+
+        // Internal - not exported
+        function calculateClassificationSignals(...) { ... }
+
+        // Exported
+        export async function getFailureClassification(...) {
+          // Uses internal functions above
+        }
+        ```
+      </action>
+    </step>
+
+    <step priority="medium">
+      <name>Verify After Each Extraction</name>
+      <action>
+        After each domain file:
+        ```bash
+        npm run build
+        npm run dev  # Quick test that dashboard loads
+        ```
+
+        If errors occur, check:
+        - Missing imports
+        - Circular dependencies
+        - Type mismatches
+      </action>
+    </step>
+  </implementation_steps>
+
+  <verification>
+    <check>All 10 domain files created in lib/db/</check>
+    <check>lib/db.ts only contains re-exports</check>
+    <check>npm run build passes</check>
+    <check>Dashboard loads and functions correctly</check>
+    <check>No circular dependency warnings</check>
+  </verification>
+
+  <deliverables>
+    <deliverable>lib/db/api-keys.ts</deliverable>
+    <deliverable>lib/db/search.ts</deliverable>
+    <deliverable>lib/db/metrics.ts</deliverable>
+    <deliverable>lib/db/performance.ts</deliverable>
+    <deliverable>lib/db/executions.ts</deliverable>
+    <deliverable>lib/db/results.ts</deliverable>
+    <deliverable>lib/db/flakiness.ts</deliverable>
+    <deliverable>lib/db/comparison.ts</deliverable>
+    <deliverable>lib/db/classification.ts</deliverable>
+    <deliverable>lib/db/ingestion.ts</deliverable>
+  </deliverables>
+
+  <next_phase>
+    <file>phases/04_cleanup_verify.xml</file>
+    <description>Move getQueriesForOrg to index.ts and delete original db.ts</description>
+  </next_phase>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>Update status.md with execution results.</description>
+    <action>
+      UPDATE docs/prompts/db-abstraction-refactor/status.md with:
+      - Date, Phase, Status
+      - Domain files created (list all)
+      - Any issues encountered
+      - Next step link
+    </action>
+  </mandatory_final_step>
+</implementation_prompt>

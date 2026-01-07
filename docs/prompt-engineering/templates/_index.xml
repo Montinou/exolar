@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Template Index - January 2026
+
+  Quick reference for all available XML prompt templates.
+  Each template is a standalone file optimized for token efficiency.
+-->
+
+<templates version="2026.01">
+
+  <category name="general" description="Universal prompts">
+    <template file="general/system-prompt.xml">Universal system prompt configuration</template>
+    <template file="general/few-shot.xml">Few-shot learning with examples</template>
+  </category>
+
+  <category name="reasoning" description="Analysis and thinking">
+    <template file="reasoning/chain-of-thought.xml">Step-by-step reasoning</template>
+    <template file="reasoning/document-analysis.xml">Document review and analysis</template>
+  </category>
+
+  <category name="code" description="Software development">
+    <template file="code/code-generation.xml">Code creation with requirements</template>
+    <template file="code/code-review.xml">Code review and feedback</template>
+  </category>
+
+  <category name="agents" description="AI agents and context engineering">
+    <template file="agents/context-stack.xml">6-layer context engineering stack</template>
+    <template file="agents/conversational.xml">Conversational agent configuration</template>
+    <template file="agents/security-prompt.xml">Prompt injection defense</template>
+    <template file="agents/claude-4x-optimized.xml">Claude 4.x optimized prompt</template>
+  </category>
+
+  <category name="data" description="Data processing">
+    <template file="data/data-extraction.xml">Extract structured data from text</template>
+    <template file="data/multi-source.xml">Synthesize multiple sources</template>
+  </category>
+
+  <category name="features" description="Feature development">
+    <template file="features/feature-prompt.xml">Feature implementation workflow</template>
+    <template file="features/investigation.xml">Initial investigation phase</template>
+    <template file="features/iterative.xml">Iterative refinement</template>
+  </category>
+
+</templates>

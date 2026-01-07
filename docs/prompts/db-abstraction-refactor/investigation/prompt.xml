@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Initial Investigation: Database Module Reorganization
+  Feature: db-abstraction-refactor
+  Phase: investigation
+
+  Goal: Make lib/db.ts more maintainable and easier to navigate
+-->
+
+<investigation_prompt>
+  <feature>
+    <name>Database Module Reorganization</name>
+    <folder>docs/prompts/db-abstraction-refactor</folder>
+    <phase>investigation</phase>
+    <prompt_file>investigation/prompt.xml</prompt_file>
+  </feature>
+
+  <task>
+    <objective>Analyze and plan reorganization of lib/db.ts for better maintainability</objective>
+    <background>
+      The current lib/db.ts is a large file (~2000+ lines) containing all database queries.
+      This makes it difficult to:
+      - Find where to make changes quickly
+      - Understand which functions are related
+      - Add new features without scrolling through unrelated code
+
+      Goal is to reorganize into a clearer structure that:
+      - Groups related functions by domain/feature
+      - Makes it obvious where to add new queries
+      - Preserves all existing functionality (no breaking changes)
+    </background>
+    <constraints>
+      <constraint>NO over-engineering - keep it simple</constraint>
+      <constraint>NO new abstractions unless clearly needed</constraint>
+      <constraint>NO breaking changes to existing API</constraint>
+      <constraint>Preserve existing function signatures</constraint>
+    </constraints>
+    <success_criteria>
+      - Clear map of current db.ts domains/groups
+      - Proposed file structure for reorganization
+      - Phase prompts for safe incremental migration
+    </success_criteria>
+  </task>
+
+  <investigation_steps>
+    <step priority="high">
+      <name>Function Inventory</name>
+      <action>
+        1. Read lib/db.ts completely
+        2. List ALL exported functions with brief description
+        3. Group functions by logical domain:
+           - Executions (CRUD, search, summary)
+           - Test Results (queries, history)
+           - Flakiness (detection, history, summary)
+           - Metrics (dashboard, trends, analytics)
+           - Organizations/API Keys
+           - Reliability/Performance
+           - Comparison
+           - Insert/Ingestion
+        4. Count lines per domain group
+      </action>
+      <output>
+        Document in investigation/analysis.md:
+        - Function list with domain grouping
+        - Lines of code per domain
+        - Identified related functions that should stay together
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Dependency Analysis</name>
+      <action>
+        1. Identify shared utilities (getSql, generateTestSignature, etc.)
+        2. Find internal function dependencies (which functions call others)
+        3. List all type imports from types.ts
+        4. Note any circular dependency risks
+      </action>
+      <output>
+        Add to investigation/analysis.md:
+        - Shared utilities list
+        - Internal dependency graph (simple)
+        - Types used per domain
+      </output>
+    </step>
+
+    <step priority="high">
+      <name>Propose File Structure</name>
+      <action>
+        Design new file organization:
+        ```
+        lib/db/
+        ├── index.ts          # Re-exports everything (backwards compatible)
+        ├── connection.ts     # getSql, setServiceAccountContext
+        ├── executions.ts     # Execution queries
+        ├── results.ts        # Test result queries
+        ├── flakiness.ts      # Flakiness detection
+        ├── metrics.ts        # Dashboard metrics, trends
+        ├── reliability.ts    # Reliability score, performance
+        ├── comparison.ts     # Execution comparison
+        ├── ingestion.ts      # Insert functions
+        └── utils.ts          # Shared utilities
+        ```
+        Validate this structure makes sense for the codebase.
+      </action>
+      <output>
+        Document in investigation/proposed-structure.md:
+        - Final file structure
+        - Which functions go in each file
+        - Migration order (safest first)
+      </output>
+    </step>
+
+    <step priority="medium">
+      <name>Create Phase Prompts</name>
+      <action>
+        Generate XML prompts for incremental migration:
+        - Phase 1: Create lib/db/ folder with index.ts re-exporting from db.ts
+        - Phase 2: Extract connection and utilities
+        - Phase 3: Extract domain files one by one
+        - Phase 4: Cleanup and verify
+      </action>
+      <output>
+        - phases/01_setup_structure.xml
+        - phases/02_extract_utilities.xml
+        - phases/03_extract_domains.xml
+        - phases/04_cleanup_verify.xml
+      </output>
+    </step>
+  </investigation_steps>
+
+  <output_deliverables>
+    <deliverable>investigation/analysis.md - Function inventory and dependencies</deliverable>
+    <deliverable>investigation/proposed-structure.md - New file organization</deliverable>
+    <deliverable>phases/*.xml - Implementation phase prompts</deliverable>
+  </output_deliverables>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+      This step is MANDATORY and must be executed after all other steps.
+    </description>
+
+    <action>
+      After completing all investigation steps, UPDATE the file:
+      docs/prompts/db-abstraction-refactor/status.md
+
+      with the following information:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Prompt: investigation/prompt.xml
+      - Phase: Investigation
+      - Status: completed | partial | blocked
+      - Summary of findings
+      - List of deliverables created
+      - Next steps (link to first phase prompt)
+      - Any blockers encountered
+    </action>
+
+    <rules>
+      <rule>ALWAYS update status.md as the LAST action</rule>
+      <rule>Include actual datetime from system</rule>
+      <rule>Be specific about files created and decisions made</rule>
+      <rule>Link to phases/01_setup_structure.xml as next step</rule>
+    </rules>
+  </mandatory_final_step>
+</investigation_prompt>

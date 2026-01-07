@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Iterative Refinement Template
+  Use for: Creative work, drafts, progressive improvement
+  Last Updated: January 2026
+-->
+
+<iterative_prompt>
+  <task>
+    <objective>{{CREATE_OR_IMPROVE_WHAT}}</objective>
+    <iteration>{{CURRENT_ITERATION_NUMBER}}</iteration>
+  </task>
+
+  <current_version>
+{{CURRENT_DRAFT_OR_VERSION}}
+  </current_version>
+
+  <feedback_on_current>
+    <positive>
+      <point>{{WHAT_WORKS_WELL_1}}</point>
+      <point>{{WHAT_WORKS_WELL_2}}</point>
+    </positive>
+    <needs_improvement>
+      <point priority="high">{{ISSUE_1}}</point>
+      <point priority="medium">{{ISSUE_2}}</point>
+      <point priority="low">{{ISSUE_3}}</point>
+    </needs_improvement>
+    <specific_requests>
+      <request>{{SPECIFIC_CHANGE_1}}</request>
+      <request>{{SPECIFIC_CHANGE_2}}</request>
+    </specific_requests>
+  </feedback_on_current>
+
+  <constraints>
+    <maintain>{{ELEMENTS_TO_KEEP}}</maintain>
+    <avoid>{{ELEMENTS_TO_REMOVE_OR_AVOID}}</avoid>
+  </constraints>
+
+  <output_format>
+    <revised_version>
+      <!-- Improved version incorporating feedback -->
+    </revised_version>
+    <changelog>
+      <change type="{{added|modified|removed}}">Description</change>
+    </changelog>
+    <questions>
+      <!-- Any clarifications needed for further refinement -->
+    </questions>
+  </output_format>
+</iterative_prompt>

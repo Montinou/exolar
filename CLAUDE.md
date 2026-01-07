@@ -332,3 +332,74 @@ See `docs/MODERN_DASHBOARD_FEATURES.md` for planned features including:
 - Intelligent Failure Clustering
 - Slack/Teams Notifications
 - Auto-Quarantine Flaky Tests
+
+## Prompt Engineering
+
+This project uses structured XML prompts for AI-assisted feature development.
+
+### Documentation Structure
+
+```
+docs/
+├── prompt-engineering/          # Templates and guides
+│   ├── README.md                # Quick reference
+│   ├── guides/                  # Conceptual guides
+│   │   ├── xml-fundamentals.md  # XML tags, nesting
+│   │   ├── context-engineering.md # 6-layer context stack
+│   │   └── claude-4x-guidelines.md # Claude 4.x tips
+│   └── templates/               # XML templates by category
+│       ├── general/             # System prompts, few-shot
+│       ├── reasoning/           # Chain-of-thought, analysis
+│       ├── code/                # Generation, review
+│       ├── agents/              # Context stack, security
+│       ├── data/                # Extraction, synthesis
+│       └── features/            # Feature development
+└── prompts/                     # Active feature prompts
+    └── <feature-slug>/          # One folder per feature
+        ├── status.md            # Progress tracking
+        ├── investigation/       # Research phase
+        └── phases/              # Implementation phases
+```
+
+### Feature Development Workflow
+
+1. **Create feature folder**:
+   ```bash
+   mkdir -p docs/prompts/<feature-slug>/{investigation,phases}
+   touch docs/prompts/<feature-slug>/status.md
+   ```
+
+2. **Investigation phase**: Create `investigation/prompt.xml` using `templates/features/investigation.xml`
+   - Analyze codebase
+   - Document findings in `investigation/findings.md`
+   - Generate phase prompts
+
+3. **Implementation phases**: Execute `phases/01_*.xml`, `phases/02_*.xml`, etc.
+   - Each phase is standalone
+   - Update `status.md` after EVERY execution
+
+### Key Templates
+
+| Template | Location | Use For |
+|----------|----------|---------|
+| Investigation | `templates/features/investigation.xml` | Initial research |
+| Feature Prompt | `templates/features/feature-prompt.xml` | Implementation phases |
+| Claude 4.x Optimized | `templates/agents/claude-4x-optimized.xml` | Claude-specific prompts |
+| Context Stack | `templates/agents/context-stack.xml` | Agent context |
+
+### Claude 4.x Guidelines
+
+- **Be explicit**: Claude 4.x is literal - does exactly what you ask
+- **Avoid "think"**: Use "consider", "evaluate", "analyze" instead (when extended thinking is off)
+- **Prevent over-engineering**: Add constraints like "keep solution minimal"
+- **Provide motivation**: Explain WHY for better results
+
+See `docs/prompt-engineering/guides/claude-4x-guidelines.md` for details.
+
+### Rules
+
+1. **Always update status.md** after every prompt execution
+2. **Keep phases standalone** - Each phase works independently
+3. **Document decisions** - Explain why, not just what
+4. **Use templates** from `docs/prompt-engineering/templates/`
+5. **Use real dates**: `date -u +"%Y-%m-%dT%H:%M:%SZ"`

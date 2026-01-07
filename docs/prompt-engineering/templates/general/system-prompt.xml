@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Universal System Prompt Template
+  Use for: General purpose AI assistant configuration
+  Last Updated: January 2026
+-->
+
+<system_prompt>
+  <!-- Define who the AI should be -->
+  <persona>
+    <role>{{ROLE: e.g., Senior Software Engineer}}</role>
+    <expertise>{{AREAS: e.g., Python, Cloud Architecture}}</expertise>
+    <communication_style>{{STYLE: e.g., Technical but accessible}}</communication_style>
+  </persona>
+
+  <!-- Define what needs to be accomplished -->
+  <task>
+    <objective>{{PRIMARY_GOAL}}</objective>
+    <success_criteria>{{WHAT_DEFINES_SUCCESS}}</success_criteria>
+  </task>
+
+  <!-- Provide relevant background -->
+  <context>
+    <background>{{RELEVANT_BACKGROUND_INFO}}</background>
+    <audience>{{WHO_WILL_USE_THIS}}</audience>
+    <constraints>{{LIMITATIONS: budget, time, technical}}</constraints>
+  </context>
+
+  <!-- Step-by-step instructions -->
+  <instructions>
+    <step priority="high">{{STEP_1}}</step>
+    <step priority="high">{{STEP_2}}</step>
+    <step priority="medium">{{STEP_3}}</step>
+  </instructions>
+
+  <!-- Rules and limitations -->
+  <behavioral_rules>
+    <always>
+      <rule>{{ALWAYS_DO_1}}</rule>
+      <rule>{{ALWAYS_DO_2}}</rule>
+    </always>
+    <never>
+      <rule>{{NEVER_DO_1}}</rule>
+      <rule>{{NEVER_DO_2}}</rule>
+    </never>
+  </behavioral_rules>
+
+  <!-- Expected output structure -->
+  <output_format>
+    <structure>{{DESCRIBE_OUTPUT_STRUCTURE}}</structure>
+    <length>{{MAX_LENGTH_OR_RANGE}}</length>
+    <style>{{FORMATTING_PREFERENCES}}</style>
+  </output_format>
+</system_prompt>
+
+<user_input>
+{{USER_REQUEST}}
+</user_input>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Initial Investigation Template
+  Use for: First phase of any new feature - research and planning
+  Last Updated: January 2026
+-->
+
+<investigation_prompt>
+  <feature>
+    <name>{{FEATURE_NAME}}</name>
+    <folder>docs/prompts/{{FEATURE_SLUG}}</folder>
+    <phase>initial-investigation</phase>
+    <prompt_file>initial-investigation/01_investigation.xml</prompt_file>
+  </feature>
+
+  <task>
+    <objective>Research and plan the implementation of {{FEATURE_NAME}}</objective>
+    <success_criteria>
+      <criterion>Clear understanding of current codebase state</criterion>
+      <criterion>Identified files to modify/create</criterion>
+      <criterion>Defined implementation phases</criterion>
+      <criterion>Created phase prompts in phases/ folder</criterion>
+    </success_criteria>
+  </task>
+
+  <investigation_steps>
+    <step priority="high">
+      <name>Codebase Analysis</name>
+      <action>Search for related code patterns, existing implementations</action>
+      <output>List of relevant files and their purposes</output>
+    </step>
+    <step priority="high">
+      <name>Requirements Mapping</name>
+      <action>Map feature requirements to code changes needed</action>
+      <output>Requirements-to-files mapping document</output>
+    </step>
+    <step priority="high">
+      <name>Phase Planning</name>
+      <action>Break implementation into logical phases</action>
+      <output>Phase breakdown with dependencies</output>
+    </step>
+    <step priority="medium">
+      <name>Create Phase Prompts</name>
+      <action>Generate XML prompts for each phase in phases/ folder</action>
+      <output>phases/01_*.xml, phases/02_*.xml, etc.</output>
+    </step>
+  </investigation_steps>
+
+  <output_deliverables>
+    <deliverable>initial-investigation/analysis.md</deliverable>
+    <deliverable>initial-investigation/phases-plan.md</deliverable>
+    <deliverable>phases/*.xml - Phase prompts</deliverable>
+  </output_deliverables>
+
+  <!-- MANDATORY: Update status after execution -->
+  <mandatory_final_step priority="critical">
+    <action>Update docs/prompts/{{FEATURE_SLUG}}/status.md with investigation results</action>
+  </mandatory_final_step>
+</investigation_prompt>

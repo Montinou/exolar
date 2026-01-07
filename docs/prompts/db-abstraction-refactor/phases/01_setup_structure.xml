@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 1: Setup Structure
+  Feature: db-abstraction-refactor
+
+  Goal: Create lib/db/ folder and index.ts that re-exports from db.ts
+  Risk: Very Low - No functional changes
+-->
+
+<implementation_prompt>
+  <feature>
+    <name>Database Module Reorganization</name>
+    <folder>docs/prompts/db-abstraction-refactor</folder>
+    <phase>01_setup_structure</phase>
+    <prompt_file>phases/01_setup_structure.xml</prompt_file>
+  </feature>
+
+  <context>
+    <previous_phase>investigation</previous_phase>
+    <analysis_file>investigation/analysis.md</analysis_file>
+    <structure_file>investigation/proposed-structure.md</structure_file>
+  </context>
+
+  <task>
+    <objective>Create lib/db/ folder with index.ts proxy that re-exports from lib/db.ts</objective>
+    <motivation>
+      This is the foundation for incremental migration. By creating a proxy first,
+      we can verify all imports work before moving any code.
+    </motivation>
+    <constraints>
+      <constraint>NO code changes to lib/db.ts yet</constraint>
+      <constraint>NO changes to any consumers</constraint>
+      <constraint>Must pass npm run build after changes</constraint>
+    </constraints>
+  </task>
+
+  <implementation_steps>
+    <step priority="high">
+      <name>Create Directory</name>
+      <action>
+        Create the lib/db/ directory:
+        ```bash
+        mkdir -p lib/db
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Create Index Proxy</name>
+      <action>
+        Create lib/db/index.ts that re-exports everything from the original file:
+
+        ```typescript
+        // lib/db/index.ts
+        // Proxy file for backwards compatibility during migration
+        // This re-exports everything from the original db.ts file
+        // Once migration is complete, this file will contain the actual exports
+
+        export * from "../db"
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Verify Build</name>
+      <action>
+        Run the build to ensure everything still works:
+        ```bash
+        npm run build
+        ```
+
+        If build fails, check for any import issues and fix them.
+      </action>
+    </step>
+
+    <step priority="medium">
+      <name>Test Import Resolution</name>
+      <action>
+        Verify that imports from @/lib/db still work:
+        ```bash
+        # Check existing imports
+        grep -r "from ['\"]@/lib/db['\"]" --include="*.ts" --include="*.tsx" | head -20
+        ```
+
+        All existing imports should continue to work without modification.
+      </action>
+    </step>
+  </implementation_steps>
+
+  <verification>
+    <check>lib/db/index.ts exists and contains re-export</check>
+    <check>npm run build passes</check>
+    <check>No changes to existing imports needed</check>
+    <check>Dashboard loads correctly</check>
+  </verification>
+
+  <deliverables>
+    <deliverable>lib/db/index.ts - Proxy re-export file</deliverable>
+  </deliverables>
+
+  <next_phase>
+    <file>phases/02_extract_utilities.xml</file>
+    <description>Extract connection and utility functions</description>
+  </next_phase>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+    </description>
+    <action>
+      After completing all steps, UPDATE:
+      docs/prompts/db-abstraction-refactor/status.md
+
+      Include:
+      - Date: Get from system (date -u +"%Y-%m-%dT%H:%M:%SZ")
+      - Phase: 01_setup_structure
+      - Status: completed | partial | blocked
+      - Files created/modified
+      - Any issues encountered
+      - Next step link
+    </action>
+  </mandatory_final_step>
+</implementation_prompt>

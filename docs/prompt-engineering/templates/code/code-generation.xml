@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Code Generation Template
+  Use for: Writing or modifying code
+  Last Updated: January 2026
+
+  Claude 4.x Note: Add explicit constraints to prevent over-engineering.
+-->
+
+<task type="{{generate|modify}}">
+  <objective>{{WHAT_CODE_SHOULD_DO}}</objective>
+  <language>{{PROGRAMMING_LANGUAGE}}</language>
+  <framework>{{FRAMEWORK_IF_APPLICABLE}}</framework>
+</task>
+
+<context>
+  <project_type>{{WEB_APP|API|LIBRARY|SCRIPT}}</project_type>
+  <existing_patterns>
+    <pattern>{{PATTERN_TO_FOLLOW_1}}</pattern>
+    <pattern>{{PATTERN_TO_FOLLOW_2}}</pattern>
+  </existing_patterns>
+  <dependencies>{{LIST_OF_AVAILABLE_LIBRARIES}}</dependencies>
+</context>
+
+<existing_code language="{{LANGUAGE}}">
+<!-- Include existing code if modifying -->
+{{EXISTING_CODE}}
+</existing_code>
+
+<requirements>
+  <functional>
+    <requirement priority="must">{{MUST_HAVE_1}}</requirement>
+    <requirement priority="must">{{MUST_HAVE_2}}</requirement>
+    <requirement priority="should">{{SHOULD_HAVE_1}}</requirement>
+  </functional>
+  <non_functional>
+    <requirement>{{PERFORMANCE_REQUIREMENTS}}</requirement>
+    <requirement>{{SECURITY_REQUIREMENTS}}</requirement>
+  </non_functional>
+</requirements>
+
+<!-- Claude 4.x: Prevent over-engineering -->
+<constraints>
+  <rule priority="high">Keep solution minimal</rule>
+  <rule priority="high">Only create files explicitly requested</rule>
+  <rule>No unnecessary abstractions</rule>
+  <rule>{{PATTERNS_TO_AVOID}}</rule>
+  <prefer>{{PREFERRED_APPROACHES}}</prefer>
+</constraints>
+
+<output_format>
+  <code>
+    <!-- Generated/Modified code with comments -->
+  </code>
+  <explanation>
+    <!-- Brief explanation of key decisions -->
+  </explanation>
+  <usage_example>
+    <!-- How to use the code -->
+  </usage_example>
+</output_format>

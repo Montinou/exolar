@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Multi-Source Synthesis Template
+  Use for: Combining information from multiple documents
+  Last Updated: January 2026
+-->
+
+<task>
+  <objective>Synthesize information from multiple sources</objective>
+  <output_goal>{{WHAT_FINAL_OUTPUT_SHOULD_BE}}</output_goal>
+</task>
+
+<sources>
+  <source id="1" type="{{TYPE}}" reliability="{{high|medium|low}}" date="{{DATE}}">
+    <title>{{SOURCE_TITLE}}</title>
+    <content>{{SOURCE_1_CONTENT}}</content>
+  </source>
+
+  <source id="2" type="{{TYPE}}" reliability="{{high|medium|low}}" date="{{DATE}}">
+    <title>{{SOURCE_TITLE}}</title>
+    <content>{{SOURCE_2_CONTENT}}</content>
+  </source>
+
+  <source id="3" type="{{TYPE}}" reliability="{{high|medium|low}}" date="{{DATE}}">
+    <title>{{SOURCE_TITLE}}</title>
+    <content>{{SOURCE_3_CONTENT}}</content>
+  </source>
+</sources>
+
+<instructions>
+  <step>Analyze each source independently</step>
+  <step>Identify common themes and contradictions</step>
+  <step>Weight information by source reliability and recency</step>
+  <step>Synthesize into coherent narrative</step>
+  <step>Cite sources using their IDs</step>
+</instructions>
+
+<output_format>
+  <synthesis>
+    <theme name="{{THEME_1}}">
+      <finding>Description [Source: 1, 2]</finding>
+    </theme>
+
+    <contradictions>
+      <contradiction>
+        <claim_1 source="1">Statement from source 1</claim_1>
+        <claim_2 source="3">Contradicting statement from source 3</claim_2>
+        <resolution>How to interpret this contradiction</resolution>
+      </contradiction>
+    </contradictions>
+  </synthesis>
+
+  <confidence_assessment>Overall reliability of synthesis</confidence_assessment>
+</output_format>

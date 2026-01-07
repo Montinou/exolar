@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 2: Extract Utilities
+  Feature: db-abstraction-refactor
+
+  Goal: Extract connection.ts, utils.ts, and types.ts
+  Risk: Low - These are foundational with no internal deps
+-->
+
+<implementation_prompt>
+  <feature>
+    <name>Database Module Reorganization</name>
+    <folder>docs/prompts/db-abstraction-refactor</folder>
+    <phase>02_extract_utilities</phase>
+    <prompt_file>phases/02_extract_utilities.xml</prompt_file>
+  </feature>
+
+  <context>
+    <previous_phase>01_setup_structure</previous_phase>
+    <prerequisite>lib/db/index.ts exists and re-exports from ../db</prerequisite>
+  </context>
+
+  <task>
+    <objective>Extract foundational utilities to separate files</objective>
+    <motivation>
+      These files have no dependencies on other db functions, making them
+      safe to extract first. They form the foundation for other domain files.
+    </motivation>
+    <constraints>
+      <constraint>Keep original functions in lib/db.ts (don't delete yet)</constraint>
+      <constraint>Update lib/db.ts to import from new files</constraint>
+      <constraint>Maintain all exports through index.ts</constraint>
+      <constraint>Must pass npm run build after each file extraction</constraint>
+    </constraints>
+  </task>
+
+  <implementation_steps>
+    <step priority="high">
+      <name>Create connection.ts</name>
+      <action>
+        Create lib/db/connection.ts with database connection utilities:
+
+        ```typescript
+        // lib/db/connection.ts
+        import { neon } from "@neondatabase/serverless"
+
+        export function getSql() {
+          return neon(process.env.DATABASE_URL!)
+        }
+
+        /**
+         * Set service account context for RLS bypass.
+         * Call this at the start of API routes that use API key auth (not user sessions).
+         */
+        export async function setServiceAccountContext() {
+          const sql = getSql()
+          await sql`SET LOCAL app.is_service_account = 'true'`
+        }
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Create utils.ts</name>
+      <action>
+        Create lib/db/utils.ts with shared utility functions:
+
+        ```typescript
+        // lib/db/utils.ts
+        import { createHash } from "crypto"
+
+        /**
+         * Generate MD5 hash signature for test identification
+         * Format: MD5(test_file::test_name)
+         */
+        export function generateTestSignature(testFile: string, testName: string): string {
+          return createHash("md5").update(`${testFile}::${testName}`).digest("hex")
+        }
+
+        /**
+         * Check if a test result is flaky based on retry count and status
+         * A test is flaky if it passed after at least one retry
+         */
+        export function isTestFlaky(retryCount: number, status: string): boolean {
+          return retryCount > 0 && status === "passed"
+        }
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Create types.ts</name>
+      <action>
+        Create lib/db/types.ts with local interfaces (those defined in db.ts, not lib/types.ts):
+
+        ```typescript
+        // lib/db/types.ts
+        // Local type definitions for db module
+        // Note: Main types are still imported from lib/types.ts
+
+        export interface DateRangeFilter {
+          from?: string // ISO date string
+          to?: string // ISO date string
+        }
+
+        export interface FailedTestResult {
+          test_name: string
+          test_file: string
+          error_message: string | null
+          duration_ms: number
+          retry_count: number
+          stack_trace?: string | null
+        }
+
+        export interface ExecutionSummary {
+          execution: import("../types").TestExecution
+          summary: {
+            total: number
+            passed: number
+            failed: number
+            skipped: number
+            pass_rate: number
+            duration_ms: number
+          }
+          error_distribution: Array<{ error_pattern: string; count: number }>
+          files_affected: Array<{ file: string; failed: number; passed: number }>
+        }
+
+        export type TrendPeriod = 'hour' | 'day' | 'week' | 'month'
+
+        export interface TrendOptions {
+          period?: TrendPeriod
+          count?: number
+          days?: number
+          from?: string
+          to?: string
+        }
+
+        export interface TrendDataPoint {
+          period: string
+          executions: number
+          passed: number
+          failed: number
+          skipped: number
+          pass_rate: number
+        }
+
+        export interface BranchStatistics {
+          branch: string
+          last_run: string | null
+          execution_count: number
+          pass_rate: number
+          last_status: "success" | "failure" | "running" | null
+        }
+
+        export interface SuiteStatistics {
+          suite: string
+          last_run: string | null
+          execution_count: number
+          pass_rate: number
+          last_status: "success" | "failure" | "running" | null
+        }
+
+        export interface GetFlakiestTestsOptions {
+          limit?: number
+          minRuns?: number
+          since?: string
+          branch?: string
+          suite?: string
+          includeResolved?: boolean
+        }
+
+        export interface GetFlakinessSummaryOptions {
+          branch?: string
+          suite?: string
+          since?: string
+        }
+
+        export interface SlowestTest {
+          test_signature: string
+          test_name: string
+          test_file: string
+          avg_duration_ms: number
+          run_count: number
+        }
+
+        export interface SuitePassRate {
+          suite: string
+          total_runs: number
+          pass_rate: number
+        }
+
+        export interface OrgApiKey {
+          id: number
+          organization_id: number
+          name: string
+          key_prefix: string
+          created_by: number | null
+          created_at: string
+          last_used_at: string | null
+          expires_at: string | null
+          revoked_at: string | null
+        }
+
+        export interface OrgApiKeyWithHash extends OrgApiKey {
+          key_hash: string
+        }
+
+        export interface ReliabilityScoreOptions {
+          from?: string
+          to?: string
+          branch?: string
+          suite?: string
+        }
+
+        export interface PerformanceRegressionsOptions {
+          threshold?: number
+          hours?: number
+          branch?: string
+          suite?: string
+          limit?: number
+          sortBy?: "regression" | "duration" | "name"
+        }
+
+        export interface ErrorDistributionOptions {
+          since?: string
+          branch?: string
+          suite?: string
+          limit?: number
+          groupBy?: 'error_type' | 'file' | 'branch'
+        }
+
+        export interface ErrorDistributionItem {
+          error_type: string
+          count: number
+          percentage: number
+          example_message: string | null
+        }
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Update lib/db.ts imports</name>
+      <action>
+        At the top of lib/db.ts, add imports from the new files and remove the duplicated code:
+
+        ```typescript
+        // Add these imports at the top
+        import { getSql, setServiceAccountContext } from "./db/connection"
+        import { generateTestSignature, isTestFlaky } from "./db/utils"
+        import type {
+          DateRangeFilter,
+          FailedTestResult,
+          ExecutionSummary,
+          TrendPeriod,
+          TrendOptions,
+          TrendDataPoint,
+          BranchStatistics,
+          SuiteStatistics,
+          GetFlakiestTestsOptions,
+          GetFlakinessSummaryOptions,
+          SlowestTest,
+          SuitePassRate,
+          OrgApiKey,
+          OrgApiKeyWithHash,
+          ReliabilityScoreOptions,
+          PerformanceRegressionsOptions,
+          ErrorDistributionOptions,
+          ErrorDistributionItem,
+        } from "./db/types"
+
+        // Re-export for backwards compatibility
+        export { getSql, setServiceAccountContext } from "./db/connection"
+        export { generateTestSignature, isTestFlaky } from "./db/utils"
+        export type {
+          DateRangeFilter,
+          FailedTestResult,
+          ExecutionSummary,
+          TrendPeriod,
+          TrendOptions,
+          TrendDataPoint,
+          BranchStatistics,
+          SuiteStatistics,
+          GetFlakiestTestsOptions,
+          GetFlakinessSummaryOptions,
+          SlowestTest,
+          SuitePassRate,
+          OrgApiKey,
+          OrgApiKeyWithHash,
+          ReliabilityScoreOptions,
+          PerformanceRegressionsOptions,
+          ErrorDistributionOptions,
+          ErrorDistributionItem,
+        } from "./db/types"
+        ```
+
+        Then remove the duplicated definitions from lib/db.ts (the function bodies and interface definitions that are now in the new files).
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Verify Build</name>
+      <action>
+        After each file creation, run:
+        ```bash
+        npm run build
+        ```
+
+        Fix any type errors before proceeding.
+      </action>
+    </step>
+
+    <step priority="medium">
+      <name>Test Dashboard</name>
+      <action>
+        Start the dev server and verify dashboard loads:
+        ```bash
+        npm run dev
+        ```
+
+        Check that metrics and data display correctly.
+      </action>
+    </step>
+  </implementation_steps>
+
+  <verification>
+    <check>lib/db/connection.ts exists with getSql, setServiceAccountContext</check>
+    <check>lib/db/utils.ts exists with generateTestSignature, isTestFlaky</check>
+    <check>lib/db/types.ts exists with all local interfaces</check>
+    <check>lib/db.ts imports from new files and re-exports</check>
+    <check>npm run build passes</check>
+    <check>Dashboard loads and displays data</check>
+  </verification>
+
+  <deliverables>
+    <deliverable>lib/db/connection.ts</deliverable>
+    <deliverable>lib/db/utils.ts</deliverable>
+    <deliverable>lib/db/types.ts</deliverable>
+    <deliverable>lib/db.ts - Updated with imports from new files</deliverable>
+  </deliverables>
+
+  <next_phase>
+    <file>phases/03_extract_domains.xml</file>
+    <description>Extract domain-specific query files</description>
+  </next_phase>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>Update status.md with execution results.</description>
+    <action>
+      UPDATE docs/prompts/db-abstraction-refactor/status.md with:
+      - Date, Phase, Status
+      - Files created
+      - Any issues encountered
+      - Next step link
+    </action>
+  </mandatory_final_step>
+</implementation_prompt>

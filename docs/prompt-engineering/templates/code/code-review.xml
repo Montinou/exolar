@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Code Review Template
+  Use for: Reviewing and providing feedback on code
+  Last Updated: January 2026
+-->
+
+<task>Review and analyze the provided code</task>
+
+<reviewer_profile>
+  <expertise>{{LANGUAGES_AND_FRAMEWORKS}}</expertise>
+  <focus_areas>
+    <area priority="high">Security vulnerabilities</area>
+    <area priority="high">Performance issues</area>
+    <area priority="medium">Code style and readability</area>
+    <area priority="low">Documentation</area>
+  </focus_areas>
+</reviewer_profile>
+
+<code_to_review language="{{LANGUAGE}}">
+{{CODE}}
+</code_to_review>
+
+<context>
+  <project_type>{{PROJECT_TYPE}}</project_type>
+  <existing_patterns>{{PATTERNS_TO_FOLLOW}}</existing_patterns>
+</context>
+
+<output_format>
+<review>
+  <summary>Brief overview of code quality</summary>
+
+  <issues>
+    <issue severity="critical|high|medium|low">
+      <location>File and line number</location>
+      <description>What's wrong</description>
+      <suggestion>How to fix</suggestion>
+    </issue>
+  </issues>
+
+  <positives>Good practices observed</positives>
+
+  <recommendations>Overall suggestions</recommendations>
+</review>
+</output_format>

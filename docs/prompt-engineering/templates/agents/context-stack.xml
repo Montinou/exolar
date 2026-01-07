@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Context Engineering Stack Template
+  Use for: AI agents requiring full context configuration
+  Last Updated: January 2026
+
+  Based on the 6-layer context stack model.
+  See guides/context-engineering.md for details.
+-->
+
+<context_stack version="2026">
+
+  <!-- Layer 1: System Instructions - Identity, capabilities, rules -->
+  <system_instructions>
+    <identity>
+      <role>{{AGENT_ROLE}}</role>
+      <organization>{{ORG_OR_PROJECT}}</organization>
+    </identity>
+
+    <capabilities>
+      <can_do>
+        <capability>{{CAPABILITY_1}}</capability>
+        <capability>{{CAPABILITY_2}}</capability>
+      </can_do>
+      <cannot_do>
+        <limitation reason="{{WHY}}">{{LIMITATION_1}}</limitation>
+      </cannot_do>
+    </capabilities>
+
+    <behavioral_rules>
+      <always>{{ALWAYS_DO}}</always>
+      <never>{{NEVER_DO}}</never>
+    </behavioral_rules>
+  </system_instructions>
+
+  <!-- Layer 2: Long-term Memory - Persistent knowledge -->
+  <long_term_memory>
+    <user_preferences>
+      <preference key="{{KEY}}">{{VALUE}}</preference>
+    </user_preferences>
+
+    <past_decisions>
+      <decision date="{{DATE}}">{{DECISION_SUMMARY}}</decision>
+    </past_decisions>
+
+    <learned_patterns>
+      <pattern>{{PATTERN_DESCRIPTION}}</pattern>
+    </learned_patterns>
+  </long_term_memory>
+
+  <!-- Layer 3: Retrieved Documents - RAG, relevant context -->
+  <retrieved_docs>
+    <doc id="1" source="{{SOURCE}}" relevance="high">
+      {{DOCUMENT_CONTENT}}
+    </doc>
+    <doc id="2" source="{{SOURCE}}" relevance="medium">
+      {{DOCUMENT_CONTENT}}
+    </doc>
+  </retrieved_docs>
+
+  <!-- Layer 4: Tool Definitions - Available actions -->
+  <tools>
+    <tool name="{{TOOL_NAME}}" type="{{TYPE}}">
+      <description>{{WHAT_IT_DOES}}</description>
+      <parameters>
+        <param name="{{PARAM}}" type="{{TYPE}}" required="true"/>
+      </parameters>
+    </tool>
+  </tools>
+
+  <!-- Layer 5: Conversation History - Recent interactions -->
+  <conversation_history max_turns="10">
+    {{RECENT_MESSAGES}}
+  </conversation_history>
+
+  <!-- Layer 6: Current Task - Immediate request -->
+  <current_task>
+    <objective>{{WHAT_TO_DO_NOW}}</objective>
+    <context>{{WHY_THIS_MATTERS}}</context>
+    <expected_output>{{WHAT_SUCCESS_LOOKS_LIKE}}</expected_output>
+  </current_task>
+
+</context_stack>

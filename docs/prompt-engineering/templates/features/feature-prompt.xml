@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Feature Implementation Prompt Template
+  Use for: Multi-phase feature development with tracking
+  Last Updated: January 2026
+
+  IMPORTANT: All prompts in docs/prompts/<feature-name>/ MUST
+  include the mandatory_final_step section to update status.md
+-->
+
+<feature_prompt>
+  <!-- Feature identification -->
+  <feature>
+    <name>{{FEATURE_NAME}}</name>
+    <folder>docs/prompts/{{FEATURE_SLUG}}</folder>
+    <phase>{{initial-investigation|phase-XX}}</phase>
+    <prompt_file>{{CURRENT_PROMPT_FILE.xml}}</prompt_file>
+  </feature>
+
+  <!-- Define the task for this phase -->
+  <task>
+    <objective>{{PHASE_OBJECTIVE}}</objective>
+    <success_criteria>{{WHAT_DEFINES_PHASE_COMPLETE}}</success_criteria>
+    <deliverables>
+      <deliverable>{{DELIVERABLE_1}}</deliverable>
+      <deliverable>{{DELIVERABLE_2}}</deliverable>
+    </deliverables>
+  </task>
+
+  <!-- Context from previous phases (if not initial) -->
+  <previous_context>
+    <status_file>docs/prompts/{{FEATURE_SLUG}}/status.md</status_file>
+    <completed_phases>
+      <phase file="{{PREVIOUS_PROMPT.xml}}">{{SUMMARY}}</phase>
+    </completed_phases>
+    <key_decisions>{{DECISIONS_MADE}}</key_decisions>
+  </previous_context>
+
+  <!-- Step-by-step instructions -->
+  <instructions>
+    <step priority="high">{{STEP_1}}</step>
+    <step priority="high">{{STEP_2}}</step>
+    <step priority="medium">{{STEP_3}}</step>
+  </instructions>
+
+  <!-- Constraints and rules -->
+  <constraints>
+    <follow_pattern>{{EXISTING_PATTERN}}</follow_pattern>
+    <avoid>{{WHAT_TO_AVOID}}</avoid>
+  </constraints>
+
+  <!-- MANDATORY: Update status after execution -->
+  <mandatory_final_step priority="critical">
+    <description>
+      Update the feature's status.md file with execution results.
+    </description>
+    <action>
+      After completing all steps, UPDATE:
+      docs/prompts/{{FEATURE_SLUG}}/status.md
+    </action>
+  </mandatory_final_step>
+</feature_prompt>

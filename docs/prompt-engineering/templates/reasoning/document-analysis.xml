@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Document Analysis Template
+  Use for: Analyzing contracts, reports, articles
+  Last Updated: January 2026
+-->
+
+<task>
+  <objective>Analyze the provided document</objective>
+  <focus_areas>
+    <area>{{FOCUS_AREA_1}}</area>
+    <area>{{FOCUS_AREA_2}}</area>
+    <area>{{FOCUS_AREA_3}}</area>
+  </focus_areas>
+</task>
+
+<document type="{{DOCUMENT_TYPE}}" source="{{SOURCE}}">
+{{DOCUMENT_CONTENT}}
+</document>
+
+<reference_material>
+  <!-- Optional: provide standards or comparison documents -->
+  <standard_template>{{REFERENCE_FOR_COMPARISON}}</standard_template>
+</reference_material>
+
+<instructions>
+  <step>Read and understand the document thoroughly</step>
+  <step>Identify key points related to each focus area</step>
+  <step>Note any unusual, concerning, or notable terms</step>
+  <step>Compare against reference material if provided</step>
+  <step>Provide actionable recommendations</step>
+</instructions>
+
+<output_format>
+  <findings>
+    <focus_area name="{{AREA_1}}">
+      <observation>Finding description</observation>
+      <risk_level>{{high|medium|low|none}}</risk_level>
+      <quote>Relevant excerpt from document</quote>
+    </focus_area>
+  </findings>
+
+  <summary>
+    Brief executive summary of key points
+  </summary>
+
+  <recommendations>
+    <recommendation priority="high">Action item</recommendation>
+    <recommendation priority="medium">Action item</recommendation>
+  </recommendations>
+</output_format>

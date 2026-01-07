@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Phase 4: Cleanup and Verify
+  Feature: db-abstraction-refactor
+
+  Goal: Finalize migration by moving getQueriesForOrg and deleting db.ts
+  Risk: Medium - Final step, must verify everything works
+-->
+
+<implementation_prompt>
+  <feature>
+    <name>Database Module Reorganization</name>
+    <folder>docs/prompts/db-abstraction-refactor</folder>
+    <phase>04_cleanup_verify</phase>
+    <prompt_file>phases/04_cleanup_verify.xml</prompt_file>
+  </feature>
+
+  <context>
+    <previous_phase>03_extract_domains</previous_phase>
+    <prerequisite>All domain files extracted to lib/db/</prerequisite>
+  </context>
+
+  <task>
+    <objective>Complete the migration by updating index.ts and removing the original db.ts</objective>
+    <motivation>
+      The original db.ts should now only contain re-exports.
+      Moving getQueriesForOrg to index.ts and deleting db.ts completes the reorganization.
+    </motivation>
+    <constraints>
+      <constraint>Ensure all exports are preserved in index.ts</constraint>
+      <constraint>Verify all consumers still work</constraint>
+      <constraint>No breaking changes to import paths</constraint>
+    </constraints>
+  </task>
+
+  <implementation_steps>
+    <step priority="high">
+      <name>Update index.ts</name>
+      <action>
+        Replace lib/db/index.ts with proper exports from all domain files:
+
+        ```typescript
+        // lib/db/index.ts
+        // Database module - exports all query functions
+        // Import from @/lib/db for all database operations
+
+        // Connection utilities
+        export { getSql, setServiceAccountContext } from "./connection"
+
+        // Shared utilities
+        export { generateTestSignature, isTestFlaky } from "./utils"
+
+        // Types
+        export type {
+          DateRangeFilter,
+          FailedTestResult,
+          ExecutionSummary,
+          TrendPeriod,
+          TrendOptions,
+          TrendDataPoint,
+          BranchStatistics,
+          SuiteStatistics,
+          GetFlakiestTestsOptions,
+          GetFlakinessSummaryOptions,
+          SlowestTest,
+          SuitePassRate,
+          OrgApiKey,
+          OrgApiKeyWithHash,
+          ReliabilityScoreOptions,
+          PerformanceRegressionsOptions,
+          ErrorDistributionOptions,
+          ErrorDistributionItem,
+        } from "./types"
+
+        // Execution queries
+        export {
+          getExecutions,
+          searchExecutions,
+          getExecutionById,
+          getExecutionsGroupedByBranch,
+        } from "./executions"
+
+        // Test results queries
+        export {
+          getTestResultsByExecutionId,
+          getFailedTestsByExecutionId,
+          getExecutionSummary,
+          getErrorDistributionByExecution,
+        } from "./results"
+
+        // Dashboard metrics
+        export {
+          getDashboardMetrics,
+          getTrendData,
+          getFailureTrendData,
+          getBranches,
+          getSuites,
+          getSlowestTests,
+          getSuitePassRates,
+          getReliabilityScore,
+        } from "./metrics"
+
+        // Search and history
+        export {
+          searchTests,
+          getTestHistory,
+          getTestStatistics,
+          getFailuresWithAIContext,
+          getErrorTypeDistribution,
+        } from "./search"
+
+        // Flakiness detection
+        export {
+          getFlakiestTests,
+          getFlakinessSummary,
+          updateFlakinessHistory,
+          getTestFlakiness,
+        } from "./flakiness"
+
+        // Performance regression
+        export {
+          updatePerformanceBaselines,
+          getPerformanceRegressions,
+          getTestDurationHistory,
+        } from "./performance"
+
+        // Execution comparison
+        export {
+          getLatestExecutionByBranch,
+          compareExecutions,
+        } from "./comparison"
+
+        // Failure classification
+        export { getFailureClassification } from "./classification"
+
+        // API key management
+        export {
+          createApiKey,
+          getApiKeysByOrg,
+          getApiKeyByHash,
+          revokeApiKey,
+          updateApiKeyLastUsed,
+        } from "./api-keys"
+
+        // Data ingestion
+        export {
+          insertExecution,
+          insertTestResults,
+          insertArtifacts,
+        } from "./ingestion"
+
+        // ============================================
+        // Org-Bound Query Helper
+        // ============================================
+        // Re-export types needed for parameters
+        import type { TestResultRequest, ArtifactRequest, ExecutionRequest } from "../types"
+        import type { DateRangeFilter, TrendOptions, GetFlakiestTestsOptions,
+                     ReliabilityScoreOptions, PerformanceRegressionsOptions,
+                     ErrorDistributionOptions } from "./types"
+        import type { ClassificationOptions } from "../types"
+
+        // Import functions for binding
+        import {
+          getExecutions,
+          searchExecutions,
+          getExecutionById,
+          getExecutionsGroupedByBranch,
+        } from "./executions"
+        import {
+          getTestResultsByExecutionId,
+          getFailedTestsByExecutionId,
+          getExecutionSummary,
+          getErrorDistributionByExecution,
+        } from "./results"
+        import {
+          getDashboardMetrics,
+          getTrendData,
+          getFailureTrendData,
+          getBranches,
+          getSuites,
+          getSlowestTests,
+          getSuitePassRates,
+          getReliabilityScore,
+        } from "./metrics"
+        import {
+          searchTests,
+          getTestHistory,
+          getTestStatistics,
+          getFailuresWithAIContext,
+          getErrorTypeDistribution,
+        } from "./search"
+        import {
+          getFlakiestTests,
+          getFlakinessSummary,
+          getTestFlakiness,
+        } from "./flakiness"
+        import {
+          updatePerformanceBaselines,
+          getPerformanceRegressions,
+          getTestDurationHistory,
+        } from "./performance"
+        import {
+          getLatestExecutionByBranch,
+          compareExecutions,
+        } from "./comparison"
+        import { getFailureClassification } from "./classification"
+        import {
+          createApiKey,
+          getApiKeysByOrg,
+          revokeApiKey,
+        } from "./api-keys"
+        import {
+          insertExecution,
+          insertTestResults,
+        } from "./ingestion"
+
+        /**
+         * Create org-bound query functions.
+         * Use this to avoid passing organizationId to every function.
+         */
+        export function getQueriesForOrg(organizationId: number) {
+          return {
+            // Execution queries
+            getExecutions: (limit?: number, offset?: number, status?: string, branch?: string, dateRange?: DateRangeFilter, suite?: string) =>
+              getExecutions(organizationId, limit, offset, status, branch, dateRange, suite),
+            getExecutionById: (id: number) =>
+              getExecutionById(organizationId, id),
+            getTestResultsByExecutionId: (executionId: number) =>
+              getTestResultsByExecutionId(organizationId, executionId),
+            getExecutionsGroupedByBranch: (dateRange?: DateRangeFilter, maxRunsPerSuite?: number) =>
+              getExecutionsGroupedByBranch(organizationId, dateRange, maxRunsPerSuite),
+
+            // Metrics queries
+            getDashboardMetrics: (dateRange?: DateRangeFilter) =>
+              getDashboardMetrics(organizationId, dateRange),
+            getTrendData: (options?: TrendOptions) =>
+              getTrendData(organizationId, options || {}),
+            getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
+              getFailureTrendData(organizationId, days, dateRange),
+            getReliabilityScore: (options?: ReliabilityScoreOptions | DateRangeFilter) =>
+              getReliabilityScore(organizationId, options),
+
+            // Helper queries
+            getBranches: () => getBranches(organizationId),
+            getSuites: () => getSuites(organizationId),
+
+            // Search and history queries
+            searchTests: (query: string, limit?: number, offset?: number) =>
+              searchTests(organizationId, query, limit, offset),
+            searchExecutions: (query: string, limit?: number, branch?: string, suite?: string) =>
+              searchExecutions(organizationId, query, limit, branch, suite),
+            getTestHistory: (signature: string, limit?: number, offset?: number) =>
+              getTestHistory(organizationId, signature, limit, offset),
+            getTestStatistics: (signature: string) =>
+              getTestStatistics(organizationId, signature),
+
+            // AI context queries
+            getFailuresWithAIContext: (options?: { errorType?: string; testFile?: string; limit?: number; offset?: number; since?: string }) =>
+              getFailuresWithAIContext(organizationId, options),
+            getErrorTypeDistribution: (options?: ErrorDistributionOptions | string) =>
+              getErrorTypeDistribution(organizationId, options),
+
+            // Flakiness queries
+            getFlakiestTests: (options?: GetFlakiestTestsOptions | number) =>
+              getFlakiestTests(organizationId, options),
+            getFlakinessSummary: () => getFlakinessSummary(organizationId),
+            getTestFlakiness: (signature: string) =>
+              getTestFlakiness(organizationId, signature),
+
+            // Dashboard analytics
+            getSlowestTests: (limit?: number, minRuns?: number) =>
+              getSlowestTests(organizationId, limit, minRuns),
+            getSuitePassRates: () => getSuitePassRates(organizationId),
+
+            // Insert functions
+            insertExecution: (data: ExecutionRequest) =>
+              insertExecution(organizationId, data),
+            insertTestResults: (executionId: number, results: TestResultRequest[]) =>
+              insertTestResults(organizationId, executionId, results),
+
+            // API key functions
+            createApiKey: (name: string, keyHash: string, keyPrefix: string, createdBy: number | null) =>
+              createApiKey(organizationId, name, keyHash, keyPrefix, createdBy),
+            getApiKeys: () => getApiKeysByOrg(organizationId),
+            revokeApiKey: (keyId: number) => revokeApiKey(keyId, organizationId),
+
+            // Performance regression
+            updatePerformanceBaselines: () =>
+              updatePerformanceBaselines(organizationId),
+            getPerformanceRegressions: (options?: PerformanceRegressionsOptions | number, hours?: number) =>
+              getPerformanceRegressions(organizationId, options, hours),
+            getTestDurationHistory: (testSignature: string, days?: number) =>
+              getTestDurationHistory(organizationId, testSignature, days),
+
+            // Comparison
+            compareExecutions: (baselineExecutionId: number, currentExecutionId: number, options?: { performanceThreshold?: number }) =>
+              compareExecutions(organizationId, baselineExecutionId, currentExecutionId, options),
+            getLatestExecutionByBranch: (branch: string, suite?: string) =>
+              getLatestExecutionByBranch(organizationId, branch, suite),
+
+            // Failure classification
+            getFailureClassification: (options: ClassificationOptions) =>
+              getFailureClassification(organizationId, options),
+          }
+        }
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Delete Original db.ts</name>
+      <action>
+        Once index.ts is complete and verified:
+
+        ```bash
+        # First verify the build passes
+        npm run build
+
+        # If successful, delete the original file
+        rm lib/db.ts
+        ```
+      </action>
+    </step>
+
+    <step priority="high">
+      <name>Full Verification</name>
+      <action>
+        Run comprehensive tests:
+
+        ```bash
+        # Type check
+        npm run build
+
+        # Lint
+        npm run lint
+
+        # Start dev server
+        npm run dev
+        ```
+
+        Manually verify:
+        1. Dashboard loads at /
+        2. Metrics display correctly
+        3. Navigation works
+        4. API routes respond
+      </action>
+    </step>
+
+    <step priority="medium">
+      <name>Verify Import Paths</name>
+      <action>
+        Ensure all consumers still work:
+
+        ```bash
+        # Find all imports from lib/db
+        grep -r "from ['\"]@/lib/db['\"]" --include="*.ts" --include="*.tsx"
+        ```
+
+        All imports should continue to work without modification.
+      </action>
+    </step>
+
+    <step priority="low">
+      <name>Document Final Structure</name>
+      <action>
+        Update any documentation that references lib/db.ts to mention lib/db/:
+
+        ```bash
+        # Check if CLAUDE.md mentions lib/db.ts
+        grep -n "lib/db" CLAUDE.md
+        ```
+
+        Update any references to reflect the new structure.
+      </action>
+    </step>
+  </implementation_steps>
+
+  <final_structure>
+    ```
+    lib/db/
+    ├── index.ts          # Main entry point with all exports + getQueriesForOrg
+    ├── connection.ts     # getSql, setServiceAccountContext
+    ├── utils.ts          # generateTestSignature, isTestFlaky
+    ├── types.ts          # Local interfaces
+    ├── executions.ts     # Execution CRUD
+    ├── results.ts        # Test results queries
+    ├── metrics.ts        # Dashboard metrics
+    ├── search.ts         # Search and history
+    ├── flakiness.ts      # Flakiness detection
+    ├── performance.ts    # Performance regression
+    ├── comparison.ts     # Execution comparison
+    ├── classification.ts # Failure classification
+    ├── api-keys.ts       # API key management
+    └── ingestion.ts      # Data insertion
+    ```
+  </final_structure>
+
+  <verification>
+    <check>lib/db.ts deleted</check>
+    <check>lib/db/index.ts contains all exports</check>
+    <check>npm run build passes</check>
+    <check>npm run lint passes</check>
+    <check>Dashboard fully functional</check>
+    <check>All API routes working</check>
+    <check>No broken imports anywhere</check>
+  </verification>
+
+  <deliverables>
+    <deliverable>lib/db/index.ts - Complete module entry point</deliverable>
+    <deliverable>Deleted lib/db.ts</deliverable>
+    <deliverable>Updated documentation (if needed)</deliverable>
+  </deliverables>
+
+  <completion>
+    <summary>
+      The database module reorganization is complete. The ~2970 line lib/db.ts
+      has been split into 13 focused domain files, making the codebase more
+      maintainable and easier to navigate.
+    </summary>
+    <benefits>
+      - Clear domain separation
+      - Each file under 500 lines
+      - Easy to find where to add new queries
+      - Backwards compatible (no consumer changes needed)
+      - Better code organization
+    </benefits>
+  </completion>
+
+  <!-- MANDATORY FINAL STEP -->
+  <mandatory_final_step priority="critical">
+    <description>Update status.md with final completion status.</description>
+    <action>
+      UPDATE docs/prompts/db-abstraction-refactor/status.md with:
+      - Date, Phase: 04_cleanup_verify
+      - Status: completed
+      - Final file structure
+      - Total files created
+      - Verification results
+      - Feature completion summary
+    </action>
+  </mandatory_final_step>
+</implementation_prompt>

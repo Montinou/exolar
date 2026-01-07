@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Chain-of-Thought Reasoning Template
+  Use for: Complex problems, math, logic, analysis
+  Last Updated: January 2026
+
+  Note: For Claude 4.x with extended thinking disabled,
+  avoid "think" - use "consider", "evaluate", "analyze" instead.
+-->
+
+<task>{{PROBLEM_TO_SOLVE}}</task>
+
+<problem_details>
+  <description>{{DETAILED_PROBLEM_DESCRIPTION}}</description>
+  <given_data>{{KNOWN_INFORMATION}}</given_data>
+  <goal>{{WHAT_TO_FIND_OR_DETERMINE}}</goal>
+</problem_details>
+
+<instructions>
+Work through this problem step-by-step in your reasoning.
+Show your analysis process before providing the final answer.
+</instructions>
+
+<output_structure>
+  <reasoning>
+    <!-- AI fills this with step-by-step analysis -->
+    <step number="1">Analyze the given information...</step>
+    <step number="2">Identify the approach...</step>
+    <step number="3">Execute the solution...</step>
+    <step number="4">Verify the result...</step>
+  </reasoning>
+
+  <answer>
+    <result>{{FINAL_ANSWER}}</result>
+    <confidence>{{high|medium|low}}</confidence>
+    <verification>{{HOW_ANSWER_WAS_VERIFIED}}</verification>
+  </answer>
+</output_structure>

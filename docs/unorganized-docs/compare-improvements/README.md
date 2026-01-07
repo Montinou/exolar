@@ -1,6 +1,6 @@
 # Compare Page Improvements
 
-This folder contains **production-ready** XML prompts for implementing improvements to the E2E Test Dashboard compare page. Each prompt follows the project's [XML Prompt Engineering](../XML_PROMPT_ENGINEERING.md) guidelines and [XML Prompt Template](../XML_PROMPT_TEMPLATE.xml).
+This folder contains **production-ready** XML prompts for implementing improvements to the E2E Test Dashboard compare page. Each prompt follows the project's [Prompt Engineering Guide](../../prompt-engineering/README.md) and templates from [prompt-engineering/templates/](../../prompt-engineering/templates/).
 
 ## ✅ Production-Ready
 
@@ -130,8 +130,8 @@ After implementing each prompt, verify:
 ## Related Documentation
 
 - [COMPARE_PAGE_IMPROVEMENTS.md](../COMPARE_PAGE_IMPROVEMENTS.md) - High-level improvement plan
-- [XML_PROMPT_ENGINEERING.md](../XML_PROMPT_ENGINEERING.md) - XML prompt best practices
-- [XML_PROMPT_TEMPLATE.xml](../XML_PROMPT_TEMPLATE.xml) - Template used for these prompts
+- [Prompt Engineering Guide](../../prompt-engineering/README.md) - XML prompt best practices
+- [Templates](../../prompt-engineering/templates/) - Templates used for these prompts
 
 ---
 
