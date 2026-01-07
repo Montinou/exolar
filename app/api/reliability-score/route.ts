@@ -16,9 +16,10 @@ export async function GET(request: Request) {
     const to = searchParams.get("to") || undefined
     const branch = searchParams.get("branch") || undefined
     const suite = searchParams.get("suite") || undefined
+    const lastRunOnly = searchParams.get("lastRunOnly") === "true"
 
     const db = getQueriesForOrg(context.organizationId)
-    const score = await db.getReliabilityScore({ from, to, branch, suite })
+    const score = await db.getReliabilityScore({ from, to, branch, suite, lastRunOnly })
 
     return NextResponse.json(score)
   } catch (error) {

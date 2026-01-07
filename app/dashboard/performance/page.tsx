@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic"
 async function PerformanceContent({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   const context = await getSessionContext()
   if (!context) {
@@ -28,6 +28,11 @@ async function PerformanceContent({
 
   const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
+
+  // Filter logic: when branch/suite filter is applied, show last run only unless historic is checked
+  const historic = params.historic === "true"
+  const hasFilter = !!(params.branch || params.suite)
+  const lastRunOnly = hasFilter && !historic
 
   const [branchStats, suiteStats] = await Promise.all([
     db.getBranches(),
@@ -49,7 +54,7 @@ async function PerformanceContent({
       />
 
       {/* Performance Alerts - Main Feature */}
-      <PerformanceAlertsCard branch={params.branch} suite={params.suite} />
+      <PerformanceAlertsCard branch={params.branch} suite={params.suite} lastRunOnly={lastRunOnly} />
 
       {/* Performance Analysis Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -124,7 +129,7 @@ function PerformanceSkeleton() {
 export default async function PerformancePage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-01-07T19:52:35Z |
-| **Updated** | 2026-01-07T21:05:13Z |
-| **Current Phase** | Phase 3 (completed) |
+| **Updated** | 2026-01-07T21:14:42Z |
+| **Current Phase** | Phase 4 (completed) |
 | **Status** | in_progress |
 
 ## Summary
@@ -46,7 +46,7 @@ Comprehensive improvements for dashboard data consistency and filter behavior ac
 | 1 | [01_chart_data_fixes.xml](phases/01_chart_data_fixes.xml) | Fix overlapping categories in charts | completed |
 | 2 | [02_filter_component.xml](phases/02_filter_component.xml) | Add "Historic Summary" checkbox | completed |
 | 3 | [03_database_queries.xml](phases/03_database_queries.xml) | Add lastRunOnly parameter + Issue 5 & 7 fixes | completed |
-| 4 | [04_page_integration.xml](phases/04_page_integration.xml) | Update all dashboard pages | pending |
+| 4 | [04_page_integration.xml](phases/04_page_integration.xml) | Update all dashboard pages | completed |
 | 5 | [05_documentation.xml](phases/05_documentation.xml) | Update docs and verify MCP | pending |
 
 ## Key Requirements
@@ -85,6 +85,7 @@ Comprehensive improvements for dashboard data consistency and filter behavior ac
 | 2026-01-07T20:55:47Z | Phase 1 | completed | Chart data fixes - removed flaky from pie, added skipped segment, added tooltip |
 | 2026-01-07T21:00:00Z | Phase 2 | completed | Historic Summary checkbox added to filters component |
 | 2026-01-07T21:05:13Z | Phase 3 | completed | lastRunOnly parameter, Issue 5 (flakiness denominator), Issue 7 (completed_at ordering) |
+| 2026-01-07T21:14:42Z | Phase 4 | completed | Integrated filter logic into all dashboard pages, added lastRunOnly to getReliabilityScore |
 
 ## Phase 1 Changes
 
@@ -146,9 +147,46 @@ Comprehensive improvements for dashboard data consistency and filter behavior ac
 
 ---
 
+## Phase 4 Changes
+
+### Files Modified
+1. `lib/db/types.ts`
+   - Added `lastRunOnly?: boolean` to `ReliabilityScoreOptions` interface
+
+2. `lib/db/metrics.ts`
+   - Updated `getReliabilityScore()` to support `lastRunOnly`
+   - Uses `getLatestExecutionId()` when `lastRunOnly=true` and branch/suite filters applied
+
+3. `app/dashboard/page.tsx`
+   - Added `historic` to searchParams type
+   - Added filter logic: `lastRunOnly = hasFilter && !historic`
+   - Updated `getDashboardMetrics()` call to pass full options (from, to, branch, suite, lastRunOnly)
+
+4. `app/dashboard/reliability/page.tsx`
+   - Added `historic` to searchParams type
+   - Added filter logic: `lastRunOnly = hasFilter && !historic`
+   - Updated `getReliabilityScore()` call to include `lastRunOnly`
+   - Pass `lastRunOnly` prop to `ReliabilityScoreCard`
+
+5. `app/dashboard/performance/page.tsx`
+   - Added `historic` to searchParams type
+   - Added filter logic: `lastRunOnly = hasFilter && !historic`
+   - Pass `lastRunOnly` prop to `PerformanceAlertsCard`
+
+6. `components/dashboard/reliability-score.tsx`
+   - Added `lastRunOnly?: boolean` to props interface
+   - Updated useEffect fetch to include `lastRunOnly` param
+   - Added `lastRunOnly` to dependency array
+
+7. `app/api/reliability-score/route.ts`
+   - Added reading `lastRunOnly` from searchParams
+   - Pass `lastRunOnly` to `getReliabilityScore()`
+
+---
+
 ## Next Step
 
-Execute Phase 4 - Page Integration:
+Execute Phase 5 - Documentation:
 ```
-Read and execute: docs/prompts/overall-reliability-performance-improvements/phases/04_page_integration.xml
+Read and execute: docs/prompts/overall-reliability-performance-improvements/phases/05_documentation.xml
 ```

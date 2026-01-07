@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic"
 async function ReliabilityContent({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   const context = await getSessionContext()
   if (!context) {
@@ -38,12 +38,18 @@ async function ReliabilityContent({
   const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
 
+  // Filter logic: when branch/suite filter is applied, show last run only unless historic is checked
+  const historic = params.historic === "true"
+  const hasFilter = !!(params.branch || params.suite)
+  const lastRunOnly = hasFilter && !historic
+
   const [score, branchStats, suiteStats] = await Promise.all([
     db.getReliabilityScore({
       from: params.from,
       to: params.to,
       branch: params.branch,
       suite: params.suite,
+      lastRunOnly,
     }),
     db.getBranches(),
     db.getSuites(),
@@ -93,6 +99,7 @@ async function ReliabilityContent({
             suite={params.suite}
             from={params.from}
             to={params.to}
+            lastRunOnly={lastRunOnly}
           />
         </div>
       </div>
@@ -315,7 +322,7 @@ function ReliabilitySkeleton() {
 export default async function ReliabilityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string }>
+  searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

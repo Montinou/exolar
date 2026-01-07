@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic"
 async function DashboardContent({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string }>
+  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string; historic?: string }>
 }) {
   const context = await getSessionContext()
   if (!context) {
@@ -36,11 +36,22 @@ async function DashboardContent({
   const db = getQueriesForOrg(context.organizationId)
   const params = await searchParams
 
+  // Filter logic: when branch/suite filter is applied, show last run only unless historic is checked
+  const historic = params.historic === "true"
+  const hasFilter = !!(params.branch || params.suite)
+  const lastRunOnly = hasFilter && !historic
+
   const dateRange: DateRangeFilter | undefined =
     params.from || params.to ? { from: params.from, to: params.to } : undefined
 
   const [metrics, executions, branchGroups, branchStats, suiteStats] = await Promise.all([
-    db.getDashboardMetrics(dateRange),
+    db.getDashboardMetrics({
+      from: dateRange?.from,
+      to: dateRange?.to,
+      branch: params.branch,
+      suite: params.suite,
+      lastRunOnly,
+    }),
     db.getExecutions(50, 0, params.status, params.branch, dateRange, params.suite),
     db.getExecutionsGroupedByBranch(dateRange),
     db.getBranches(),
@@ -163,7 +174,7 @@ function DashboardSkeleton() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string }>
+  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string; historic?: string }>
 }) {
   return (
     <div className="min-h-screen bg-background">

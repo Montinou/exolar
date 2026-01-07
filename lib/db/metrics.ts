@@ -513,17 +513,45 @@ export async function getReliabilityScore(
   const to = opts.to
   const branch = "branch" in opts ? opts.branch : undefined
   const suite = "suite" in opts ? opts.suite : undefined
+  const lastRunOnly = "lastRunOnly" in opts ? opts.lastRunOnly : false
+
+  // When lastRunOnly=true, filter to the latest execution matching branch/suite
+  let latestExecutionId: number | null = null
+  if (lastRunOnly && (branch || suite)) {
+    latestExecutionId = await getLatestExecutionId(organizationId, branch, suite)
+    if (!latestExecutionId) {
+      // No execution found, return default score
+      return {
+        score: 0,
+        breakdown: {
+          passRateContribution: 0,
+          flakinessContribution: 0,
+          stabilityContribution: 0,
+        },
+        rawMetrics: {
+          passRate: 0,
+          flakyRate: 0,
+          durationCV: 0,
+        },
+        trend: 0,
+        status: "critical",
+      }
+    }
+  }
 
   // Build date filter for current period
-  const dateFilter =
-    from && to
+  // If lastRunOnly and we have an execution, skip date filter (we filter by execution)
+  const dateFilter = latestExecutionId
+    ? ""
+    : from && to
       ? `AND te.started_at BETWEEN '${from}'::timestamptz AND '${to}'::timestamptz`
       : `AND te.started_at > NOW() - INTERVAL '7 days'`
 
   // Build optional branch/suite filters
   const branchFilter = branch ? `AND te.branch = '${branch}'` : ""
   const suiteFilter = suite ? `AND te.suite = '${suite}'` : ""
-  const extraFilters = branchFilter + suiteFilter
+  const executionFilter = latestExecutionId ? `AND te.id = ${latestExecutionId}` : ""
+  const extraFilters = branchFilter + suiteFilter + executionFilter
 
   const result = await sql`
     WITH current_metrics AS (

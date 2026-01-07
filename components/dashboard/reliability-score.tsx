@@ -15,9 +15,10 @@ interface ReliabilityScoreCardProps {
   suite?: string
   from?: string
   to?: string
+  lastRunOnly?: boolean
 }
 
-export function ReliabilityScoreCard({ branch, suite, from, to }: ReliabilityScoreCardProps) {
+export function ReliabilityScoreCard({ branch, suite, from, to, lastRunOnly }: ReliabilityScoreCardProps) {
   const [score, setScore] = useState<ReliabilityScore | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -31,6 +32,7 @@ export function ReliabilityScoreCard({ branch, suite, from, to }: ReliabilitySco
         if (suite) params.set("suite", suite)
         if (from) params.set("from", from)
         if (to) params.set("to", to)
+        if (lastRunOnly) params.set("lastRunOnly", "true")
 
         const url = `/api/reliability-score${params.toString() ? `?${params}` : ""}`
         const response = await fetch(url)
@@ -49,7 +51,7 @@ export function ReliabilityScoreCard({ branch, suite, from, to }: ReliabilitySco
     }
 
     fetchScore()
-  }, [branch, suite, from, to])
+  }, [branch, suite, from, to, lastRunOnly])
 
   if (loading) {
     return (

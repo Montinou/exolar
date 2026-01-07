@@ -171,6 +171,7 @@ export interface ReliabilityScoreOptions {
   to?: string
   branch?: string
   suite?: string
+  lastRunOnly?: boolean // Filter to latest execution matching branch/suite filters
 }
 
 export interface PerformanceRegressionsOptions {
