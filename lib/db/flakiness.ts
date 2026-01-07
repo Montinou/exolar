@@ -20,6 +20,7 @@ export async function getFlakiestTests(
   let branch: string | undefined
   let suite: string | undefined
   let includeResolved = false
+  let executionId: number | undefined
 
   if (typeof options === 'number') {
     limit = options
@@ -36,6 +37,7 @@ export async function getFlakiestTests(
     branch = options.branch
     suite = options.suite
     includeResolved = options.includeResolved ?? false
+    executionId = options.executionId
   }
 
   // NOTE: If the function is called with (orgId, limit, minRuns), 'options' will be 'limit'.
@@ -89,9 +91,9 @@ export async function getFlakiestTests(
     `
   }
 
-  // When branch or suite filter is active, calculate filtered stats
+  // When branch, suite, or executionId filter is active, calculate filtered stats
   // Otherwise return overall stats from test_flakiness_history
-  const hasFilters = branch || suite
+  const hasFilters = branch || suite || executionId
 
   let results
   if (hasFilters) {
@@ -99,6 +101,7 @@ export async function getFlakiestTests(
     const filterConditions = []
     if (branch) filterConditions.push(`te_filtered.branch = '${branch.replace(/'/g, "''")}'`)
     if (suite) filterConditions.push(`te_filtered.suite = '${suite.replace(/'/g, "''")}'`)
+    if (executionId) filterConditions.push(`te_filtered.id = ${executionId}`)
     if (since) filterConditions.push(`tr_filtered.started_at >= '${since}'`)
     const filterWhere = filterConditions.join(" AND ")
 
@@ -275,11 +278,12 @@ export async function updateFlakinessHistory(
       flaky_runs = test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0},
       passed_runs = test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0},
       failed_runs = test_flakiness_history.failed_runs + ${status === "failed" ? 1 : 0},
+      -- Issue 5 fix: Use total_runs (not passed_runs) as denominator for consistent flakiness rate
       flakiness_rate = CASE
-        WHEN test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0} > 0
+        WHEN test_flakiness_history.total_runs + 1 > 0
         THEN ROUND(
           (test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0})::decimal
-          / (test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0}) * 100, 2
+          / (test_flakiness_history.total_runs + 1) * 100, 2
         )
         ELSE 0
       END,

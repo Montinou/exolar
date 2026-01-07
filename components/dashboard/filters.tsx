@@ -5,6 +5,8 @@ import { format, parseISO } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { DateRangePicker } from "@/components/dashboard/date-range-picker"
 import { X } from "lucide-react"
 
@@ -25,6 +27,10 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
   const currentSuite = searchParams.get("suite")
   const currentFrom = searchParams.get("from")
   const currentTo = searchParams.get("to")
+  const currentHistoric = searchParams.get("historic") === "true"
+
+  // Show historic checkbox when branch or suite filter is applied
+  const hasFilter = !!(currentBranch || currentSuite)
 
   const dateRange: DateRange | undefined =
     currentFrom || currentTo
@@ -119,6 +125,28 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
           ))}
         </SelectContent>
       </Select>
+
+      {/* Historic Summary checkbox - only shows when branch/suite filter is applied */}
+      {hasFilter && (
+        <div className="flex items-center gap-2 px-2">
+          <Checkbox
+            id="historic"
+            checked={currentHistoric}
+            onCheckedChange={(checked) => {
+              const params = new URLSearchParams(searchParams.toString())
+              if (checked) {
+                params.set("historic", "true")
+              } else {
+                params.delete("historic")
+              }
+              router.push(`?${params.toString()}`)
+            }}
+          />
+          <Label htmlFor="historic" className="text-sm cursor-pointer whitespace-nowrap">
+            Historic Summary
+          </Label>
+        </div>
+      )}
 
       {hasFilters && (
         <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full sm:w-auto">

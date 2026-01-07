@@ -92,6 +92,7 @@ export {
 // Dashboard metrics
 export {
   getDashboardMetrics,
+  getLatestExecutionId,
   getTrendData,
   getFailureTrendData,
   getBranches,
@@ -100,6 +101,7 @@ export {
   getSuitePassRates,
   getReliabilityScore,
 } from "./metrics"
+export type { DashboardMetricsOptions } from "./metrics"
 
 // Search and history
 export {
@@ -183,6 +185,7 @@ import {
 import { getTestResultsByExecutionId } from "./results"
 import {
   getDashboardMetrics,
+  getLatestExecutionId,
   getTrendData,
   getFailureTrendData,
   getBranches,
@@ -191,6 +194,7 @@ import {
   getSuitePassRates,
   getReliabilityScore,
 } from "./metrics"
+import type { DashboardMetricsOptions } from "./metrics"
 import {
   searchTests,
   getTestHistory,
@@ -255,8 +259,10 @@ export function getQueriesForOrg(organizationId: number) {
       getExecutionsGroupedByBranch(organizationId, dateRange, maxRunsPerSuite),
 
     // Metrics queries
-    getDashboardMetrics: (dateRange?: DateRangeFilter) =>
-      getDashboardMetrics(organizationId, dateRange),
+    getDashboardMetrics: (options?: DashboardMetricsOptions | DateRangeFilter) =>
+      getDashboardMetrics(organizationId, options),
+    getLatestExecutionId: (branch?: string, suite?: string) =>
+      getLatestExecutionId(organizationId, branch, suite),
     getTrendData: (options?: TrendOptions) => getTrendData(organizationId, options || {}),
     getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
       getFailureTrendData(organizationId, days, dateRange),

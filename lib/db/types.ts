@@ -127,6 +127,7 @@ export interface GetFlakiestTestsOptions {
   branch?: string
   suite?: string
   includeResolved?: boolean
+  executionId?: number // Filter to flaky tests from specific execution (for lastRunOnly mode)
 }
 
 export interface GetFlakinessSummaryOptions {

@@ -4,7 +4,7 @@
   Feature: overall-reliability-performance-improvements
   Priority: High
 
-  Goal: Add lastRunOnly parameter to database queries
+  Goal: Add lastRunOnly parameter to database queries + Fix Issues 5 & 7
 -->
 
 <phase_prompt>
@@ -15,28 +15,59 @@
   </feature>
 
   <task>
-    <objective>Add lastRunOnly parameter to database functions to support "last run" filtering</objective>
+    <objective>Add lastRunOnly parameter to database functions and fix data consistency issues</objective>
 
     <context>
       Current state:
       - All queries aggregate ALL executions in time range
       - No function supports lastRunOnly parameter
+      - Issue 5: Flakiness rate uses passed_runs as denominator (incorrect)
+      - Issue 7: Latest execution uses started_at ordering (ambiguous for parallel runs)
 
       Target state:
       - When lastRunOnly=true, filter metrics to most recent execution
       - Most recent execution determined by branch/suite filter
+      - Flakiness rate uses total_runs as denominator (consistent)
+      - Latest execution uses completed_at ordering (deterministic)
     </context>
   </task>
+
+  <issues_addressed>
+    <issue id="5" severity="high">
+      <name>Flakiness Denominator Inconsistency</name>
+      <problem>flakiness_rate = flaky_runs / passed_runs (wrong - excludes failed runs)</problem>
+      <solution>flakiness_rate = flaky_runs / total_runs (correct - all runs)</solution>
+      <file>lib/db/flakiness.ts</file>
+      <line>~278</line>
+    </issue>
+    <issue id="7" severity="medium">
+      <name>Latest Execution Selection Ambiguity</name>
+      <problem>ORDER BY started_at DESC - parallel executions show wrong "latest"</problem>
+      <solution>ORDER BY completed_at DESC - deterministic selection</solution>
+      <file>lib/db/metrics.ts</file>
+    </issue>
+  </issues_addressed>
 
   <implementation_steps>
     <step>
       <file>lib/db/metrics.ts</file>
       <changes>
         <change>
-          <description>Add getLatestExecutionId helper function</description>
+          <description>Add DashboardMetricsOptions interface</description>
+          <add>
+export interface DashboardMetricsOptions extends DateRangeFilter {
+  lastRunOnly?: boolean
+  branch?: string
+  suite?: string
+}
+          </add>
+        </change>
+        <change>
+          <description>Add getLatestExecutionId helper function (Issue 7 fix: use completed_at)</description>
           <add>
 /**
- * Get the ID of the most recent execution matching filters
+ * Get the ID of the most recent completed execution matching filters.
+ * Uses completed_at for ordering to handle parallel executions correctly (Issue 7 fix).
  */
 export async function getLatestExecutionId(
   organizationId: number,
@@ -45,17 +76,16 @@ export async function getLatestExecutionId(
 ): Promise&lt;number | null&gt; {
   const sql = getSql()
 
-  const conditions = [`organization_id = ${organizationId}`]
-  if (branch) conditions.push(`branch = '${branch}'`)
-  if (suite) conditions.push(`suite = '${suite}'`)
+  const conditions = [`organization_id = ${organizationId}`, "completed_at IS NOT NULL"]
+  if (branch) conditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+  if (suite) conditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
 
   const whereClause = conditions.join(" AND ")
 
   const result = await sql`
     SELECT id FROM test_executions
     WHERE ${sql.unsafe(whereClause)}
-      AND completed_at IS NOT NULL
-    ORDER BY started_at DESC
+    ORDER BY completed_at DESC
     LIMIT 1
   `
 
@@ -64,7 +94,7 @@ export async function getLatestExecutionId(
           </add>
         </change>
         <change>
-          <description>Update getDashboardMetrics to support lastRunOnly</description>
+          <description>Update getDashboardMetrics to support lastRunOnly and branch/suite filters</description>
           <before>
 export async function getDashboardMetrics(
   organizationId: number,
@@ -72,29 +102,18 @@ export async function getDashboardMetrics(
 ): Promise&lt;DashboardMetrics&gt;
           </before>
           <after>
-interface DashboardMetricsOptions extends DateRangeFilter {
-  lastRunOnly?: boolean
-  branch?: string
-  suite?: string
-}
-
 export async function getDashboardMetrics(
   organizationId: number,
-  options?: DashboardMetricsOptions
-): Promise&lt;DashboardMetrics&gt;
+  options?: DashboardMetricsOptions | DateRangeFilter
+)
           </after>
           <action>
             Inside the function:
-            1. Extract lastRunOnly, branch, suite from options
-            2. If lastRunOnly=true, call getLatestExecutionId(orgId, branch, suite)
-            3. Add WHERE execution_id = latestId to relevant queries
-          </action>
-        </change>
-        <change>
-          <description>Update getReliabilityScore to support lastRunOnly</description>
-          <action>
-            1. Add lastRunOnly to ReliabilityScoreOptions interface
-            2. When lastRunOnly=true, filter to latest execution
+            1. Extract lastRunOnly, branch, suite from options (handle backward compat)
+            2. If lastRunOnly=true AND (branch OR suite), call getLatestExecutionId
+            3. Add branch/suite filters to all query conditions
+            4. Add execution_id filter when lastRunOnly
+            5. Update latestExecution query to use completed_at ordering
           </action>
         </change>
       </changes>
@@ -104,12 +123,48 @@ export async function getDashboardMetrics(
       <file>lib/db/flakiness.ts</file>
       <changes>
         <change>
-          <description>Add executionId filter to getFlakiestTests</description>
+          <description>Issue 5 fix: Change flakiness_rate denominator from passed_runs to total_runs</description>
+          <before>
+flakiness_rate = CASE
+  WHEN test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0} > 0
+  THEN ROUND(
+    (test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0})::decimal
+    / (test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0}) * 100, 2
+  )
+  ELSE 0
+END,
+          </before>
+          <after>
+-- Issue 5 fix: Use total_runs (not passed_runs) as denominator for consistent flakiness rate
+flakiness_rate = CASE
+  WHEN test_flakiness_history.total_runs + 1 > 0
+  THEN ROUND(
+    (test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0})::decimal
+    / (test_flakiness_history.total_runs + 1) * 100, 2
+  )
+  ELSE 0
+END,
+          </after>
+        </change>
+        <change>
+          <description>Add executionId filter to getFlakiestTests for lastRunOnly support</description>
           <action>
-            1. Add executionId?: number to options
-            2. When executionId provided, filter to that execution's results
-            3. Calculate flakiness from test_results instead of aggregate table
+            1. Add executionId?: number to options parsing
+            2. Include executionId in hasFilters check
+            3. Add executionId filter condition: te_filtered.id = ${executionId}
           </action>
+        </change>
+      </changes>
+    </step>
+
+    <step>
+      <file>lib/db/types.ts</file>
+      <changes>
+        <change>
+          <description>Add executionId to GetFlakiestTestsOptions</description>
+          <add>
+  executionId?: number // Filter to flaky tests from specific execution (for lastRunOnly mode)
+          </add>
         </change>
       </changes>
     </step>
@@ -118,10 +173,13 @@ export async function getDashboardMetrics(
       <file>lib/db/index.ts</file>
       <changes>
         <change>
-          <description>Export new helper and update getQueriesForOrg</description>
+          <description>Export new helper and type, update getQueriesForOrg</description>
           <action>
-            1. Export getLatestExecutionId
-            2. Add lastRunOnly support to wrapped functions in getQueriesForOrg
+            1. Export getLatestExecutionId from metrics
+            2. Export type DashboardMetricsOptions from metrics
+            3. Import getLatestExecutionId and DashboardMetricsOptions
+            4. Update getDashboardMetrics in getQueriesForOrg to accept DashboardMetricsOptions
+            5. Add getLatestExecutionId to getQueriesForOrg return object
           </action>
         </change>
       </changes>
@@ -129,18 +187,24 @@ export async function getDashboardMetrics(
   </implementation_steps>
 
   <sql_patterns>
-    <pattern name="last_run_filter">
+    <pattern name="last_run_filter_fixed">
+-- Issue 7 fix: Use completed_at for deterministic ordering
 WITH latest_execution AS (
   SELECT id FROM test_executions
   WHERE organization_id = $1
     AND ($2::text IS NULL OR branch = $2)
     AND ($3::text IS NULL OR suite = $3)
     AND completed_at IS NOT NULL
-  ORDER BY started_at DESC
+  ORDER BY completed_at DESC
   LIMIT 1
 )
 SELECT ... FROM test_results tr
 WHERE tr.execution_id = (SELECT id FROM latest_execution)
+    </pattern>
+    <pattern name="flakiness_rate_fixed">
+-- Issue 5 fix: Use total_runs as denominator
+flakiness_rate = flaky_runs / total_runs * 100
+-- NOT: flaky_runs / passed_runs * 100 (incorrect)
     </pattern>
   </sql_patterns>
 
@@ -148,21 +212,24 @@ WHERE tr.execution_id = (SELECT id FROM latest_execution)
     <test>getLatestExecutionId returns correct ID for branch filter</test>
     <test>getLatestExecutionId returns correct ID for suite filter</test>
     <test>getLatestExecutionId returns null when no matches</test>
+    <test>getLatestExecutionId uses completed_at ordering (Issue 7)</test>
     <test>getDashboardMetrics with lastRunOnly=true returns single execution data</test>
     <test>getDashboardMetrics with lastRunOnly=false returns aggregated data</test>
-    <test>getReliabilityScore with lastRunOnly=true works correctly</test>
+    <test>getDashboardMetrics respects branch/suite filters</test>
+    <test>updateFlakinessHistory uses total_runs denominator (Issue 5)</test>
+    <test>getFlakiestTests supports executionId filter</test>
     <test>Run: npm run build (no TypeScript errors)</test>
   </testing>
 
   <mandatory_final_step priority="critical">
     <action>
-      Update status.md with phase completion
+      Update status.md with phase completion including Issue 5 and Issue 7 fixes
     </action>
   </mandatory_final_step>
 
   <mandatory_commit_step priority="critical">
     <commit_format>
-      feat(overall-reliability-performance-improvements): phase-03 - Add lastRunOnly parameter to database queries
+      feat(overall-reliability-performance-improvements): phase-03 - Add lastRunOnly parameter + Issue 5 &amp; 7 fixes
     </commit_format>
   </mandatory_commit_step>
 </phase_prompt>

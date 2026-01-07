@@ -5,8 +5,8 @@
 | Field | Value |
 |-------|-------|
 | **Created** | 2026-01-07T19:52:35Z |
-| **Updated** | 2026-01-07T20:55:47Z |
-| **Current Phase** | Phase 1 (completed) |
+| **Updated** | 2026-01-07T21:05:13Z |
+| **Current Phase** | Phase 3 (completed) |
 | **Status** | in_progress |
 
 ## Summary
@@ -44,8 +44,8 @@ Comprehensive improvements for dashboard data consistency and filter behavior ac
 | Phase | Prompt | Description | Status |
 |-------|--------|-------------|--------|
 | 1 | [01_chart_data_fixes.xml](phases/01_chart_data_fixes.xml) | Fix overlapping categories in charts | completed |
-| 2 | [02_filter_component.xml](phases/02_filter_component.xml) | Add "Historic Summary" checkbox | pending |
-| 3 | [03_database_queries.xml](phases/03_database_queries.xml) | Add lastRunOnly parameter | pending |
+| 2 | [02_filter_component.xml](phases/02_filter_component.xml) | Add "Historic Summary" checkbox | completed |
+| 3 | [03_database_queries.xml](phases/03_database_queries.xml) | Add lastRunOnly parameter + Issue 5 & 7 fixes | completed |
 | 4 | [04_page_integration.xml](phases/04_page_integration.xml) | Update all dashboard pages | pending |
 | 5 | [05_documentation.xml](phases/05_documentation.xml) | Update docs and verify MCP | pending |
 
@@ -83,6 +83,8 @@ Comprehensive improvements for dashboard data consistency and filter behavior ac
 |------|-------|--------|-------|
 | 2026-01-07T20:34:17Z | Investigation | completed | Analysis complete, 5 phase prompts created |
 | 2026-01-07T20:55:47Z | Phase 1 | completed | Chart data fixes - removed flaky from pie, added skipped segment, added tooltip |
+| 2026-01-07T21:00:00Z | Phase 2 | completed | Historic Summary checkbox added to filters component |
+| 2026-01-07T21:05:13Z | Phase 3 | completed | lastRunOnly parameter, Issue 5 (flakiness denominator), Issue 7 (completed_at ordering) |
 
 ## Phase 1 Changes
 
@@ -110,9 +112,43 @@ Comprehensive improvements for dashboard data consistency and filter behavior ac
 
 ---
 
+## Phase 2 Changes
+
+### Files Modified
+1. `components/dashboard/filters.tsx`
+   - Added Checkbox and Label imports from shadcn/ui
+   - Added `currentHistoric` state from URL param
+   - Added `hasFilter` computed value (branch || suite)
+   - Added "Historic Summary" checkbox that appears when filter is applied
+   - Checkbox sets `?historic=true` URL parameter
+
+---
+
+## Phase 3 Changes
+
+### Files Modified
+1. `lib/db/metrics.ts`
+   - Added `DashboardMetricsOptions` interface (extends DateRangeFilter with lastRunOnly, branch, suite)
+   - Added `getLatestExecutionId()` helper function using `ORDER BY completed_at DESC` (Issue 7 fix)
+   - Updated `getDashboardMetrics()` to support lastRunOnly and branch/suite filters
+   - Updated latestExecution query to use `completed_at` for ordering
+
+2. `lib/db/flakiness.ts`
+   - **Issue 5 fix**: Changed flakiness_rate denominator from `passed_runs` to `total_runs`
+   - Added `executionId` option to `getFlakiestTests()` for lastRunOnly support
+
+3. `lib/db/types.ts`
+   - Added `executionId?: number` to `GetFlakiestTestsOptions` interface
+
+4. `lib/db/index.ts`
+   - Exported `getLatestExecutionId` and `DashboardMetricsOptions`
+   - Updated `getQueriesForOrg` to support new options
+
+---
+
 ## Next Step
 
-Execute Phase 2 - Filter Component Update:
+Execute Phase 4 - Page Integration:
 ```
-Read and execute: docs/prompts/overall-reliability-performance-improvements/phases/02_filter_component.xml
+Read and execute: docs/prompts/overall-reliability-performance-improvements/phases/04_page_integration.xml
 ```

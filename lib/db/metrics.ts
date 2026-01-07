@@ -19,9 +19,85 @@ import type {
 // Dashboard Metrics
 // ============================================
 
-export async function getDashboardMetrics(organizationId: number, dateRange?: DateRangeFilter) {
+/**
+ * Options for getDashboardMetrics
+ * Extends DateRangeFilter with lastRunOnly and branch/suite filters
+ */
+export interface DashboardMetricsOptions extends DateRangeFilter {
+  lastRunOnly?: boolean
+  branch?: string
+  suite?: string
+}
+
+/**
+ * Get the ID of the most recent completed execution matching filters.
+ * Uses completed_at for ordering to handle parallel executions correctly (Issue 7 fix).
+ */
+export async function getLatestExecutionId(
+  organizationId: number,
+  branch?: string,
+  suite?: string
+): Promise<number | null> {
   const sql = getSql()
+
+  const conditions = [`organization_id = ${organizationId}`, "completed_at IS NOT NULL"]
+  if (branch) conditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+  if (suite) conditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
+
+  const whereClause = conditions.join(" AND ")
+
+  const result = await sql`
+    SELECT id FROM test_executions
+    WHERE ${sql.unsafe(whereClause)}
+    ORDER BY completed_at DESC
+    LIMIT 1
+  `
+
+  return result[0]?.id ?? null
+}
+
+export async function getDashboardMetrics(
+  organizationId: number,
+  options?: DashboardMetricsOptions | DateRangeFilter
+) {
+  // Handle both old DateRangeFilter and new DashboardMetricsOptions
+  const opts: DashboardMetricsOptions = options || {}
+  const dateRange: DateRangeFilter | undefined = opts.from || opts.to ? { from: opts.from, to: opts.to } : undefined
+  const lastRunOnly = "lastRunOnly" in opts ? opts.lastRunOnly : false
+  const branch = "branch" in opts ? opts.branch : undefined
+  const suite = "suite" in opts ? opts.suite : undefined
+  const sql = getSql()
+
+  // When lastRunOnly=true, filter to the latest execution matching branch/suite
+  let latestExecutionId: number | null = null
+  if (lastRunOnly && (branch || suite)) {
+    latestExecutionId = await getLatestExecutionId(organizationId, branch, suite)
+    if (!latestExecutionId) {
+      // No execution found, return empty metrics
+      return {
+        total_executions: 0,
+        pass_rate: 0,
+        failure_rate: 0,
+        avg_duration_ms: 0,
+        critical_failures: 0,
+        last_24h_executions: 0,
+        failure_volume: 0,
+        latestPassRate: null,
+        flakyTests: 0,
+      } as DashboardMetrics
+    }
+  }
+
   const conditions = ["completed_at IS NOT NULL", `organization_id = ${organizationId}`]
+
+  // Add branch/suite filters
+  if (branch) conditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+  if (suite) conditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
+
+  // If lastRunOnly, filter to specific execution
+  if (latestExecutionId) {
+    conditions.push(`id = ${latestExecutionId}`)
+  }
 
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
@@ -56,9 +132,14 @@ export async function getDashboardMetrics(organizationId: number, dateRange?: Da
     `te.organization_id = ${organizationId}`,
   ]
 
+  // Add branch/suite/executionId filters to critical query
+  if (branch) criticalConditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+  if (suite) criticalConditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+  if (latestExecutionId) criticalConditions.push(`te.id = ${latestExecutionId}`)
+
   if (dateRange?.from) {
     criticalConditions.push(`te.started_at >= '${dateRange.from}'`)
-  } else {
+  } else if (!latestExecutionId) {
     criticalConditions.push("te.started_at > NOW() - INTERVAL '7 days'")
   }
 
@@ -76,12 +157,25 @@ export async function getDashboardMetrics(organizationId: number, dateRange?: Da
   `
 
   // Get latest execution test counts for donut chart
+  // If lastRunOnly and we have an execution, use that specific one
+  // Otherwise, get the most recent execution matching filters
+  // Uses completed_at for ordering (Issue 7 fix)
+  const latestExecConditions = [
+    `organization_id = ${organizationId}`,
+    "completed_at IS NOT NULL",
+  ]
+  if (latestExecutionId) {
+    latestExecConditions.push(`id = ${latestExecutionId}`)
+  } else {
+    if (branch) latestExecConditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+    if (suite) latestExecConditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
+  }
+
   const latestExecution = await sql`
     SELECT total_tests, passed, failed, skipped
     FROM test_executions
-    WHERE organization_id = ${organizationId}
-      AND completed_at IS NOT NULL
-    ORDER BY started_at DESC
+    WHERE ${sql.unsafe(latestExecConditions.join(" AND "))}
+    ORDER BY completed_at DESC
     LIMIT 1
   `
 
