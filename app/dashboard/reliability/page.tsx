@@ -152,7 +152,7 @@ async function ReliabilityContent({
                 +{score.breakdown.stabilityContribution}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {Math.round((1 - score.rawMetrics.durationCV) * 100)}% consistent × 30% weight
+                {Math.round((1 - Math.min(score.rawMetrics.durationCV, 1)) * 100)}% consistent × 30% weight
               </p>
             </CardContent>
           </Card>

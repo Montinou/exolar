@@ -1478,41 +1478,130 @@ export async function getFlakiestTests(
 
   const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter} ${suiteFilter}`
 
-  const results = await sql`
-    SELECT 
-      tfh.*,
-      (
-        SELECT te.branch 
-        FROM test_results tr 
-        JOIN test_executions te ON tr.execution_id = te.id
-        WHERE tr.test_signature = tfh.test_signature
-          AND tr.is_flaky = true
-          AND te.organization_id = ${organizationId}
-        ORDER BY tr.started_at DESC
-        LIMIT 1
-      ) as last_flaky_branch
-    FROM test_flakiness_history tfh
-    ${sql.unsafe(whereClause)}
-    ORDER BY flakiness_rate DESC, flaky_runs DESC
-    LIMIT ${limit}
-  `
+  // When branch or suite filter is active, calculate filtered stats
+  // Otherwise return overall stats from test_flakiness_history
+  const hasFilters = branch || suite
+
+  let results
+  if (hasFilters) {
+    // Build filter conditions for the join
+    const filterConditions = []
+    if (branch) filterConditions.push(`te_filtered.branch = '${branch.replace(/'/g, "''")}'`)
+    if (suite) filterConditions.push(`te_filtered.suite = '${suite.replace(/'/g, "''")}'`)
+    const filterWhere = filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : ""
+
+    results = await sql`
+      SELECT
+        tfh.test_signature,
+        tfh.test_name,
+        tfh.test_file,
+        COUNT(*) FILTER (WHERE tr_filtered.is_flaky = true) as flaky_runs,
+        COUNT(*) as total_runs,
+        ROUND(
+          COUNT(*) FILTER (WHERE tr_filtered.is_flaky = true)::numeric /
+          NULLIF(COUNT(*), 0) * 100, 2
+        ) as flakiness_rate,
+        MAX(CASE WHEN tr_filtered.is_flaky = true THEN tr_filtered.started_at END) as last_flaky_at,
+        (
+          SELECT te.branch
+          FROM test_results tr
+          JOIN test_executions te ON tr.execution_id = te.id
+          WHERE tr.test_signature = tfh.test_signature
+            AND tr.is_flaky = true
+            AND te.organization_id = ${organizationId}
+          ORDER BY tr.started_at DESC
+          LIMIT 1
+        ) as last_flaky_branch
+      FROM test_flakiness_history tfh
+      JOIN test_results tr_filtered ON tfh.test_signature = tr_filtered.test_signature
+      JOIN test_executions te_filtered ON tr_filtered.execution_id = te_filtered.id
+        AND te_filtered.organization_id = ${organizationId}
+        ${sql.unsafe(filterWhere)}
+      ${sql.unsafe(whereClause)}
+      GROUP BY tfh.test_signature, tfh.test_name, tfh.test_file
+      HAVING COUNT(*) FILTER (WHERE tr_filtered.is_flaky = true) > 0
+      ORDER BY flakiness_rate DESC, flaky_runs DESC
+      LIMIT ${limit}
+    `
+  } else {
+    results = await sql`
+      SELECT
+        tfh.*,
+        (
+          SELECT te.branch
+          FROM test_results tr
+          JOIN test_executions te ON tr.execution_id = te.id
+          WHERE tr.test_signature = tfh.test_signature
+            AND tr.is_flaky = true
+            AND te.organization_id = ${organizationId}
+          ORDER BY tr.started_at DESC
+          LIMIT 1
+        ) as last_flaky_branch
+      FROM test_flakiness_history tfh
+      ${sql.unsafe(whereClause)}
+      ORDER BY flakiness_rate DESC, flaky_runs DESC
+      LIMIT ${limit}
+    `
+  }
 
   return results as unknown as TestFlakinessHistory[]
 }
 
-export async function getFlakinessSummary(organizationId: number): Promise<FlakinessSummary> {
+export interface GetFlakinessSummaryOptions {
+  branch?: string
+  suite?: string
+  since?: string
+}
+
+export async function getFlakinessSummary(
+  organizationId: number,
+  options: GetFlakinessSummaryOptions = {}
+): Promise<FlakinessSummary> {
+  const { branch, suite, since } = options
   const sql = getSql()
 
-  const summaryResult = await sql`
-    SELECT
-      COUNT(*) FILTER (WHERE flaky_runs > 0) as total_flaky_tests,
-      COALESCE(AVG(flakiness_rate) FILTER (WHERE flaky_runs > 0), 0) as avg_flakiness_rate
-    FROM test_flakiness_history
-    WHERE total_runs >= 5
-      AND organization_id = ${organizationId}
-  `
+  const hasFilters = branch || suite || since
 
-  const topFlaky = await getFlakiestTests(organizationId, { limit: 5 })
+  let summaryResult
+  if (hasFilters) {
+    // Build filter conditions
+    const filterConditions = [`te.organization_id = ${organizationId}`]
+    if (branch) filterConditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+    if (suite) filterConditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+    if (since) filterConditions.push(`tr.started_at >= '${since}'`)
+    const filterWhere = filterConditions.join(" AND ")
+
+    // Calculate filtered summary from test_results directly
+    summaryResult = await sql`
+      SELECT
+        COUNT(DISTINCT CASE WHEN tr.is_flaky = true THEN tr.test_signature END) as total_flaky_tests,
+        COALESCE(
+          COUNT(*) FILTER (WHERE tr.is_flaky = true)::numeric /
+          NULLIF(COUNT(*), 0) * 100,
+          0
+        ) as avg_flakiness_rate
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE ${sql.unsafe(filterWhere)}
+    `
+  } else {
+    // Use aggregate table for unfiltered summary (faster)
+    summaryResult = await sql`
+      SELECT
+        COUNT(*) FILTER (WHERE flaky_runs > 0) as total_flaky_tests,
+        COALESCE(AVG(flakiness_rate) FILTER (WHERE flaky_runs > 0), 0) as avg_flakiness_rate
+      FROM test_flakiness_history
+      WHERE total_runs >= 5
+        AND organization_id = ${organizationId}
+    `
+  }
+
+  const topFlaky = await getFlakiestTests(organizationId, {
+    limit: 5,
+    branch,
+    suite,
+    since
+  })
 
   return {
     total_flaky_tests: Number(summaryResult[0].total_flaky_tests),
@@ -1839,7 +1928,7 @@ export async function getReliabilityScore(
       SELECT
         COALESCE(COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100, 0) as pass_rate,
         COALESCE(COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100, 0) as flaky_rate,
-        COALESCE(STDDEV(tr.duration_ms) / NULLIF(AVG(tr.duration_ms), 0), 0) as duration_cv
+        COALESCE(STDDEV(tr.duration_ms) FILTER (WHERE tr.status = 'passed') / NULLIF(AVG(tr.duration_ms) FILTER (WHERE tr.status = 'passed'), 0), 0) as duration_cv
       FROM test_results tr
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
@@ -1850,7 +1939,7 @@ export async function getReliabilityScore(
       SELECT
         COALESCE(COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100, 0) as pass_rate,
         COALESCE(COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100, 0) as flaky_rate,
-        COALESCE(STDDEV(tr.duration_ms) / NULLIF(AVG(tr.duration_ms), 0), 0) as duration_cv
+        COALESCE(STDDEV(tr.duration_ms) FILTER (WHERE tr.status = 'passed') / NULLIF(AVG(tr.duration_ms) FILTER (WHERE tr.status = 'passed'), 0), 0) as duration_cv
       FROM test_results tr
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}

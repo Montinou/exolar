@@ -176,7 +176,7 @@ export function ReliabilityScoreCard({ branch, suite, from, to }: ReliabilitySco
         <div>
           <p className="text-xs text-muted-foreground">Stability</p>
           <p className="text-sm font-medium">
-            {Math.round((1 - score.rawMetrics.durationCV) * 100)}%
+            {Math.round((1 - Math.min(score.rawMetrics.durationCV, 1)) * 100)}%
           </p>
         </div>
       </div>

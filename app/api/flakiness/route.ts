@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const includeResolved = searchParams.get("include_resolved") === "true"
 
     const [summary, flakiestTests] = await Promise.all([
-      db.getFlakinessSummary(),
+      db.getFlakinessSummary({ branch, suite, since }),
       db.getFlakiestTests({
         limit,
         minRuns,
