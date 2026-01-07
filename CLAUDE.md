@@ -403,3 +403,4 @@ See `docs/prompt-engineering/guides/claude-4x-guidelines.md` for details.
 3. **Document decisions** - Explain why, not just what
 4. **Use templates** from `docs/prompt-engineering/templates/`
 5. **Use real dates**: `date -u +"%Y-%m-%dT%H:%M:%SZ"`
+6. **Commit after each phase**: Use format `feat(<feature-slug>): <phase> - <description>`

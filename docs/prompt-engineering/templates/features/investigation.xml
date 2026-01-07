@@ -56,4 +56,21 @@
   <mandatory_final_step priority="critical">
     <action>Update docs/prompts/{{FEATURE_SLUG}}/status.md with investigation results</action>
   </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <description>
+      Commit all changes with a structured message identifying feature and phase.
+    </description>
+    <commit_format>
+      feat({{FEATURE_SLUG}}): investigation - {{BRIEF_DESCRIPTION}}
+
+      Example: feat(db-abstraction-refactor): investigation - Initial codebase analysis
+    </commit_format>
+    <action>
+      After updating status.md, commit all changes:
+      1. Stage: git add docs/prompts/{{FEATURE_SLUG}}/
+      2. Commit with format: feat({{FEATURE_SLUG}}): investigation - {{description}}
+    </action>
+  </mandatory_commit_step>
 </investigation_prompt>

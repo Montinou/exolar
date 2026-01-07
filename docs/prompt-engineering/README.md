@@ -23,6 +23,22 @@ See [templates/_index.xml](templates/_index.xml) for full catalog.
 | [data/](templates/data/) | Data extraction, multi-source synthesis |
 | [features/](templates/features/) | Feature development workflows |
 
+## Commit Convention
+
+Every phase prompt execution must end with:
+1. Update `status.md` (mandatory_final_step)
+2. Commit changes (mandatory_commit_step)
+
+**Commit format:**
+```
+feat(<feature-slug>): <phase> - <brief description>
+```
+
+Examples:
+- `feat(db-refactor): investigation - Initial analysis complete`
+- `feat(db-refactor): phase-01 - Setup folder structure`
+- `feat(db-refactor): phase-02 - Extract utility functions`
+
 ## Quick Tips
 
 ```

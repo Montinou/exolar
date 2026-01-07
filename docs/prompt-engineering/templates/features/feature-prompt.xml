@@ -59,4 +59,21 @@
       docs/prompts/{{FEATURE_SLUG}}/status.md
     </action>
   </mandatory_final_step>
+
+  <!-- MANDATORY: Commit changes after status update -->
+  <mandatory_commit_step priority="critical">
+    <description>
+      Commit all changes with a structured message identifying feature and phase.
+    </description>
+    <commit_format>
+      feat({{FEATURE_SLUG}}): {{PHASE}} - {{BRIEF_DESCRIPTION}}
+
+      Example: feat(db-abstraction-refactor): phase-02 - Extract utility functions
+    </commit_format>
+    <action>
+      After updating status.md, commit all changes:
+      1. Stage: git add docs/prompts/{{FEATURE_SLUG}}/ [+ any modified source files]
+      2. Commit with format: feat({{FEATURE_SLUG}}): {{PHASE}} - {{description}}
+    </action>
+  </mandatory_commit_step>
 </feature_prompt>

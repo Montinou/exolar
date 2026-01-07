@@ -32,6 +32,20 @@ import type {
 // Import from new modular files
 import { getSql, setServiceAccountContext } from "./db/connection"
 import { generateTestSignature, isTestFlaky } from "./db/utils"
+import {
+  createApiKey,
+  getApiKeysByOrg,
+  getApiKeyByHash,
+  revokeApiKey,
+  updateApiKeyLastUsed,
+} from "./db/api-keys"
+import {
+  searchTests,
+  getTestHistory,
+  getTestStatistics,
+  getFailuresWithAIContext,
+  getErrorTypeDistribution,
+} from "./db/search"
 import type {
   DateRangeFilter,
   FailedTestResult,
@@ -76,6 +90,22 @@ export type {
   ErrorDistributionOptions,
   ErrorDistributionItem,
 } from "./db/types"
+
+// Re-export domain modules
+export {
+  createApiKey,
+  getApiKeysByOrg,
+  getApiKeyByHash,
+  revokeApiKey,
+  updateApiKeyLastUsed,
+} from "./db/api-keys"
+export {
+  searchTests,
+  getTestHistory,
+  getTestStatistics,
+  getFailuresWithAIContext,
+  getErrorTypeDistribution,
+} from "./db/search"
 
 export async function getExecutions(
   organizationId: number,
@@ -1038,285 +1068,6 @@ export async function insertArtifacts(
 }
 
 // ============================================
-// Search and History Functions (Phase 04)
-// ============================================
-
-export async function searchTests(organizationId: number, query: string, limit = 50, offset = 0): Promise<TestSearchResult[]> {
-  const sql = getSql()
-
-  if (!query || query.length < 2) {
-    return []
-  }
-
-  const searchPattern = `%${query}%`
-
-  const results = await sql`
-    SELECT
-      COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) as test_signature,
-      tr.test_name,
-      tr.test_file,
-      COUNT(*) as run_count,
-      MAX(tr.started_at) as last_run,
-      (
-        SELECT status FROM test_results tr2
-        JOIN test_executions te2 ON tr2.execution_id = te2.id
-        WHERE tr2.test_name = tr.test_name
-          AND tr2.test_file = tr.test_file
-          AND te2.organization_id = ${organizationId}
-        ORDER BY tr2.started_at DESC LIMIT 1
-      ) as last_status,
-      ROUND(
-        COUNT(*) FILTER (WHERE tr.status = 'passed')::decimal
-        / NULLIF(COUNT(*), 0) * 100, 1
-      ) as pass_rate
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    WHERE (tr.test_name ILIKE ${searchPattern}
-       OR tr.test_file ILIKE ${searchPattern})
-      AND te.organization_id = ${organizationId}
-    GROUP BY tr.test_name, tr.test_file, tr.test_signature
-    ORDER BY run_count DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `
-
-  return results as TestSearchResult[]
-}
-
-export async function getTestHistory(organizationId: number, signature: string, limit = 20, offset = 0): Promise<TestHistoryItem[]> {
-  const sql = getSql()
-
-  const results = await sql`
-    SELECT
-      tr.*,
-      te.branch,
-      te.commit_sha,
-      te.status as execution_status
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    WHERE (tr.test_signature = ${signature}
-       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature})
-      AND te.organization_id = ${organizationId}
-    ORDER BY tr.started_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `
-
-  return results as TestHistoryItem[]
-}
-
-export async function getTestStatistics(organizationId: number, signature: string): Promise<TestStatistics> {
-  const sql = getSql()
-
-  const result = await sql`
-    SELECT
-      COUNT(*) as total_runs,
-      ROUND(
-        COUNT(*) FILTER (WHERE tr.status = 'passed')::decimal
-        / NULLIF(COUNT(*), 0) * 100, 1
-      ) as pass_rate,
-      ROUND(AVG(tr.duration_ms)) as avg_duration_ms,
-      ROUND(
-        COUNT(*) FILTER (WHERE tr.retry_count > 0 AND tr.status = 'passed')::decimal
-        / NULLIF(COUNT(*) FILTER (WHERE tr.status = 'passed'), 0) * 100, 1
-      ) as flaky_rate,
-      MAX(tr.started_at) FILTER (WHERE tr.status = 'failed') as last_failure
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    WHERE (tr.test_signature = ${signature}
-       OR MD5(tr.test_file || '::' || tr.test_name) = ${signature})
-      AND te.organization_id = ${organizationId}
-  `
-
-  return {
-    total_runs: Number(result[0].total_runs),
-    pass_rate: Number(result[0].pass_rate) || 0,
-    avg_duration_ms: Number(result[0].avg_duration_ms) || 0,
-    flaky_rate: Number(result[0].flaky_rate) || 0,
-    last_failure: result[0].last_failure,
-  }
-}
-
-// ============================================
-// AI Context Analysis Functions
-// ============================================
-
-export async function getFailuresWithAIContext(
-  organizationId: number,
-  options: {
-    errorType?: string
-    testFile?: string
-    limit?: number
-    offset?: number
-    since?: string
-    executionId?: number
-    requireAIContext?: boolean
-    runId?: string
-  } = {}
-): Promise<TestResult[]> {
-  const sql = getSql()
-  const { errorType, testFile, limit = 50, offset = 0, since, executionId, requireAIContext = false, runId } = options
-
-  const conditions = [
-    "tr.status IN ('failed', 'timedout')",
-    `te.organization_id = ${organizationId}`,
-  ]
-
-  // Only require ai_context when filtering by AI error type or explicitly requested
-  if (requireAIContext || errorType) {
-    conditions.push("tr.ai_context IS NOT NULL")
-  }
-
-  if (errorType) {
-    conditions.push(`tr.ai_context->'error'->>'type' = '${errorType.replace(/'/g, "''")}'`)
-  }
-
-  if (testFile) {
-    conditions.push(`tr.test_file ILIKE '%${testFile.replace(/'/g, "''")}%'`)
-  }
-
-  if (since) {
-    conditions.push(`tr.created_at >= '${since}'`)
-  }
-
-  if (executionId) {
-    conditions.push(`tr.execution_id = ${executionId}`)
-  }
-
-  if (runId) {
-    conditions.push(`te.run_id = '${runId}'`)
-  }
-
-  const whereClause = `WHERE ${conditions.join(" AND ")}`
-
-  // Build query with dynamic conditions
-  const query = `
-    SELECT
-      tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
-      tr.status, tr.duration_ms, tr.is_critical, tr.error_message, tr.stack_trace,
-      tr.browser, tr.retry_count, tr.ai_context, tr.created_at
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    ${whereClause}
-    ORDER BY tr.created_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `
-
-  const result = await sql.unsafe(query)
-  return result as unknown as TestResult[]
-}
-
-// ============================================
-// Error Distribution Types and Options
-// ============================================
-
-export async function getErrorTypeDistribution(
-  organizationId: number,
-  options: ErrorDistributionOptions | string = {}
-): Promise<ErrorDistributionItem[]> {
-  const sql = getSql()
-  
-  // Handle backwards compatibility - if a string is passed, treat it as 'since'
-  const opts: ErrorDistributionOptions = typeof options === 'string' 
-    ? { since: options } 
-    : options
-  
-  const { since, branch, suite, limit = 10, groupBy = 'error_type' } = opts
-
-  const conditions = [
-    "tr.status IN ('failed', 'timedout')",
-    `te.organization_id = ${organizationId}`,
-  ]
-
-  // AI context is only required when grouping by error_type
-  if (groupBy === 'error_type') {
-    conditions.push("tr.ai_context IS NOT NULL")
-  }
-
-  if (since) {
-    conditions.push(`tr.created_at >= '${since}'`)
-  }
-
-  if (branch) {
-    conditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
-  }
-
-  if (suite) {
-    conditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
-  }
-
-  const whereClause = `WHERE ${conditions.join(" AND ")}`
-
-  // Determine grouping column based on groupBy option
-  let groupColumn: string
-  let selectColumn: string
-  
-  switch (groupBy) {
-    case 'file':
-      groupColumn = 'tr.test_file'
-      selectColumn = 'tr.test_file as error_type'  // Reuse field name for consistent response shape
-      break
-    case 'branch':
-      groupColumn = 'te.branch'
-      selectColumn = 'te.branch as error_type'
-      break
-    case 'error_type':
-    default:
-      groupColumn = "tr.ai_context->'error'->>'type'"
-      selectColumn = "tr.ai_context->'error'->>'type' as error_type"
-  }
-
-  // Ensure limit is within bounds (1-100)
-  const safeLimit = Math.min(Math.max(1, limit), 100)
-
-  // Query with percentage calculation using CTE and example_message from most recent occurrence
-  const query = `
-    WITH total_count AS (
-      SELECT COUNT(*) as total
-      FROM test_results tr
-      JOIN test_executions te ON tr.execution_id = te.id
-      ${whereClause}
-    ),
-    grouped AS (
-      SELECT
-        ${selectColumn},
-        COUNT(*) as count,
-        MAX(tr.created_at) as latest_at
-      FROM test_results tr
-      JOIN test_executions te ON tr.execution_id = te.id
-      ${whereClause}
-      GROUP BY ${groupColumn}
-      ORDER BY count DESC
-      LIMIT ${safeLimit}
-    )
-    SELECT 
-      g.error_type,
-      g.count::integer as count,
-      ROUND((g.count::decimal / NULLIF(tc.total, 0)) * 100, 1)::float as percentage,
-      (
-        SELECT tr2.error_message 
-        FROM test_results tr2
-        JOIN test_executions te2 ON tr2.execution_id = te2.id
-        WHERE ${groupBy === 'error_type' 
-          ? "tr2.ai_context->'error'->>'type' = g.error_type" 
-          : groupBy === 'file' 
-            ? "tr2.test_file = g.error_type"
-            : "te2.branch = g.error_type"}
-          AND te2.organization_id = ${organizationId}
-          AND tr2.status IN ('failed', 'timedout')
-        ORDER BY tr2.created_at DESC 
-        LIMIT 1
-      ) as example_message
-    FROM grouped g, total_count tc
-    ORDER BY g.count DESC
-  `
-
-  const result = await sql.unsafe(query)
-  return result as unknown as ErrorDistributionItem[]
-}
-
-// ============================================
 // Flakiness Detection Functions (Phase 06)
 // ============================================
 
@@ -1672,113 +1423,6 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
   `
 
   return result as SuitePassRate[]
-}
-
-// ============================================
-// Organization API Key Functions
-// ============================================
-
-/**
- * Create a new API key for an organization
- */
-export async function createApiKey(
-  organizationId: number,
-  name: string,
-  keyHash: string,
-  keyPrefix: string,
-  createdBy: number | null
-): Promise<OrgApiKey> {
-  const sql = getSql()
-
-  const result = await sql`
-    INSERT INTO organization_api_keys (
-      organization_id,
-      name,
-      key_hash,
-      key_prefix,
-      created_by
-    ) VALUES (
-      ${organizationId},
-      ${name},
-      ${keyHash},
-      ${keyPrefix},
-      ${createdBy}
-    )
-    RETURNING id, organization_id, name, key_prefix, created_by, created_at, last_used_at, expires_at, revoked_at
-  `
-
-  return result[0] as OrgApiKey
-}
-
-/**
- * Get all API keys for an organization (excludes key_hash for security)
- */
-export async function getApiKeysByOrg(organizationId: number): Promise<OrgApiKey[]> {
-  const sql = getSql()
-
-  const result = await sql`
-    SELECT
-      id,
-      organization_id,
-      name,
-      key_prefix,
-      created_by,
-      created_at,
-      last_used_at,
-      expires_at,
-      revoked_at
-    FROM organization_api_keys
-    WHERE organization_id = ${organizationId}
-    ORDER BY created_at DESC
-  `
-
-  return result as OrgApiKey[]
-}
-
-/**
- * Get an API key by its hash (for validation)
- */
-export async function getApiKeyByHash(keyHash: string): Promise<OrgApiKeyWithHash | null> {
-  const sql = getSql()
-
-  const result = await sql`
-    SELECT *
-    FROM organization_api_keys
-    WHERE key_hash = ${keyHash}
-  `
-
-  return result.length > 0 ? (result[0] as OrgApiKeyWithHash) : null
-}
-
-/**
- * Revoke an API key (soft delete)
- */
-export async function revokeApiKey(keyId: number, organizationId: number): Promise<boolean> {
-  const sql = getSql()
-
-  const result = await sql`
-    UPDATE organization_api_keys
-    SET revoked_at = NOW()
-    WHERE id = ${keyId}
-      AND organization_id = ${organizationId}
-      AND revoked_at IS NULL
-    RETURNING id
-  `
-
-  return result.length > 0
-}
-
-/**
- * Update last_used_at timestamp for an API key
- */
-export async function updateApiKeyLastUsed(keyId: number): Promise<void> {
-  const sql = getSql()
-
-  await sql`
-    UPDATE organization_api_keys
-    SET last_used_at = NOW()
-    WHERE id = ${keyId}
-  `
 }
 
 // ============================================
