@@ -1,11 +1,53 @@
 # Feature: Database Abstraction Refactor
 
 ## Current Status
-**Phase:** 02_extract_utilities
+**Phase:** 03_extract_domains
 **Status:** completed
-**Last Updated:** 2026-01-07T18:55:53Z
+**Last Updated:** 2026-01-07T19:28:16Z
 
 ## Last Execution
+
+**Prompt:** phases/03_extract_domains.xml
+**Phase:** 03_extract_domains
+**Status:** completed
+**Date:** 2026-01-07T19:28:16Z
+
+### Files Created
+- `lib/db/api-keys.ts` - API key management (5 functions: createApiKey, getApiKeysByOrg, getApiKeyByHash, revokeApiKey, updateApiKeyLastUsed)
+- `lib/db/search.ts` - Search and history queries (5 functions: searchTests, getTestHistory, getTestStatistics, getFailuresWithAIContext, getErrorTypeDistribution)
+- `lib/db/metrics.ts` - Dashboard metrics (8 functions: getDashboardMetrics, getTrendData, getFailureTrendData, getBranches, getSuites, getSlowestTests, getSuitePassRates, getReliabilityScore)
+- `lib/db/performance.ts` - Performance regression tracking (3 functions: updatePerformanceBaselines, getPerformanceRegressions, getTestDurationHistory)
+- `lib/db/executions.ts` - Execution CRUD (4 functions: getExecutions, searchExecutions, getExecutionById, getExecutionsGroupedByBranch)
+- `lib/db/results.ts` - Test results queries (4 functions: getTestResultsByExecutionId, getFailedTestsByExecutionId, getExecutionSummary, getErrorDistributionByExecution)
+- `lib/db/flakiness.ts` - Flakiness detection (4 functions: getFlakiestTests, getFlakinessSummary, updateFlakinessHistory, getTestFlakiness)
+- `lib/db/comparison.ts` - Comparative analysis (2 functions: getLatestExecutionByBranch, compareExecutions)
+- `lib/db/classification.ts` - Failure classification/auto-triage (3 functions: extractErrorType, calculateClassificationSignals, getFailureClassification)
+- `lib/db/ingestion.ts` - Data ingestion (3 functions: insertExecution, insertTestResults, insertArtifacts)
+
+### Files Modified
+- `lib/db.ts` - Reduced to re-exports + getQueriesForOrg helper (~270 lines from ~2800 lines)
+
+### Verification Results
+- `npm run build` - PASSED (all routes compiled successfully)
+- Import resolution - All existing imports from `@/lib/db` continue to work
+- No changes to existing consumer files required
+- Type checking passes
+
+### Cross-Domain Dependencies Resolved
+- `comparison.ts` → imports `getExecutionById` from `executions.ts`
+- `ingestion.ts` → imports `updateFlakinessHistory` from `flakiness.ts`
+- `results.ts` → imports `getExecutionById` from `executions.ts`
+
+### Notes
+- All 42 query functions extracted to 10 domain-specific files
+- lib/db.ts now contains only re-exports and the `getQueriesForOrg()` helper
+- Backwards compatibility maintained via re-exports
+- Clean separation of concerns achieved
+- Ready for Phase 4: Cleanup and verification
+
+---
+
+## Previous: Phase 02
 
 **Prompt:** phases/02_extract_utilities.xml
 **Phase:** 02_extract_utilities
@@ -112,9 +154,9 @@ Analyzed `lib/db.ts` (2970 lines) and identified 17 logical domains:
 
 ## Next Steps
 
-1. Execute Phase 3: `phases/03_extract_domains.xml`
-2. This extracts domain-specific query files
-3. Verify build passes after each extraction
+1. Execute Phase 4: `phases/04_cleanup_verify.xml`
+2. Final cleanup and verification
+3. Optionally delete lib/db.ts if all imports moved to lib/db/index.ts
 
 ---
 
@@ -122,6 +164,7 @@ Analyzed `lib/db.ts` (2970 lines) and identified 17 logical domains:
 
 | Date | Prompt | Phase | Status |
 |------|--------|-------|--------|
+| 2026-01-07T19:28:16Z | phases/03_extract_domains.xml | 03_extract_domains | completed |
 | 2026-01-07T18:55:53Z | phases/02_extract_utilities.xml | 02_extract_utilities | completed |
 | 2026-01-07T18:41:28Z | phases/01_setup_structure.xml | 01_setup_structure | completed |
 | 2026-01-07T18:38:24Z | investigation/prompt.xml | Investigation | completed |
