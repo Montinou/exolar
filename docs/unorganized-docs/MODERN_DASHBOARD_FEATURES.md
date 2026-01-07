@@ -29,6 +29,29 @@ This document analyzes 15+ modern test dashboards to identify cutting-edge featu
 - Multi-tenancy with organization filtering
 - API key management
 
+### Recently Implemented
+
+#### Smart Filter Behavior
+
+The dashboard provides intelligent data scoping based on filter selection:
+
+| Filter State | Data Shown |
+|-------------|------------|
+| No filter | All runs (historical aggregate) |
+| Branch/Suite selected | Last run only for that filter |
+| Filter + "Historic Summary" | All runs for that filter |
+
+This allows users to quickly see the current state of their tests (last run) when filtering, while still having access to historical aggregate data via the "Historic Summary" checkbox.
+
+#### Chart Data Consistency
+
+All charts now properly represent data categories:
+
+- **Donut Chart**: Shows only mutually exclusive categories (Passed/Failed/Skipped)
+- **Flaky Indicator**: Displayed as separate badge below chart (not as a pie slice since flaky tests overlap with passed/failed)
+- **Summary Bar**: Shows Passed/Failed/Skipped segments only
+- **Tooltips**: Added to explain the pass rate formula and flaky count meaning
+
 ---
 
 ## Feature Categories

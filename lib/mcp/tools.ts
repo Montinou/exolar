@@ -176,6 +176,13 @@ Fields returned:
       properties: {
         from: { type: "string", description: "Start date (ISO 8601)" },
         to: { type: "string", description: "End date (ISO 8601)" },
+        branch: { type: "string", description: "Filter by branch name" },
+        suite: { type: "string", description: "Filter by test suite" },
+        lastRunOnly: {
+          type: "boolean",
+          description:
+            "When true with branch/suite filter, return metrics from most recent execution only",
+        },
       },
     },
   },
@@ -439,6 +446,11 @@ Use this first to quickly assess suite health before calling get_flaky_tests or 
         to: { type: "string", description: "End date (ISO 8601)" },
         branch: { type: "string", description: "Filter by branch name" },
         suite: { type: "string", description: "Filter by test suite" },
+        lastRunOnly: {
+          type: "boolean",
+          description:
+            "When true with branch/suite filter, return score from most recent execution only",
+        },
       },
     },
   },
@@ -803,17 +815,24 @@ export async function handleToolCall(
           .object({
             from: z.string().optional(),
             to: z.string().optional(),
+            branch: z.string().optional(),
+            suite: z.string().optional(),
+            lastRunOnly: z.boolean().optional(),
           })
           .parse(args)
 
-        const metrics = await db.getDashboardMetrics(
-          orgId,
-          input.from && input.to ? { from: input.from, to: input.to } : undefined
-        )
+        const metrics = await db.getDashboardMetrics(orgId, {
+          from: input.from,
+          to: input.to,
+          branch: input.branch,
+          suite: input.suite,
+          lastRunOnly: input.lastRunOnly,
+        })
 
         return jsonResponse({
           organization: authContext.organizationSlug,
           period: { from: input.from || "all time", to: input.to || "now" },
+          filters: { branch: input.branch, suite: input.suite, lastRunOnly: input.lastRunOnly },
           metrics,
         })
       }
@@ -1155,6 +1174,7 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
             to: z.string().optional(),
             branch: z.string().optional(),
             suite: z.string().optional(),
+            lastRunOnly: z.boolean().optional(),
           })
           .parse(args)
 
@@ -1163,10 +1183,12 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           to: input.to,
           branch: input.branch,
           suite: input.suite,
+          lastRunOnly: input.lastRunOnly,
         })
 
         return jsonResponse({
           organization: authContext.organizationSlug,
+          filters: { branch: input.branch, suite: input.suite, lastRunOnly: input.lastRunOnly },
           ...score,
         })
       }

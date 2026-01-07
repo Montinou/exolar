@@ -325,6 +325,8 @@ See `docs/MCP_INTEGRATION.md` for configuration and usage.
 - AI context for failures
 - Multi-tenancy with organization filtering
 - API key management
+- **Smart Filter Behavior** - When branch/suite selected: shows last run only by default; "Historic Summary" checkbox shows all runs for filter
+- **Chart Data Consistency** - Donut shows only passed/failed/skipped; flaky displayed as separate badge below chart
 
 ### Roadmap
 See `docs/MODERN_DASHBOARD_FEATURES.md` for planned features including:

@@ -89,7 +89,7 @@ Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `get_failed_tests` | Failed tests with AI context | `error_type`, `limit`, `since` |
-| `get_dashboard_metrics` | Overall metrics | `from`, `to` |
+| `get_dashboard_metrics` | Overall metrics | `from`, `to`, `branch`, `suite`, `lastRunOnly` |
 | `get_trends` | Time-series data | `days` |
 | `get_error_distribution` | Error type breakdown | `since` |
 
@@ -111,7 +111,7 @@ Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `get_reliability_score` | Overall suite health score (0-100) | `from`, `to`, `branch`, `suite` |
+| `get_reliability_score` | Overall suite health score (0-100) | `from`, `to`, `branch`, `suite`, `lastRunOnly` |
 | `get_performance_regressions` | Tests slower than baseline | `threshold`, `hours`, `branch`, `suite`, `limit`, `sort_by` |
 | `compare_executions` | Compare two test executions | `baseline_id`, `current_id`, `baseline_branch`, `current_branch`, `suite`, `filter` |
 
@@ -177,6 +177,25 @@ Once configured, you can ask Claude things like:
 - "Is this test failure a flake or a real bug?"
 - "Classify the failure in test 'should login successfully'"
 - "Help me set up MCP integration"
+
+## Filter Behavior
+
+When using tools with branch/suite filters:
+- `lastRunOnly: true` - Returns metrics from most recent execution matching filter
+- `lastRunOnly: false` (default) - Returns aggregated metrics across all executions
+
+**Example:**
+```json
+{
+  "tool": "get_reliability_score",
+  "args": {
+    "branch": "main",
+    "lastRunOnly": true
+  }
+}
+```
+
+This is useful when you want to see the health score for just the latest CI run on a specific branch, rather than historical aggregate data.
 
 ## Troubleshooting
 
