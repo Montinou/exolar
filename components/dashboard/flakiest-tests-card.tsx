@@ -29,10 +29,12 @@ export function FlakiestTestsCard({
   branch,
   suite,
   since,
+  lastRunOnly,
 }: {
   branch?: string
   suite?: string
   since?: string
+  lastRunOnly?: boolean
 }) {
   const [data, setData] = useState<FlakinessData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -40,11 +42,13 @@ export function FlakiestTestsCard({
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true) // Reset loading on filter change
       try {
         const params = new URLSearchParams({ limit: "5" })
         if (branch) params.append("branch", branch)
         if (suite) params.append("suite", suite)
         if (since) params.append("since", since)
+        if (lastRunOnly) params.append("lastRunOnly", "true")
 
         const response = await fetch(`/api/flakiness?${params.toString()}`)
         if (!response.ok) {
@@ -61,7 +65,7 @@ export function FlakiestTestsCard({
     }
 
     fetchData()
-  }, [branch, suite, since])
+  }, [branch, suite, since, lastRunOnly])
 
   if (loading) {
     return (

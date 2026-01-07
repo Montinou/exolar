@@ -134,6 +134,7 @@ export interface GetFlakinessSummaryOptions {
   branch?: string
   suite?: string
   since?: string
+  lastRunOnly?: boolean // Filter to latest execution matching branch/suite filters
 }
 
 export interface SlowestTest {

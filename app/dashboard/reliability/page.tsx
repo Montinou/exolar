@@ -245,7 +245,12 @@ async function ReliabilityContent({
 
       {/* Flakiest Tests and Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <FlakiestTestsCard branch={params.branch} suite={params.suite} since={params.from} />
+        <FlakiestTestsCard
+          branch={params.branch}
+          suite={params.suite}
+          since={params.from}
+          lastRunOnly={lastRunOnly}
+        />
       </div>
 
       {/* Formula Explanation */}

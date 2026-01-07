@@ -1,5 +1,6 @@
 import { getSql } from "./connection"
 import { isTestFlaky } from "./utils"
+import { getLatestExecutionId } from "./metrics"
 import type { GetFlakiestTestsOptions, GetFlakinessSummaryOptions } from "./types"
 import type { TestFlakinessHistory, FlakinessSummary } from "../types"
 
@@ -174,10 +175,24 @@ export async function getFlakinessSummary(
   organizationId: number,
   options: GetFlakinessSummaryOptions = {}
 ): Promise<FlakinessSummary> {
-  const { branch, suite, since } = options
+  const { branch, suite, since, lastRunOnly } = options
   const sql = getSql()
 
-  const hasFilters = branch || suite || since
+  // When lastRunOnly is true and we have branch/suite filters, get the latest execution
+  let latestExecutionId: number | null = null
+  if (lastRunOnly && (branch || suite)) {
+    latestExecutionId = await getLatestExecutionId(organizationId, branch, suite)
+    if (!latestExecutionId) {
+      // No executions found for the filter, return empty results
+      return {
+        total_flaky_tests: 0,
+        avg_flakiness_rate: 0,
+        most_flaky_tests: [],
+      }
+    }
+  }
+
+  const hasFilters = branch || suite || since || latestExecutionId
 
   let summaryResult
   if (hasFilters) {
@@ -186,6 +201,7 @@ export async function getFlakinessSummary(
     if (branch) filterConditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
     if (suite) filterConditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
     if (since) filterConditions.push(`tr.started_at >= '${since}'`)
+    if (latestExecutionId) filterConditions.push(`te.id = ${latestExecutionId}`)
     const filterWhere = filterConditions.join(" AND ")
 
     // Calculate filtered summary from test_results directly
@@ -217,7 +233,8 @@ export async function getFlakinessSummary(
     limit: 5,
     branch,
     suite,
-    since
+    since,
+    executionId: latestExecutionId ?? undefined
   })
 
   return {

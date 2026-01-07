@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { DateRangePicker } from "@/components/dashboard/date-range-picker"
 import { X } from "lucide-react"
@@ -126,10 +126,13 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
         </SelectContent>
       </Select>
 
-      {/* Historic Summary checkbox - only shows when branch/suite filter is applied */}
+      {/* Historic Summary switch - only shows when branch/suite filter is applied */}
       {hasFilter && (
         <div className="flex items-center gap-2 px-2">
-          <Checkbox
+          <Label htmlFor="historic" className="text-sm cursor-pointer whitespace-nowrap">
+            Historic Summary
+          </Label>
+          <Switch
             id="historic"
             checked={currentHistoric}
             onCheckedChange={(checked) => {
@@ -142,9 +145,6 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
               router.push(`?${params.toString()}`)
             }}
           />
-          <Label htmlFor="historic" className="text-sm cursor-pointer whitespace-nowrap">
-            Historic Summary
-          </Label>
         </div>
       )}
 
