@@ -3,6 +3,30 @@
 // Note: Main types are still imported from lib/types.ts
 
 // ============================================
+// User Types
+// ============================================
+
+export interface DashboardUser {
+  id: number
+  email: string
+  role: "admin" | "viewer"
+  invited_by: number | null
+  default_org_id: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Invite {
+  id: number
+  email: string
+  role: "admin" | "viewer"
+  invited_by: number
+  organization_id: number | null
+  used: boolean
+  created_at: string
+}
+
+// ============================================
 // Organization Types
 // ============================================
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { authServer } from "@/lib/auth/server"
-import { checkUserAccess } from "@/lib/db-users"
+import { checkUserAccess } from "@/lib/db"
 
 /**
  * GET /api/auth/check-access - Check if current user has access

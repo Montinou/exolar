@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { authServer } from "@/lib/auth/server"
-import { isAdmin, getAllUsers, updateUserRole, deleteUser, getUserByEmail } from "@/lib/db-users"
+import { isAdmin, getAllUsers, updateUserRole, deleteUser, getUserByEmail } from "@/lib/db"
 
 /**
  * GET /api/admin/users - List all users

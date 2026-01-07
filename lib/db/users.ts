@@ -1,29 +1,12 @@
-import { neon } from "@neondatabase/serverless"
+// lib/db/users.ts
+// User and invite database operations
+// Uses shared getSql from connection.ts (NOT local definition)
 
-function getSql() {
-  return neon(process.env.DATABASE_URL!)
-}
+import { getSql } from "./connection"
+import type { DashboardUser, Invite } from "./types"
 
-// Types
-export interface DashboardUser {
-  id: number
-  email: string
-  role: "admin" | "viewer"
-  invited_by: number | null
-  default_org_id: number | null
-  created_at: string
-  updated_at: string
-}
-
-export interface Invite {
-  id: number
-  email: string
-  role: "admin" | "viewer"
-  invited_by: number
-  organization_id: number | null
-  used: boolean
-  created_at: string
-}
+// Re-export types for convenience
+export type { DashboardUser, Invite }
 
 // ============================================
 // User Queries

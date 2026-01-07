@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { authClient } from "@/lib/auth/client"
-import type { DashboardUser } from "@/lib/db-users"
+import type { DashboardUser } from "@/lib/db"
 
 interface AccessState {
   loading: boolean

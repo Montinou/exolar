@@ -10,6 +10,9 @@ export { generateTestSignature, isTestFlaky } from "./utils"
 
 // Types
 export type {
+  // User types
+  DashboardUser,
+  Invite,
   // Organization types
   Organization,
   OrganizationMember,
@@ -34,6 +37,23 @@ export type {
   ErrorDistributionOptions,
   ErrorDistributionItem,
 } from "./types"
+
+// User operations
+export {
+  getUserByEmail,
+  getAllUsers,
+  createUser,
+  updateUserRole,
+  deleteUser,
+  getInviteByEmail,
+  getAllInvites,
+  createInvite,
+  markInviteAsUsedById,
+  markInviteAsUsed,
+  deleteInvite,
+  checkUserAccess,
+  isAdmin,
+} from "./users"
 
 // Organization operations
 export {

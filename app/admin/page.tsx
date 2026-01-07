@@ -14,8 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import Link from "next/link"
-import type { DashboardUser, Invite } from "@/lib/db-users"
-import type { Organization } from "@/lib/db"
+import type { DashboardUser, Invite, Organization } from "@/lib/db"
 
 export default function AdminPage() {
   const router = useRouter()
