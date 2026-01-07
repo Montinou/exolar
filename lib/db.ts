@@ -1390,6 +1390,7 @@ export interface GetFlakiestTestsOptions {
   minRuns?: number
   since?: string
   branch?: string
+  suite?: string
   includeResolved?: boolean
 }
 
@@ -1404,13 +1405,14 @@ export async function getFlakiestTests(
   let minRuns = 5
   let since: string | undefined
   let branch: string | undefined
+  let suite: string | undefined
   let includeResolved = false
 
   if (typeof options === 'number') {
     limit = options
     // minRuns would be the next argument but we can't easily access it without changing signature entirely
     // so we'll treat it as default or handle if the caller passes a second arg (which we can't see here easily without ...args)
-    // To be safe and cleaner, let's just support the new object signature primarily, 
+    // To be safe and cleaner, let's just support the new object signature primarily,
     // but if we want to be strict about "update instead of create", we should fully replace the signature.
     // However, to avoid breaking other calls immediately, I'll check if the second arg is present in the "arguments" object if I could...
     // Actually, let's just simplify and say we are changing the signature. I will update all callers.
@@ -1419,6 +1421,7 @@ export async function getFlakiestTests(
     minRuns = options.minRuns ?? 5
     since = options.since
     branch = options.branch
+    suite = options.suite
     includeResolved = options.includeResolved ?? false
   }
 
@@ -1458,7 +1461,22 @@ export async function getFlakiestTests(
     `
   }
 
-  const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter}`
+  let suiteFilter = ""
+  if (suite) {
+    // Filter by suite - similar pattern to branch filter
+    suiteFilter = `
+      AND test_signature IN (
+        SELECT DISTINCT tr.test_signature
+        FROM test_results tr
+        JOIN test_executions te ON tr.execution_id = te.id
+        WHERE te.suite = '${suite.replace(/'/g, "''")}'
+          AND te.organization_id = ${organizationId}
+          AND tr.is_flaky = true
+      )
+    `
+  }
+
+  const whereClause = `WHERE ${conditions.join(" AND ")} ${branchFilter} ${suiteFilter}`
 
   const results = await sql`
     SELECT 

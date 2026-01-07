@@ -18,15 +18,17 @@ export async function GET(request: NextRequest) {
     const minRuns = parseInt(searchParams.get("minRuns") || "5")
     const since = searchParams.get("since") || undefined
     const branch = searchParams.get("branch") || undefined
+    const suite = searchParams.get("suite") || undefined
     const includeResolved = searchParams.get("include_resolved") === "true"
 
     const [summary, flakiestTests] = await Promise.all([
       db.getFlakinessSummary(),
       db.getFlakiestTests({
-        limit, 
+        limit,
         minRuns,
         since,
         branch,
+        suite,
         includeResolved
       }),
     ])

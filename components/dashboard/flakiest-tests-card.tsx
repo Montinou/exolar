@@ -27,9 +27,11 @@ interface FlakinessData {
 
 export function FlakiestTestsCard({
   branch,
+  suite,
   since,
 }: {
   branch?: string
+  suite?: string
   since?: string
 }) {
   const [data, setData] = useState<FlakinessData | null>(null)
@@ -41,6 +43,7 @@ export function FlakiestTestsCard({
       try {
         const params = new URLSearchParams({ limit: "5" })
         if (branch) params.append("branch", branch)
+        if (suite) params.append("suite", suite)
         if (since) params.append("since", since)
 
         const response = await fetch(`/api/flakiness?${params.toString()}`)
@@ -58,7 +61,7 @@ export function FlakiestTestsCard({
     }
 
     fetchData()
-  }, [branch, since])
+  }, [branch, suite, since])
 
   if (loading) {
     return (
