@@ -22,8 +22,15 @@ export function UserMenu() {
   const handleSignOut = async () => {
     try {
       await authClient.signOut()
-      router.push("/")
-      router.refresh()
+      // Domain-based redirect after sign out
+      const hostname = window.location.hostname
+      if (hostname.includes("e2e-test-dashboard")) {
+        // Internal domain: redirect to sign-in
+        window.location.href = "/auth/sign-in"
+      } else {
+        // Public domain (exolar): redirect to landing page
+        window.location.href = "/"
+      }
     } catch (error) {
       console.error("Failed to sign out:", error)
     }
