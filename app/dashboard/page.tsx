@@ -72,6 +72,9 @@ async function DashboardContent({
   return (
     <>
       <div className="space-y-6">
+        {/* Filters - positioned at top below nav tabs */}
+        <Filters branches={branches} suites={suites} />
+
         {/* Stats Overview */}
         <StatsCards metrics={metrics} />
 
@@ -109,11 +112,8 @@ async function DashboardContent({
           <FlakinessBySuiteChart data={[]} />
         </div>
 
-        {/* Filters and Executions */}
-        <div className="space-y-4">
-          <Filters branches={branches} suites={suites} />
-          <ExecutionsView executions={executions} branchGroups={branchGroups} />
-        </div>
+        {/* Executions */}
+        <ExecutionsView executions={executions} branchGroups={branchGroups} />
       </div>
     </>
   )

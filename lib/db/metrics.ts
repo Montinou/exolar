@@ -596,11 +596,17 @@ export async function getReliabilityScore(
     prev_duration_cv: null,
   }
 
+  // For single-run analysis (lastRunOnly=true), we can't measure duration stability
+  // because there's nothing to compare against. Set CV to 0 = 100% stable.
+  const effectiveDurationCV = lastRunOnly
+    ? 0
+    : Number(row.duration_cv) || 0
+
   // Calculate contributions using formula weights
   const passRateContribution = (Number(row.pass_rate) || 0) * 0.4
   const flakinessContribution = (100 - (Number(row.flaky_rate) || 0)) * 0.3
   const stabilityContribution =
-    (1 - Math.min(Number(row.duration_cv) || 0, 1)) * 100 * 0.3
+    (1 - Math.min(effectiveDurationCV, 1)) * 100 * 0.3
 
   const score = Math.round(
     passRateContribution + flakinessContribution + stabilityContribution
@@ -625,7 +631,7 @@ export async function getReliabilityScore(
     rawMetrics: {
       passRate: Math.round(Number(row.pass_rate) || 0),
       flakyRate: Math.round(Number(row.flaky_rate) || 0),
-      durationCV: Math.round((Number(row.duration_cv) || 0) * 100) / 100,
+      durationCV: Math.round(effectiveDurationCV * 100) / 100,
     },
     trend: score - prevScore,
     status: score >= 80 ? "healthy" : score >= 60 ? "warning" : "critical",
