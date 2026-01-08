@@ -578,7 +578,7 @@ export async function getReliabilityScore(
         AND tr.status = 'passed'
         ${sql.unsafe(dateFilter)}
         ${sql.unsafe(extraFilters)}
-      GROUP BY tr.test_name, tr.file
+      GROUP BY tr.test_name, tr.test_file
       HAVING COUNT(*) > 1
     ),
     current_metrics AS (
@@ -605,7 +605,7 @@ export async function getReliabilityScore(
         AND tr.status = 'passed'
         AND te.started_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days'
         ${sql.unsafe(extraFilters)}
-      GROUP BY tr.test_name, tr.file
+      GROUP BY tr.test_name, tr.test_file
       HAVING COUNT(*) > 1
     ),
     previous_metrics AS (
