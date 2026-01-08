@@ -8,7 +8,9 @@ const baseUrl = process.env.BETTER_AUTH_URL ||
 export const authServer = createAuthServer({
   baseURL: baseUrl,
   trustedOrigins: [
-    baseUrl, 
-    "https://exolar-qa.vercel.app", // Explicitly allowing production domain
+    baseUrl,
+    "https://exolar.vercel.app",
+    "https://exolar-qa.vercel.app",
+    "https://e2e-test-dashboard.vercel.app",
   ],
 })
