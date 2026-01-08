@@ -77,7 +77,7 @@ export function StatusDonutChart({
                 backdropFilter: "blur(8px)",
               }}
               itemStyle={{ color: "oklch(0.985 0 0)" }}
-              formatter={(value: number) => [`${value.toFixed(1)}%`, ""]}
+              formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
             />
           </PieChart>
         </ResponsiveContainer>

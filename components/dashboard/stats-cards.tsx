@@ -44,7 +44,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
     {
       label: "Avg Duration",
       value: `${(metrics.avg_duration_ms / 1000).toFixed(1)}s`,
-      description: "Per test execution",
+      description: "Per suite execution",
       icon: Clock,
       trend: "neutral",
       type: "duration",
