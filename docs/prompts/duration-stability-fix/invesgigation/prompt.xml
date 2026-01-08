@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Duration Stability Fix - Investigation Prompt
+  Issue: Single-run stability calculation returns 0% instead of 100%
+  Last Updated: January 2026
+-->
+
+<investigation_prompt>
+  <feature>
+    <name>Duration Stability Fix</name>
+    <folder>docs/prompts/duration-stability-fix</folder>
+    <phase>investigation</phase>
+    <type>bug-fix</type>
+  </feature>
+
+  <problem>
+    <summary>Duration Stability shows 0% for single runs (lastRunOnly=true), contributing +0 to reliability score when it should be +30</summary>
+    <root_cause>
+      Current formula calculates coefficient of variation (STDDEV/AVG) across all test durations within ONE run.
+      This measures "uniformity of test durations" not "stability over time."
+    </root_cause>
+    <symptom>
+      A run with tests ranging 2s-60s gets high CV = low stability (incorrect)
+    </symptom>
+    <expected_behavior>
+      For a single run with no historical data to compare against, stability should be 100% (no regression detected)
+    </expected_behavior>
+  </problem>
+
+  <task>
+    <objective>Investigate and plan proper fix for duration stability calculation</objective>
+    <success_criteria>
+      <criterion>Identify all files involved in stability calculation</criterion>
+      <criterion>Understand current formula and its flaws</criterion>
+      <criterion>Design correct stability metric for single vs multi-run scenarios</criterion>
+      <criterion>Create implementation phases</criterion>
+    </success_criteria>
+  </task>
+
+  <investigation_steps>
+    <step priority="high">
+      <name>Locate Stability Calculation</name>
+      <action>Find where duration stability is calculated (API, lib, components)</action>
+      <output>List of files with stability logic</output>
+    </step>
+    <step priority="high">
+      <name>Analyze Current Formula</name>
+      <action>Document the current STDDEV/AVG approach and why it fails</action>
+      <output>Formula breakdown with identified issues</output>
+    </step>
+    <step priority="high">
+      <name>Design Correct Metric</name>
+      <action>Define proper stability calculation for single-run and multi-run scenarios</action>
+      <output>New formula specification</output>
+    </step>
+    <step priority="medium">
+      <name>Create Phase Prompts</name>
+      <action>Generate implementation phases in phases/ folder</action>
+      <output>phases/01_*.xml, phases/02_*.xml, etc.</output>
+    </step>
+  </investigation_steps>
+
+  <output_deliverables>
+    <deliverable>investigation/findings.md</deliverable>
+    <deliverable>phases/*.xml - Implementation prompts</deliverable>
+  </output_deliverables>
+
+  <mandatory_final_step priority="critical">
+    <action>Update docs/prompts/duration-stability-fix/status.md with investigation results</action>
+  </mandatory_final_step>
+
+  <mandatory_commit_step priority="critical">
+    <commit_format>feat(duration-stability-fix): investigation - {{BRIEF_DESCRIPTION}}</commit_format>
+  </mandatory_commit_step>
+</investigation_prompt>

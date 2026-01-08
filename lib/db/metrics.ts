@@ -553,23 +553,66 @@ export async function getReliabilityScore(
   const executionFilter = latestExecutionId ? `AND te.id = ${latestExecutionId}` : ""
   const extraFilters = branchFilter + suiteFilter + executionFilter
 
+  // Calculate per-test CV (coefficient of variation) for duration stability
+  // This measures how stable each test's duration is across multiple runs,
+  // rather than measuring variance between different tests (which was incorrect).
+  //
+  // For example:
+  // - Test A runs: [2s, 2.1s, 1.9s] → CV ≈ 0.05 (very stable)
+  // - Test B runs: [60s, 61s, 59s] → CV ≈ 0.017 (very stable)
+  // - Average CV = ~0.034 → 97% stability
+  //
+  // The old approach calculated STDDEV([2, 60, ...]) / AVG([2, 60, ...])
+  // which measured uniformity of test durations, not stability over time.
   const result = await sql`
-    WITH current_metrics AS (
+    WITH current_per_test_cv AS (
+      SELECT
+        CASE
+          WHEN AVG(tr.duration_ms) > 0
+          THEN COALESCE(STDDEV(tr.duration_ms) / AVG(tr.duration_ms), 0)
+          ELSE 0
+        END as cv
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND tr.status = 'passed'
+        ${sql.unsafe(dateFilter)}
+        ${sql.unsafe(extraFilters)}
+      GROUP BY tr.test_name, tr.file
+      HAVING COUNT(*) > 1
+    ),
+    current_metrics AS (
       SELECT
         COALESCE(COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100, 0) as pass_rate,
         COALESCE(COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100, 0) as flaky_rate,
-        COALESCE(STDDEV(tr.duration_ms) FILTER (WHERE tr.status = 'passed') / NULLIF(AVG(tr.duration_ms) FILTER (WHERE tr.status = 'passed'), 0), 0) as duration_cv
+        COALESCE((SELECT AVG(cv) FROM current_per_test_cv), 0) as duration_cv
       FROM test_results tr
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
         ${sql.unsafe(dateFilter)}
         ${sql.unsafe(extraFilters)}
     ),
+    previous_per_test_cv AS (
+      SELECT
+        CASE
+          WHEN AVG(tr.duration_ms) > 0
+          THEN COALESCE(STDDEV(tr.duration_ms) / AVG(tr.duration_ms), 0)
+          ELSE 0
+        END as cv
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND tr.status = 'passed'
+        AND te.started_at BETWEEN NOW() - INTERVAL '14 days' AND NOW() - INTERVAL '7 days'
+        ${sql.unsafe(extraFilters)}
+      GROUP BY tr.test_name, tr.file
+      HAVING COUNT(*) > 1
+    ),
     previous_metrics AS (
       SELECT
         COALESCE(COUNT(*) FILTER (WHERE tr.status = 'passed')::float / NULLIF(COUNT(*), 0) * 100, 0) as pass_rate,
         COALESCE(COUNT(*) FILTER (WHERE tr.is_flaky = true)::float / NULLIF(COUNT(*), 0) * 100, 0) as flaky_rate,
-        COALESCE(STDDEV(tr.duration_ms) FILTER (WHERE tr.status = 'passed') / NULLIF(AVG(tr.duration_ms) FILTER (WHERE tr.status = 'passed'), 0), 0) as duration_cv
+        COALESCE((SELECT AVG(cv) FROM previous_per_test_cv), 0) as duration_cv
       FROM test_results tr
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Duration Stability Fix - Phase 01
+  Verify Single-Run Stability Fix
+  Status: COMPLETED
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Duration Stability Fix</name>
+    <folder>docs/prompts/duration-stability-fix</folder>
+    <phase>01_verify_single_run</phase>
+    <status>completed</status>
+  </feature>
+
+  <objective>
+    Verify that the single-run stability fix (lastRunOnly=true) correctly returns 100% stability.
+  </objective>
+
+  <implementation>
+    <existing_fix location="lib/db/metrics.ts:599-603">
+      <code>
+        // For single-run analysis (lastRunOnly=true), we can't measure duration stability
+        // because there's nothing to compare against. Set CV to 0 = 100% stable.
+        const effectiveDurationCV = lastRunOnly
+          ? 0
+          : Number(row.duration_cv) || 0
+      </code>
+    </existing_fix>
+
+    <verification_steps>
+      <step>Select a branch/suite filter in the dashboard</step>
+      <step>Confirm lastRunOnly=true is passed to the API</step>
+      <step>Verify stability shows 100% and contributes +30 to score</step>
+    </verification_steps>
+  </implementation>
+
+  <result>
+    <status>verified</status>
+    <notes>Fix was implemented in commit 9d557a8. When lastRunOnly=true, effectiveDurationCV=0, which results in 100% stability.</notes>
+  </result>
+</phase_prompt>

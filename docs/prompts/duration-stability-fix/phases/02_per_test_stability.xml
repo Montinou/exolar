@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Duration Stability Fix - Phase 02
+  Implement Per-Test Stability Calculation
+  Status: COMPLETED
+-->
+
+<phase_prompt>
+  <feature>
+    <name>Duration Stability Fix</name>
+    <folder>docs/prompts/duration-stability-fix</folder>
+    <phase>02_per_test_stability</phase>
+    <status>completed</status>
+  </feature>
+
+  <objective>
+    Implement correct duration stability calculation that measures per-test consistency across runs,
+    rather than uniformity of test durations within a run.
+  </objective>
+
+  <problem>
+    <previous_formula>
+      STDDEV(all_test_durations) / AVG(all_test_durations)
+    </previous_formula>
+    <issue>
+      This measured variance between different tests (2s test vs 60s test = high CV),
+      not stability of each test across multiple runs.
+    </issue>
+  </problem>
+
+  <solution>
+    <description>
+      Calculate coefficient of variation (CV) for each test across its runs,
+      then average all test CVs for overall stability.
+    </description>
+
+    <sql_approach>
+      <cte name="current_per_test_cv">
+        Group by test_name + file, calculate STDDEV/AVG per test,
+        only include tests with COUNT > 1 (multiple runs)
+      </cte>
+      <cte name="current_metrics">
+        Use subquery to get AVG(cv) from per_test_cv CTE
+      </cte>
+    </sql_approach>
+
+    <example>
+      Test A runs: [2s, 2.1s, 1.9s] -> CV ≈ 0.05 (stable)
+      Test B runs: [60s, 61s, 59s] -> CV ≈ 0.017 (stable)
+      Average CV = ~0.034 -> 97% stability
+    </example>
+  </solution>
+
+  <implementation>
+    <file>lib/db/metrics.ts</file>
+    <lines_modified>556-631</lines_modified>
+    <changes>
+      <change>Added current_per_test_cv CTE with GROUP BY test_name, file</change>
+      <change>Added previous_per_test_cv CTE for trend calculation</change>
+      <change>Modified current_metrics to use subquery for duration_cv</change>
+      <change>Modified previous_metrics to use subquery for duration_cv</change>
+      <change>Added HAVING COUNT(*) > 1 to exclude single-run tests</change>
+    </changes>
+  </implementation>
+
+  <edge_cases>
+    <case name="single_run_tests">
+      Tests with only 1 run are excluded from CV calculation (HAVING COUNT > 1)
+    </case>
+    <case name="no_repeated_tests">
+      If no tests have multiple runs, AVG returns NULL, COALESCE returns 0 = 100% stable
+    </case>
+    <case name="zero_duration">
+      Tests with 0 average duration return CV = 0 (CASE WHEN avg > 0)
+    </case>
+  </edge_cases>
+
+  <result>
+    <status>implemented</status>
+    <notes>
+      Multi-run stability now correctly reflects actual test duration consistency.
+      Different tests having different natural durations no longer affects stability.
+    </notes>
+  </result>
+</phase_prompt>
