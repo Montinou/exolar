@@ -21,7 +21,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (data?.session) {
       // Only redirect if on auth pages (sign-in flow completed)
       if (pathname?.startsWith("/auth")) {
-        router.push("/dashboard")
+        // Use full page navigation to ensure session cookie is sent with request
+        // (client-side router.push causes race condition with middleware)
+        window.location.href = "/dashboard"
       }
     }
   }
