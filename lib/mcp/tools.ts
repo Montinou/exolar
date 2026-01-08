@@ -556,30 +556,27 @@ Use filter param to focus on specific categories (e.g., filter="new_failure" or 
     },
   },
 
-  // Installation & Auto-Triage Tools
+  // CI Integration Guide Tool
   {
     name: "get_installation_config",
-    description: `Get installation configuration for connecting Claude Code or other IDEs to Exolar QA.
+    description: `Get CI/CD integration guide for connecting Playwright tests to Exolar QA dashboard.
 
-Returns ready-to-use configuration snippets for:
-- Claude Desktop (config.json snippet)
-- Cursor IDE (mcp.json snippet)
-- Claude Code CLI (add command)
+Returns everything needed to integrate test reporting:
+- api_endpoint: URL and schema for POST /api/test-results
+- playwright_reporter: Complete TypeScript code for custom reporter
+- github_actions: Ready-to-use workflow YAML
+- env_variables: Required environment variables
+- api_key_setup: Instructions for generating API keys
 
-Also includes:
-- setup_steps: Step-by-step instructions
-- auth_command: CLI command to authenticate
-- credentials_location: Where tokens are stored
-- docs_url: Link to settings/documentation
-
-Use this when a user asks to "install Exolar skills" or set up MCP integration.`,
+Use this when a user asks to "connect tests to dashboard", "set up CI integration", or "configure Playwright reporter".
+AI should use this to write the integration code for the user's project.`,
     inputSchema: {
       type: "object" as const,
       properties: {
-        ide: {
+        section: {
           type: "string",
-          enum: ["claude_desktop", "cursor", "claude_code_cli", "all"],
-          description: "Target IDE to get config for. Default: 'all' returns all options.",
+          enum: ["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"],
+          description: "Specific section to return. Default: 'all' returns everything.",
         },
       },
     },
@@ -1313,90 +1310,290 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
       case "get_installation_config": {
         const input = z
           .object({
-            ide: z.enum(["claude_desktop", "cursor", "claude_code_cli", "all"]).default("all"),
+            section: z.enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"]).default("all"),
           })
           .parse(args)
 
         // Infer dashboard URL from environment or use default
         const dashboardUrl =
           process.env.NEXT_PUBLIC_DASHBOARD_URL ||
-          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar-qa.vercel.app")
+          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar.vercel.app")
 
-        const npmPackage = "@exolar-qa/mcp-server"
-
-        const configs = {
+        const guide = {
           organization: authContext.organizationSlug,
-          npm_package: npmPackage,
-
-          claude_desktop: {
-            config_path: "~/.config/claude/claude_desktop_config.json",
-            config_path_windows: "%APPDATA%\\Claude\\claude_desktop_config.json",
-            config_snippet: {
-              mcpServers: {
-                "exolar-qa": {
-                  command: "npx",
-                  args: ["-y", npmPackage],
-                },
-              },
-            },
-            note: "After adding, restart Claude Desktop",
-          },
-
-          cursor: {
-            config_path: "~/.cursor/mcp.json",
-            config_path_windows: "%USERPROFILE%\\.cursor\\mcp.json",
-            config_snippet: {
-              mcpServers: {
-                "exolar-qa": {
-                  command: "npx",
-                  args: ["-y", npmPackage],
-                },
-              },
-            },
-            note: "After adding, restart Cursor",
-          },
-
-          claude_code_cli: {
-            add_command: `claude mcp add --transport stdio exolar-qa -- npx -y ${npmPackage}`,
-            auth_command: `npx ${npmPackage} --login`,
-            status_command: `npx ${npmPackage} --status`,
-            logout_command: `npx ${npmPackage} --logout`,
-          },
-
-          setup_steps: [
-            `1. Authenticate: npx ${npmPackage} --login`,
-            "2. Add to your IDE using the config above",
-            "3. Restart your IDE",
-            "4. Claude will now have access to your test data",
-          ],
-
-          credentials_location: "~/.e2e-dashboard-mcp/config.json",
-          token_expiry: "30 days",
           dashboard_url: dashboardUrl,
-          docs_url: `${dashboardUrl}/settings/mcp`,
+
+          api_endpoint: {
+            url: `${dashboardUrl}/api/test-results`,
+            method: "POST",
+            authentication: "Bearer token in Authorization header",
+            content_type: "application/json",
+            request_schema: {
+              execution: {
+                run_id: "string (required) - Unique CI run identifier",
+                branch: "string (required) - Git branch name",
+                commit_sha: "string (required) - Git commit hash",
+                commit_message: "string (optional) - Commit message",
+                triggered_by: "string (optional) - Who triggered the run",
+                workflow_name: "string (optional) - CI workflow name",
+                suite: "string (optional) - Test suite name",
+                status: "'success' | 'failure' | 'running' (required)",
+                total_tests: "number (required)",
+                passed: "number (required)",
+                failed: "number (required)",
+                skipped: "number (required)",
+                duration_ms: "number (optional)",
+                started_at: "ISO datetime (required)",
+                completed_at: "ISO datetime (optional)",
+              },
+              results: {
+                _description: "Array of test results",
+                test_name: "string (required) - Test title",
+                test_file: "string (required) - Spec file path",
+                status: "'passed' | 'failed' | 'skipped' | 'timedout' (required)",
+                duration_ms: "number (required)",
+                error_message: "string (optional) - Error for failures",
+                stack_trace: "string (optional) - Full stack trace",
+                retry_count: "number (optional) - Number of retries",
+                browser: "string (optional) - Browser name",
+              },
+              artifacts: {
+                _description: "Array of artifacts (optional)",
+                test_name: "string (required)",
+                test_file: "string (required)",
+                type: "'screenshot' | 'trace' | 'video' (required)",
+                filename: "string (required)",
+                data: "string (required) - Base64 encoded file data",
+              },
+            },
+            response_schema: {
+              success: "boolean",
+              execution_id: "number - Use this ID to query results",
+              results_count: "number",
+              artifacts_count: "number",
+              error: "string (only on failure)",
+            },
+            example_curl: `curl -X POST ${dashboardUrl}/api/test-results \\
+  -H "Authorization: Bearer exolar_your_api_key" \\
+  -H "Content-Type: application/json" \\
+  -d '{"execution": {...}, "results": [...]}'`,
+          },
+
+          playwright_reporter: {
+            description: "Custom Playwright reporter that sends results to Exolar QA",
+            file_path: "reporters/exolar-reporter.ts",
+            code: `import type { Reporter, TestCase, TestResult, FullConfig, Suite, FullResult } from '@playwright/test/reporter';
+
+interface ExolarConfig {
+  apiUrl: string;
+  apiKey: string;
+  suite?: string;
+}
+
+class ExolarReporter implements Reporter {
+  private config: ExolarConfig;
+  private results: Array<{
+    test_name: string;
+    test_file: string;
+    status: 'passed' | 'failed' | 'skipped' | 'timedout';
+    duration_ms: number;
+    error_message?: string;
+    stack_trace?: string;
+    retry_count: number;
+  }> = [];
+  private startTime: Date = new Date();
+
+  constructor(options: ExolarConfig) {
+    this.config = {
+      apiUrl: options.apiUrl || process.env.EXOLAR_API_URL || '${dashboardUrl}/api/test-results',
+      apiKey: options.apiKey || process.env.EXOLAR_API_KEY || '',
+      suite: options.suite || process.env.EXOLAR_SUITE,
+    };
+  }
+
+  onTestEnd(test: TestCase, result: TestResult) {
+    this.results.push({
+      test_name: test.title,
+      test_file: test.location.file.replace(process.cwd() + '/', ''),
+      status: result.status as 'passed' | 'failed' | 'skipped' | 'timedout',
+      duration_ms: result.duration,
+      error_message: result.error?.message,
+      stack_trace: result.error?.stack,
+      retry_count: result.retry,
+    });
+  }
+
+  async onEnd(result: FullResult) {
+    if (!this.config.apiKey) {
+      console.warn('[Exolar] No API key configured, skipping report');
+      return;
+    }
+
+    const passed = this.results.filter(r => r.status === 'passed').length;
+    const failed = this.results.filter(r => r.status === 'failed').length;
+    const skipped = this.results.filter(r => r.status === 'skipped').length;
+
+    const payload = {
+      execution: {
+        run_id: process.env.GITHUB_RUN_ID || \`local-\${Date.now()}\`,
+        branch: process.env.GITHUB_REF_NAME || 'local',
+        commit_sha: process.env.GITHUB_SHA || 'local',
+        commit_message: process.env.GITHUB_COMMIT_MESSAGE,
+        triggered_by: process.env.GITHUB_ACTOR,
+        workflow_name: process.env.GITHUB_WORKFLOW,
+        suite: this.config.suite,
+        status: failed > 0 ? 'failure' : 'success',
+        total_tests: this.results.length,
+        passed,
+        failed,
+        skipped,
+        duration_ms: Date.now() - this.startTime.getTime(),
+        started_at: this.startTime.toISOString(),
+        completed_at: new Date().toISOString(),
+      },
+      results: this.results,
+    };
+
+    try {
+      const response = await fetch(this.config.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': \`Bearer \${this.config.apiKey}\`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('[Exolar] Failed to send results:', error);
+      } else {
+        const data = await response.json();
+        console.log(\`[Exolar] Results sent successfully. Execution ID: \${data.execution_id}\`);
+      }
+    } catch (error) {
+      console.error('[Exolar] Error sending results:', error);
+    }
+  }
+}
+
+export default ExolarReporter;`,
+            playwright_config_snippet: `// playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  reporter: [
+    ['list'],
+    ['./reporters/exolar-reporter.ts', {
+      apiUrl: '${dashboardUrl}/api/test-results',
+      apiKey: process.env.EXOLAR_API_KEY,
+      suite: 'my-test-suite',
+    }],
+  ],
+});`,
+          },
+
+          github_actions: {
+            description: "GitHub Actions workflow for running tests with Exolar reporting",
+            file_path: ".github/workflows/e2e-tests.yml",
+            code: `name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        run: npx playwright test
+        env:
+          EXOLAR_API_KEY: \${{ secrets.EXOLAR_API_KEY }}
+          EXOLAR_SUITE: my-app-e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30`,
+          },
+
+          env_variables: {
+            required: {
+              EXOLAR_API_KEY: "Your organization API key (get from dashboard settings)",
+            },
+            optional: {
+              EXOLAR_API_URL: `API endpoint URL (default: ${dashboardUrl}/api/test-results)`,
+              EXOLAR_SUITE: "Test suite name for grouping results",
+            },
+            github_secrets_setup: [
+              "1. Go to your GitHub repository → Settings → Secrets and variables → Actions",
+              "2. Click 'New repository secret'",
+              "3. Name: EXOLAR_API_KEY",
+              "4. Value: Your API key from Exolar dashboard",
+            ],
+          },
+
+          api_key_setup: {
+            steps: [
+              `1. Go to ${dashboardUrl}/settings/api-keys`,
+              "2. Click 'Create API Key'",
+              "3. Give it a descriptive name (e.g., 'GitHub Actions - MyRepo')",
+              "4. Copy the generated key (starts with 'exolar_')",
+              "5. Store it securely - it won't be shown again",
+            ],
+            key_format: "exolar_xxxxxxxxxxxxxxxxxxxx",
+            note: "API keys are scoped to your organization and never expire (but can be revoked)",
+          },
+
+          quick_start: [
+            "1. Create an API key in the dashboard settings",
+            "2. Add EXOLAR_API_KEY to your CI secrets",
+            "3. Create the reporter file (reporters/exolar-reporter.ts)",
+            "4. Update playwright.config.ts to use the reporter",
+            "5. Run your tests - results appear in dashboard automatically",
+          ],
         }
 
-        // Filter by IDE if specified
-        if (input.ide !== "all") {
+        // Filter by section if specified
+        if (input.section !== "all") {
           const filtered: Record<string, unknown> = {
-            organization: configs.organization,
-            npm_package: configs.npm_package,
-            setup_steps: configs.setup_steps,
-            credentials_location: configs.credentials_location,
-            token_expiry: configs.token_expiry,
-            docs_url: configs.docs_url,
+            organization: guide.organization,
+            dashboard_url: guide.dashboard_url,
           }
-          if (input.ide === "claude_desktop") {
-            filtered.claude_desktop = configs.claude_desktop
-          } else if (input.ide === "cursor") {
-            filtered.cursor = configs.cursor
-          } else if (input.ide === "claude_code_cli") {
-            filtered.claude_code_cli = configs.claude_code_cli
+          if (input.section === "api_endpoint") {
+            filtered.api_endpoint = guide.api_endpoint
+          } else if (input.section === "playwright_reporter") {
+            filtered.playwright_reporter = guide.playwright_reporter
+          } else if (input.section === "github_actions") {
+            filtered.github_actions = guide.github_actions
+          } else if (input.section === "env_variables") {
+            filtered.env_variables = guide.env_variables
+            filtered.api_key_setup = guide.api_key_setup
           }
           return jsonResponse(filtered)
         }
 
-        return jsonResponse(configs)
+        return jsonResponse(guide)
       }
 
       case "classify_failure": {
