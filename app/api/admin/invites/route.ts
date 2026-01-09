@@ -84,14 +84,20 @@ export async function POST(request: Request) {
         },
       })
 
+      // Determine roles
+      // If an organization is selected, the Platform Role should be "viewer" (not System Admin)
+      // The Org Role will be whatever was selected (Admin or Viewer)
+      const platformRole = organizationId ? "viewer" : role
+      const orgRole = role
+
       // Create user in Dashboard DB
       // Use organizationId if provided, otherwise default (null or 1 handled by createUser logic if we pass it)
       // createUser signature: (email, role, invitedBy, defaultOrgId)
-      const user = await createUser(email, role, adminUser.id, organizationId)
+      const user = await createUser(email, platformRole, adminUser.id, organizationId)
 
       // Add to Organization if provided
       if (organizationId) {
-        await addOrganizationMember(organizationId, user.id, role)
+        await addOrganizationMember(organizationId, user.id, orgRole)
       }
 
       // Send invite email with credentials (non-blocking - don't fail if email fails)
