@@ -79,14 +79,16 @@ export async function POST(request: Request) {
       // Create user in Auth provider
       // Use provided name or fallback to part of email
       const name = providedName || email.split("@")[0]
-      const { error: signUpError } = await authServer.signUp.email({
+      const { data, error: createUserError } = await authServer.admin.createUser({
         email,
         password,
         name,
       })
-
-      if (signUpError) {
-        console.error("Auth provider sign up failed:", signUpError)
+      
+      const authUser = data?.user
+      
+      if (createUserError) {
+        console.error("Auth provider create user failed:", createUserError)
         return NextResponse.json({ error: "Failed to create user identity" }, { status: 500 })
       }
 
