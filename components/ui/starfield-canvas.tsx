@@ -51,19 +51,32 @@ export function StarfieldCanvas({
     // Initialize stars with randomized breathing parameters
     const stars: Star[] = [];
     for (let i = 0; i < numStars; i++) {
-      // 90% small stars, 10% medium stars
-      const isSmall = Math.random() < 0.9;
-      const radius = isSmall
-        ? Math.random() * 0.5 + 0.3 // 0.3-0.8px for small
-        : Math.random() * 0.4 + 0.8; // 0.8-1.2px for medium
+      // 80% small stars, 15% medium, 5% large bright stars
+      const rand = Math.random();
+      let radius: number;
+      let baseAlpha: number;
+
+      if (rand < 0.8) {
+        // Small stars
+        radius = Math.random() * 0.5 + 0.4; // 0.4-0.9px
+        baseAlpha = Math.random() * 0.5 + 0.5; // 0.5-1.0
+      } else if (rand < 0.95) {
+        // Medium stars - brighter
+        radius = Math.random() * 0.5 + 0.9; // 0.9-1.4px
+        baseAlpha = Math.random() * 0.3 + 0.7; // 0.7-1.0
+      } else {
+        // Large bright stars - very visible
+        radius = Math.random() * 0.6 + 1.4; // 1.4-2.0px
+        baseAlpha = 1.0; // Always full brightness base
+      }
 
       stars.push({
         x: Math.random() * width,
         y: Math.random() * height,
         radius,
-        baseAlpha: Math.random() * 0.6 + 0.4, // 0.4-1.0 for brighter stars
+        baseAlpha,
         // Wide range of twinkle speeds for varied breathing
-        twinkleSpeed: Math.random() * 0.027 + 0.003, // 0.003-0.03
+        twinkleSpeed: Math.random() * 0.04 + 0.005, // 0.005-0.045 (faster)
         // Random starting phase so they don't sync
         twinklePhase: Math.random() * Math.PI * 2,
       });
@@ -79,10 +92,10 @@ export function StarfieldCanvas({
           star.twinklePhase += star.twinkleSpeed;
         }
 
-        // Calculate breathing alpha with wider amplitude (0.5)
-        const twinkle = Math.sin(star.twinklePhase) * 0.5;
+        // Calculate breathing alpha with wider amplitude (0.7) for more dramatic effect
+        const twinkle = Math.sin(star.twinklePhase) * 0.7;
         const currentAlpha = Math.max(
-          0.1,
+          0.05,
           Math.min(1, star.baseAlpha + twinkle)
         );
 
