@@ -18,7 +18,15 @@ export default function ApiAuthenticationPage() {
           <span>/</span>
           <span className="text-foreground">Authentication</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">API Authentication</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >API Authentication</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Exolar uses API keys to authenticate requests. API keys are scoped to your organization
           and can be managed from your dashboard settings.

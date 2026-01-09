@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserMenu } from "@/components/dashboard/user-menu"
-import { ArrowLeft, UserPlus, Trash2, Shield, Loader2, Users, Mail } from "lucide-react"
+import { ArrowLeft, UserPlus, Trash2, Shield, Loader2, Users, Mail, Building2 } from "lucide-react"
 
 interface Member {
   id: number
@@ -34,56 +34,49 @@ interface Organization {
   slug: string
 }
 
-export default function OrgMembersPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id: orgId } = use(params)
+export default function TeamSettingsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [hasAccess, setHasAccess] = useState(false)
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "viewer">("viewer")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     loadData()
-  }, [orgId])
+  }, [])
 
   async function loadData() {
     try {
-      // Check if user is admin
-      const accessRes = await fetch("/api/auth/check-access")
-      const accessData = await accessRes.json()
+      const res = await fetch("/api/settings/team")
 
-      if (!accessData.authorized || accessData.user?.role !== "admin") {
-        setIsAdmin(false)
+      if (res.status === 403) {
+        setHasAccess(false)
         setLoading(false)
         return
       }
 
-      setIsAdmin(true)
-
-      // Fetch org details and members
-      const [orgRes, membersRes] = await Promise.all([
-        fetch(`/api/organizations/${orgId}`),
-        fetch(`/api/organizations/${orgId}/members`),
-      ])
-
-      if (orgRes.ok) {
-        const orgData = await orgRes.json()
-        setOrganization(orgData.organization)
+      if (!res.ok) {
+        throw new Error("Failed to load team data")
       }
 
-      if (membersRes.ok) {
-        const membersData = await membersRes.json()
-        setMembers(membersData.members || [])
-        setInvites(membersData.invites || [])
-      }
+      const data = await res.json()
+      setHasAccess(true)
+      setOrganization(data.organization)
+      setMembers(data.members || [])
+      setInvites(data.invites || [])
+      setCurrentUserId(data.currentUserId)
+      setCurrentUserRole(data.currentUserRole)
     } catch (err) {
       console.error("Failed to load data:", err)
-      setError("Failed to load data")
+      setError("Failed to load team data")
     } finally {
       setLoading(false)
     }
@@ -97,9 +90,10 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
 
     setSubmitting(true)
     setError(null)
+    setSuccess(null)
 
     try {
-      const res = await fetch(`/api/organizations/${orgId}/members`, {
+      const res = await fetch("/api/settings/team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
@@ -114,6 +108,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
 
       setInviteEmail("")
       setInviteRole("viewer")
+      setSuccess(data.status === "added" ? "Member added successfully" : "Invitation sent successfully")
       await loadData()
     } catch (err) {
       console.error("Failed to invite member:", err)
@@ -124,28 +119,54 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
   }
 
   async function updateRole(userId: number, newRole: string) {
+    setError(null)
+    setSuccess(null)
+
     try {
-      await fetch(`/api/organizations/${orgId}/members/${userId}`, {
+      const res = await fetch("/api/settings/team", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
+        body: JSON.stringify({ userId, role: newRole }),
       })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Failed to update role")
+        return
+      }
+
+      setSuccess("Role updated successfully")
       await loadData()
     } catch (err) {
       console.error("Failed to update role:", err)
+      setError("Failed to update role")
     }
   }
 
-  async function removeMember(userId: number) {
-    if (!confirm("Are you sure you want to remove this member?")) return
+  async function removeMember(userId: number, email: string) {
+    if (!confirm(`Are you sure you want to remove ${email} from the organization?`)) return
+
+    setError(null)
+    setSuccess(null)
 
     try {
-      await fetch(`/api/organizations/${orgId}/members/${userId}`, {
+      const res = await fetch(`/api/settings/team?userId=${userId}`, {
         method: "DELETE",
       })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Failed to remove member")
+        return
+      }
+
+      setSuccess("Member removed successfully")
       await loadData()
     } catch (err) {
       console.error("Failed to remove member:", err)
+      setError("Failed to remove member")
     }
   }
 
@@ -171,7 +192,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
     )
   }
 
-  if (!isAdmin) {
+  if (!hasAccess) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md glass-card">
@@ -179,15 +200,15 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <Shield className="h-6 w-6 text-destructive" />
             </div>
-            <CardTitle>Admin Access Required</CardTitle>
+            <CardTitle>Organization Admin Required</CardTitle>
             <CardDescription>
-              You need admin privileges to access this page.
+              You need to be an organization admin or owner to manage team members.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <Button variant="outline" onClick={() => router.push("/")}>
+            <Button variant="outline" onClick={() => router.push("/settings")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back to Settings
             </Button>
           </CardContent>
         </Card>
@@ -204,7 +225,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push("/admin/organizations")}
+                onClick={() => router.push("/settings")}
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
@@ -218,28 +239,46 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
                       WebkitTextFillColor: "transparent",
                       backgroundClip: "text",
                     }}
-                  >{organization?.name || "Organization"} - Members</span>
+                  >Team Management</span>
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage members and invites for this organization
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  {organization?.name || "Organization"}
                 </p>
               </div>
             </div>
-            <UserMenu />
+            <div className="flex items-center gap-2">
+              <Badge className={roleColors[currentUserRole || "viewer"]}>
+                Your role: {currentUserRole}
+              </Badge>
+              <UserMenu />
+            </div>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8 space-y-8">
+        {/* Status Messages */}
+        {error && (
+          <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="bg-green-500/10 text-green-600 dark:text-green-400 px-4 py-3 rounded-md">
+            {success}
+          </div>
+        )}
+
         {/* Invite Form */}
         <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5" />
-              Invite Member
+              Invite Team Member
             </CardTitle>
             <CardDescription>
-              Add an existing user or send an invite to a new user
+              Add an existing user or send an invitation to a new user
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -249,9 +288,10 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
                 <Input
                   id="email"
                   type="email"
-                  placeholder="user@example.com"
+                  placeholder="colleague@example.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && inviteMember()}
                 />
               </div>
               <div className="w-full sm:w-32 space-y-2">
@@ -278,7 +318,6 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
                 Invite
               </Button>
             </div>
-            {error && <p className="text-sm text-destructive mt-2">{error}</p>}
           </CardContent>
         </Card>
 
@@ -288,7 +327,7 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
-                Pending Invites
+                Pending Invitations
               </CardTitle>
               <CardDescription>
                 Users who have been invited but haven&apos;t signed in yet
@@ -297,26 +336,26 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Invited At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invites.map((invite) => (
-                    <TableRow key={invite.id}>
-                      <TableCell>{invite.email}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{invite.role}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(invite.created_at).toLocaleDateString()}
-                      </TableCell>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Invited At</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
+                  </TableHeader>
+                  <TableBody>
+                    {invites.map((invite) => (
+                      <TableRow key={invite.id}>
+                        <TableCell className="font-medium">{invite.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{invite.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(invite.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
                 </Table>
               </div>
             </CardContent>
@@ -328,66 +367,79 @@ export default function OrgMembersPage({ params }: { params: Promise<{ id: strin
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Members
+              Team Members
             </CardTitle>
             <CardDescription>
-              {members.length} member{members.length !== 1 ? "s" : ""} in this organization
+              {members.length} member{members.length !== 1 ? "s" : ""} in {organization?.name}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {members.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                No members yet. Invite someone to get started.
+                No team members yet. Invite someone to get started.
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {members.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell>{member.user_email}</TableCell>
-                      <TableCell>
-                        <Badge className={roleColors[member.role]}>{member.role}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(member.joined_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {member.role !== "owner" && (
-                          <div className="flex justify-end gap-2">
-                            <Select
-                              value={member.role}
-                              onValueChange={(v) => updateRole(member.user_id, v)}
-                            >
-                              <SelectTrigger className="w-24 h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="viewer">Viewer</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => removeMember(member.user_id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {members.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell className="font-medium">
+                          {member.user_email}
+                          {member.user_id === currentUserId && (
+                            <span className="text-muted-foreground ml-2">(you)</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={roleColors[member.role]}>{member.role}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(member.joined_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {member.role !== "owner" && member.user_id !== currentUserId && (
+                            <div className="flex justify-end gap-2">
+                              <Select
+                                value={member.role}
+                                onValueChange={(v) => updateRole(member.user_id, v)}
+                              >
+                                <SelectTrigger className="w-24 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="viewer">Viewer</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => removeMember(member.user_id, member.user_email)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                          {member.role === "owner" && (
+                            <span className="text-muted-foreground text-sm">Owner</span>
+                          )}
+                          {member.user_id === currentUserId && member.role !== "owner" && (
+                            <span className="text-muted-foreground text-sm">You</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

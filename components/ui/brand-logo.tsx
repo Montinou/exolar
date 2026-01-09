@@ -1,18 +1,21 @@
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { AnimatedLogo } from "./animated-logo"
 
 interface BrandLogoProps {
-  variant?: "icon" | "full" | "header"
+  variant?: "icon" | "full" | "header" | "animated-icon"
   className?: string
   width?: number
   height?: number
+  animated?: boolean
 }
 
 export function BrandLogo({
   variant = "icon",
   className,
   width,
-  height
+  height,
+  animated = true
 }: BrandLogoProps) {
   // Header variant - full width banner with constrained height
   if (variant === "header") {
@@ -26,6 +29,16 @@ export function BrandLogo({
           className="w-full h-auto max-h-40 object-cover object-center"
           priority
         />
+      </div>
+    )
+  }
+
+  // Animated icon variant - uses AnimatedLogo component with lightning effects
+  if (variant === "animated-icon") {
+    const size = width || 32
+    return (
+      <div className={cn("relative inline-flex items-center justify-center", className)}>
+        <AnimatedLogo size={size} animated={animated} />
       </div>
     )
   }

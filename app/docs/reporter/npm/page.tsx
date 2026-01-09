@@ -69,7 +69,15 @@ export default function ReporterNpmPage() {
           <span>/</span>
           <span className="text-foreground">npm Package</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">@exolar-qa/playwright-reporter</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >@exolar-qa/playwright-reporter</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           The official Playwright reporter for Exolar QA. Automatically uploads test results to your dashboard.
         </p>

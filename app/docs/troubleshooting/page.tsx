@@ -194,7 +194,15 @@ export default function TroubleshootingPage() {
     <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Troubleshooting</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >Troubleshooting</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Common issues and solutions for Exolar integration. Can&apos;t find your issue?{" "}
           <Link href="https://github.com/Montinou/e2e-test-dashboard/issues" className="text-primary hover:underline">

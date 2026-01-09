@@ -39,13 +39,13 @@ export function Hero() {
             Test Results, Ready for the{" "}
             <span
               style={{
-                background: "linear-gradient(90deg, oklch(0.75 0.15 195) 0%, oklch(0.78 0.18 75) 100%)",
+                background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
               }}
             >
-              AI Age
+              AI Era
             </span>
           </h1>
 

@@ -140,7 +140,15 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
               </Button>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-xl sm:text-2xl font-bold">Test Execution Details</h1>
+                  <h1
+                    className="text-xl sm:text-2xl font-bold"
+                    style={{
+                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                    }}
+                  >Test Execution Details</h1>
                   <Badge variant={execution.status === "success" ? "default" : "destructive"}>
                     {execution.status}
                   </Badge>

@@ -66,9 +66,10 @@ export function DeviceShowcase() {
             Your Test Suite,{" "}
             <span
               style={{
-                background: "linear-gradient(135deg, var(--safety-amber), var(--exolar-cyan))",
+                background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
               Omnipresent

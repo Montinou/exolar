@@ -22,7 +22,15 @@ export default function ReporterPage() {
     <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Playwright Reporter</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >Playwright Reporter</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           The Exolar QA reporter automatically captures your Playwright test results
           and sends them to your dashboard. Choose how you want to integrate.

@@ -138,8 +138,16 @@ export default async function PerformancePage({
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="space-y-1 sm:space-y-2">
               <div className="flex items-center gap-2">
-                <BrandLogo variant="icon" width={32} height={32} />
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                <BrandLogo variant="animated-icon" width={32} />
+                <h1
+                  className="text-2xl sm:text-3xl font-bold tracking-tight"
+                  style={{
+                    background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
                   Performance
                 </h1>
               </div>

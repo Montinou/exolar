@@ -1,217 +1,290 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Star } from 'lucide-react';
-
-// --- Componentes Auxiliares ---
-
-// Componente para una sola estrella parpadeante
-const TwinklingStar = ({ delay, x, y, size }) => (
-  <motion.div
-    initial={{ opacity: 0.2, scale: 0.5 }}
-    animate={{ 
-      opacity: [0.2, 1, 0.2], 
-      scale: [0.5, 1.2, 0.5] 
-    }}
-    transition={{ 
-      duration: Math.random() * 3 + 2, 
-      repeat: Infinity, 
-      delay: delay,
-      ease: "easeInOut"
-    }}
-    style={{ 
-      left: `${x}%`, 
-      top: `${y}%`,
-      width: size,
-      height: size
-    }}
-    className="absolute bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)] z-10 pointer-events-none"
-  />
-);
-
-// Componente para una estrella fugaz
-const ShootingStar = () => {
-  const startY = Math.random() * 50; // Comienza en la mitad superior
-  
-  return (
-    <motion.div
-      initial={{ x: '-10%', y: `${startY}%`, opacity: 0, scale: 0.5 }}
-      animate={{ 
-        x: '150%', 
-        y: `${startY + 20}%`, 
-        opacity: [0, 1, 1, 0], 
-        scale: 1 
-      }}
-      transition={{ 
-        duration: 2.5, 
-        ease: "easeIn",
-        repeat: Infinity,
-        repeatDelay: Math.random() * 10 + 5 // Intervalo aleatorio
-      }}
-      className="absolute z-10 w-32 h-0.5 bg-gradient-to-r from-transparent via-white to-transparent pointer-events-none rotate-12"
-    />
-  );
-};
-
-// --- Componente Principal: CosmicBanner ---
-
-const CosmicBanner = ({ 
-  bgImage, 
-  overlayImage, 
-  title = "Mi App Espacial",
-  subtitle = "Explora el universo"
-}) => {
-  // Generar estrellas estáticas solo una vez para evitar re-renderizados pesados
-  const stars = useMemo(() => {
-    return Array.from({ length: 40 }).map((_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() > 0.8 ? 3 : 2, // Algunas más grandes
-      delay: Math.random() * 5
-    }));
-  }, []);
-
-  return (
-    <div className="relative w-full h-[280px] md:h-[300px] overflow-hidden group shadow-2xl bg-black rounded-b-3xl md:rounded-3xl mx-auto max-w-[1920px]">
-      
-      {/* 1. Capa de Fondo (Imagen 10:1 o Panorámica) */}
-      <div className="absolute inset-0 z-0">
-        <img 
-          src={bgImage} 
-          alt="Banner Background" 
-          className="w-full h-full object-cover object-center scale-105 group-hover:scale-110 transition-transform duration-[20s] ease-linear"
-        />
-        {/* Overlay degradado para asegurar legibilidad y fusión con la app */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60 mix-blend-multiply" />
-        <div className="absolute inset-0 bg-indigo-900/20 mix-blend-overlay" />
-      </div>
-
-      {/* 2. Capa de Estrellas Animadas */}
-      <div className="absolute inset-0 z-10 overflow-hidden">
-        {stars.map((star) => (
-          <TwinklingStar 
-            key={star.id} 
-            {...star} 
-          />
-        ))}
-        {/* Añadimos un par de estrellas fugaces */}
-        <ShootingStar />
-        <ShootingStar />
-      </div>
-
-      {/* 3. Contenido Central (Logo / Texto) */}
-      <div className="relative z-20 flex flex-col items-center justify-center h-full text-center px-4">
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, ease: "outBack" }}
-          className="relative"
-        >
-          {/* Contenedor del Logo / Imagen PNG superpuesta */}
-          {overlayImage ? (
-            <motion.img 
-              src={overlayImage} 
-              alt="App Logo"
-              className="h-32 md:h-40 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]"
-              animate={{ y: [0, -10, 0] }} // Flotación suave
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            />
-          ) : (
-             // Placeholder si no hay imagen de overlay
-            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl shadow-xl">
-              <Sparkles className="w-16 h-16 text-yellow-300 mx-auto mb-2" />
-              <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-200 via-white to-purple-200 tracking-tighter">
-                {title}
-              </h1>
-            </div>
-          )}
-        </motion.div>
-
-        {/* Subtítulo opcional */}
-        {subtitle && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 1 }}
-            className="mt-4 text-white/90 text-sm md:text-lg font-light tracking-widest uppercase drop-shadow-md"
-          >
-            {subtitle}
-          </motion.p>
-        )}
-      </div>
-
-      {/* Bordes decorativos estilo UI futurista (Opcional) */}
-      <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent z-30" />
-      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent z-30" />
-    </div>
-  );
-};
-
-// --- App Principal para demostrar el uso ---
+import React, { useRef, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 
 export default function App() {
-  // NOTA PARA EL USUARIO:
-  // Aquí es donde conectarías tus archivos subidos.
-  // He usado URLs de ejemplo por si los archivos locales no se renderizan en esta vista previa,
-  // pero he dejado comentado el código para usar tus archivos.
-  
-  // Opción A: Usando tus archivos (Descomenta esto en tu proyecto real)
-  // const bgImage = "./1767956770696.jpg";
-  // const overlayImage = "./1000092157.png";
-
-  // Opción B: Fallback para esta demo (Unsplash)
-  const bgImage = "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=2622&auto=format&fit=crop"; 
-  // const overlayImage = null; // Pon null para ver el texto por defecto, o una URL de PNG
-
-  // Simulamos tu PNG con un logo placeholder, ya que no puedo leer el archivo local directamente en el iframe
-  const overlayImage = "https://cdn-icons-png.flaticon.com/512/3163/3163246.png"; 
-
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 font-sans selection:bg-purple-500 selection:text-white">
-      
-      {/* Navbar simulado */}
-      <nav className="p-4 border-b border-white/10 flex justify-between items-center mb-8 bg-black/50 backdrop-blur-sm sticky top-0 z-50">
-        <span className="font-bold text-xl tracking-tight">CosmosApp</span>
-        <button className="px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-sm transition-colors">
-          Menú
-        </button>
-      </nav>
-
-      <main className="container mx-auto px-4 pb-20">
-        
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4 text-purple-300">Vista Previa del Banner</h2>
-          <p className="text-gray-400 mb-6 max-w-2xl">
-            Este componente es totalmente responsivo. Mantiene una altura de 280-300px mientras 
-            centra la imagen de fondo (ideal para assets 10:1) y añade efectos de partículas.
-          </p>
-        </div>
-
-        {/* --- AQUÍ ESTÁ EL COMPONENTE QUE PEDISTE --- */}
-        <CosmicBanner 
-          bgImage={bgImage}
-          overlayImage={overlayImage}
-          title="GALAXY ONE"
-          subtitle="Tu viaje comienza aquí"
-        />
-        {/* ------------------------------------------- */}
-
-        {/* Sección de contenido simulada para ver como queda integrado */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((item) => (
-            <div key={item} className="bg-gray-800/50 p-6 rounded-2xl border border-white/5 hover:border-purple-500/30 transition-colors cursor-pointer group">
-              <div className="w-12 h-12 rounded-full bg-purple-900/30 flex items-center justify-center mb-4 text-purple-400 group-hover:scale-110 transition-transform">
-                <Star size={20} fill="currentColor" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Característica {item}</h3>
-              <p className="text-gray-400 text-sm">
-                Descripción breve de la funcionalidad de la app debajo del banner espectacular.
-              </p>
-            </div>
-          ))}
-        </div>
-
-      </main>
+    <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center p-6 font-sans">
+      <div className="w-full max-w-4xl">
+        <Banner />
+      </div>
+      <p className="mt-4 text-neutral-600 text-xs text-center uppercase tracking-widest">
+        Electricidad Caótica: Rayos zigzagueantes y aleatorios
+      </p>
     </div>
   );
+}
+
+// --- COMPONENTE PRINCIPAL ---
+function Banner() {
+  return (
+    <div className="relative w-full h-[300px] overflow-hidden rounded-xl bg-black border border-white/10 shadow-2xl group isolate">
+      {/* 1. Fondo de Estrellas */}
+      <Starfield />
+
+      {/* 2. Atmósfera / Vignette */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(10,20,30,0.4),rgba(0,0,0,1)_90%)] z-10 pointer-events-none" />
+      
+      {/* 3. Contenido Central */}
+      <div className="relative z-20 w-full h-full flex flex-col items-center justify-center pt-4">
+        
+        {/* LOGO ELÉCTRICO ZIG-ZAG */}
+        <div className="mb-6 scale-125">
+          <CyberEclipseZigZag />
+        </div>
+
+        {/* TEXTO PRINCIPAL */}
+        <motion.h1 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="text-6xl md:text-7xl font-black tracking-tighter leading-none relative z-20"
+        >
+          {/* Sombra de texto */}
+          <span className="absolute inset-0 text-transparent bg-clip-text bg-gradient-to-b from-white/10 to-transparent blur-sm transform translate-y-2 pointer-events-none" aria-hidden="true">
+            EXOLAR
+          </span>
+          {/* Gradiente Principal */}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-cyan-200 to-orange-500 drop-shadow-[0_0_25px_rgba(34,211,238,0.2)]">
+            EXOLAR
+          </span>
+        </motion.h1>
+
+        {/* SUBTEXTO */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1, delay: 0.5 }}
+          className="mt-2 flex items-center justify-center gap-4 w-full"
+        >
+          <div className="h-[1px] w-12 bg-gradient-to-r from-transparent via-cyan-900 to-transparent opacity-50"></div>
+          <p className="text-slate-400 text-[10px] md:text-xs font-bold tracking-[0.4em] uppercase text-shadow-sm">
+            Testing Dashboard
+          </p>
+          <div className="h-[1px] w-12 bg-gradient-to-r from-transparent via-orange-900 to-transparent opacity-50"></div>
+        </motion.div>
+
+      </div>
+    </div>
+  );
+}
+
+// --- LOGO: ECLIPSE CON RAYOS ZIGZAGUEANTES ---
+function CyberEclipseZigZag() {
+  
+  // Animación de fondo (Respiración)
+  const breathingTransition = {
+    duration: 5,
+    repeat: Infinity,
+    repeatType: "mirror",
+    ease: "easeInOut"
+  };
+
+  return (
+    <motion.div 
+      className="relative w-24 h-24 flex items-center justify-center"
+      animate={{ y: [-5, 5, -5] }}
+      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+    >
+      
+      {/* 1. LADO HIELO (Fondo) */}
+      <motion.div 
+        className="absolute -top-2 -left-2 w-20 h-20 bg-cyan-500 rounded-full blur-[35px] mix-blend-screen opacity-40"
+        animate={{ scale: [0.9, 1.1], opacity: [0.3, 0.5] }}
+        transition={breathingTransition}
+      />
+
+      {/* 2. LADO FUEGO (Fondo) */}
+      <motion.div 
+        className="absolute -bottom-2 -right-2 w-20 h-20 bg-orange-600 rounded-full blur-[35px] mix-blend-screen opacity-40"
+        animate={{ scale: [0.9, 1.1], opacity: [0.3, 0.6] }}
+        transition={{ ...breathingTransition, delay: 2.5 }}
+      />
+
+      {/* 3. CUERPO DEL ECLIPSE */}
+      <div className="relative w-16 h-16 rounded-full bg-black z-10 shadow-2xl overflow-hidden isolate">
+        
+        {/* Borde Metálico Dual */}
+        <div 
+            className="absolute inset-0 rounded-full opacity-100 pointer-events-none border-[2px] border-transparent z-20"
+            style={{
+                background: "linear-gradient(135deg, #06b6d4, #000000 40%, #000000 60%, #f97316) border-box",
+                WebkitMask: "linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0)",
+                WebkitMaskComposite: "xor",
+                maskComposite: "exclude"
+            }}
+        />
+        
+        {/* INTERIOR: RAYOS ZIG-ZAG */}
+        <div className="absolute inset-0 w-full h-full z-10">
+            {/* Rayo Cyan 1 - Lento y espaciado */}
+            <ZigZagBolt color="#22d3ee" delay={1} duration={6} />
+            
+            {/* Rayo Naranja - En contra-tiempo */}
+            <ZigZagBolt color="#f97316" delay={4.5} duration={7} />
+            
+            {/* Rayo Blanco Central - Muy raro y rápido */}
+            <ZigZagBolt color="#ffffff" delay={2} duration={10} strokeWidth={1.5} />
+        </div>
+
+        {/* Oscurecimiento interno para profundidad */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_20%,black_100%)] z-10 pointer-events-none" />
+      </div>
+
+    </motion.div>
+  );
+}
+
+// Componente para generar un Rayo Zig-Zag SVG Aleatorio
+function ZigZagBolt({ color, delay, duration, strokeWidth = 2 }) {
+    // Generamos una forma aleatoria única para este componente
+    // Un camino que cruza de izquierda (0, 50) a derecha (100, 50) con ruido en Y
+    const pathData = useMemo(() => {
+        let d = "M -10,50 "; // Empezar fuera
+        const segments = 6; // Número de quiebres
+        for (let i = 1; i <= segments; i++) {
+            const x = (i / segments) * 120 - 10;
+            // Desviación aleatoria vertical (jitter) fuerte
+            const jitter = (Math.random() - 0.5) * 50; 
+            d += `L ${x},${50 + jitter} `;
+        }
+        return d;
+    }, []);
+
+    // Rotación aleatoria inicial para que no siempre sea horizontal
+    const rotation = useMemo(() => Math.random() * 360, []);
+
+    return (
+        <motion.div
+            className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none"
+            style={{ rotate: rotation }}
+        >
+            <motion.svg
+                viewBox="0 0 100 100"
+                className="w-[140%] h-[140%] overflow-visible" // Más grande para cubrir rotaciones
+                initial={{ opacity: 0 }}
+                animate={{ 
+                    opacity: [0, 1, 0, 0, 0.8, 0], // Doble flash rápido
+                    pathLength: [0, 1] // Efecto de dibujo rápido opcional
+                }} 
+                transition={{
+                    duration: 0.4, // El flash dura muy poco (golpe eléctrico)
+                    times: [0, 0.1, 0.2, 0.3, 0.4, 1],
+                    repeat: Infinity,
+                    repeatDelay: duration, // Mucho tiempo de espera entre rayos
+                    delay: delay,
+                    ease: "linear"
+                }}
+            >
+                <path 
+                    d={pathData} 
+                    stroke={color} 
+                    strokeWidth={strokeWidth} 
+                    fill="none" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="bevel"
+                    filter={`drop-shadow(0 0 4px ${color})`} // Glow del rayo
+                />
+            </motion.svg>
+        </motion.div>
+    );
+}
+
+
+// --- FONDO: CANVAS STARFIELD (Optimizado) ---
+function Starfield() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationFrameId;
+    const width = canvas.width = canvas.parentElement.offsetWidth;
+    const height = canvas.height = canvas.parentElement.offsetHeight;
+
+    const stars = [];
+    const numStars = 300; 
+    
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        radius: Math.random() < 0.8 ? Math.random() * 0.8 : Math.random() * 1.5,
+        alpha: Math.random() * 0.8 + 0.2,
+        baseAlpha: Math.random() * 0.8 + 0.2,
+        speed: Math.random() * 0.05 + 0.01,
+        twinkleSpeed: Math.random() * 0.02 + 0.005,
+        twinklePhase: Math.random() * Math.PI * 2
+      });
+    }
+
+    let shootingStars = [];
+    const createShootingStar = () => {
+      const startX = Math.random() * width;
+      const startY = Math.random() < 0.5 ? -10 : Math.random() * (height / 2);
+      shootingStars.push({
+        x: startX,
+        y: startY,
+        length: Math.random() * 80 + 50,
+        speed: Math.random() * 10 + 15,
+        angle: Math.PI / 4 + (Math.random() * 0.2 - 0.1),
+        opacity: 1,
+        life: 1
+      });
+    };
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      const gradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, width);
+      gradient.addColorStop(0, 'rgba(10, 20, 30, 0)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      stars.forEach(star => {
+        star.twinklePhase += star.twinkleSpeed;
+        const twinkle = Math.sin(star.twinklePhase) * 0.3;
+        const currentAlpha = Math.max(0.1, Math.min(1, star.baseAlpha + twinkle));
+        ctx.fillStyle = `rgba(220, 240, 255, ${currentAlpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fill();
+        star.y -= star.speed; 
+        if (star.y < 0) star.y = height;
+      });
+
+      if (Math.random() < 0.015) createShootingStar();
+
+      for (let i = shootingStars.length - 1; i >= 0; i--) {
+        const s = shootingStars[i];
+        s.x += Math.cos(s.angle) * s.speed;
+        s.y += Math.sin(s.angle) * s.speed;
+        s.life -= 0.02;
+        s.opacity = s.life;
+
+        if (s.life > 0) {
+          const endX = s.x - Math.cos(s.angle) * s.length;
+          const endY = s.y - Math.sin(s.angle) * s.length;
+          const grad = ctx.createLinearGradient(s.x, s.y, endX, endY);
+          grad.addColorStop(0, `rgba(200, 255, 255, ${s.opacity})`);
+          grad.addColorStop(1, `rgba(34, 211, 238, 0)`);
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(endX, endY);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        } else {
+          shootingStars.splice(i, 1);
+        }
+        if (s.x > width + 100 || s.y > height + 100) shootingStars.splice(i, 1);
+      }
+      animationFrameId = requestAnimationFrame(render);
+    };
+    render();
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 z-0 opacity-80" />;
 }

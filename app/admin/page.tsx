@@ -218,8 +218,16 @@ export default function AdminPage() {
               </Button>
               <div>
                 <div className="flex items-center gap-2">
-                  <BrandLogo variant="icon" width={24} height={24} />
-                  <h1 className="text-2xl font-bold">Admin Panel</h1>
+                  <BrandLogo variant="animated-icon" width={24} />
+                  <h1
+                    className="text-2xl font-bold"
+                    style={{
+                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                    }}
+                  >Admin Panel</h1>
                 </div>
                 <p className="text-sm text-muted-foreground">Manage users and invites</p>
               </div>
@@ -250,48 +258,48 @@ export default function AdminPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleInvite} className="grid gap-4 md:grid-cols-4 items-end">
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="user@example.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="org">Organization (Optional)</Label>
-                <Select value={inviteOrg} onValueChange={setInviteOrg}>
-                  <SelectTrigger id="org">
-                    <SelectValue placeholder="Select Organization" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Default (Attorneyshare)</SelectItem>
-                    {organizations.map(org => (
-                      <SelectItem key={org.id} value={org.id.toString()}>{org.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 md:col-span-1">
-                <Label htmlFor="password">Password (Optional)</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Set password (optional)"
-                  value={invitePassword}
-                  onChange={(e) => setInvitePassword(e.target.value)}
-                  minLength={8}
-                />
-              </div>
-              <div className="flex gap-4 items-end md:col-span-1">
-                <div className="flex-1 space-y-2">
+            <form onSubmit={handleInvite} className="flex flex-col gap-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="org">Organization (Optional)</Label>
+                  <Select value={inviteOrg} onValueChange={setInviteOrg}>
+                    <SelectTrigger id="org">
+                      <SelectValue placeholder="Select Organization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Default (Attorneyshare)</SelectItem>
+                      {organizations.map(org => (
+                        <SelectItem key={org.id} value={org.id.toString()}>{org.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password (Optional)</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Set password (optional)"
+                    value={invitePassword}
+                    onChange={(e) => setInvitePassword(e.target.value)}
+                    minLength={8}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
                   <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "admin" | "viewer")}>
-                    <SelectTrigger>
+                    <SelectTrigger id="role">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -300,6 +308,8 @@ export default function AdminPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="flex justify-end">
                 <Button type="submit" disabled={submitting}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4 mr-2" />}
                   Invite

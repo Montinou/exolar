@@ -129,7 +129,15 @@ export default function SendCredentialsPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Send Credentials</h1>
+        <h1
+          className="text-3xl font-bold mb-2"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >Send Credentials</h1>
         <p className="text-muted-foreground">
           Bulk email credentials to team members. Select users and choose the appropriate email template.
         </p>

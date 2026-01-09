@@ -5,7 +5,6 @@ import { MCPShowcase } from "@/components/landing/MCPShowcase"
 import { DeviceShowcase } from "@/components/landing/DeviceShowcase"
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid"
 import { InstallTabs } from "@/components/landing/InstallTabs"
-import { Footer } from "@/components/landing/Footer"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +22,6 @@ export default async function LandingPage() {
       <DeviceShowcase />
       <FeaturesGrid />
       <InstallTabs />
-      <Footer />
     </main>
   )
 }

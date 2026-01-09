@@ -167,7 +167,14 @@ export default function OrganizationsPage() {
               <div>
                 <h1 className="text-2xl font-bold flex items-center gap-2">
                   <Building className="h-6 w-6" />
-                  Organizations
+                  <span
+                    style={{
+                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                    }}
+                  >Organizations</span>
                 </h1>
                 <p className="text-sm text-muted-foreground">Manage multi-tenant organizations</p>
               </div>

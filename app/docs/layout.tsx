@@ -108,10 +108,18 @@ function DocsSidebar() {
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
-      <SidebarHeader className="border-b border-border/40 px-4 py-3">
-        <Link href="/docs" className="flex items-center gap-2">
-          <BrandLogo variant="icon" width={24} height={24} />
-          <span className="font-semibold group-data-[collapsible=icon]:hidden">Documentation</span>
+      <SidebarHeader className="border-b border-border/40 px-4 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
+        <Link href="/docs" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <BrandLogo variant="animated-icon" width={24} />
+          <span
+            className="font-semibold group-data-[collapsible=icon]:hidden"
+            style={{
+              background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >Documentation</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -211,11 +219,6 @@ export default function DocsLayout({
                 <span className="hidden sm:inline">Back to Home</span>
                 <span className="sm:hidden">Home</span>
               </Link>
-              <span className="text-border hidden sm:block">/</span>
-              <div className="hidden sm:flex items-center gap-2">
-                <BrandLogo variant="icon" width={24} height={24} />
-                <span className="font-semibold">Documentation</span>
-              </div>
             </div>
             <Link
               href="https://github.com/Montinou/e2e-test-dashboard"

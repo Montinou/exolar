@@ -122,7 +122,15 @@ export default function GitHubActionDocsPage() {
 
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">GitHub Action</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >GitHub Action</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Automatically upload your Playwright test results to Exolar
           from GitHub Actions. Track test history, detect flaky tests, and analyze failures.

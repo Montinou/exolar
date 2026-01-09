@@ -1,13 +1,11 @@
 "use client"
 
-import Image from "next/image"
-
 import { useEffect, type ReactNode } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2 } from "lucide-react"
-import { BrandLogo } from "@/components/ui/brand-logo"
+import { AnimatedLogo } from "@/components/ui/animated-logo"
 import { AccessProvider, useAccess } from "./access-context"
 
 interface AccessGateProps {
@@ -77,13 +75,8 @@ function LoginPrompt() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 relative flex items-center justify-center">
-            <Image
-              src="/branding/logo-icon.png"
-              alt="Exolar Logo" 
-              fill 
-              className="object-contain rounded-full"
-            />
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <AnimatedLogo size="lg" />
           </div>
           <CardTitle className="text-2xl">Welcome</CardTitle>
           <CardDescription>

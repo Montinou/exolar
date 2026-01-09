@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
+import { AnimatedLogo } from "@/components/ui/animated-logo"
 import {
   Card,
   CardHeader,
@@ -77,10 +77,16 @@ export default function MCPSettingsPage() {
         </div>
 
         <div className="flex items-center gap-3 mb-2">
-          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/10 shadow-sm">
-            <Image src="/branding/logo-icon.png" alt="Exolar" fill className="object-contain" />
-          </div>
-          <h1 className="text-2xl font-bold">MCP Integration</h1>
+          <AnimatedLogo size="md" />
+          <h1
+            className="text-2xl font-bold"
+            style={{
+              background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >MCP Integration</h1>
         </div>
         <p className="text-muted-foreground mb-6">
           Connect Claude Code to access your test data directly

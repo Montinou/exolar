@@ -440,7 +440,15 @@ export default function MCPDocsPage() {
 
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">MCP Integration</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >MCP Integration</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Connect Claude Code to your E2E test data using the Model Context Protocol (MCP).
           Give your AI coding assistant direct access to test results, failures, and trends.

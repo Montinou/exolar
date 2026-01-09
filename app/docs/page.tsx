@@ -51,7 +51,15 @@ export default function DocsPage() {
     <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Documentation</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >Documentation</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Learn how to set up Exolar, integrate with your CI/CD pipeline,
           and connect your AI coding assistant for intelligent test analysis.

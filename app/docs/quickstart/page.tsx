@@ -11,7 +11,15 @@ export default function QuickStartPage() {
     <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Quick Start</h1>
+        <h1
+          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          style={{
+            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >Quick Start</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Get your Playwright tests reporting to Exolar QA in under 5 minutes.
           Follow these steps to start seeing your test results in the dashboard.
