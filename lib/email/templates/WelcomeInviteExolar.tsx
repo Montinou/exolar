@@ -18,8 +18,8 @@ interface WelcomeInviteExolarProps {
  * Email Banner Component - Animated GIF version of the banner
  */
 function EmailBanner({ dashboardUrl }: { dashboardUrl: string }) {
-  // Use the animated GIF banner
-  const bannerUrl = `${dashboardUrl}/assets/banner-header.gif`
+  // Use the animated GIF banner with cache-busting version
+  const bannerUrl = `${dashboardUrl}/assets/banner-header.gif?v=2`
 
   return (
     <table

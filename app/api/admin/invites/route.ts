@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { email, role, organizationId, password: providedPassword, template = "attorneyshare" } = body
+    const { email, role, organizationId, password: providedPassword, template = "exolar" } = body
 
     if (!email || !role) {
       return NextResponse.json({ error: "Email and role are required" }, { status: 400 })
