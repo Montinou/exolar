@@ -39,11 +39,11 @@ function EmailBanner({ dashboardUrl }: { dashboardUrl: string }) {
             <img
               src={bannerUrl}
               alt="Exolar Testing Dashboard"
-              width="600"
+              width="700"
               style={{
                 display: "block",
                 width: "100%",
-                maxWidth: "600px",
+                maxWidth: "700px",
                 height: "auto",
                 borderRadius: "12px 12px 0 0",
               }}
@@ -55,7 +55,7 @@ function EmailBanner({ dashboardUrl }: { dashboardUrl: string }) {
           <td
             style={{
               height: "2px",
-              background: "linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.5) 30%, rgba(249, 115, 22, 0.5) 70%, transparent)",
+              background: "linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.5) 30%, rgba(34, 211, 238, 0.5) 70%, transparent)",
             }}
           />
         </tr>
@@ -230,11 +230,11 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     backgroundColor: "#0f1219",
     margin: "0 auto",
-    maxWidth: "600px",
+    maxWidth: "700px",
     width: "100%",
     borderRadius: "18px",
     border: "1px solid rgba(139, 92, 246, 0.25)",
-    boxShadow: "0 4px 60px rgba(245, 166, 35, 0.12), 0 0 80px rgba(139, 92, 246, 0.15)",
+    boxShadow: "0 4px 60px rgba(77, 208, 225, 0.12), 0 0 80px rgba(139, 92, 246, 0.15)",
     overflow: "hidden",
   },
   content: {
@@ -247,7 +247,7 @@ const styles: Record<string, React.CSSProperties> = {
   subtitle: {
     margin: 0,
     fontSize: "14px",
-    color: "rgba(245, 166, 35, 0.9)",
+    color: "rgba(77, 208, 225, 0.9)",
     textTransform: "uppercase" as const,
     letterSpacing: "2px",
   },
@@ -267,7 +267,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 8px 32px rgba(139, 92, 246, 0.12)",
   },
   credentialsTitle: {
-    color: "#f5a623",
+    color: "#4dd0e1",
     fontSize: "16px",
     fontWeight: 600,
     margin: "0 0 20px 0",
@@ -294,29 +294,29 @@ const styles: Record<string, React.CSSProperties> = {
   },
   code: {
     display: "inline-block",
-    backgroundColor: "rgba(245, 166, 35, 0.1)",
-    color: "#f5a623",
+    backgroundColor: "rgba(77, 208, 225, 0.1)",
+    color: "#4dd0e1",
     padding: "8px 14px",
     borderRadius: "8px",
     fontFamily: '"SF Mono", Consolas, Monaco, monospace',
     fontSize: "14px",
     fontWeight: 600,
-    border: "1px solid rgba(245, 166, 35, 0.2)",
+    border: "1px solid rgba(77, 208, 225, 0.2)",
   },
   link: {
-    color: "#f5a623",
+    color: "#4dd0e1",
     textDecoration: "none",
-    borderBottom: "1px solid rgba(245, 166, 35, 0.3)",
+    borderBottom: "1px solid rgba(77, 208, 225, 0.3)",
   },
   warningBox: {
-    backgroundColor: "rgba(77, 208, 225, 0.06)",
-    border: "1px solid rgba(77, 208, 225, 0.2)",
+    backgroundColor: "rgba(245, 166, 35, 0.06)",
+    border: "1px solid rgba(245, 166, 35, 0.2)",
     borderRadius: "10px",
     padding: "14px 18px",
     margin: "24px 40px",
   },
   warningText: {
-    color: "#4dd0e1",
+    color: "#f5a623",
     fontSize: "13px",
     margin: 0,
   },
@@ -326,14 +326,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   button: {
     display: "inline-block",
-    background: "linear-gradient(135deg, #f5a623 0%, #ff8f00 50%, #e68900 100%)",
+    background: "linear-gradient(135deg, #4dd0e1 0%, #22d3ee 50%, #06b6d4 100%)",
     color: "#080a14",
     padding: "16px 40px",
     borderRadius: "10px",
     textDecoration: "none",
     fontWeight: 700,
     fontSize: "15px",
-    boxShadow: "0 4px 24px rgba(245, 166, 35, 0.4), 0 0 40px rgba(245, 166, 35, 0.15)",
+    boxShadow: "0 4px 24px rgba(77, 208, 225, 0.4), 0 0 40px rgba(77, 208, 225, 0.15)",
     letterSpacing: "0.5px",
   },
   featuresSection: {

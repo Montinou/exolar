@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   Book,
   Terminal,
@@ -31,6 +31,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
   SidebarInset,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   Collapsible,
@@ -103,11 +104,14 @@ const navigation = [
   { name: "Troubleshooting", href: "/docs/troubleshooting", icon: HelpCircle },
 ]
 
-function DocsSidebar() {
+function DocsSidebarContent() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { state } = useSidebar()
+  const isCollapsed = state === "collapsed"
 
   return (
-    <Sidebar variant="sidebar" collapsible="icon">
+    <>
       <SidebarHeader className="border-b border-border/40 px-4 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
         <Link href="/docs" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
           <BrandLogo variant="animated-icon" width={24} />
@@ -136,8 +140,24 @@ function DocsSidebar() {
                   sub => pathname === sub.href
                 )
 
-                // Items with sub-menus use collapsible
+                // Items with sub-menus use collapsible (only when expanded)
                 if (hasSubItems) {
+                  // When collapsed, navigate directly instead of toggling
+                  if (isCollapsed) {
+                    return (
+                      <SidebarMenuItem key={item.name}>
+                        <SidebarMenuButton
+                          tooltip={item.name}
+                          isActive={isActive || isSubItemActive}
+                          onClick={() => router.push(item.href)}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.name}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  }
+
                   return (
                     <Collapsible
                       key={item.name}
@@ -190,6 +210,14 @@ function DocsSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+    </>
+  )
+}
+
+function DocsSidebar() {
+  return (
+    <Sidebar variant="sidebar" collapsible="icon">
+      <DocsSidebarContent />
     </Sidebar>
   )
 }
