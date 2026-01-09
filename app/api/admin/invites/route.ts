@@ -54,7 +54,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { email, role, organizationId, password: providedPassword, template = "exolar" } = body
+    const { email, role, organizationId, password: providedPassword, template = "exolar", name: providedName } = body
+    
+
 
     if (!email || !role) {
       return NextResponse.json({ error: "Email and role are required" }, { status: 400 })
@@ -75,7 +77,8 @@ export async function POST(request: Request) {
 
     try {
       // Create user in Auth provider
-      const name = email.split("@")[0]
+      // Use provided name or fallback to part of email
+      const name = providedName || email.split("@")[0]
       const { error: signUpError } = await authServer.signUp.email({
         email,
         password,

@@ -24,6 +24,7 @@ export default function AdminPage() {
   const [invites, setInvites] = useState<Invite[]>([])
   const [organizations, setOrganizations] = useState<Organization[]>([]) // Add organizations state
   const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteName, setInviteName] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "viewer">("viewer")
   const [inviteOrg, setInviteOrg] = useState<string>("") // Add inviteOrg state
 
@@ -81,6 +82,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: inviteEmail,
+          name: inviteName,
           role: inviteRole,
           organizationId: inviteOrg ? parseInt(inviteOrg) : undefined,
         }),
@@ -102,6 +104,7 @@ export default function AdminPage() {
       }
       
       setInviteEmail("")
+      setInviteName("")
       setInviteRole("viewer")
       setInviteOrg("")
     } catch (err) {
@@ -267,6 +270,16 @@ export default function AdminPage() {
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name (Optional)</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="John Doe"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
