@@ -54,7 +54,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
  */
 export async function sendInviteEmail(data: InviteEmailData): Promise<{ success: boolean; emailId?: string; error?: string }> {
   try {
-    const { email, password, role, name, dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.cloud", template = "attorneyshare" } = data
+    const { email, password, role, name, dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.vercel.app", template = "attorneyshare" } = data
 
     // Extract name from email if not provided
     const recipientName = name || email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
