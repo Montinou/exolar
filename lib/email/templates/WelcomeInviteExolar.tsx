@@ -1,10 +1,10 @@
 /**
  * Welcome Invite Email Template - Exolar Product
  * For inviting external customers to the Exolar Testing Dashboard
+ * Uses design inspired by the AnimatedBanner component
  */
 
 import * as React from "react"
-import { render } from "@react-email/render"
 
 interface WelcomeInviteExolarProps {
   name: string
@@ -12,6 +12,56 @@ interface WelcomeInviteExolarProps {
   password: string
   role: "admin" | "viewer"
   dashboardUrl: string
+}
+
+/**
+ * Email Banner Component - Animated GIF version of the banner
+ */
+function EmailBanner({ dashboardUrl }: { dashboardUrl: string }) {
+  // Use the animated GIF banner
+  const bannerUrl = `${dashboardUrl}/assets/banner-header.gif`
+
+  return (
+    <table
+      width="100%"
+      cellPadding="0"
+      cellSpacing="0"
+      style={{
+        backgroundColor: "#000000",
+        borderRadius: "12px",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        overflow: "hidden",
+      }}
+    >
+      <tbody>
+        <tr>
+          <td style={{ textAlign: "center" as const }}>
+            <img
+              src={bannerUrl}
+              alt="Exolar Testing Dashboard"
+              width="600"
+              style={{
+                display: "block",
+                width: "100%",
+                maxWidth: "600px",
+                height: "auto",
+                borderRadius: "12px 12px 0 0",
+              }}
+            />
+          </td>
+        </tr>
+        {/* Bottom accent line */}
+        <tr>
+          <td
+            style={{
+              height: "2px",
+              background: "linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.5) 30%, rgba(249, 115, 22, 0.5) 70%, transparent)",
+            }}
+          />
+        </tr>
+      </tbody>
+    </table>
+  )
 }
 
 /**
@@ -30,21 +80,27 @@ export function WelcomeInviteExolarEmail({ name, email, password, role, dashboar
           <tbody>
             <tr>
               <td style={styles.content}>
-                {/* Header */}
-                <div style={styles.header}>
-                  <h1 style={styles.title}>Welcome to Exolar Testing Dashboard</h1>
-                  <p style={styles.subtitle}>Enterprise E2E Test Monitoring & Analytics</p>
+                {/* Animated Banner */}
+                <div style={{ padding: "16px 16px 0" }}>
+                  <EmailBanner dashboardUrl={dashboardUrl} />
+                </div>
+
+                {/* Subtitle */}
+                <div style={styles.subtitleSection}>
+                  <p style={styles.subtitle}>E2E Test Monitoring Platform</p>
                 </div>
 
                 {/* Greeting */}
                 <p style={styles.text}>Hi {name},</p>
 
                 <p style={styles.text}>
-                  Welcome to <strong>Exolar Testing Dashboard</strong>! Your team has invited you to join as a <strong>{roleDisplay}</strong>.
+                  Welcome to <strong>Exolar Testing Dashboard</strong>! Your team has invited you to join as a{" "}
+                  <strong>{roleDisplay}</strong>.
                 </p>
 
                 <p style={styles.text}>
-                  Exolar provides comprehensive monitoring, analytics, and insights for your end-to-end test automation. Track test health, identify flaky tests, and catch performance regressions before they reach production.
+                  Exolar provides comprehensive monitoring, analytics, and insights for your end-to-end test automation.
+                  Track test health, identify flaky tests, and catch performance regressions before they reach production.
                 </p>
 
                 {/* Credentials Box */}
@@ -94,13 +150,27 @@ export function WelcomeInviteExolarEmail({ name, email, password, role, dashboar
                 <div style={styles.featuresSection}>
                   <h3 style={styles.featuresTitle}>Platform Features:</h3>
                   <ul style={styles.featuresList}>
-                    <li style={styles.featuresItem}>📊 <strong>Real-Time Monitoring</strong> - Track test executions as they happen</li>
-                    <li style={styles.featuresItem}>📈 <strong>Trends & Analytics</strong> - Visualize pass rates and identify patterns</li>
-                    <li style={styles.featuresItem}>🐛 <strong>Flaky Test Detection</strong> - Automatically identify unreliable tests</li>
-                    <li style={styles.featuresItem}>⚡ <strong>Performance Insights</strong> - Catch regressions before deployment</li>
-                    <li style={styles.featuresItem}>🎯 <strong>Smart Filtering</strong> - Drill down by branch, suite, or timeframe</li>
-                    <li style={styles.featuresItem}>📄 <strong>Test Artifacts</strong> - Access screenshots, traces, and logs</li>
-                    <li style={styles.featuresItem}>🤖 <strong>Claude Code Integration</strong> - Query your tests with AI via MCP</li>
+                    <li style={styles.featuresItem}>
+                      📊 <strong>Real-Time Monitoring</strong> - Track test executions as they happen
+                    </li>
+                    <li style={styles.featuresItem}>
+                      📈 <strong>Trends & Analytics</strong> - Visualize pass rates and identify patterns
+                    </li>
+                    <li style={styles.featuresItem}>
+                      🐛 <strong>Flaky Test Detection</strong> - Automatically identify unreliable tests
+                    </li>
+                    <li style={styles.featuresItem}>
+                      ⚡ <strong>Performance Insights</strong> - Catch regressions before deployment
+                    </li>
+                    <li style={styles.featuresItem}>
+                      🎯 <strong>Smart Filtering</strong> - Drill down by branch, suite, or timeframe
+                    </li>
+                    <li style={styles.featuresItem}>
+                      📄 <strong>Test Artifacts</strong> - Access screenshots, traces, and logs
+                    </li>
+                    <li style={styles.featuresItem}>
+                      🤖 <strong>Claude Code Integration</strong> - Query your tests with AI via MCP
+                    </li>
                   </ul>
                 </div>
 
@@ -149,137 +219,139 @@ export function WelcomeInviteExolarEmail({ name, email, password, role, dashboar
   )
 }
 
-/**
- * Render the email template to HTML string
- */
-export function renderWelcomeInviteExolar(props: WelcomeInviteExolarProps): string {
-  return render(<WelcomeInviteExolarEmail {...props} />, { pretty: false })
-}
-
 // Inline styles for email client compatibility
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   body: {
-    backgroundColor: "#f6f9fc",
+    backgroundColor: "#080a14",
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-    margin: "0",
-    padding: "0",
+    margin: 0,
+    padding: "48px 20px",
   },
   container: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#0f1219",
     margin: "0 auto",
-    padding: "40px 20px",
     maxWidth: "600px",
     width: "100%",
+    borderRadius: "18px",
+    border: "1px solid rgba(139, 92, 246, 0.25)",
+    boxShadow: "0 4px 60px rgba(245, 166, 35, 0.12), 0 0 80px rgba(139, 92, 246, 0.15)",
+    overflow: "hidden",
   },
   content: {
-    padding: "0",
+    padding: 0,
   },
-  header: {
+  subtitleSection: {
     textAlign: "center" as const,
-    marginBottom: "32px",
-    paddingBottom: "24px",
-    borderBottom: "2px solid #8b5cf6",
-  },
-  title: {
-    color: "#1e293b",
-    fontSize: "28px",
-    fontWeight: "700",
-    margin: "0 0 8px 0",
+    padding: "20px 40px 24px",
   },
   subtitle: {
-    color: "#64748b",
-    fontSize: "16px",
-    margin: "0",
+    margin: 0,
+    fontSize: "14px",
+    color: "rgba(245, 166, 35, 0.9)",
+    textTransform: "uppercase" as const,
+    letterSpacing: "2px",
   },
   text: {
-    color: "#334155",
+    color: "#b8bcc8",
     fontSize: "16px",
-    lineHeight: "24px",
+    lineHeight: "26px",
     margin: "0 0 16px 0",
+    padding: "0 40px",
   },
   credentialsBox: {
-    backgroundColor: "#faf5ff",
-    border: "2px solid #e9d5ff",
-    borderRadius: "8px",
-    padding: "24px",
-    margin: "24px 0",
+    background: "linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(245, 166, 35, 0.04), rgba(15, 18, 25, 0.95))",
+    border: "1px solid rgba(139, 92, 246, 0.35)",
+    borderRadius: "16px",
+    padding: "28px",
+    margin: "24px 40px",
+    boxShadow: "0 8px 32px rgba(139, 92, 246, 0.12)",
   },
   credentialsTitle: {
-    color: "#1e293b",
-    fontSize: "18px",
-    fontWeight: "600",
-    margin: "0 0 16px 0",
+    color: "#f5a623",
+    fontSize: "16px",
+    fontWeight: 600,
+    margin: "0 0 20px 0",
+    textTransform: "uppercase" as const,
+    letterSpacing: "1px",
   },
   credentialsTable: {
     width: "100%",
     borderCollapse: "collapse" as const,
   },
   credentialLabel: {
-    color: "#64748b",
-    fontSize: "14px",
-    padding: "8px 0",
-    width: "30%",
+    color: "#7a7f8c",
+    fontSize: "13px",
+    padding: "10px 0",
+    width: "28%",
     verticalAlign: "top" as const,
   },
   credentialValue: {
-    color: "#1e293b",
+    color: "#ffffff",
     fontSize: "14px",
-    fontWeight: "500",
-    padding: "8px 0",
+    fontWeight: 500,
+    padding: "10px 0",
     wordBreak: "break-all" as const,
   },
   code: {
-    backgroundColor: "#e9d5ff",
-    color: "#6b21a8",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+    display: "inline-block",
+    backgroundColor: "rgba(245, 166, 35, 0.1)",
+    color: "#f5a623",
+    padding: "8px 14px",
+    borderRadius: "8px",
+    fontFamily: '"SF Mono", Consolas, Monaco, monospace',
     fontSize: "14px",
+    fontWeight: 600,
+    border: "1px solid rgba(245, 166, 35, 0.2)",
   },
   link: {
-    color: "#7c3aed",
+    color: "#f5a623",
     textDecoration: "none",
+    borderBottom: "1px solid rgba(245, 166, 35, 0.3)",
   },
   warningBox: {
-    backgroundColor: "#fef3c7",
-    border: "1px solid #fbbf24",
-    borderRadius: "6px",
-    padding: "12px 16px",
-    margin: "24px 0",
+    backgroundColor: "rgba(77, 208, 225, 0.06)",
+    border: "1px solid rgba(77, 208, 225, 0.2)",
+    borderRadius: "10px",
+    padding: "14px 18px",
+    margin: "24px 40px",
   },
   warningText: {
-    color: "#92400e",
-    fontSize: "14px",
-    margin: "0",
+    color: "#4dd0e1",
+    fontSize: "13px",
+    margin: 0,
   },
   buttonContainer: {
     textAlign: "center" as const,
-    margin: "32px 0",
+    margin: "36px 0",
   },
   button: {
-    backgroundColor: "#7c3aed",
-    color: "#ffffff",
-    padding: "14px 32px",
-    borderRadius: "8px",
-    textDecoration: "none",
-    fontWeight: "600",
-    fontSize: "16px",
     display: "inline-block",
+    background: "linear-gradient(135deg, #f5a623 0%, #ff8f00 50%, #e68900 100%)",
+    color: "#080a14",
+    padding: "16px 40px",
+    borderRadius: "10px",
+    textDecoration: "none",
+    fontWeight: 700,
+    fontSize: "15px",
+    boxShadow: "0 4px 24px rgba(245, 166, 35, 0.4), 0 0 40px rgba(245, 166, 35, 0.15)",
+    letterSpacing: "0.5px",
   },
   featuresSection: {
-    margin: "32px 0",
+    margin: "32px 40px",
   },
   featuresTitle: {
-    color: "#1e293b",
-    fontSize: "18px",
-    fontWeight: "600",
-    margin: "0 0 12px 0",
+    color: "#ffffff",
+    fontSize: "15px",
+    fontWeight: 600,
+    margin: "0 0 20px 0",
+    textTransform: "uppercase" as const,
+    letterSpacing: "1px",
   },
   featuresList: {
-    color: "#334155",
+    color: "#b8bcc8",
     fontSize: "15px",
     lineHeight: "28px",
-    margin: "0",
+    margin: 0,
     paddingLeft: "20px",
     listStyle: "none",
   },
@@ -287,41 +359,45 @@ const styles = {
     margin: "8px 0",
   },
   gettingStartedSection: {
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "rgba(139, 92, 246, 0.06)",
     borderRadius: "8px",
     padding: "20px 24px",
-    margin: "32px 0",
+    margin: "32px 40px",
+    border: "1px solid rgba(139, 92, 246, 0.15)",
   },
   gettingStartedTitle: {
-    color: "#1e293b",
-    fontSize: "18px",
-    fontWeight: "600",
+    color: "#ffffff",
+    fontSize: "15px",
+    fontWeight: 600,
     margin: "0 0 12px 0",
+    textTransform: "uppercase" as const,
+    letterSpacing: "1px",
   },
   gettingStartedList: {
-    color: "#334155",
+    color: "#b8bcc8",
     fontSize: "15px",
     lineHeight: "26px",
-    margin: "0",
+    margin: 0,
     paddingLeft: "20px",
   },
   gettingStartedItem: {
     margin: "12px 0",
   },
   footer: {
-    borderTop: "1px solid #e2e8f0",
+    borderTop: "1px solid rgba(255, 255, 255, 0.06)",
     marginTop: "32px",
     paddingTop: "24px",
+    padding: "24px 40px 32px",
   },
   footerText: {
-    color: "#64748b",
-    fontSize: "14px",
+    color: "#7a7f8c",
+    fontSize: "13px",
     lineHeight: "20px",
     margin: "0 0 8px 0",
     textAlign: "center" as const,
   },
   small: {
-    fontSize: "12px",
-    color: "#94a3b8",
+    fontSize: "11px",
+    color: "#4a4f5c",
   },
 }
