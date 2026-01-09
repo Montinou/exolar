@@ -14,16 +14,16 @@ export function BrandLogo({
   width,
   height
 }: BrandLogoProps) {
-  // Header variant - banner at top (constrained height)
+  // Header variant - full width banner with constrained height
   if (variant === "header") {
     return (
-      <div className={cn("relative w-full max-h-32 overflow-hidden flex items-center justify-center py-4", className)}>
+      <div className={cn("relative w-full", className)}>
         <Image
           src="/branding/logo-header.png"
           alt="Exolar E2E Dashboard"
-          width={600}
-          height={150}
-          className="h-24 w-auto object-contain"
+          width={1920}
+          height={200}
+          className="w-full h-auto max-h-40 object-cover object-center"
           priority
         />
       </div>

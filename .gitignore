@@ -5,3 +5,4 @@ node_modules
 .claude
 .env
 USER_CREDENTIALS.md
+.env.production
