@@ -76,13 +76,16 @@ export async function POST(request: Request) {
     try {
       // Create user in Auth provider
       const name = email.split("@")[0]
-      await authServer.api.signUpEmail({
-        body: {
-          email,
-          password,
-          name,
-        },
+      const { error: signUpError } = await authServer.signUp.email({
+        email,
+        password,
+        name,
       })
+
+      if (signUpError) {
+        console.error("Auth provider sign up failed:", signUpError)
+        return NextResponse.json({ error: "Failed to create user identity" }, { status: 500 })
+      }
 
       // Determine roles
       // If an organization is selected, the Platform Role should be "viewer" (not System Admin)
