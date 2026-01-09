@@ -1,11 +1,12 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono, Orbitron } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const orbitron = Orbitron({ subsets: ["latin"], variable: "--font-orbitron" })
 
 export const metadata: Metadata = {
   title: "Exolar QA",
@@ -39,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`font-sans antialiased`}>
+      <body className={`font-sans antialiased ${orbitron.variable}`}>
         {children}
         <Analytics />
         <script

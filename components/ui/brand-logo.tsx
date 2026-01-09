@@ -19,7 +19,7 @@ export function BrandLogo({
     return (
       <div className={cn("relative w-full", className)}>
         <Image
-          src="/branding/logo-header.png"
+          src="/branding/logo-header-v2.png"
           alt="Exolar E2E Dashboard"
           width={1920}
           height={200}

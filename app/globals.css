@@ -346,3 +346,157 @@
   --sidebar-border: hsl(240 3.7% 15.9%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
+
+/* ========================================
+   Animated Banner - Space Effects
+   ======================================== */
+
+/* Star twinkle - subtle opacity breathing */
+@keyframes star-twinkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* Star float - gentle position drift */
+@keyframes star-float {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.5;
+  }
+  25% {
+    transform: translate(2px, -3px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-1px, -5px);
+    opacity: 0.6;
+  }
+  75% {
+    transform: translate(-3px, -2px);
+    opacity: 0.9;
+  }
+}
+
+/* Star pulse - glow intensity change */
+@keyframes star-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    filter: blur(0px);
+  }
+  50% {
+    opacity: 0.8;
+    filter: blur(0.5px);
+  }
+}
+
+/* Shooting star - diagonal streak with luminous tail */
+@keyframes shooting-star {
+  0% {
+    left: -10%;
+    opacity: 0;
+    transform: translateX(0) rotate(-35deg) scaleX(0.5);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(10vw) rotate(-35deg) scaleX(1);
+  }
+  80% {
+    opacity: 0.8;
+  }
+  100% {
+    left: 110%;
+    opacity: 0;
+    transform: translateX(100vw) rotate(-35deg) scaleX(0.7);
+  }
+}
+
+/* Nebula drift - very slow cloud movement */
+@keyframes nebula-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(10px, -5px) scale(1.02);
+    opacity: 0.8;
+  }
+}
+
+/* Eclipse glow - ambient light breathing */
+@keyframes eclipse-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+/* Eclipse pulse - icon glow breathing */
+@keyframes eclipse-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.15);
+  }
+}
+
+/* Apply animations to star classes */
+.star-twinkle {
+  animation: star-twinkle ease-in-out infinite;
+}
+
+.star-float {
+  animation: star-float ease-in-out infinite;
+}
+
+.star-pulse {
+  animation: star-pulse ease-in-out infinite;
+}
+
+/* Shooting star element - realistic with luminous tail */
+.shooting-star {
+  width: 80px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.95 0.05 195 / 0.3) 10%,
+    oklch(0.98 0.02 0) 30%,
+    oklch(1 0 0) 50%,
+    oklch(0.95 0.08 195) 100%
+  );
+  animation: shooting-star linear infinite;
+  border-radius: 50%;
+  box-shadow:
+    0 0 4px 2px oklch(1 0 0 / 0.8),
+    0 0 12px 4px oklch(0.9 0.1 195 / 0.5),
+    0 0 20px 6px oklch(0.85 0.12 195 / 0.3);
+  filter: blur(0.3px);
+}
+
+/* Nebula layer animation */
+.nebula-drift {
+  animation: nebula-drift 20s ease-in-out infinite;
+}
+
+/* Eclipse glow animation */
+.eclipse-glow {
+  animation: eclipse-glow 4s ease-in-out infinite;
+}
+
+/* Eclipse icon pulse */
+.eclipse-pulse {
+  animation: eclipse-pulse 3s ease-in-out infinite;
+}

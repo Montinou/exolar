@@ -3,12 +3,12 @@
 import Link from "next/link"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { WishlistForm } from "./WishlistForm"
-import { BrandLogo } from "@/components/ui/brand-logo"
 import { FadeInOnScroll } from "@/components/ui/fade-in-on-scroll"
+import { AnimatedBanner } from "./AnimatedBanner"
 
 export function Hero() {
   return (
-    <section className="relative flex flex-col overflow-hidden grid-pattern">
+    <section className="relative flex flex-col overflow-hidden">
       {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -19,7 +19,7 @@ export function Hero() {
 
       {/* Full-width Header Banner */}
       <div className="relative z-10 w-full animate-in fade-in duration-1000">
-        <BrandLogo variant="header" />
+        <AnimatedBanner />
       </div>
 
       {/* Content */}
@@ -39,7 +39,7 @@ export function Hero() {
             Test Results, Ready for the{" "}
             <span
               style={{
-                background: "linear-gradient(135deg, var(--safety-amber), var(--exolar-cyan))",
+                background: "linear-gradient(90deg, oklch(0.75 0.15 195) 0%, oklch(0.78 0.18 75) 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
