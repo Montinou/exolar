@@ -52,7 +52,7 @@ export function WishlistFooter() {
   return (
     <section className="relative h-[250px] w-full bg-black overflow-hidden">
       {/* Starfield Canvas Background */}
-      <StarfieldCanvas numStars={400} />
+      <StarfieldCanvas numStars={150} />
 
       {/* Subtle radial vignette */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(0,0,0,0.3)_70%,rgba(0,0,0,0.6)_100%)] z-10 pointer-events-none" />

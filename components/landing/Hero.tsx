@@ -72,26 +72,46 @@ export function Hero() {
               View Documentation
             </Link>
           </div>
+        </div>
+      </div>
 
-          {/* Wishlist Form with Starfield Background */}
-          <div className="pt-8 w-full max-w-2xl mx-auto">
-            <div className="relative overflow-hidden rounded-xl bg-black border border-cyan-900/20">
-              {/* Starfield background */}
-              <StarfieldCanvas numStars={300} />
+      {/* Wishlist Form with Starfield Background - Full Width */}
+      <div className="relative w-full overflow-hidden bg-black">
+        {/* Starfield background */}
+        <StarfieldCanvas numStars={150} />
 
-              {/* Content */}
-              <div className="relative z-10 p-8 text-center">
-                <p className="text-sm text-slate-400 mb-4">
-                  Get early access updates
-                </p>
-                <WishlistForm />
-              </div>
-            </div>
+        {/* Top border accent */}
+        <div
+          className="absolute top-0 left-0 w-full h-px z-30"
+          style={{
+            background:
+              "linear-gradient(to right, transparent 5%, oklch(0.75 0.15 195 / 0.4) 50%, transparent 95%)",
+          }}
+        />
+
+        {/* Content */}
+        <div className="relative z-10 py-10 px-4 text-center">
+          <p className="text-sm text-slate-400 mb-4">
+            Get early access updates
+          </p>
+          <div className="max-w-lg mx-auto">
+            <WishlistForm />
           </div>
         </div>
 
-        {/* Visual: Playwright <-> AI Connection */}
-        <div className="mt-20 max-w-5xl mx-auto">
+        {/* Bottom border accent */}
+        <div
+          className="absolute bottom-0 left-0 w-full h-px z-30"
+          style={{
+            background:
+              "linear-gradient(to right, transparent 5%, oklch(0.75 0.15 195 / 0.4) 50%, transparent 95%)",
+          }}
+        />
+      </div>
+
+      {/* Visual: Playwright <-> AI Connection */}
+      <div className="relative z-10 container mx-auto px-4 py-8">
+        <div className="mt-12 max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
             {/* Playwright Trace */}
             <FadeInOnScroll direction="left">
