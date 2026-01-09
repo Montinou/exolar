@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireOrgAdmin } from "@/lib/session-context"
+import { requireSessionContext, isSystemAdmin, isOrgAdmin } from "@/lib/session-context"
 import {
   getOrganizationMembers,
   addOrganizationMember,
@@ -18,8 +18,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const context = await requireOrgAdmin()
-
+    const context = await requireSessionContext()
+    
+    // Check access: System Admin OR Org Admin for this specific org
     const { id } = await params
     const orgId = parseInt(id)
 
@@ -27,7 +28,10 @@ export async function GET(
       return NextResponse.json({ error: "Invalid organization ID" }, { status: 400 })
     }
 
-    if (context.organizationId !== orgId) {
+    const isSystem = isSystemAdmin(context)
+    const isOrgOwner = isOrgAdmin(context) && context.organizationId === orgId
+
+    if (!isSystem && !isOrgOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
@@ -54,8 +58,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const context = await requireOrgAdmin()
-
+    const context = await requireSessionContext()
+    
+    // Check access: System Admin OR Org Admin for this specific org
     const { id } = await params
     const orgId = parseInt(id)
 
@@ -63,7 +68,10 @@ export async function POST(
       return NextResponse.json({ error: "Invalid organization ID" }, { status: 400 })
     }
 
-    if (context.organizationId !== orgId) {
+    const isSystem = isSystemAdmin(context)
+    const isOrgOwner = isOrgAdmin(context) && context.organizationId === orgId
+
+    if (!isSystem && !isOrgOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
