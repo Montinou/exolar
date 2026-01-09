@@ -26,7 +26,7 @@ export default function AdminPage() {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "viewer">("viewer")
   const [inviteOrg, setInviteOrg] = useState<string>("") // Add inviteOrg state
-  const [invitePassword, setInvitePassword] = useState("") // Add invitePassword state
+
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -83,7 +83,6 @@ export default function AdminPage() {
           email: inviteEmail,
           role: inviteRole,
           organizationId: inviteOrg ? parseInt(inviteOrg) : undefined,
-          password: invitePassword || undefined
         }),
       })
 
@@ -105,7 +104,6 @@ export default function AdminPage() {
       setInviteEmail("")
       setInviteRole("viewer")
       setInviteOrg("")
-      setInvitePassword("")
     } catch (err) {
       console.error("Failed to create invite:", err)
       setError("Failed to create invite")
@@ -285,17 +283,7 @@ export default function AdminPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password (Optional)</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Set password (optional)"
-                    value={invitePassword}
-                    onChange={(e) => setInvitePassword(e.target.value)}
-                    minLength={8}
-                  />
-                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
                   <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "admin" | "viewer")}>
