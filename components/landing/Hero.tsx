@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { ArrowRight, Sparkles } from "lucide-react"
 import { WishlistForm } from "./WishlistForm"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -9,7 +8,7 @@ import { FadeInOnScroll } from "@/components/ui/fade-in-on-scroll"
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col overflow-hidden grid-pattern">
+    <section className="relative flex flex-col overflow-hidden grid-pattern">
       {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
