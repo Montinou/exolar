@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles } from "lucide-react"
 import { WishlistForm } from "./WishlistForm"
 import { FadeInOnScroll } from "@/components/ui/fade-in-on-scroll"
 import { AnimatedBanner } from "./AnimatedBanner"
+import { StarfieldCanvas } from "@/components/ui/starfield-canvas"
 
 export function Hero() {
   return (
@@ -72,12 +73,20 @@ export function Hero() {
             </Link>
           </div>
 
-          {/* Wishlist Form */}
-          <div className="pt-8 max-w-lg mx-auto">
-            <p className="text-sm text-muted-foreground mb-3">
-              Get early access updates
-            </p>
-            <WishlistForm />
+          {/* Wishlist Form with Starfield Background */}
+          <div className="pt-8 w-full max-w-2xl mx-auto">
+            <div className="relative overflow-hidden rounded-xl bg-black border border-cyan-900/20">
+              {/* Starfield background */}
+              <StarfieldCanvas numStars={300} />
+
+              {/* Content */}
+              <div className="relative z-10 p-8 text-center">
+                <p className="text-sm text-slate-400 mb-4">
+                  Get early access updates
+                </p>
+                <WishlistForm />
+              </div>
+            </div>
           </div>
         </div>
 
