@@ -9,6 +9,8 @@ import {
   createUser,
   addOrganizationMember,
 } from "@/lib/db"
+import { sendInviteEmail } from "@/lib/email/resend"
+import { generateSecurePassword } from "@/lib/utils"
 
 /**
  * GET /api/admin/invites - List all invites
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { email, role, organizationId, password } = body
+    const { email, role, organizationId, password: providedPassword, template = "attorneyshare" } = body
 
     if (!email || !role) {
       return NextResponse.json({ error: "Email and role are required" }, { status: 400 })
@@ -68,37 +70,58 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User already exists" }, { status: 409 })
     }
 
-    if (password) {
+    // Generate password if not provided
+    const password = providedPassword || generateSecurePassword(16)
+
+    try {
+      // Create user in Auth provider
+      const name = email.split("@")[0]
+      await authServer.api.signUpEmail({
+        body: {
+          email,
+          password,
+          name,
+        },
+      })
+
+      // Create user in Dashboard DB
+      // Use organizationId if provided, otherwise default (null or 1 handled by createUser logic if we pass it)
+      // createUser signature: (email, role, invitedBy, defaultOrgId)
+      const user = await createUser(email, role, adminUser.id, organizationId)
+
+      // Add to Organization if provided
+      if (organizationId) {
+        await addOrganizationMember(organizationId, user.id, role)
+      }
+
+      // Send invite email with credentials (non-blocking - don't fail if email fails)
       try {
-        // Create user in Auth provider
-        const name = email.split("@")[0]
-        await authServer.api.signUpEmail({
-          body: {
-            email,
-            password,
-            name,
-          },
+        const emailResult = await sendInviteEmail({
+          email,
+          password,
+          role,
+          name,
+          template: template as "attorneyshare" | "exolar",
         })
 
-        // Create user in Dashboard DB
-        // Use organizationId if provided, otherwise default (null or 1 handled by createUser logic if we pass it)
-        // createUser signature: (email, role, invitedBy, defaultOrgId)
-        const user = await createUser(email, role, adminUser.id, organizationId)
-
-        // Add to Organization if provided
-        if (organizationId) {
-          await addOrganizationMember(organizationId, user.id, role)
+        if (emailResult.success) {
+          console.log(`[Invites] Email sent successfully to ${email}:`, emailResult.emailId)
+        } else {
+          console.warn(`[Invites] Failed to send email to ${email}:`, emailResult.error)
         }
-
-        return NextResponse.json({ user }, { status: 201 })
-      } catch (err) {
-         console.error("Failed to create user with password:", err)
-         return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
+      } catch (emailError) {
+        console.error("[Invites] Email sending error (non-blocking):", emailError)
       }
-    }
 
-    const invite = await createInvite(email, role, adminUser.id, organizationId)
-    return NextResponse.json({ invite }, { status: 201 })
+      return NextResponse.json({
+        user,
+        passwordGenerated: !providedPassword,
+        emailSent: true,
+      }, { status: 201 })
+    } catch (err) {
+       console.error("Failed to create user with password:", err)
+       return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
+    }
   } catch (error) {
     console.error("[admin/invites] POST error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

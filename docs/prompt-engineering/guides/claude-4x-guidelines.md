@@ -18,6 +18,8 @@ Claude 4.x does **exactly what you ask**, nothing more:
 
 ## Extended Thinking
 
+### When Extended Thinking is Disabled
+
 When extended thinking is **disabled**, Claude Opus 4.5 is sensitive to the word "think":
 
 ```xml
@@ -31,6 +33,43 @@ When extended thinking is **disabled**, Claude Opus 4.5 is sensitive to the word
 ```
 
 **Alternative words**: consider, believe, evaluate, analyze, examine, reflect
+
+### Ultrathink in Claude Code
+
+When using **Claude Code** (the CLI tool), you can use special keywords to control the thinking budget. These words are mapped directly to token allocations:
+
+| Keyword | Token Budget | Use Case |
+|---------|--------------|----------|
+| `think` | ~4,000 tokens | Basic reasoning |
+| `think hard` | ~10,000 tokens | Moderate complexity |
+| `think harder` | ~20,000 tokens | Complex problems |
+| `megathink` | ~10,000 tokens | Very complex |
+| `ultrathink` | ~32,000 tokens | Maximum reasoning |
+
+**Example usage in prompts:**
+
+```xml
+<!-- For complex architectural decisions -->
+<instructions>
+  Ultrathink about the implications of this refactoring before proposing changes.
+</instructions>
+
+<!-- For moderate analysis -->
+<instructions>
+  Think hard about edge cases in this implementation.
+</instructions>
+```
+
+### When to Use What
+
+| Context | Recommendation |
+|---------|----------------|
+| **Claude Code** | Use think/ultrathink keywords to control reasoning depth |
+| **API without extended thinking** | Avoid "think", use alternatives |
+| **API with extended thinking enabled** | "Think" works fine, budget controlled via API params |
+| **Claude chat interface** | Depends on whether thinking mode is enabled |
+
+**Important**: Ultrathink is a **Claude Code-specific feature**. The keywords map to the system's thinking budget allocation. In other contexts (API, chat), use the API's `thinking` parameter instead.
 
 ## Preventing Over-Engineering (Opus 4.5)
 
@@ -113,6 +152,8 @@ Claude 4.5 excels at extended sessions with:
 |----------|----------------|
 | Need minimal solution | Add explicit "keep it simple" constraints |
 | Extended thinking off | Avoid "think", use "consider/evaluate" |
+| **Claude Code complex task** | Use `ultrathink` for maximum reasoning |
+| **Claude Code moderate task** | Use `think hard` for deeper analysis |
 | Complex multi-step task | Let model work incrementally |
 | Independent operations | Allow parallel execution |
 | Dependent operations | Specify sequential mode |
@@ -162,6 +203,9 @@ Claude 4.5 excels at extended sessions with:
 - [Claude 4.x Best Practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-4-best-practices)
 - [Claude 4 System Prompt Analysis](https://www.prompthub.us/blog/an-analysis-of-the-claude-4-system-prompt)
 - [Complete Guide to Claude Opus 4 and Sonnet 4](https://www.prompthub.us/blog/the-complete-guide-to-claude-opus-4-and-claude-sonnet-4)
+- [The Ultrathink Mystery - ITECS](https://itecsonline.com/post/the-ultrathink-mystery-does-claude-really-think-harder)
+- [Claude Code Best Practices - Simon Willison](https://simonwillison.net/2025/Apr/19/claude-code-best-practices/)
+- [Extended Thinking - Claude Docs](https://docs.claude.com/en/docs/build-with-claude/extended-thinking)
 
 ---
 *Last updated: January 2026*
