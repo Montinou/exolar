@@ -10,9 +10,11 @@ export default function middleware(request: NextRequest) {
   const hostname = request.headers.get("host") || ""
   const pathname = request.nextUrl.pathname
 
-  // e2e-test-dashboard domain → redirect root to sign-in (internal dashboard URL)
+  // e2e-test-dashboard domain → redirect root to dashboard (auth middleware handles session check)
+  // If no session → auth middleware redirects to /auth/sign-in
+  // If session exists → shows /dashboard
   if (hostname.includes("e2e-test-dashboard") && pathname === "/") {
-    return NextResponse.redirect(new URL("/auth/sign-in", request.url))
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
   // Public domains (exolar.vercel.app, etc) → pass through root "/" to show landing page
