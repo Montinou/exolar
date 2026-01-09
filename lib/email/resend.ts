@@ -12,7 +12,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Default sender email - using Resend's default testing email
 // Update to your verified domain when ready for production
-const DEFAULT_FROM_EMAIL = "Exolar Test Dashboard <noreply@ai-innovation.cloud>"
+const DEFAULT_FROM_EMAIL = "Exolar Testing Dashboard <noreply@ai-innovation.site>"
 
 /**
  * Send a generic email
@@ -54,7 +54,7 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
  */
 export async function sendInviteEmail(data: InviteEmailData): Promise<{ success: boolean; emailId?: string; error?: string }> {
   try {
-    const { email, password, role, name, dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.vercel.app", template = "attorneyshare" } = data
+    const { email, password, role, name, dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site", template = "attorneyshare" } = data
 
     // Extract name from email if not provided
     const recipientName = name || email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
