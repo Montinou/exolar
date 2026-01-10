@@ -4,39 +4,41 @@ This document explains how to set up and use the MCP (Model Context Protocol) in
 
 ## Overview
 
-The E2E Test Dashboard includes a built-in MCP server at `/api/mcp` that allows Claude Code to access your test data directly. This enables Claude to:
+Exolar QA includes a built-in MCP server that allows Claude Code to access your test data directly through a streamlined interface. The server uses **HTTP Streamable transport** via Vercel's `mcp-handler` package.
 
-- Query test executions and results
-- Search for specific tests
-- Analyze failures and flakiness
-- Access metrics and trends
+**Key Features:**
+- **5 consolidated tools** (reduced from 24) - 83% token savings
+- **Router pattern** for flexible data access
+- **14 queryable datasets** covering all test analytics
+- **Semantic definitions** to prevent AI hallucinations
+- **HTTP Streamable transport** - more reliable than legacy SSE
 
 ## Quick Start
 
 1. **Get Your Configuration**
-   - Log into the dashboard
+   - Log into the dashboard at your deployed URL
    - Go to `/settings/mcp`
    - Copy the configuration JSON
 
 2. **Add to Claude Code**
    - Open or create `~/.claude.json`
-   - Paste the configuration
+   - Add the configuration to `mcpServers`
    - Replace `<your-token>` with your actual token
 
 3. **Use Claude Code**
-   - Restart Claude Code
+   - Restart Claude Code if already running
    - Ask Claude to access your test data
+   - Example: "Show me what datasets are available"
 
 ## Configuration
 
-The MCP configuration looks like this:
+Add this to your `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
-    "e2e-dashboard": {
-      "url": "https://your-dashboard.vercel.app/api/mcp",
-      "transport": "sse",
+    "exolar-qa": {
+      "url": "https://your-dashboard.vercel.app/api/mcp/mcp",
       "headers": {
         "Authorization": "Bearer <your-neon-auth-token>"
       }
@@ -44,6 +46,8 @@ The MCP configuration looks like this:
   }
 }
 ```
+
+> **Note**: The URL path is `/api/mcp/mcp` (not `/api/mcp`)
 
 ## Getting Your Token
 
@@ -54,9 +58,515 @@ Your Neon Auth token can be obtained from the browser developer tools:
 3. Go to Network tab
 4. Make any request (reload the page)
 5. Look for the `Authorization` header in the request headers
-6. Copy the token after `Bearer `
+6. Copy the token value after `Bearer `
 
-> **Note**: Tokens expire after a period of time. You may need to get a new token periodically.
+> **Important**: Tokens expire after a period of time. You may need to get a new token periodically.
+
+## Architecture
+
+### Transport: HTTP Streamable
+
+The MCP server uses Vercel's official `mcp-handler` package with **HTTP Streamable transport**:
+
+- **Standard compliant**: Follows the MCP specification
+- **Reliable**: Automatic retry logic built-in
+- **Efficient**: Better payload chunking for large responses
+- **Streaming**: JSON-RPC 2.0 over HTTP with streaming support
+- **Replaces**: Previous SSE (Server-Sent Events) implementation
+
+### Router Pattern
+
+Instead of 24 individual tools, the server uses a **two-level router pattern**:
+
+1. **Tool Level**: Which category? (explore, query, action, definition, config)
+2. **Dataset Level**: Which data? (executions, flaky_tests, trends, etc.)
+
+**Benefits:**
+- 83% reduction in tool definition overhead (~3,000 → ~500 tokens)
+- Unified filter interface across all queries
+- Better discoverability via `explore_exolar_index`
+- Flexible dataset selection
+
+### Handler Organization
+
+```
+lib/mcp/
+├── auth.ts              # JWT validation (Neon Auth + MCP tokens)
+├── tools.ts             # 5 consolidated tool definitions
+├── definitions.ts       # Metric semantic layer
+├── formatters.ts        # Output formatters (JSON/Markdown/CSV)
+├── analytics.ts         # Shared business logic
+└── handlers/
+    ├── explore.ts       # Discovery (datasets, branches, suites, metrics)
+    ├── query.ts         # Universal data router (14 datasets)
+    ├── action.ts        # Heavy operations (compare, report, classify)
+    └── definition.ts    # Metric definition lookup
+```
+
+## Available Tools (5 Total)
+
+### 1. explore_exolar_index
+
+**Purpose**: Discovery tool - call FIRST to learn what data exists in your dashboard.
+
+**Parameters**:
+```typescript
+{
+  category: "datasets" | "branches" | "suites" | "metrics",
+  query?: string,      // Optional search filter
+  format?: "json" | "markdown"
+}
+```
+
+**Returns**: List of available items in the requested category.
+
+**Examples**:
+```javascript
+// See all queryable datasets
+explore_exolar_index({ category: "datasets" })
+
+// List branches with execution stats
+explore_exolar_index({ category: "branches" })
+
+// Find metrics containing "rate"
+explore_exolar_index({ category: "metrics", query: "rate" })
+```
+
+**Replaces**: `list_available_metrics`, `list_branches`, `list_suites`
+
+---
+
+### 2. query_exolar_data
+
+**Purpose**: Universal data retrieval router. Retrieves data from any of the 14 available datasets.
+
+**Parameters**:
+```typescript
+{
+  dataset: "executions" | "execution_details" | "failures" | ...,
+  filters?: {
+    branch?: string,
+    suite?: string,
+    limit?: number,
+    offset?: number,
+    // ... (see Filter Reference below)
+  },
+  view_mode?: "list" | "summary" | "detailed",
+  format?: "json" | "markdown"
+}
+```
+
+**Available Datasets** (14):
+
+| Dataset | Description | Key Filters |
+|---------|-------------|-------------|
+| `executions` | List test executions | branch, suite, status, from/to, limit |
+| `execution_details` | Full execution + test results | execution_id (required) |
+| `failures` | Failed tests with AI context | execution_id, error_type, limit |
+| `flaky_tests` | Tests with flakiness history | min_runs, include_resolved, branch |
+| `trends` | Time-series metrics | period, count, branch, suite |
+| `dashboard_stats` | Overall metrics summary | from/to, branch, suite, lastRunOnly |
+| `error_analysis` | Error type distribution | since, branch, suite |
+| `test_search` | Search tests by name/file | query (required), limit |
+| `test_history` | Test run history | test_signature (required), limit |
+| `flakiness_summary` | Overall flakiness metrics | branch, suite |
+| `reliability_score` | Suite health (0-100) | from/to, branch, suite, lastRunOnly |
+| `performance_regressions` | Tests slower than baseline | threshold, hours, sort_by, branch, suite |
+| `execution_summary` | Execution overview | execution_id (required) |
+| `execution_failures` | Failures for execution | execution_id (required), limit |
+
+**Examples**:
+```javascript
+// Get recent executions on main branch
+query_exolar_data({
+  dataset: "executions",
+  filters: { branch: "main", limit: 10 }
+})
+
+// Get flaky tests with at least 5 runs
+query_exolar_data({
+  dataset: "flaky_tests",
+  filters: { min_runs: 5, include_resolved: false }
+})
+
+// Get full execution details
+query_exolar_data({
+  dataset: "execution_details",
+  filters: { execution_id: 123 }
+})
+
+// Search for login tests
+query_exolar_data({
+  dataset: "test_search",
+  filters: { query: "login" }
+})
+```
+
+**Replaces**: 15 individual `get_*` tools (get_executions, get_failed_tests, get_flaky_tests, get_trends, get_dashboard_metrics, get_error_distribution, search_tests, get_test_history, get_flakiness_summary, get_reliability_score, get_performance_regressions, and more)
+
+---
+
+### 3. perform_exolar_action
+
+**Purpose**: Execute heavy operations like comparing executions, generating reports, or classifying failures.
+
+**Actions**:
+
+#### compare
+Compare two test executions side-by-side.
+
+**Parameters**:
+```typescript
+{
+  action: "compare",
+  params: {
+    // Option A: Compare by execution IDs
+    baseline_id?: number,
+    current_id?: number,
+
+    // Option B: Compare by branches (uses latest executions)
+    baseline_branch?: string,
+    current_branch?: string,
+
+    suite?: string,
+    filter?: "new_failure" | "fixed" | "new_test" | "removed_test"
+  }
+}
+```
+
+**Example**:
+```javascript
+// Compare main vs feature branch
+perform_exolar_action({
+  action: "compare",
+  params: {
+    baseline_branch: "main",
+    current_branch: "feature-auth"
+  }
+})
+```
+
+#### generate_report
+Generate a markdown failure report for an execution.
+
+**Parameters**:
+```typescript
+{
+  action: "generate_report",
+  params: {
+    execution_id: number
+  }
+}
+```
+
+#### classify
+Classify a test failure as FLAKE or BUG using historical data.
+
+**Parameters**:
+```typescript
+{
+  action: "classify",
+  params: {
+    // Option A: By test_id
+    test_id?: number,
+
+    // Option B: By execution + test name
+    execution_id?: number,
+    test_name?: string,
+    test_file?: string
+  }
+}
+```
+
+**Returns**:
+- `suggested_classification`: "FLAKE" | "BUG" | "UNKNOWN"
+- `confidence`: 0.0-1.0 score
+- `classification_signals`: Weighted indicators
+- `historical_metrics`: Flakiness rate, total runs
+- `recent_runs`: Last 10 executions
+
+**Example**:
+```javascript
+// Classify a failure
+perform_exolar_action({
+  action: "classify",
+  params: {
+    execution_id: 123,
+    test_name: "should login successfully"
+  }
+})
+```
+
+**Replaces**: `compare_executions`, `generate_failure_report`, `classify_failure`
+
+---
+
+### 4. get_semantic_definition
+
+**Purpose**: Get metric definitions to prevent AI hallucinations about how metrics are calculated.
+
+**Parameters**:
+```typescript
+{
+  metric_id: string  // e.g., "pass_rate", "flaky_rate", "reliability_score"
+}
+```
+
+**Returns**:
+```typescript
+{
+  id: string,
+  name: string,
+  category: "execution" | "flakiness" | "performance" | "reliability",
+  type: "percentage" | "count" | "duration" | "score" | "rate",
+  formula: string,        // Exact calculation formula
+  description: string,
+  unit?: string,
+  thresholds?: {
+    healthy?: number,
+    warning?: number,
+    critical?: number
+  },
+  relatedTools?: string[]
+}
+```
+
+**Example**:
+```javascript
+// Understand pass_rate calculation
+get_semantic_definition({ metric_id: "pass_rate" })
+→ {
+  formula: "(passed_tests / total_tests) × 100",
+  thresholds: { healthy: 95, warning: 80, critical: 0 },
+  description: "Percentage of tests that passed. Does not include skipped tests in numerator."
+}
+```
+
+**This is a new tool**: Prevents misunderstanding of metric calculations by providing explicit formulas.
+
+---
+
+### 5. get_installation_config
+
+**Purpose**: Get CI/CD integration code snippets and setup instructions.
+
+**Parameters**:
+```typescript
+{
+  section?: "api_endpoint" | "playwright_reporter" | "github_actions" | "env_variables" | "all"
+}
+```
+
+**Returns**: Code snippets and step-by-step setup instructions for integrating Exolar QA with your CI/CD pipeline.
+
+**Example**:
+```javascript
+// Get all setup instructions
+get_installation_config({ section: "all" })
+
+// Get only GitHub Actions config
+get_installation_config({ section: "github_actions" })
+```
+
+**Unchanged**: Same functionality as before consolidation.
+
+---
+
+## Filter Reference
+
+### Common Filters (used across multiple datasets)
+
+| Filter | Type | Description | Example |
+|--------|------|-------------|---------|
+| `branch` | string | Filter by branch name | `"main"` |
+| `suite` | string | Filter by test suite | `"e2e"` |
+| `from` | string | Start date (ISO 8601) | `"2025-01-01T00:00:00Z"` |
+| `to` | string | End date (ISO 8601) | `"2025-01-10T23:59:59Z"` |
+| `date_range` | enum | Predefined date ranges | `"last_24h"`, `"last_7d"`, `"last_30d"`, `"last_90d"` |
+| `limit` | number | Max results to return | `20` (default) |
+| `offset` | number | Skip N results (pagination) | `0` (default) |
+| `execution_id` | number | Specific execution ID | `123` |
+| `query` | string | Search text | `"login"` |
+| `status` | string | Filter by status | `"passed"`, `"failed"`, `"flaky"` |
+
+### Dataset-Specific Filters
+
+**flaky_tests**:
+- `min_runs`: Minimum number of runs (default: 5)
+- `include_resolved`: Include tests that are no longer flaky (default: false)
+
+**performance_regressions**:
+- `threshold`: Minimum slowdown percentage (default: 20)
+- `hours`: Time window in hours (default: 24)
+- `sort_by`: "regression" | "duration" | "name" (default: "regression")
+
+**reliability_score**:
+- `lastRunOnly`: Show only last run metrics (default: false)
+
+**trends**:
+- `period`: "hour" | "day" | "week" | "month" (default: "day")
+- `count`: Number of periods (default: 7)
+
+**test_search**:
+- `query`: Search text (required)
+
+**test_history**:
+- `test_signature`: Test identifier (required)
+
+## Usage Patterns
+
+### Pattern 1: Discovery First
+
+Start by exploring what data is available:
+
+```javascript
+// 1. See all datasets
+explore_exolar_index({ category: "datasets" })
+
+// 2. Check available branches
+explore_exolar_index({ category: "branches" })
+
+// 3. Query specific dataset
+query_exolar_data({
+  dataset: "executions",
+  filters: { branch: "main", limit: 10 }
+})
+```
+
+### Pattern 2: Filtered Queries
+
+Use filters to narrow down results:
+
+```javascript
+query_exolar_data({
+  dataset: "executions",
+  filters: {
+    branch: "main",
+    suite: "e2e",
+    date_range: "last_7d",
+    status: "failed",
+    limit: 10
+  }
+})
+```
+
+### Pattern 3: Metric Definitions
+
+When you see an unfamiliar metric:
+
+```javascript
+// 1. See a metric like "stability_index"
+// 2. Get its definition
+get_semantic_definition({ metric_id: "stability_index" })
+// 3. Understand formula and thresholds
+```
+
+### Pattern 4: Execution Comparison
+
+Compare test runs:
+
+```javascript
+// Compare by branches
+perform_exolar_action({
+  action: "compare",
+  params: {
+    baseline_branch: "main",
+    current_branch: "feature-auth",
+    filter: "new_failure"  // Show only regressions
+  }
+})
+```
+
+### Pattern 5: Failure Classification
+
+Determine if a failure is a flake or real bug:
+
+```javascript
+perform_exolar_action({
+  action: "classify",
+  params: {
+    execution_id: 123,
+    test_name: "should handle timeouts"
+  }
+})
+```
+
+## Example Prompts
+
+Once configured, you can ask Claude things like:
+
+**Discovery**:
+- "Show me what datasets are available"
+- "List all branches with their stats"
+- "What metrics can I query?"
+
+**Querying Data**:
+- "Get recent test failures on main branch"
+- "Show me the flakiest tests with at least 5 runs"
+- "What were the test results from the last CI run?"
+- "Search for tests related to login"
+- "Get metrics for the past week"
+
+**Analysis**:
+- "What's the health score for my test suite?"
+- "Are there any performance regressions on the main branch?"
+- "Show me tests that got slower in the last 24 hours"
+- "What's the error distribution for failed tests?"
+
+**Comparison**:
+- "Compare the last two runs on main branch"
+- "What tests broke in the feature branch compared to main?"
+- "Show me new failures between execution 123 and 456"
+
+**Classification**:
+- "Is this test failure a flake or a real bug?"
+- "Classify the failure in test 'should login successfully'"
+
+**Setup**:
+- "Help me set up MCP integration"
+- "How do I configure GitHub Actions?"
+
+**Definitions**:
+- "What's the formula for pass rate?"
+- "How is reliability score calculated?"
+
+## Output Formats
+
+### Markdown (Default)
+
+- CLI-friendly tables
+- Human-readable format
+- **~70% fewer tokens than JSON**
+- Easier to scan in Claude Code
+
+**Example**:
+```markdown
+| Test Name | Status | Duration |
+|-----------|--------|----------|
+| login.test | passed | 1.2s     |
+| auth.test  | failed | 2.5s     |
+```
+
+### JSON
+
+- Structured data for programmatic use
+- Full details included
+- Better for parsing
+
+**Example**:
+```json
+{
+  "tests": [
+    {
+      "name": "login.test",
+      "status": "passed",
+      "duration": 1200
+    }
+  ]
+}
+```
+
+Specify format in tool parameters: `format: "json"` or `format: "markdown"`
 
 ## Environment Variables
 
@@ -67,159 +577,147 @@ Your Neon Auth token can be obtained from the browser developer tools:
 | `NEON_AUTH_JWKS_URL` | Neon Auth JWKS endpoint | `https://auth.neon.tech/.well-known/jwks.json` |
 | `DATABASE_URL` | PostgreSQL connection | Already set from Neon |
 
-### In Vercel
+### Setting in Vercel
 
-Set `NEON_AUTH_JWKS_URL` in your Vercel project:
 1. Go to Project Settings → Environment Variables
-2. Add: `NEON_AUTH_JWKS_URL` = `https://auth.neon.tech/.well-known/jwks.json`
+2. Add `NEON_AUTH_JWKS_URL` = `https://auth.neon.tech/.well-known/jwks.json`
+3. Redeploy the application
 
-## Available Tools
+## Authentication
 
-### Core Query Tools
+The MCP server validates JWT tokens from Neon Auth:
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_executions` | List test executions | `limit`, `status`, `branch`, `suite`, `from`, `to` |
-| `get_execution_details` | Get execution + results | `execution_id` (required) |
-| `search_tests` | Search by name/file | `query` (required), `limit` |
-| `get_test_history` | Test run history | `test_signature` (required), `limit` |
+1. **Token Verification**: Uses JWKS (JSON Web Key Set) to verify token signatures
+2. **User Context**: Extracts user ID, email, and organization membership
+3. **Organization Scoping**: All queries are automatically filtered by organization
+4. **RLS Protection**: Database-level Row Level Security provides additional isolation
 
-### Analysis Tools
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_failed_tests` | Failed tests with AI context | `error_type`, `limit`, `since` |
-| `get_dashboard_metrics` | Overall metrics | `from`, `to`, `branch`, `suite`, `lastRunOnly` |
-| `get_trends` | Time-series data | `days` |
-| `get_error_distribution` | Error type breakdown | `since` |
-
-### Flakiness Tools
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_flaky_tests` | Flaky tests list | `limit`, `min_runs` |
-| `get_flakiness_summary` | Overall flakiness | (none) |
-
-### Resource Tools
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `list_branches` | Available branches | (none) |
-| `list_suites` | Available test suites | (none) |
-
-### Performance & Reliability Tools
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_reliability_score` | Overall suite health score (0-100) | `from`, `to`, `branch`, `suite`, `lastRunOnly` |
-| `get_performance_regressions` | Tests slower than baseline | `threshold`, `hours`, `branch`, `suite`, `limit`, `sort_by` |
-| `compare_executions` | Compare two test executions | `baseline_id`, `current_id`, `baseline_branch`, `current_branch`, `suite`, `filter` |
-
-### Installation & Auto-Triage Tools
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `get_installation_config` | Get IDE config snippets for MCP setup | `ide` (optional: "claude_desktop", "cursor", "claude_code_cli", "all") |
-| `classify_failure` | Classify test failure as FLAKE vs BUG | `test_id` OR (`execution_id` + `test_name`), `test_file` (optional) |
-
-**Installation Config** returns:
-- Config snippets for Claude Desktop, Cursor, and Claude Code CLI
-- Setup steps and authentication commands
-- Dashboard URLs and credential locations
-- Use this when a user asks to "install Exolar skills"
-
-**Classify Failure** returns:
-- `current_failure`: Error details, retry count, status
-- `historical_metrics`: Total runs, flaky runs, flakiness rate
-- `recent_runs`: Last 10 executions with status
-- `classification_signals`: Weighted FLAKE vs BUG indicators
-- `suggested_classification`: "FLAKE" | "BUG" | "UNKNOWN"
-- `confidence`: 0.0-1.0 score with reasoning
-
-FLAKE indicators: `retry_succeeded`, `high_flakiness_rate`, `timing_error_type`, `mixed_recent_results`
-BUG indicators: `no_retry_success`, `low_flakiness_rate`, `assertion_error_type`, `consistent_failure_pattern`
-
-**Reliability Score** returns:
-- `score`: 0-100 health score
-- `status`: "healthy" (80+), "warning" (60-79), "critical" (<60)
-- `breakdown`: Pass rate, flakiness, stability contributions
-- `trend`: Change from previous period
-
-**Performance Regressions** returns:
-- Tests with duration exceeding their historical baseline
-- Severity: "critical" (>50% slower) or "warning" (20-50% slower)
-- Sort options: `regression`, `duration`, `name`
-
-**Compare Executions** returns:
-- Side-by-side comparison of two test runs
-- Summary: Pass rate delta, duration delta, test count changes
-- Diff categories: `new_failure`, `fixed`, `new_test`, `removed_test`, `unchanged`
-- Use `baseline_branch`/`current_branch` to compare latest executions from branches
-- Use `filter` to focus on specific diff categories (e.g., `filter="new_failure"` for regressions)
-
-## Example Prompts
-
-Once configured, you can ask Claude things like:
-
-- "Get my recent test failures"
-- "Search for tests related to login"
-- "Show me the flakiest tests"
-- "What were the test results from the last CI run?"
-- "Get metrics for the past week"
-- "Show error distribution for failed tests"
-- "What's the health score for my test suite?"
-- "Are there any performance regressions on the main branch?"
-- "Show me tests that got slower in the last 24 hours"
-- "Compare the last two runs on main branch"
-- "What tests broke in the feature branch compared to main?"
-- "Show me new failures between execution 123 and 456"
-- "Install Exolar QA skills in my IDE"
-- "Is this test failure a flake or a real bug?"
-- "Classify the failure in test 'should login successfully'"
-- "Help me set up MCP integration"
-
-## Filter Behavior
-
-When using tools with branch/suite filters:
-- `lastRunOnly: true` - Returns metrics from most recent execution matching filter
-- `lastRunOnly: false` (default) - Returns aggregated metrics across all executions
-
-**Example:**
-```json
-{
-  "tool": "get_reliability_score",
-  "args": {
-    "branch": "main",
-    "lastRunOnly": true
-  }
-}
-```
-
-This is useful when you want to see the health score for just the latest CI run on a specific branch, rather than historical aggregate data.
+**Token Expiration**: Tokens expire after a period of time. When you see authentication errors, get a new token from the browser developer tools.
 
 ## Troubleshooting
 
 ### "Invalid or expired token"
 
-Your token may have expired. Get a new token from the browser developer tools.
+**Solution**: Get a new token from browser dev tools:
+1. Log into dashboard
+2. F12 → Network tab
+3. Reload page
+4. Copy Authorization header value
 
 ### "User not found"
 
-Ensure you:
-1. Are logged into the dashboard
-2. Have an organization assigned
-3. Used the token from the same session
+**Causes**:
+- Not logged into dashboard
+- No organization assigned
+- Token from different session
+
+**Solution**:
+1. Log into dashboard
+2. Ensure you have an organization assigned
+3. Get new token from same session
 
 ### Connection fails
 
-Check:
+**Check**:
 1. Dashboard is deployed and accessible
-2. `NEON_AUTH_JWKS_URL` is set in Vercel
+2. `NEON_AUTH_JWKS_URL` is set in Vercel environment variables
 3. Your network can reach the dashboard URL
+4. URL in config is correct: `/api/mcp/mcp` (not `/api/mcp`)
+
+### Tool not found
+
+**Cause**: Using old tool names from the 24-tool version
+
+**Solution**: Use the 5 consolidated tools:
+- Old: `get_executions` → New: `query_exolar_data({ dataset: "executions" })`
+- Old: `list_branches` → New: `explore_exolar_index({ category: "branches" })`
+- Old: `compare_executions` → New: `perform_exolar_action({ action: "compare" })`
+
+### Empty results
+
+**Check**:
+1. You have test data in your organization
+2. Filters are not too restrictive
+3. Branch/suite names are correct
+4. Date ranges include recent data
 
 ## Security
 
-- All data is organization-scoped
-- Users can only access their organization's data
-- JWT tokens are verified using Neon Auth's JWKS
-- RLS policies provide additional database-level security
+### Data Isolation
+
+- **Organization-scoped queries**: All data automatically filtered by organization
+- **User verification**: JWT tokens verified using Neon Auth JWKS
+- **Database RLS**: Row Level Security policies provide additional protection
+- **No cross-tenant access**: Users can only access their organization's data
+
+### Token Security
+
+- **HTTPS only**: All communication encrypted in transit
+- **No token storage**: Tokens not stored server-side
+- **Expiration**: Tokens expire after period of inactivity
+- **Header-based auth**: Tokens passed via Authorization header
+
+### Best Practices
+
+1. **Never commit tokens**: Keep `.claude.json` out of version control
+2. **Rotate regularly**: Get new tokens periodically
+3. **Limit scope**: Tokens are org-scoped automatically
+4. **Secure storage**: Store tokens in secure credential managers
+
+## Migration from Old Tool Set
+
+If you were using the previous 24-tool version:
+
+### Tool Mapping
+
+| Old Tool | New Tool | Parameters |
+|----------|----------|------------|
+| `list_available_metrics` | `explore_exolar_index` | `{ category: "metrics" }` |
+| `list_branches` | `explore_exolar_index` | `{ category: "branches" }` |
+| `list_suites` | `explore_exolar_index` | `{ category: "suites" }` |
+| `get_executions` | `query_exolar_data` | `{ dataset: "executions" }` |
+| `get_execution_details` | `query_exolar_data` | `{ dataset: "execution_details" }` |
+| `get_failed_tests` | `query_exolar_data` | `{ dataset: "failures" }` |
+| `get_flaky_tests` | `query_exolar_data` | `{ dataset: "flaky_tests" }` |
+| `get_trends` | `query_exolar_data` | `{ dataset: "trends" }` |
+| `get_dashboard_metrics` | `query_exolar_data` | `{ dataset: "dashboard_stats" }` |
+| `get_error_distribution` | `query_exolar_data` | `{ dataset: "error_analysis" }` |
+| `search_tests` | `query_exolar_data` | `{ dataset: "test_search" }` |
+| `get_test_history` | `query_exolar_data` | `{ dataset: "test_history" }` |
+| `get_flakiness_summary` | `query_exolar_data` | `{ dataset: "flakiness_summary" }` |
+| `get_reliability_score` | `query_exolar_data` | `{ dataset: "reliability_score" }` |
+| `get_performance_regressions` | `query_exolar_data` | `{ dataset: "performance_regressions" }` |
+| `compare_executions` | `perform_exolar_action` | `{ action: "compare" }` |
+| `generate_failure_report` | `perform_exolar_action` | `{ action: "generate_report" }` |
+| `classify_failure` | `perform_exolar_action` | `{ action: "classify" }` |
+| `get_installation_config` | `get_installation_config` | (unchanged) |
+
+### Benefits of Migration
+
+- **83% fewer tokens**: Tool definitions reduced from ~3,000 to ~500 tokens
+- **Simpler interface**: One tool (`query_exolar_data`) replaces 15 tools
+- **Better discovery**: `explore_exolar_index` shows what's available
+- **Unified filters**: Consistent filter interface across all datasets
+- **Semantic layer**: Metric definitions prevent hallucinations
+
+## Additional Resources
+
+- **Settings Page**: `/settings/mcp` - Get your configuration
+- **Project Documentation**: `CLAUDE.md` - Development guidelines
+- **Source Code**: `lib/mcp/` - Implementation details
+- **Handler Code**: `lib/mcp/handlers/` - Dataset routing logic
+
+## Support
+
+For issues or questions:
+1. Check this documentation first
+2. Review troubleshooting section
+3. Inspect browser console for errors
+4. Verify environment variables in Vercel
+5. Check Vercel deployment logs
+
+---
+
+**Last Updated**: 2026-01-10
+**MCP Version**: 2.0 (Router Pattern)
+**Transport**: HTTP Streamable via `mcp-handler` v1.0.7

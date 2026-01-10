@@ -44,7 +44,7 @@ app/                         # Next.js App Router
 │   ├── artifacts/           # R2 signed URLs
 │   ├── organizations/       # Org management
 │   ├── admin/               # Admin endpoints
-│   ├── mcp/                 # MCP server endpoint (SSE)
+│   ├── mcp/                 # MCP server endpoint (HTTP Streamable)
 │   └── reliability-score/   # Test reliability calculations
 ├── admin/                   # Admin pages (users, invites, organizations)
 ├── dashboard/               # Dashboard pages (performance, reliability)
@@ -68,9 +68,17 @@ lib/                         # Core utilities
 ├── colors.ts                # Theme color utilities
 ├── validation.ts            # Input validation
 ├── mcp/                     # MCP server implementation
-│   ├── server.ts            # MCP server setup
-│   ├── tools.ts             # MCP tool definitions
-│   └── handlers.ts          # Tool handlers
+│   ├── index.ts             # Exports and router
+│   ├── auth.ts              # JWT validation (Neon Auth + MCP tokens)
+│   ├── tools.ts             # 5 consolidated tool definitions
+│   ├── definitions.ts       # Metric semantic layer (prevents hallucinations)
+│   ├── formatters.ts        # Output formatters (JSON/Markdown/CSV)
+│   ├── analytics.ts         # Shared business logic
+│   └── handlers/            # Tool handlers
+│       ├── explore.ts       # Discovery (datasets, branches, suites)
+│       ├── query.ts         # Universal data router (14 datasets)
+│       ├── action.ts        # Heavy operations (compare, report, classify)
+│       └── definition.ts    # Metric definition lookup
 └── auth/                    # Auth utilities
 
 scripts/                     # SQL migration scripts for Neon
@@ -248,6 +256,131 @@ Never use placeholder values.
 - Run format commands unless explicitly asked
 - Assume things without verifying - confirm instead
 
+## Parent Project Rules
+
+This project inherits rules from the parent Attorneyshare repository located in `../.claude/rules/`. These rules provide standardized patterns for common operations.
+
+### GitHub Operations (`../.claude/rules/github-operations.md`)
+
+**Critical Repository Protection:**
+Before ANY GitHub operation that creates/modifies issues or PRs, ALWAYS check remote origin:
+
+```bash
+remote_url=$(git remote get-url origin 2>/dev/null || echo "")
+if [[ "$remote_url" == *"template-repo"* ]]; then
+  echo "❌ ERROR: Wrong repository!"
+  exit 1
+fi
+```
+
+**Key Principles:**
+- Don't pre-check authentication - trust `gh` CLI and handle failures
+- Use `--json` for structured output when parsing
+- Always specify `--repo` to avoid defaulting to wrong repository
+- Error format: `❌ GitHub operation failed: Run: gh auth login`
+
+### AST-Grep Integration (`../.claude/rules/use-ast-grep.md`)
+
+Use `ast-grep` for structural code analysis instead of regex when available:
+
+**When to Use:**
+- Finding function calls, class definitions, method implementations
+- Language-aware refactoring (renaming, updating signatures)
+- Complex code analysis (finding usage patterns)
+- Semantic code understanding (structure-based, not text-based)
+
+**Pattern Syntax:**
+- `$VAR` - matches any single node and captures it
+- `$$$` - matches zero or more nodes (wildcard)
+- `$$` - matches one or more nodes
+- Literal code - matches exactly as written
+
+**Examples:**
+```bash
+# Find React hooks
+ast-grep --pattern 'const [$STATE, $SETTER] = useState($$$)' --lang tsx .
+
+# Find function calls
+ast-grep --pattern 'functionName($$$)' --lang ts .
+
+# Find imports
+ast-grep --pattern 'import { $$$ } from "$MODULE"' --lang ts .
+
+# Find class definitions
+ast-grep --pattern 'class $NAME { $$$ }' --lang ts .
+```
+
+**Supported Languages:** TypeScript, JavaScript, TSX, Python, Go, Rust, Ruby, Java, C, C++, PHP, and 15+ others
+
+### Test Execution (`../.claude/rules/test-execution.md`)
+
+**Core Principles:**
+1. Always use test-runner agent from `.claude/agents/test-runner.md`
+2. No mocking - use real services for accurate results
+3. Verbose output - capture everything for debugging
+4. Check test structure first - before assuming code bugs
+
+**Cleanup:**
+Always clean up after tests:
+```bash
+pkill -f "jest|mocha|pytest|phpunit|rspec|ctest" 2>/dev/null || true
+pkill -f "mvn.*test|gradle.*test|gradlew.*test" 2>/dev/null || true
+```
+
+### Path Standards (`../.claude/rules/path-standards.md`)
+
+Extended path usage guidelines for privacy and portability:
+
+**Core Principles:**
+1. **Privacy Protection** - Never include absolute paths with usernames
+2. **Portability** - Use relative paths that work across environments
+3. **Cross-Project** - Use `../project-name/` for sibling directories
+
+**Path Formats:**
+```markdown
+# Correct ✅
+- lib/db.ts
+- ../project-name/internal/auth/server.go
+- [filename.ts:42](src/filename.ts#L42)  # Clickable references
+
+# Incorrect ❌
+- /Users/username/project/lib/db.ts
+- C:\Users\username\project\lib\db.ts
+```
+
+### Standard Patterns (`../.claude/rules/standard-patterns.md`)
+
+Core principles for all operations:
+
+**Fail Fast:**
+- Check critical prerequisites only
+- Don't over-validate things that rarely fail
+- Trust the system (file system works, GitHub CLI authenticated)
+
+**Clear Errors:**
+- Format: `❌ {What failed}: {Exact solution}`
+- Example: `❌ Epic not found: Run /pm:prd-parse feature-name`
+
+**Minimal Output:**
+- Use ✅/❌/⚠️ sparingly
+- Show results, not decoration
+- Focus on what matters
+
+**Smart Defaults:**
+- Only ask when destructive or ambiguous
+- Proceed with sensible defaults
+- Don't ask permission for safe operations
+
+### Other Available Rules
+
+Additional rules available but less relevant for this project:
+- `worktree-operations.md` - Git worktree management for parallel development
+- `branch-operations.md` - Git branch operations and best practices
+- `agent-coordination.md` - Multi-agent coordination patterns
+- `frontmatter-operations.md` - YAML frontmatter in markdown files
+- `strip-frontmatter.md` - Removing frontmatter before GitHub sync
+
+
 ## Testing
 
 This project monitors Playwright test results but doesn't have its own test suite yet. When adding tests:
@@ -285,26 +418,60 @@ See `docs/MULTITENANCY_COMPLETED.md` for full implementation details.
 
 ## MCP Integration
 
-The dashboard exposes a MCP server for Claude Code integration at `/api/mcp`.
+The dashboard exposes a MCP server for Claude Code integration at `/api/mcp/[transport]`.
 
-### Available Tools
-| Tool | Description |
-|------|-------------|
-| `get_executions` | List test executions with filters |
-| `get_execution_details` | Get execution + results |
-| `search_tests` | Search by name/file |
-| `get_test_history` | Test run history |
-| `get_failed_tests` | Failed tests with AI context |
-| `get_dashboard_metrics` | Overall metrics |
-| `get_trends` | Time-series data |
-| `get_flaky_tests` | Flaky tests list |
-| `list_branches` | Available branches |
-| `list_suites` | Available test suites |
-| `get_reliability_score` | Suite health score (0-100) with branch/suite filters |
-| `get_performance_regressions` | Tests slower than baseline with sorting options |
-| `compare_executions` | Compare two executions (by ID or branch) to find regressions/improvements |
+### Transport: HTTP Streamable
+- Uses Vercel's `mcp-handler` package (v1.0.7)
+- HTTP Streamable is the new MCP standard (replaces SSE)
+- More reliable with automatic retry logic
+- Better payload chunking for large responses
 
-See `docs/MCP_INTEGRATION.md` for configuration and usage.
+### Configuration URL
+```json
+{
+  "mcpServers": {
+    "exolar-qa": {
+      "url": "https://your-domain.vercel.app/api/mcp/mcp",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      }
+    }
+  }
+}
+```
+
+### Architecture: Router Pattern
+The MCP server uses a consolidated router pattern with **5 tools** (reduced from 24):
+
+| Tool | Purpose | Replaces |
+|------|---------|----------|
+| `explore_exolar_index` | Discovery (datasets, branches, suites, metrics) | 3 tools |
+| `query_exolar_data` | Universal data retrieval with 14 datasets | 15 tools |
+| `perform_exolar_action` | Heavy operations (compare, report, classify) | 3 tools |
+| `get_semantic_definition` | Metric definitions (prevents hallucinations) | New |
+| `get_installation_config` | CI/CD setup guide | Unchanged |
+
+**Token Savings**: ~83% reduction in tool definition overhead (~3,000 → ~500 tokens)
+
+### Available Datasets (via query_exolar_data)
+1. **executions** - List test executions
+2. **execution_details** - Execution + results
+3. **failures** - Failed tests with AI context
+4. **flaky_tests** - Flaky test list
+5. **trends** - Time-series data
+6. **dashboard_stats** - Overall metrics
+7. **error_analysis** - Error type breakdown
+8. **test_search** - Search by name/file
+9. **test_history** - Test run history
+10. **flakiness_summary** - Overall flakiness
+11. **reliability_score** - Suite health (0-100)
+12. **performance_regressions** - Tests slower than baseline
+13. **execution_summary** - Execution overview
+14. **execution_failures** - Failures for execution
+
+**Router Pattern**: Use `query_exolar_data({ dataset: "executions" })` instead of `get_executions()`. All old tools are mapped to the new 5-tool structure.
+
+See `docs/unorganized-docs/MCP_INTEGRATION.md` for full documentation.
 
 ## Key Features
 

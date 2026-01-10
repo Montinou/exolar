@@ -63,19 +63,17 @@ const navigation = [
       { name: "Troubleshooting", href: "/docs/github-action#troubleshooting" },
     ]
   },
-  { 
-    name: "MCP Integration", 
-    href: "/docs/mcp", 
+  {
+    name: "MCP Integration",
+    href: "/docs/mcp",
     icon: Terminal,
     subItems: [
       { name: "Installation", href: "/docs/mcp#installation" },
-      { name: "CLI Commands", href: "/docs/mcp#cli-commands" },
-      { name: "Core Tools", href: "/docs/mcp#core-tools" },
-      { name: "Analysis Tools", href: "/docs/mcp#analysis-tools" },
-      { name: "Flakiness Tools", href: "/docs/mcp#flakiness-tools" },
-      { name: "Aggregation Tools", href: "/docs/mcp#aggregation-tools" },
-      { name: "Performance Tools", href: "/docs/mcp#performance-tools" },
-      { name: "Metadata Tools", href: "/docs/mcp#metadata-tools" },
+      { name: "Architecture", href: "/docs/mcp#architecture" },
+      { name: "Tools (5)", href: "/docs/mcp#tools" },
+      { name: "Datasets (14)", href: "/docs/mcp#datasets" },
+      { name: "Migration", href: "/docs/mcp#migration" },
+      { name: "Examples", href: "/docs/mcp#examples" },
       { name: "Security", href: "/docs/mcp#security" },
       { name: "Troubleshooting", href: "/docs/mcp#troubleshooting" },
     ]

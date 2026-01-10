@@ -1,621 +1,238 @@
 /**
- * MCP Tools - Tool Definitions and Handlers
+ * MCP Tools - Consolidated Router Pattern
  *
- * All 20 MCP tools for the E2E Dashboard.
- * Uses existing lib/db.ts functions directly.
+ * 5 tools total (reduced from 24):
+ * 1. explore_exolar_index - Discovery (datasets, branches, suites, metrics)
+ * 2. query_exolar_data - Universal data retrieval router
+ * 3. perform_exolar_action - Heavy actions (compare, report, classify)
+ * 4. get_semantic_definition - Metric definitions to prevent hallucinations
+ * 5. get_installation_config - CI/CD setup guide
+ *
+ * Token savings: ~83% reduction in tool definitions.
  */
 
 import { z } from "zod"
 import type { MCPAuthContext } from "./auth"
-import * as db from "@/lib/db"
-import { getSignedR2Url, isR2Configured } from "@/lib/r2"
+import { handleExplore } from "./handlers/explore"
+import { handleQuery } from "./handlers/query"
+import { handleAction } from "./handlers/action"
+import { handleDefinition } from "./handlers/definition"
 
 // ============================================
-// Tool Definitions
+// Tool Definitions (5 tools)
 // ============================================
 
 export const allTools = [
-  // Core Tools
+  // ============================================
+  // 1. Discovery Tool
+  // ============================================
   {
-    name: "get_executions",
-    description: `List test executions with optional filters. Returns workflow runs with pass/fail counts, duration, and metadata.
+    name: "explore_exolar_index",
+    description: `Discover available datasets, branches, suites, or metrics. Call FIRST to learn what data exists.
 
-Fields returned per execution:
-- id: number - Execution ID (use with get_execution_details)
-- suite: string - Test suite name (e.g., "Negotiation")
-- branch: string - Git branch name
-- commit_sha: string - Git commit hash
-- status: "success" | "failure" | "running"
-- passed_count, failed_count, skipped_count: number
-- duration_ms: number - Total execution time
-- started_at, completed_at: ISO datetime`,
+Examples:
+- explore_exolar_index({ category: "datasets" }) → See all queryable datasets
+- explore_exolar_index({ category: "branches" }) → List branches with stats
+- explore_exolar_index({ category: "metrics", query: "rate" }) → Find metrics containing "rate"`,
     inputSchema: {
       type: "object" as const,
       properties: {
-        limit: { type: "number", description: "Max results (1-100)", default: 20 },
-        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
-        status: {
+        category: {
           type: "string",
-          enum: ["success", "failure", "running"],
-          description: "Filter by execution status",
+          enum: ["datasets", "branches", "suites", "metrics"],
+          description: "What to explore",
         },
-        branch: { type: "string", description: "Filter by branch name" },
-        suite: { type: "string", description: "Filter by test suite" },
-        from: { type: "string", description: "Start date (ISO 8601)" },
-        to: { type: "string", description: "End date (ISO 8601)" },
-        run_id: { type: "string", description: "Filter by CI run ID (e.g., GitHub Actions run ID)" },
+        query: {
+          type: "string",
+          description: "Optional search filter",
+        },
+        format: {
+          type: "string",
+          enum: ["json", "markdown"],
+          description: "Output format (default: markdown)",
+        },
       },
+      required: ["category"],
     },
   },
+
+  // ============================================
+  // 2. Universal Query Tool (Router)
+  // ============================================
   {
-    name: "get_execution_details",
-    description: `Get detailed info about a specific test execution including all test results, artifacts, and failure details.
+    name: "query_exolar_data",
+    description: `Retrieve data from any dataset. Use explore_exolar_index(category="datasets") to see available datasets.
 
-TIP: For large executions (40+ tests), use get_execution_summary or get_execution_failures instead to reduce response size.
+Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures
 
-Fields returned per test:
-- test_name: string - Test title
-- test_file: string - Spec file path (e.g., "negotiation/flow.spec.ts")
-- status: "passed" | "failed" | "skipped"
-- error_message: string | null - Error description for failures
-- duration_ms: number - Test duration
-- retry_count: number - Number of retries
-- artifacts: array | null - Screenshots, traces, etc.`,
+Examples:
+- query_exolar_data({ dataset: "executions", filters: { branch: "main", limit: 10 } })
+- query_exolar_data({ dataset: "flaky_tests", filters: { min_runs: 5 } })
+- query_exolar_data({ dataset: "execution_summary", filters: { execution_id: 123 } })`,
     inputSchema: {
       type: "object" as const,
       properties: {
-        execution_id: { type: "number", description: "Execution ID" },
-        status: {
+        dataset: {
           type: "string",
-          enum: ["passed", "failed", "skipped", "all"],
+          enum: [
+            "executions",
+            "execution_details",
+            "failures",
+            "flaky_tests",
+            "trends",
+            "dashboard_stats",
+            "error_analysis",
+            "test_search",
+            "test_history",
+            "flakiness_summary",
+            "reliability_score",
+            "performance_regressions",
+            "execution_summary",
+            "execution_failures",
+          ],
+          description: "Dataset to query",
+        },
+        filters: {
+          type: "object",
           description:
-            "Filter by test status. Use 'failed' to reduce response size. Default: 'all'",
+            "Filter object. Common: branch, suite, limit, offset, execution_id, from/to dates, query (for search)",
+          properties: {
+            branch: { type: "string" },
+            suite: { type: "string" },
+            from: { type: "string", description: "ISO date" },
+            to: { type: "string", description: "ISO date" },
+            date_range: { type: "string", enum: ["last_24h", "last_7d", "last_30d", "last_90d"] },
+            limit: { type: "number" },
+            offset: { type: "number" },
+            execution_id: { type: "number" },
+            test_signature: { type: "string" },
+            query: { type: "string" },
+            status: { type: "string" },
+            min_runs: { type: "number" },
+            include_resolved: { type: "boolean" },
+            group_by: { type: "string" },
+            period: { type: "string", enum: ["hour", "day", "week", "month"] },
+            count: { type: "number" },
+            threshold: { type: "number" },
+            hours: { type: "number" },
+            sort_by: { type: "string" },
+            include_artifacts: { type: "boolean" },
+            include_retries: { type: "boolean" },
+            include_stack_traces: { type: "boolean" },
+            lastRunOnly: { type: "boolean" },
+          },
         },
-        include_artifacts: {
-          type: "boolean",
-          description: "Include artifact links (screenshots, traces). Default: true",
-        },
-      },
-      required: ["execution_id"],
-    },
-  },
-  {
-    name: "search_tests",
-    description: `Search for tests by name or file path. Returns aggregated statistics including run count, pass rate, and last run.
-
-Fields returned per test:
-- test_signature: string - Unique test identifier (use with get_test_history)
-- test_name: string - Test title
-- test_file: string - Spec file path
-- run_count: number - Total executions
-- pass_rate: number - Success percentage (0-100)
-- last_run: ISO datetime
-- last_status: "passed" | "failed" | "skipped"`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        query: { type: "string", description: "Search term (min 2 chars)" },
-        limit: { type: "number", description: "Max results", default: 20 },
-        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "get_test_history",
-    description: `Get execution history for a specific test across all runs. Useful for tracking test stability over time.
-
-Fields returned per run:
-- execution_id: number - Parent execution ID
-- status: "passed" | "failed" | "skipped"
-- error_message: string | null
-- duration_ms: number
-- retry_count: number
-- run_at: ISO datetime
-- branch: string - Git branch for this run`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        test_signature: {
+        view_mode: {
           type: "string",
-          description: "Test signature (MD5 hash of file::name)",
+          enum: ["list", "summary", "detailed"],
+          description: "Output detail level (default: list)",
         },
-        limit: { type: "number", default: 20 },
-        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
-      },
-      required: ["test_signature"],
-    },
-  },
-
-  // Analysis Tools
-  {
-    name: "get_failed_tests",
-    description: `Get failed tests with optional AI-enriched context. Now works without AI context by default.
-
-Returns per test:
-- test_name, test_file: Test identification
-- error_message, stack_trace: Error details
-- duration_ms, retry_count: Execution info
-- ai_context: AI analysis (if available)`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        execution_id: {
-          type: "number",
-          description: "Filter to a specific execution (recommended for targeted analysis)",
-        },
-        error_type: {
+        format: {
           type: "string",
-          description: "Filter by AI error type (e.g., 'TimeoutError', 'AssertionError'). Requires AI context.",
+          enum: ["json", "markdown"],
+          description: "Output format (default: markdown)",
         },
-        test_file: {
+      },
+      required: ["dataset"],
+    },
+  },
+
+  // ============================================
+  // 3. Action Tool
+  // ============================================
+  {
+    name: "perform_exolar_action",
+    description: `Execute heavy operations: compare executions, generate reports, classify failures.
+
+Actions:
+- compare: Side-by-side execution comparison (by ID or branch)
+- generate_report: Markdown failure report for an execution
+- classify: Determine if failure is FLAKE vs BUG
+
+Examples:
+- perform_exolar_action({ action: "compare", params: { baseline_branch: "main", current_branch: "feature" } })
+- perform_exolar_action({ action: "generate_report", params: { execution_id: 123 } })
+- perform_exolar_action({ action: "classify", params: { execution_id: 123, test_name: "login test" } })`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        action: {
           type: "string",
-          description: "Filter by test file path (partial match)",
+          enum: ["compare", "generate_report", "classify"],
+          description: "Action to perform",
         },
-        limit: { type: "number", default: 20 },
-        offset: { type: "number", description: "Skip N results for pagination. Default: 0", default: 0 },
-        since: { type: "string", description: "Only failures since this date (ISO 8601)" },
-        run_id: { type: "string", description: "Filter by CI run ID" },
-      },
-    },
-  },
-  {
-    name: "get_dashboard_metrics",
-    description: `Get overall dashboard metrics: total executions, pass rate, failure rate, avg duration, and more.
-
-Fields returned:
-- total_executions: number
-- total_tests: number
-- pass_rate: number - Overall percentage (0-100)
-- failure_rate: number
-- avg_duration_ms: number - Average execution time
-- executions_per_day: number
-- most_common_failure: string | null`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        from: { type: "string", description: "Start date (ISO 8601)" },
-        to: { type: "string", description: "End date (ISO 8601)" },
-        branch: { type: "string", description: "Filter by branch name" },
-        suite: { type: "string", description: "Filter by test suite" },
-        lastRunOnly: {
-          type: "boolean",
-          description:
-            "When true with branch/suite filter, return metrics from most recent execution only",
+        params: {
+          type: "object",
+          description: "Action-specific parameters",
+          properties: {
+            // compare
+            baseline_id: { type: "number" },
+            current_id: { type: "number" },
+            baseline_branch: { type: "string" },
+            current_branch: { type: "string" },
+            suite: { type: "string" },
+            filter: {
+              type: "string",
+              enum: ["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"],
+            },
+            performance_threshold: { type: "number" },
+            // generate_report
+            execution_id: { type: "number" },
+            include_passed: { type: "boolean" },
+            include_recommendations: { type: "boolean" },
+            // classify
+            test_id: { type: "number" },
+            test_name: { type: "string" },
+            test_file: { type: "string" },
+          },
         },
-      },
-    },
-  },
-  {
-    name: "get_trends",
-    description: `Get time-series trend data with flexible granularity. Supports hourly, daily, weekly, and monthly aggregation.
-
-Fields returned per period:
-- period: ISO datetime - Period start (hour/day/week/month depending on granularity)
-- executions: number - Total runs in this period
-- passed: number - Passed execution count
-- failed: number - Failed execution count
-- skipped: number - Skipped/other execution count
-- pass_rate: number - Success percentage (0-100)
-
-Use 'period' param to control granularity. Use 'from'/'to' for custom date ranges.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        period: {
+        format: {
           type: "string",
-          enum: ["hour", "day", "week", "month"],
-          default: "day",
-          description: "Time granularity for aggregation",
+          enum: ["json", "markdown"],
+          description: "Output format (default: markdown)",
         },
-        count: {
-          type: "number",
-          description: "Number of periods to look back (e.g., count=7 with period=day = last 7 days)",
-        },
-        days: {
-          type: "number",
-          description: "DEPRECATED: Use count + period instead. Number of days to look back.",
-        },
-        from: {
+      },
+      required: ["action"],
+    },
+  },
+
+  // ============================================
+  // 4. Semantic Definition Tool
+  // ============================================
+  {
+    name: "get_semantic_definition",
+    description: `Get how a metric is calculated. ALWAYS call before interpreting unfamiliar metrics - prevents hallucinations.
+
+Returns: formula, thresholds (healthy/warning/critical), unit, related tools.
+
+Example: get_semantic_definition({ metric_id: "reliability_score" })`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        metric_id: {
           type: "string",
-          description: "Start date (ISO 8601). Overrides count/days if specified.",
-        },
-        to: {
-          type: "string",
-          description: "End date (ISO 8601). Defaults to now.",
+          description: "Metric ID (e.g., 'pass_rate', 'flaky_rate', 'reliability_score')",
         },
       },
-    },
-  },
-  {
-    name: "get_error_distribution",
-    description: `Get breakdown of error types from failed tests. Shows which error types are most common.
-
-Supports filtering by branch, suite, and date range.
-
-Fields returned per error type:
-- error_type: string - Error category (e.g., "TimeoutError", "AssertionError") or file/branch when using group_by
-- count: number - Number of occurrences
-- percentage: number - Share of total failures (0-100)
-- example_message: string | null - Sample error message from most recent occurrence`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        since: { 
-          type: "string", 
-          description: "Only count errors since this date (ISO 8601)" 
-        },
-        branch: { 
-          type: "string", 
-          description: "Filter by branch name" 
-        },
-        suite: { 
-          type: "string", 
-          description: "Filter by test suite" 
-        },
-        limit: { 
-          type: "number", 
-          description: "Max error types to return (default: 10, max: 100)" 
-        },
-        group_by: {
-          type: "string",
-          enum: ["error_type", "file", "branch"],
-          description: "How to group errors. Default: error_type",
-        },
-      },
+      required: ["metric_id"],
     },
   },
 
-  // Flakiness Tools
-  {
-    name: "get_flaky_tests",
-    description: `Get list of flaky tests sorted by flakiness rate. A test is flaky if it sometimes passes after retries.
-
-Fields returned per test:
-- test_signature: string - Unique test identifier
-- test_name: string - Test title
-- test_file: string - Spec file path
-- flakiness_rate: number - Percentage of runs that required retries (0-100)
-- total_runs: number - Total executions
-- flaky_runs: number - Runs with retry
-- last_flaky: ISO datetime
-- last_flaky_branch: string | null - Branch where test was last flaky`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        limit: { type: "number", description: "Max results", default: 10 },
-        min_runs: { type: "number", description: "Minimum runs to be considered", default: 5 },
-        since: { type: "string", description: "Only include tests that have been flaky since this date (ISO 8601)" },
-        branch: { type: "string", description: "Filter to tests that are flaky on this specific branch" },
-        include_resolved: { type: "boolean", description: "Include tests that are no longer flaky (flaky_runs = 0)", default: false },
-      },
-    },
-  },
-  {
-    name: "get_flakiness_summary",
-    description: `Get overall flakiness summary: total flaky tests, average flakiness rate, and total flaky runs.
-
-Fields returned:
-- total_flaky_tests: number - Tests with any flaky runs
-- average_flakiness_rate: number - Average across all tests (0-100)
-- total_flaky_runs: number - Total executions with retries
-- worst_offenders: array - Top 5 flakiest tests`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {},
-    },
-  },
-
-  // Metadata Tools
-  {
-    name: "list_branches",
-    description: `Get list of branches with test run statistics.
-
-Fields returned per branch:
-- branch: string - Branch name
-- last_run: ISO datetime - Most recent execution
-- execution_count: number - Total runs in period
-- pass_rate: number (0-100) - Average success rate
-- last_status: "success" | "failure" | "running" - Most recent execution status`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        days: {
-          type: "number",
-          description: "Only include branches with runs in the last N days (default: 30, max: 365)",
-          default: 30,
-        },
-      },
-    },
-  },
-  {
-    name: "list_suites",
-    description: `Get list of test suites with run statistics.
-
-Fields returned per suite:
-- suite: string - Suite name (e.g., "Negotiation")
-- last_run: ISO datetime - Most recent execution
-- execution_count: number - Total runs in period
-- pass_rate: number (0-100) - Average success rate
-- last_status: "success" | "failure" | "running" - Most recent execution status`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        days: {
-          type: "number",
-          description: "Only include suites with runs in the last N days (default: 30, max: 365)",
-          default: 30,
-        },
-      },
-    },
-  },
-
-  // Aggregation Tools (lighter, faster alternatives to get_execution_details)
-  {
-    name: "get_execution_summary",
-    description: `Get aggregated summary of an execution without the full test list. Use this first for quick analysis, then get_execution_failures if you need failure details.
-
-Returns:
-- execution: Metadata (branch, commit, status, duration)
-- summary: Counts (total, passed, failed, skipped, pass_rate)
-- error_distribution: Grouped error types with counts
-- files_affected: Files with failure/pass counts`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        execution_id: { type: "number", description: "Execution ID" },
-      },
-      required: ["execution_id"],
-    },
-  },
-  {
-    name: "get_execution_failures",
-    description: `Get only failed tests from a specific execution with error grouping. Much smaller response than get_execution_details (~5KB vs ~100KB).
-
-Returns failures grouped by file with:
-- test_name: Test title
-- test_file: Spec file path
-- error_message: Error description
-- duration_ms: Test duration`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        execution_id: { type: "number", description: "Execution ID" },
-        group_by: {
-          type: "string",
-          enum: ["file", "error_type", "none"],
-          description: "Group failures by file path, error type, or return flat list",
-        },
-        include_retries: {
-          type: "boolean",
-          description: "Include retry attempts (default: false, only final failures)",
-        },
-        include_stack_traces: {
-          type: "boolean",
-          description: "Include full stack traces (increases response size)",
-        },
-      },
-      required: ["execution_id"],
-    },
-  },
-  {
-    name: "generate_failure_report",
-    description: `Generate a pre-formatted markdown report for an execution. Ready for documentation or sharing.
-
-Returns a markdown string with:
-- Execution metadata and summary
-- Failures grouped by file
-- Error distribution analysis
-- Recommended actions`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        execution_id: { type: "number", description: "Execution ID" },
-        include_passed: {
-          type: "boolean",
-          description: "Include passed tests in report (default: false)",
-        },
-        include_recommendations: {
-          type: "boolean",
-          description: "Include AI-suggested actions (default: true)",
-        },
-      },
-      required: ["execution_id"],
-    },
-  },
-
-  // Performance & Reliability Tools
-  {
-    name: "get_reliability_score",
-    description: `Get overall test suite health score (0-100). Quick way to assess suite stability before deeper analysis.
-
-Formula: (PassRate × 40%) + ((100 - FlakyRate) × 30%) + (DurationStability × 30%)
-
-Returns:
-- score: number (0-100) - Overall health score
-- status: "healthy" (80+) | "warning" (60-79) | "critical" (<60)
-- breakdown: Pass rate, flakiness, and stability contributions
-- rawMetrics: Actual pass rate %, flaky rate %, duration CV
-- trend: Change from previous period (-100 to +100)
-
-Use this first to quickly assess suite health before calling get_flaky_tests or get_failed_tests.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        from: { type: "string", description: "Start date (ISO 8601)" },
-        to: { type: "string", description: "End date (ISO 8601)" },
-        branch: { type: "string", description: "Filter by branch name" },
-        suite: { type: "string", description: "Filter by test suite" },
-        lastRunOnly: {
-          type: "boolean",
-          description:
-            "When true with branch/suite filter, return score from most recent execution only",
-        },
-      },
-    },
-  },
-  {
-    name: "get_performance_regressions",
-    description: `Get tests running slower than their historical baseline. Detects performance regressions automatically.
-
-Returns per regression:
-- testName, testFile: Test identification
-- testSignature: Unique identifier for get_test_history
-- currentAvgMs: Current average duration in milliseconds
-- baselineDurationMs: Historical baseline duration
-- regressionPercent: How much slower (positive %)
-- severity: "critical" (>50%) | "warning" (20-50%)
-- trend: "increasing" | "stable" | "decreasing"
-
-Summary includes: totalRegressions, criticalCount, warningCount.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        threshold: {
-          type: "number",
-          description: "Minimum regression % to flag (default: 0.20 = 20%)",
-        },
-        hours: {
-          type: "number",
-          description: "Look back period in hours (default: 24)",
-        },
-        branch: { type: "string", description: "Filter by branch name" },
-        suite: { type: "string", description: "Filter by test suite" },
-        limit: {
-          type: "number",
-          description: "Max results to return (default: 20)",
-        },
-        sort_by: {
-          type: "string",
-          enum: ["regression", "duration", "name"],
-          description: "Sort order: by regression %, duration, or name (default: regression)",
-        },
-      },
-    },
-  },
-  {
-    name: "compare_executions",
-    description: `Compare two test executions to identify regressions, improvements, and changes. Side-by-side analysis of test results.
-
-Use baseline_id/current_id for specific executions, or baseline_branch/current_branch for branch comparison (uses latest execution from each).
-
-Returns:
-- baseline: Execution metadata (id, branch, commit, status, test counts)
-- current: Execution metadata
-- summary: Pass rate delta, duration delta, test count delta, status change counts
-- performanceSummary: Count of duration regressions, improvements, and stable tests
-- tests: Array of test comparisons with diff and duration categories
-
-Diff Categories:
-- new_failure: Was passing in baseline, now failing
-- fixed: Was failing in baseline, now passing
-- new_test: Only exists in current execution
-- removed_test: Only exists in baseline execution
-- unchanged: Same status in both
-
-Duration Categories:
-- regression: >threshold% slower than baseline
-- improvement: >threshold% faster than baseline
-- stable: Within threshold
-
-Use filter param to focus on specific categories (e.g., filter="new_failure" or filter="performance_regression").`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        baseline_id: {
-          type: "number",
-          description: "Baseline execution ID (the 'before' run)",
-        },
-        current_id: {
-          type: "number",
-          description: "Current execution ID (the 'after' run)",
-        },
-        baseline_branch: {
-          type: "string",
-          description: "Use latest execution from this branch as baseline",
-        },
-        current_branch: {
-          type: "string",
-          description: "Use latest execution from this branch as current",
-        },
-        suite: {
-          type: "string",
-          description: "Filter to specific suite (applies to branch lookups)",
-        },
-        filter: {
-          type: "string",
-          enum: ["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"],
-          description: "Filter results by category (default: all)",
-        },
-        performance_threshold: {
-          type: "number",
-          default: 20,
-          description: "Percentage change threshold for regression/improvement classification (default: 20%)",
-        },
-      },
-    },
-  },
-
-  // CI Integration Guide Tool
+  // ============================================
+  // 5. Installation Config Tool (unchanged)
+  // ============================================
   {
     name: "get_installation_config",
-    description: `Get CI/CD integration guide for connecting Playwright tests to Exolar QA dashboard.
+    description: `CI/CD integration guide for connecting Playwright to Exolar QA.
 
-Returns everything needed to integrate test reporting:
-- api_endpoint: URL and schema for POST /api/test-results
-- playwright_reporter: Complete TypeScript code for custom reporter
-- github_actions: Ready-to-use workflow YAML
-- env_variables: Required environment variables
-- api_key_setup: Instructions for generating API keys
-
-Use this when a user asks to "connect tests to dashboard", "set up CI integration", or "configure Playwright reporter".
-AI should use this to write the integration code for the user's project.`,
+Sections: api_endpoint, playwright_reporter, github_actions, env_variables`,
     inputSchema: {
       type: "object" as const,
       properties: {
         section: {
           type: "string",
           enum: ["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"],
-          description: "Specific section to return. Default: 'all' returns everything.",
-        },
-      },
-    },
-  },
-  {
-    name: "classify_failure",
-    description: `Get structured classification data for a test failure to determine if it's a FLAKE vs BUG.
-
-Provides AI-friendly data including:
-- current_failure: Error details, retry count, status
-- historical_metrics: Total runs, flaky runs, flakiness rate, last flaky/passed/failed
-- recent_runs: Last 10 test executions with status and branch
-- classification_signals: Weighted indicators for FLAKE vs BUG
-- suggested_classification: "FLAKE" | "BUG" | "UNKNOWN"
-- confidence: 0.0-1.0 score
-- reasoning: Explanation of the classification
-
-FLAKE indicators: retry_succeeded, high_flakiness_rate, timing_error_type, mixed_recent_results
-BUG indicators: no_retry_success, low_flakiness_rate, assertion_error_type, consistent_failure_pattern
-
-Input: Either test_id (result ID) OR (execution_id + test_name)`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        test_id: {
-          type: "number",
-          description: "Test result ID (from test_results table)",
-        },
-        execution_id: {
-          type: "number",
-          description: "Execution ID (alternative to test_id)",
-        },
-        test_name: {
-          type: "string",
-          description: "Test name (required if using execution_id)",
-        },
-        test_file: {
-          type: "string",
-          description: "Test file path (optional, helps disambiguate)",
+          description: "Section to return (default: all)",
         },
       },
     },
@@ -632,7 +249,7 @@ interface ToolResponse {
 }
 
 // ============================================
-// Tool Handler
+// Tool Handler (Router)
 // ============================================
 
 export async function handleToolCall(
@@ -640,749 +257,116 @@ export async function handleToolCall(
   args: Record<string, unknown>,
   authContext: MCPAuthContext
 ): Promise<ToolResponse> {
-  const orgId = authContext.organizationId
-
   try {
     switch (name) {
-      case "get_executions": {
-        const input = z
-          .object({
-            limit: z.number().min(1).max(100).default(20),
-            offset: z.number().min(0).default(0),
-            status: z.enum(["success", "failure", "running"]).optional(),
-            branch: z.string().optional(),
-            suite: z.string().optional(),
-            from: z.string().optional(),
-            to: z.string().optional(),
-            run_id: z.string().optional(),
-          })
-          .parse(args)
-
-        const executions = await db.getExecutions(
-          orgId,
-          input.limit,
-          input.offset,
-          input.status,
-          input.branch,
-          input.from && input.to ? { from: input.from, to: input.to } : undefined,
-          input.suite,
-          input.run_id
-        )
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          count: executions.length,
-          pagination: {
-            offset: input.offset,
-            limit: input.limit,
-            has_more: executions.length === input.limit,
-          },
-          executions,
-        })
-      }
-
-      case "get_execution_details": {
-        const input = z
-          .object({
-            execution_id: z.number(),
-            status: z.enum(["passed", "failed", "skipped", "all"]).default("all"),
-            include_artifacts: z.boolean().default(true),
-          })
-          .parse(args)
-
-        const execution = await db.getExecutionById(orgId, input.execution_id)
-
-        if (!execution) {
-          return errorResponse("Execution not found or access denied")
-        }
-
-        // Single database call - store reference before any filtering
-        const allResults = await db.getTestResultsByExecutionId(orgId, input.execution_id)
-
-        // Filter by status if specified (in-memory filtering)
-        const filteredResults = input.status === "all"
-          ? allResults
-          : allResults.filter((r) => r.status === input.status)
-
-        // Optionally strip artifacts to reduce response size
-        const outputResults = input.include_artifacts
-          ? filteredResults
-          : filteredResults.map((r) => ({ ...r, artifacts: null }))
-
-        return jsonResponse({
-          execution,
-          filter: { status: input.status, include_artifacts: input.include_artifacts },
-          test_results: outputResults,
-          summary: {
-            total: allResults.length,
-            passed: allResults.filter((r) => r.status === "passed").length,
-            failed: allResults.filter((r) => r.status === "failed").length,
-            skipped: allResults.filter((r) => r.status === "skipped").length,
-            filtered_count: outputResults.length,
-          },
-        })
-      }
-
-      case "search_tests": {
-        const input = z
-          .object({
-            query: z.string().min(2),
-            limit: z.number().min(1).max(100).default(20),
-            offset: z.number().min(0).default(0),
-          })
-          .parse(args)
-
-        const tests = await db.searchTests(orgId, input.query, input.limit, input.offset)
-
-        return jsonResponse({
-          query: input.query,
-          count: tests.length,
-          pagination: {
-            offset: input.offset,
-            limit: input.limit,
-            has_more: tests.length === input.limit,
-          },
-          tests,
-        })
-      }
-
-      case "get_test_history": {
-        const input = z
-          .object({
-            test_signature: z.string(),
-            limit: z.number().min(1).max(100).default(20),
-            offset: z.number().min(0).default(0),
-          })
-          .parse(args)
-
-        const history = await db.getTestHistory(orgId, input.test_signature, input.limit, input.offset)
-
-        return jsonResponse({
-          test_signature: input.test_signature,
-          count: history.length,
-          pagination: {
-            offset: input.offset,
-            limit: input.limit,
-            has_more: history.length === input.limit,
-          },
-          history,
-        })
-      }
-
-      case "get_failed_tests": {
-        const input = z
-          .object({
-            execution_id: z.number().optional(),
-            error_type: z.string().optional(),
-            test_file: z.string().optional(),
-            limit: z.number().min(1).max(100).default(20),
-            offset: z.number().min(0).default(0),
-            since: z.string().optional(),
-            run_id: z.string().optional(),
-          })
-          .parse(args)
-
-        const failures = await db.getFailuresWithAIContext(orgId, {
-          executionId: input.execution_id,
-          errorType: input.error_type,
-          testFile: input.test_file,
-          limit: input.limit,
-          offset: input.offset,
-          since: input.since,
-          runId: input.run_id,
-          // Only require AI context if filtering by error_type
-          requireAIContext: !!input.error_type,
-        })
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          execution_id: input.execution_id,
-          count: failures.length,
-          pagination: {
-            offset: input.offset,
-            limit: input.limit,
-            has_more: failures.length === input.limit,
-          },
-          failures,
-        })
-      }
-
-      case "get_dashboard_metrics": {
-        const input = z
-          .object({
-            from: z.string().optional(),
-            to: z.string().optional(),
-            branch: z.string().optional(),
-            suite: z.string().optional(),
-            lastRunOnly: z.boolean().optional(),
-          })
-          .parse(args)
-
-        const metrics = await db.getDashboardMetrics(orgId, {
-          from: input.from,
-          to: input.to,
-          branch: input.branch,
-          suite: input.suite,
-          lastRunOnly: input.lastRunOnly,
-        })
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          period: { from: input.from || "all time", to: input.to || "now" },
-          filters: { branch: input.branch, suite: input.suite, lastRunOnly: input.lastRunOnly },
-          metrics,
-        })
-      }
-
-      case "get_trends": {
-        const input = z.object({
-          period: z.enum(["hour", "day", "week", "month"]).default("day"),
-          count: z.number().min(1).max(100).optional(),
-          days: z.number().min(1).max(90).optional(),      // Deprecated but supported
-          from: z.string().optional(),
-          to: z.string().optional(),
-        }).parse(args)
-      
-        // Validate limits per period type
-        const maxCounts: Record<string, number> = {
-          hour: 168,    // 7 days of hours
-          day: 90,      // 90 days
-          week: 52,     // 1 year of weeks
-          month: 24,    // 2 years of months
-        }
-        
-        const effectiveCount = input.count || input.days || 7
-        const maxForPeriod = maxCounts[input.period]
-        
-        if (effectiveCount > maxForPeriod) {
-          return errorResponse(
-            `count exceeds maximum for ${input.period} period (max: ${maxForPeriod})`
-          )
-        }
-      
-        const trends = await db.getTrendData(orgId, {
-          period: input.period,
-          count: effectiveCount,
-          from: input.from,
-          to: input.to,
-        })
-      
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          period: input.period,
-          count: trends.length,
-          date_range: {
-            from: input.from || `${effectiveCount} ${input.period}s ago`,
-            to: input.to || "now",
-          },
-          trends,
-        })
-      }
-
-      case "get_error_distribution": {
-        const input = z
-          .object({
-            since: z.string().optional(),
-            branch: z.string().optional(),
-            suite: z.string().optional(),
-            limit: z.number().min(1).max(100).default(10),
-            group_by: z.enum(["error_type", "file", "branch"]).default("error_type"),
-          })
-          .parse(args)
-
-        const distribution = await db.getErrorTypeDistribution(orgId, {
-          since: input.since,
-          branch: input.branch,
-          suite: input.suite,
-          limit: input.limit,
-          groupBy: input.group_by,
-        })
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          filters: {
-            since: input.since || "all time",
-            branch: input.branch || "all",
-            suite: input.suite || "all",
-          },
-          group_by: input.group_by,
-          total_types: distribution.length,
-          distribution,
-        })
-      }
-
-      case "get_flaky_tests": {
-        const input = z
-          .object({
-            limit: z.number().min(1).max(100).default(10),
-            min_runs: z.number().min(1).default(5),
-            since: z.string().optional(),
-            branch: z.string().optional(),
-            include_resolved: z.boolean().default(false),
-          })
-          .parse(args)
-
-        const flakyTests = await db.getFlakiestTests(orgId, {
-          limit: input.limit,
-          minRuns: input.min_runs,
-          since: input.since,
-          branch: input.branch,
-          includeResolved: input.include_resolved,
-        })
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          count: flakyTests.length,
-          filters: {
-            since: input.since || "all time",
-            branch: input.branch || "all",
-            include_resolved: input.include_resolved,
-          },
-          flaky_tests: flakyTests,
-        })
-      }
-
-      case "get_flakiness_summary": {
-        const summary = await db.getFlakinessSummary(orgId)
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          summary,
-        })
-      }
-
-      case "list_branches": {
-        const input = z
-          .object({
-            days: z.number().min(1).max(365).default(30),
-          })
-          .parse(args)
-
-        const branches = await db.getBranches(orgId, input.days)
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          period_days: input.days,
-          count: branches.length,
-          branches,
-        })
-      }
-
-      case "list_suites": {
-        const input = z
-          .object({
-            days: z.number().min(1).max(365).default(30),
-          })
-          .parse(args)
-
-        const suites = await db.getSuites(orgId, input.days)
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          period_days: input.days,
-          count: suites.length,
-          suites,
-        })
-      }
-
-      // Aggregation Tools
-      case "get_execution_summary": {
-        const input = z.object({ execution_id: z.number() }).parse(args)
-
-        const summary = await db.getExecutionSummary(orgId, input.execution_id)
-
-        if (!summary) {
-          return errorResponse("Execution not found or access denied")
-        }
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          ...summary,
-        })
-      }
-
-      case "get_execution_failures": {
-        const input = z
-          .object({
-            execution_id: z.number(),
-            group_by: z.enum(["file", "error_type", "none"]).default("file"),
-            include_retries: z.boolean().default(false),
-            include_stack_traces: z.boolean().default(false),
-          })
-          .parse(args)
-
-        const failures = await db.getFailedTestsByExecutionId(orgId, input.execution_id, {
-          includeRetries: input.include_retries,
-          includeStackTraces: input.include_stack_traces,
-        })
-
-        // Group failures based on group_by parameter
-        let grouped: Record<string, unknown[]> | unknown[] = failures
-
-        if (input.group_by === "file") {
-          const byFile: Record<string, unknown[]> = {}
-          for (const f of failures) {
-            if (!byFile[f.test_file]) byFile[f.test_file] = []
-            byFile[f.test_file].push({
-              test_name: f.test_name,
-              error_message: f.error_message,
-              duration_ms: f.duration_ms,
-              retry_count: f.retry_count,
-              ...(input.include_stack_traces && { stack_trace: f.stack_trace }),
-            })
-          }
-          grouped = byFile
-        } else if (input.group_by === "error_type") {
-          const errorDist = await db.getErrorDistributionByExecution(orgId, input.execution_id)
-          grouped = errorDist
-        }
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          execution_id: input.execution_id,
-          total_failures: failures.length,
-          group_by: input.group_by,
-          failures: grouped,
-        })
-      }
-
-      case "generate_failure_report": {
-        const input = z
-          .object({
-            execution_id: z.number(),
-            include_passed: z.boolean().default(false),
-            include_recommendations: z.boolean().default(true),
-          })
-          .parse(args)
-
-        const summary = await db.getExecutionSummary(orgId, input.execution_id)
-
-        if (!summary) {
-          return errorResponse("Execution not found or access denied")
-        }
-
-        const failures = await db.getFailedTestsByExecutionId(orgId, input.execution_id, {
-          includeRetries: false,
-          includeStackTraces: false,
-        })
-
-        // Group failures by file
-        const failuresByFile: Record<string, typeof failures> = {}
-        for (const f of failures) {
-          if (!failuresByFile[f.test_file]) failuresByFile[f.test_file] = []
-          failuresByFile[f.test_file].push(f)
-        }
-
-        // Generate markdown report
-        const { execution, summary: stats, error_distribution } = summary
-        let report = `# Test Execution Report
-
-**Execution ID:** ${execution.id}
-**Branch:** \`${execution.branch}\`
-**Commit:** \`${execution.commit_sha?.substring(0, 8) || "N/A"}\`
-**Date:** ${execution.started_at}
-**Duration:** ${Math.round((stats.duration_ms || 0) / 1000)}s
-
----
-
-## Summary
-
-| Metric | Value |
-|--------|-------|
-| **Total Tests** | ${stats.total} |
-| **Passed** | ${stats.passed} |
-| **Failed** | ${stats.failed} |
-| **Skipped** | ${stats.skipped} |
-| **Pass Rate** | ${stats.pass_rate}% |
-
----
-
-## Error Distribution
-
-| Error Type | Count |
-|------------|-------|
-${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n")}
-
----
-
-## Failed Tests by File
-
-`
-        for (const [file, tests] of Object.entries(failuresByFile)) {
-          report += `### ${file}\n\n`
-          report += `| Test Name | Error | Duration |\n`
-          report += `|-----------|-------|----------|\n`
-          for (const t of tests) {
-            const errorShort = (t.error_message || "Unknown").substring(0, 60).replace(/\|/g, "\\|")
-            report += `| ${t.test_name} | ${errorShort}... | ${t.duration_ms}ms |\n`
-          }
-          report += `\n`
-        }
-
-        if (input.include_recommendations && stats.failed > 0) {
-          report += `---
-
-## Recommendations
-
-`
-          // Analyze errors and generate recommendations
-          const hasApiErrors = error_distribution.some((e) => e.error_pattern.includes("API Error"))
-          const hasTimeouts = error_distribution.some((e) => e.error_pattern.includes("Timeout"))
-
-          if (hasApiErrors) {
-            report += `1. **Investigate Backend API Issues**
-   - Check API logs for 500 errors
-   - Verify database connectivity
-   - Check environment variables on preview deployment
-
-`
-          }
-
-          if (hasTimeouts) {
-            report += `2. **Fix Timeout Issues**
-   - Review modal close handlers
-   - Check for race conditions in async operations
-   - Consider increasing timeouts or adding explicit waits
-
-`
-          }
-
-          if (!hasApiErrors && !hasTimeouts) {
-            report += `1. **Review Test Assertions**
-   - Check if selectors are up to date
-   - Verify test data setup
-
-`
-          }
-        }
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          execution_id: input.execution_id,
-          format: "markdown",
-          report,
-        })
-      }
-
-      case "get_reliability_score": {
-        const input = z
-          .object({
-            from: z.string().optional(),
-            to: z.string().optional(),
-            branch: z.string().optional(),
-            suite: z.string().optional(),
-            lastRunOnly: z.boolean().optional(),
-          })
-          .parse(args)
-
-        const score = await db.getReliabilityScore(orgId, {
-          from: input.from,
-          to: input.to,
-          branch: input.branch,
-          suite: input.suite,
-          lastRunOnly: input.lastRunOnly,
-        })
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          filters: { branch: input.branch, suite: input.suite, lastRunOnly: input.lastRunOnly },
-          ...score,
-        })
-      }
-
-      case "get_performance_regressions": {
-        const input = z
-          .object({
-            threshold: z.number().optional(),
-            hours: z.number().optional(),
-            branch: z.string().optional(),
-            suite: z.string().optional(),
-            limit: z.number().optional(),
-            sort_by: z.enum(["regression", "duration", "name"]).optional(),
-          })
-          .parse(args)
-
-        const summary = await db.getPerformanceRegressions(orgId, {
-          threshold: input.threshold,
-          hours: input.hours,
-          branch: input.branch,
-          suite: input.suite,
-          limit: input.limit,
-          sortBy: input.sort_by,
-        })
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          ...summary,
-        })
-      }
-
-      case "compare_executions": {
-        const input = z
-          .object({
-            baseline_id: z.number().optional(),
-            current_id: z.number().optional(),
-            baseline_branch: z.string().optional(),
-            current_branch: z.string().optional(),
-            suite: z.string().optional(),
-            filter: z.enum(["new_failure", "fixed", "new_test", "removed_test", "performance_regression", "all"]).optional(),
-            performance_threshold: z.number().min(1).max(100).default(20),
-          })
-          .parse(args)
-
-        // Resolve execution IDs
-        let baselineId = input.baseline_id
-        let currentId = input.current_id
-
-        // Resolve branch to execution ID if branch specified
-        if (input.baseline_branch && !baselineId) {
-          const baselineExec = await db.getLatestExecutionByBranch(
-            orgId,
-            input.baseline_branch,
-            input.suite
-          )
-          if (!baselineExec) {
-            return errorResponse(
-              `No execution found for branch "${input.baseline_branch}"${input.suite ? ` with suite "${input.suite}"` : ""}`
-            )
-          }
-          baselineId = baselineExec.id
-        }
-
-        if (input.current_branch && !currentId) {
-          const currentExec = await db.getLatestExecutionByBranch(
-            orgId,
-            input.current_branch,
-            input.suite
-          )
-          if (!currentExec) {
-            return errorResponse(
-              `No execution found for branch "${input.current_branch}"${input.suite ? ` with suite "${input.suite}"` : ""}`
-            )
-          }
-          currentId = currentExec.id
-        }
-
-        // Validate we have both IDs
-        if (!baselineId || !currentId) {
-          return errorResponse(
-            "Must provide either baseline_id/current_id or baseline_branch/current_branch"
-          )
-        }
-
-        // Get comparison with performance threshold
-        const comparison = await db.compareExecutions(orgId, baselineId, currentId, {
-          performanceThreshold: input.performance_threshold,
-        })
-
-        if (!comparison) {
-          return errorResponse("One or both executions not found or access denied")
-        }
-
-        // Calculate performance summary
-        const performanceSummary = {
-          regressions: comparison.tests.filter((t) => t.durationCategory === "regression").length,
-          improvements: comparison.tests.filter((t) => t.durationCategory === "improvement").length,
-          stable: comparison.tests.filter((t) => t.durationCategory === "stable").length,
-          threshold_pct: input.performance_threshold,
-        }
-
-        // Apply filter if specified
-        let filteredTests = comparison.tests
-        if (input.filter === "performance_regression") {
-          filteredTests = comparison.tests.filter((t) => t.durationCategory === "regression")
-        } else if (input.filter && input.filter !== "all") {
-          filteredTests = comparison.tests.filter((t) => t.diffCategory === input.filter)
-        }
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          baseline: comparison.baseline,
-          current: comparison.current,
-          summary: comparison.summary,
-          performanceSummary,
-          filter: input.filter || "all",
-          tests: filteredTests,
-          test_count: filteredTests.length,
-        })
-      }
-
-      case "get_installation_config": {
-        const input = z
-          .object({
-            section: z.enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"]).default("all"),
-          })
-          .parse(args)
-
-        // Infer dashboard URL from environment or use default
-        const dashboardUrl =
-          process.env.NEXT_PUBLIC_DASHBOARD_URL ||
-          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar.vercel.app")
-
-        const guide = {
-          organization: authContext.organizationSlug,
-          dashboard_url: dashboardUrl,
-
-          api_endpoint: {
-            url: `${dashboardUrl}/api/test-results`,
-            method: "POST",
-            authentication: "Bearer token in Authorization header",
-            content_type: "application/json",
-            request_schema: {
-              execution: {
-                run_id: "string (required) - Unique CI run identifier",
-                branch: "string (required) - Git branch name",
-                commit_sha: "string (required) - Git commit hash",
-                commit_message: "string (optional) - Commit message",
-                triggered_by: "string (optional) - Who triggered the run",
-                workflow_name: "string (optional) - CI workflow name",
-                suite: "string (optional) - Test suite name",
-                status: "'success' | 'failure' | 'running' (required)",
-                total_tests: "number (required)",
-                passed: "number (required)",
-                failed: "number (required)",
-                skipped: "number (required)",
-                duration_ms: "number (optional)",
-                started_at: "ISO datetime (required)",
-                completed_at: "ISO datetime (optional)",
-              },
-              results: {
-                _description: "Array of test results",
-                test_name: "string (required) - Test title",
-                test_file: "string (required) - Spec file path",
-                status: "'passed' | 'failed' | 'skipped' | 'timedout' (required)",
-                duration_ms: "number (required)",
-                error_message: "string (optional) - Error for failures",
-                stack_trace: "string (optional) - Full stack trace",
-                retry_count: "number (optional) - Number of retries",
-                browser: "string (optional) - Browser name",
-              },
-              artifacts: {
-                _description: "Array of artifacts (optional)",
-                test_name: "string (required)",
-                test_file: "string (required)",
-                type: "'screenshot' | 'trace' | 'video' (required)",
-                filename: "string (required)",
-                data: "string (required) - Base64 encoded file data",
-              },
-            },
-            response_schema: {
-              success: "boolean",
-              execution_id: "number - Use this ID to query results",
-              results_count: "number",
-              artifacts_count: "number",
-              error: "string (only on failure)",
-            },
-            example_curl: `curl -X POST ${dashboardUrl}/api/test-results \\
+      case "explore_exolar_index":
+        return await handleExplore(args, authContext)
+
+      case "query_exolar_data":
+        return await handleQuery(args, authContext)
+
+      case "perform_exolar_action":
+        return await handleAction(args, authContext)
+
+      case "get_semantic_definition":
+        return await handleDefinition(args, authContext)
+
+      case "get_installation_config":
+        return await handleInstallationConfig(args, authContext)
+
+      default:
+        return errorResponse(`Unknown tool: ${name}. Available: explore_exolar_index, query_exolar_data, perform_exolar_action, get_semantic_definition, get_installation_config`)
+    }
+  } catch (error) {
+    return errorResponse(error instanceof Error ? error.message : "Tool execution failed")
+  }
+}
+
+// ============================================
+// Installation Config Handler (kept inline)
+// ============================================
+
+async function handleInstallationConfig(
+  args: Record<string, unknown>,
+  authContext: MCPAuthContext
+): Promise<ToolResponse> {
+  const input = z
+    .object({
+      section: z
+        .enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"])
+        .default("all"),
+    })
+    .parse(args)
+
+  // Infer dashboard URL from environment or use default
+  const dashboardUrl =
+    process.env.NEXT_PUBLIC_DASHBOARD_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar.vercel.app")
+
+  const guide = {
+    organization: authContext.organizationSlug,
+    dashboard_url: dashboardUrl,
+
+    api_endpoint: {
+      url: `${dashboardUrl}/api/test-results`,
+      method: "POST",
+      authentication: "Bearer token in Authorization header",
+      content_type: "application/json",
+      request_schema: {
+        execution: {
+          run_id: "string (required) - Unique CI run identifier",
+          branch: "string (required) - Git branch name",
+          commit_sha: "string (required) - Git commit hash",
+          commit_message: "string (optional) - Commit message",
+          triggered_by: "string (optional) - Who triggered the run",
+          workflow_name: "string (optional) - CI workflow name",
+          suite: "string (optional) - Test suite name",
+          status: "'success' | 'failure' | 'running' (required)",
+          total_tests: "number (required)",
+          passed: "number (required)",
+          failed: "number (required)",
+          skipped: "number (required)",
+          duration_ms: "number (optional)",
+          started_at: "ISO datetime (required)",
+          completed_at: "ISO datetime (optional)",
+        },
+        results: {
+          _description: "Array of test results",
+          test_name: "string (required) - Test title",
+          test_file: "string (required) - Spec file path",
+          status: "'passed' | 'failed' | 'skipped' | 'timedout' (required)",
+          duration_ms: "number (required)",
+          error_message: "string (optional) - Error for failures",
+          stack_trace: "string (optional) - Full stack trace",
+          retry_count: "number (optional) - Number of retries",
+          browser: "string (optional) - Browser name",
+        },
+        artifacts: {
+          _description: "Array of artifacts (optional)",
+          test_name: "string (required)",
+          test_file: "string (required)",
+          type: "'screenshot' | 'trace' | 'video' (required)",
+          filename: "string (required)",
+          data: "string (required) - Base64 encoded file data",
+        },
+      },
+      response_schema: {
+        success: "boolean",
+        execution_id: "number - Use this ID to query results",
+        results_count: "number",
+        artifacts_count: "number",
+        error: "string (only on failure)",
+      },
+      example_curl: `curl -X POST ${dashboardUrl}/api/test-results \\
   -H "Authorization: Bearer exolar_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{"execution": {...}, "results": [...]}'`,
-          },
+    },
 
-          playwright_reporter: {
-            description: "Custom Playwright reporter that sends results to Exolar QA",
-            file_path: "reporters/exolar-reporter.ts",
-            code: `import type { Reporter, TestCase, TestResult, FullConfig, Suite, FullResult } from '@playwright/test/reporter';
+    playwright_reporter: {
+      description: "Custom Playwright reporter that sends results to Exolar QA",
+      file_path: "reporters/exolar-reporter.ts",
+      code: `import type { Reporter, TestCase, TestResult, FullConfig, Suite, FullResult } from '@playwright/test/reporter';
 
 interface ExolarConfig {
   apiUrl: string;
@@ -1478,7 +462,7 @@ class ExolarReporter implements Reporter {
 }
 
 export default ExolarReporter;`,
-            playwright_config_snippet: `// playwright.config.ts
+      playwright_config_snippet: `// playwright.config.ts
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
@@ -1491,12 +475,12 @@ export default defineConfig({
     }],
   ],
 });`,
-          },
+    },
 
-          github_actions: {
-            description: "GitHub Actions workflow for running tests with Exolar reporting",
-            file_path: ".github/workflows/e2e-tests.yml",
-            code: `name: E2E Tests
+    github_actions: {
+      description: "GitHub Actions workflow for running tests with Exolar reporting",
+      file_path: ".github/workflows/e2e-tests.yml",
+      code: `name: E2E Tests
 
 on:
   push:
@@ -1535,106 +519,70 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30`,
-          },
+    },
 
-          env_variables: {
-            required: {
-              EXOLAR_API_KEY: "Your organization API key (get from dashboard settings)",
-            },
-            optional: {
-              EXOLAR_API_URL: `API endpoint URL (default: ${dashboardUrl}/api/test-results)`,
-              EXOLAR_SUITE: "Test suite name for grouping results",
-            },
-            github_secrets_setup: [
-              "1. Go to your GitHub repository → Settings → Secrets and variables → Actions",
-              "2. Click 'New repository secret'",
-              "3. Name: EXOLAR_API_KEY",
-              "4. Value: Your API key from Exolar dashboard",
-            ],
-          },
+    env_variables: {
+      required: {
+        EXOLAR_API_KEY: "Your organization API key (get from dashboard settings)",
+      },
+      optional: {
+        EXOLAR_API_URL: `API endpoint URL (default: ${dashboardUrl}/api/test-results)`,
+        EXOLAR_SUITE: "Test suite name for grouping results",
+      },
+      github_secrets_setup: [
+        "1. Go to your GitHub repository → Settings → Secrets and variables → Actions",
+        "2. Click 'New repository secret'",
+        "3. Name: EXOLAR_API_KEY",
+        "4. Value: Your API key from Exolar dashboard",
+      ],
+    },
 
-          api_key_setup: {
-            steps: [
-              `1. Go to ${dashboardUrl}/settings/api-keys`,
-              "2. Click 'Create API Key'",
-              "3. Give it a descriptive name (e.g., 'GitHub Actions - MyRepo')",
-              "4. Copy the generated key (starts with 'exolar_')",
-              "5. Store it securely - it won't be shown again",
-            ],
-            key_format: "exolar_xxxxxxxxxxxxxxxxxxxx",
-            note: "API keys are scoped to your organization and never expire (but can be revoked)",
-          },
+    api_key_setup: {
+      steps: [
+        `1. Go to ${dashboardUrl}/settings/api-keys`,
+        "2. Click 'Create API Key'",
+        "3. Give it a descriptive name (e.g., 'GitHub Actions - MyRepo')",
+        "4. Copy the generated key (starts with 'exolar_')",
+        "5. Store it securely - it won't be shown again",
+      ],
+      key_format: "exolar_xxxxxxxxxxxxxxxxxxxx",
+      note: "API keys are scoped to your organization and never expire (but can be revoked)",
+    },
 
-          quick_start: [
-            "1. Create an API key in the dashboard settings",
-            "2. Add EXOLAR_API_KEY to your CI secrets",
-            "3. Create the reporter file (reporters/exolar-reporter.ts)",
-            "4. Update playwright.config.ts to use the reporter",
-            "5. Run your tests - results appear in dashboard automatically",
-          ],
-        }
-
-        // Filter by section if specified
-        if (input.section !== "all") {
-          const filtered: Record<string, unknown> = {
-            organization: guide.organization,
-            dashboard_url: guide.dashboard_url,
-          }
-          if (input.section === "api_endpoint") {
-            filtered.api_endpoint = guide.api_endpoint
-          } else if (input.section === "playwright_reporter") {
-            filtered.playwright_reporter = guide.playwright_reporter
-          } else if (input.section === "github_actions") {
-            filtered.github_actions = guide.github_actions
-          } else if (input.section === "env_variables") {
-            filtered.env_variables = guide.env_variables
-            filtered.api_key_setup = guide.api_key_setup
-          }
-          return jsonResponse(filtered)
-        }
-
-        return jsonResponse(guide)
-      }
-
-      case "classify_failure": {
-        const input = z
-          .object({
-            test_id: z.number().optional(),
-            execution_id: z.number().optional(),
-            test_name: z.string().optional(),
-            test_file: z.string().optional(),
-          })
-          .parse(args)
-
-        // Must have either test_id OR (execution_id + test_name)
-        if (!input.test_id && (!input.execution_id || !input.test_name)) {
-          return errorResponse("Must provide either test_id OR (execution_id + test_name)")
-        }
-
-        const classification = await db.getFailureClassification(orgId, {
-          testId: input.test_id,
-          executionId: input.execution_id,
-          testName: input.test_name,
-          testFile: input.test_file,
-        })
-
-        if (!classification) {
-          return errorResponse("Test not found or no failure data available")
-        }
-
-        return jsonResponse({
-          organization: authContext.organizationSlug,
-          ...classification,
-        })
-      }
-
-      default:
-        return errorResponse(`Unknown tool: ${name}`)
-    }
-  } catch (error) {
-    return errorResponse(error instanceof Error ? error.message : "Tool execution failed")
+    quick_start: [
+      "1. Create an API key in the dashboard settings",
+      "2. Add EXOLAR_API_KEY to your CI secrets",
+      "3. Create the reporter file (reporters/exolar-reporter.ts)",
+      "4. Update playwright.config.ts to use the reporter",
+      "5. Run your tests - results appear in dashboard automatically",
+    ],
   }
+
+  // Filter by section if specified
+  if (input.section !== "all") {
+    const filtered: Record<string, unknown> = {
+      organization: guide.organization,
+      dashboard_url: guide.dashboard_url,
+    }
+    if (input.section === "api_endpoint") {
+      filtered.api_endpoint = guide.api_endpoint
+    } else if (input.section === "playwright_reporter") {
+      filtered.playwright_reporter = guide.playwright_reporter
+    } else if (input.section === "github_actions") {
+      filtered.github_actions = guide.github_actions
+    } else if (input.section === "env_variables") {
+      filtered.env_variables = guide.env_variables
+      filtered.api_key_setup = guide.api_key_setup
+    }
+    return jsonResponse(filtered)
+  }
+
+  return jsonResponse(guide)
 }
+
+// ============================================
+// Response Helpers
+// ============================================
 
 function jsonResponse(data: unknown): ToolResponse {
   return {

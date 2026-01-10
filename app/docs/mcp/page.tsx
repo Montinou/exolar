@@ -4,434 +4,197 @@ import { Check } from "lucide-react"
 import { CodeBlock } from "@/components/docs/code-block"
 import { ToolCard } from "@/components/docs/tool-card"
 
-// Core Tools
-const coreTools = [
+// New Consolidated Tools (Router Pattern)
+const consolidatedTools = [
   {
-    name: "get_executions",
-    description: "List test executions with optional filters. Returns workflow runs with pass/fail counts, duration, and metadata.",
-    category: "core" as const,
+    name: "explore_exolar_index",
+    description: "Discovery tool - call FIRST to learn what data exists. Lists datasets, branches, suites, or metrics with optional search filtering.",
+    category: "discovery" as const,
     parameters: [
-      { name: "limit", type: "number", default: "20", description: "Max results (1-100)" },
-      { name: "offset", type: "number", default: "0", description: "Skip N results" },
-      { name: "status", type: "string", description: "Filter: success | failure | running" },
-      { name: "branch", type: "string", description: "Filter by branch name" },
-      { name: "suite", type: "string", description: "Filter by test suite" },
-      { name: "from", type: "string", description: "Start date (ISO 8601)" },
-      { name: "to", type: "string", description: "End date (ISO 8601)" },
-      { name: "run_id", type: "string", description: "Filter by CI run ID" },
+      {
+        name: "category",
+        type: "string",
+        required: true,
+        description: "What to explore: datasets | branches | suites | metrics"
+      },
+      { name: "query", type: "string", description: "Optional search filter" },
+      { name: "format", type: "string", default: "markdown", description: "Output format: json | markdown" },
     ],
     responseFields: [
-      "id: number - Execution ID",
-      "suite: string - Test suite name",
-      "branch: string - Git branch",
-      "commit_sha: string - Git commit",
-      "commit_sha: string - Git commit",
-      "status: success | failure | running",
-      "run_id: string - CI Run ID",
-      "passed_count, failed_count, skipped_count: number",
-      "duration_ms: number",
-      "started_at, completed_at: ISO datetime",
+      "For datasets: List of 14 queryable datasets with descriptions",
+      "For branches: Branch names with stats (last_run, execution_count, pass_rate)",
+      "For suites: Suite names with stats",
+      "For metrics: Metric definitions with formulas and thresholds",
     ],
-    example: `"Show me the last 10 failed executions on main"`,
+    example: `"Show me what datasets are available"`,
+    replaces: ["list_available_metrics", "list_branches", "list_suites"],
   },
   {
-    name: "get_execution_details",
-    description: "Get detailed info about a specific test execution including all test results and artifacts.",
-    category: "core" as const,
+    name: "query_exolar_data",
+    description: "Universal data retrieval router. Retrieves data from any of the 14 available datasets using a unified filter interface.",
+    category: "query" as const,
     parameters: [
-      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
-      { name: "status", type: "string", default: "all", description: "Filter: passed | failed | skipped | all" },
-      { name: "include_artifacts", type: "boolean", default: "true", description: "Include artifact links" },
+      {
+        name: "dataset",
+        type: "string",
+        required: true,
+        description: "Dataset to query: executions | execution_details | failures | flaky_tests | trends | dashboard_stats | error_analysis | test_search | test_history | flakiness_summary | reliability_score | performance_regressions | execution_summary | execution_failures"
+      },
+      {
+        name: "filters",
+        type: "object",
+        description: "Filter object with common fields: branch, suite, limit, offset, execution_id, from/to dates, query, status, min_runs, etc."
+      },
+      { name: "view_mode", type: "string", default: "list", description: "Output detail level: list | summary | detailed" },
+      { name: "format", type: "string", default: "markdown", description: "Output format: json | markdown (~70% token savings)" },
     ],
     responseFields: [
-      "test_name: string - Test title",
-      "test_file: string - Spec file path",
-      "status: passed | failed | skipped",
-      "error_message: string | null",
-      "duration_ms: number",
-      "retry_count: number",
-      "artifacts: array | null",
+      "Dataset-specific results with unified structure",
+      "Pagination metadata (limit, offset, has_more)",
+      "Markdown tables for CLI-friendly viewing",
+    ],
+    example: `"Get flaky tests with at least 5 runs on main branch"`,
+    replaces: [
+      "get_executions",
+      "get_execution_details",
+      "get_failed_tests",
+      "get_flaky_tests",
+      "get_trends",
+      "get_dashboard_metrics",
+      "get_error_distribution",
+      "search_tests",
+      "get_test_history",
+      "get_flakiness_summary",
+      "get_reliability_score",
+      "get_performance_regressions",
+      "get_execution_summary",
+      "get_execution_failures",
+      "generate_failure_report"
     ],
   },
   {
-    name: "search_tests",
-    description: "Search for tests by name or file path. Returns aggregated statistics including run count and pass rate.",
-    category: "core" as const,
+    name: "perform_exolar_action",
+    description: "Execute heavy operations: compare executions, generate reports, or classify failures as FLAKE vs BUG.",
+    category: "action" as const,
     parameters: [
-      { name: "query", type: "string", required: true, description: "Search term (min 2 chars)" },
-      { name: "limit", type: "number", default: "20", description: "Max results" },
-      { name: "offset", type: "number", default: "0", description: "Skip N results" },
+      {
+        name: "action",
+        type: "string",
+        required: true,
+        description: "Action to perform: compare | generate_report | classify"
+      },
+      {
+        name: "params",
+        type: "object",
+        required: true,
+        description: "Action-specific parameters (e.g., baseline_id, current_id, execution_id, test_name)"
+      },
     ],
     responseFields: [
-      "test_signature: string - Unique test identifier",
-      "test_name: string - Test title",
-      "test_file: string - Spec file path",
-      "run_count: number - Total executions",
-      "pass_rate: number - Success % (0-100)",
-      "last_run: ISO datetime",
-      "last_status: passed | failed | skipped",
+      "compare: Side-by-side execution comparison with diff categories and performance deltas",
+      "generate_report: Markdown report with failures, error distribution, and recommendations",
+      "classify: FLAKE vs BUG classification with confidence score and reasoning",
     ],
-    example: `"Search for tests related to login"`,
+    example: `"Compare main vs feature-auth branch and show regressions"`,
+    replaces: ["compare_executions", "generate_failure_report", "classify_failure"],
   },
   {
-    name: "get_test_history",
-    description: "Get execution history for a specific test across all runs. Useful for tracking test stability over time.",
-    category: "core" as const,
-    parameters: [
-      { name: "test_signature", type: "string", required: true, description: "Test signature (MD5 hash of file::name)" },
-      { name: "limit", type: "number", default: "20", description: "Max results" },
-      { name: "offset", type: "number", default: "0", description: "Skip N results" },
-    ],
-    responseFields: [
-      "execution_id: number - Parent execution ID",
-      "status: passed | failed | skipped",
-      "error_message: string | null",
-      "duration_ms: number",
-      "retry_count: number",
-      "run_at: ISO datetime",
-      "branch: string",
-    ],
-    example: `"Show me the history for the checkout test"`,
-  },
-]
-
-// Analysis Tools
-const analysisTools = [
-  {
-    name: "get_failed_tests",
-    description: "Get failed tests with optional AI-enriched context. Works without AI context by default.",
-    category: "analysis" as const,
-    parameters: [
-      { name: "execution_id", type: "number", description: "Filter to specific execution" },
-      { name: "error_type", type: "string", description: "Filter by error type (e.g., TimeoutError)" },
-      { name: "test_file", type: "string", description: "Filter by file path (partial match)" },
-      { name: "limit", type: "number", default: "20", description: "Max results" },
-      { name: "offset", type: "number", default: "0", description: "Skip N results" },
-      { name: "since", type: "string", description: "Only failures since date (ISO 8601)" },
-      { name: "run_id", type: "string", description: "Filter by CI run ID" },
-    ],
-    responseFields: [
-      "test_name, test_file: Test identification",
-      "error_message, stack_trace: Error details",
-      "duration_ms, retry_count: Execution info",
-      "ai_context: AI analysis (if available)",
-    ],
-    example: `"Show me recent test failures"`,
-  },
-  {
-    name: "get_dashboard_metrics",
-    description: "Get overall dashboard metrics: total executions, pass rate, failure rate, avg duration.",
-    category: "analysis" as const,
-    parameters: [
-      { name: "from", type: "string", description: "Start date (ISO 8601)" },
-      { name: "to", type: "string", description: "End date (ISO 8601)" },
-    ],
-    responseFields: [
-      "total_executions: number",
-      "total_tests: number",
-      "pass_rate: number (0-100)",
-      "failure_rate: number",
-      "avg_duration_ms: number",
-      "executions_per_day: number",
-      "most_common_failure: string | null",
-    ],
-    example: `"Get dashboard metrics for the last 7 days"`,
-  },
-  {
-    name: "get_trends",
-    description: "Get time-series trend data with flexible granularity. Supports hourly, daily, weekly, and monthly aggregation.",
-    category: "analysis" as const,
-    parameters: [
-      { name: "period", type: "string", default: "day", description: "Granularity: hour | day | week | month" },
-      { name: "count", type: "number", description: "Number of periods to look back" },
-      { name: "days", type: "number", description: "DEPRECATED: Use count + period" },
-      { name: "from", type: "string", description: "Start date (ISO 8601)" },
-      { name: "to", type: "string", description: "End date (ISO 8601)" },
-    ],
-    responseFields: [
-      "period: ISO datetime - Period start",
-      "executions: number - Total runs",
-      "passed: number - Passed count",
-      "failed: number - Failed count",
-      "skipped: number - Skipped count",
-      "pass_rate: number (0-100)",
-    ],
-    example: `"Show me weekly test trends for the last month"`,
-  },
-  {
-    name: "get_error_distribution",
-    description: "Get breakdown of error types from failed tests. Shows which error types are most common.",
-    category: "analysis" as const,
-    parameters: [
-      { name: "since", type: "string", description: "Only count errors since date (ISO 8601)" },
-      { name: "branch", type: "string", description: "Filter by branch name" },
-      { name: "suite", type: "string", description: "Filter by test suite" },
-      { name: "limit", type: "number", default: "10", description: "Max error types" },
-      { name: "group_by", type: "string", default: "error_type", description: "Group: error_type | file | branch" },
-    ],
-    responseFields: [
-      "error_type: string - Error category",
-      "count: number - Occurrences",
-      "percentage: number (0-100)",
-      "example_message: string - Sample error",
-    ],
-    example: `"Show me the error distribution from this week"`,
-  },
-]
-
-// Flakiness Tools
-const flakinessTools = [
-  {
-    name: "get_flaky_tests",
-    description: "Get list of flaky tests sorted by flakiness rate. Supports filtering by time window, branch, and resolution status.",
-    category: "flakiness" as const,
-    parameters: [
-      { name: "limit", type: "number", default: "10", description: "Max results" },
-      { name: "min_runs", type: "number", default: "5", description: "Minimum runs to be considered" },
-      { name: "since", type: "string", description: "Only tests flaky since date (ISO 8601)" },
-      { name: "branch", type: "string", description: "Filter to tests flaky on this branch" },
-      { name: "include_resolved", type: "boolean", default: "false", description: "Include tests no longer flaky" },
-    ],
-    responseFields: [
-      "test_signature: string - Unique identifier",
-      "test_name: string - Test title",
-      "test_file: string - Spec file path",
-      "flakiness_rate: number (0-100)",
-      "total_runs: number",
-      "flaky_runs: number",
-      "last_flaky: ISO datetime",
-      "last_flaky_branch: string | null - Branch where last flaky",
-    ],
-    example: `"What tests are flaky on the main branch?"`,
-  },
-  {
-    name: "get_flakiness_summary",
-    description: "Get overall flakiness summary: total flaky tests, average rate, and worst offenders.",
-    category: "flakiness" as const,
-    parameters: [],
-    responseFields: [
-      "total_flaky_tests: number",
-      "average_flakiness_rate: number (0-100)",
-      "total_flaky_runs: number",
-      "worst_offenders: array - Top 5 flakiest",
-    ],
-  },
-]
-
-// Aggregation Tools
-const aggregationTools = [
-  {
-    name: "get_execution_summary",
-    description: "Get aggregated summary of an execution without the full test list. Use for quick analysis.",
-    category: "core" as const,
-    parameters: [
-      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
-    ],
-    responseFields: [
-      "execution: Metadata (branch, commit, status, duration)",
-      "summary: Counts (total, passed, failed, skipped, pass_rate)",
-      "error_distribution: Grouped error types",
-      "files_affected: Files with failure/pass counts",
-    ],
-  },
-  {
-    name: "get_execution_failures",
-    description: "Get only failed tests from an execution with error grouping. Much smaller response than get_execution_details.",
-    category: "core" as const,
-    parameters: [
-      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
-      { name: "group_by", type: "string", default: "file", description: "Group: file | error_type | none" },
-      { name: "include_retries", type: "boolean", default: "false", description: "Include retry attempts" },
-      { name: "include_stack_traces", type: "boolean", default: "false", description: "Include full stack traces" },
-    ],
-    responseFields: [
-      "test_name: Test title",
-      "test_file: Spec file path",
-      "error_message: Error description",
-      "duration_ms: Test duration",
-    ],
-  },
-  {
-    name: "generate_failure_report",
-    description: "Generate a pre-formatted markdown report for an execution. Ready for documentation or sharing.",
-    category: "core" as const,
-    parameters: [
-      { name: "execution_id", type: "number", required: true, description: "Execution ID" },
-      { name: "include_passed", type: "boolean", default: "false", description: "Include passed tests" },
-      { name: "include_recommendations", type: "boolean", default: "true", description: "Include AI-suggested actions" },
-    ],
-    responseFields: [
-      "Markdown string with:",
-      "- Execution metadata and summary",
-      "- Failures grouped by file",
-      "- Error distribution analysis",
-      "- Recommended actions",
-    ],
-  },
-]
-
-// Performance Tools
-const performanceTools = [
-  {
-    name: "get_reliability_score",
-    description: "Get overall test suite health score (0-100). Quick way to assess suite stability.",
-    category: "performance" as const,
-    parameters: [
-      { name: "from", type: "string", description: "Start date (ISO 8601)" },
-      { name: "to", type: "string", description: "End date (ISO 8601)" },
-      { name: "branch", type: "string", description: "Filter by branch" },
-      { name: "suite", type: "string", description: "Filter by suite" },
-    ],
-    responseFields: [
-      "score: number (0-100) - Health score",
-      "status: healthy (80+) | warning (60-79) | critical (<60)",
-      "breakdown: Pass rate, flakiness, stability contributions",
-      "rawMetrics: Actual percentages",
-      "trend: Change from previous period",
-    ],
-    example: `"What's the health score for my test suite?"`,
-  },
-  {
-    name: "get_performance_regressions",
-    description: "Get tests running slower than their historical baseline. Detects performance regressions automatically.",
-    category: "performance" as const,
-    parameters: [
-      { name: "threshold", type: "number", default: "0.20", description: "Min regression % (20%)" },
-      { name: "hours", type: "number", default: "24", description: "Look back period in hours" },
-      { name: "branch", type: "string", description: "Filter by branch" },
-      { name: "suite", type: "string", description: "Filter by suite" },
-      { name: "limit", type: "number", default: "20", description: "Max results" },
-      { name: "sort_by", type: "string", default: "regression", description: "Sort: regression | duration | name" },
-    ],
-    responseFields: [
-      "testName, testFile: Test identification",
-      "testSignature: Unique identifier",
-      "currentAvgMs: Current average duration",
-      "baselineDurationMs: Historical baseline",
-      "regressionPercent: How much slower (%)",
-      "severity: critical (>50%) | warning (20-50%)",
-      "trend: increasing | stable | decreasing",
-    ],
-    example: `"Show me tests that got slower in the last 24 hours"`,
-  },
-  {
-    name: "compare_executions",
-    description: "Compare two test executions side-by-side to identify regressions, improvements, and performance changes.",
-    category: "performance" as const,
-    parameters: [
-      { name: "baseline_id", type: "number", description: "Baseline execution ID" },
-      { name: "current_id", type: "number", description: "Current execution ID" },
-      { name: "baseline_branch", type: "string", description: "Use latest execution from this branch as baseline" },
-      { name: "current_branch", type: "string", description: "Use latest execution from this branch as current" },
-      { name: "suite", type: "string", description: "Filter to specific suite (for branch lookups)" },
-      { name: "filter", type: "string", description: "Filter: new_failure | fixed | new_test | removed_test | performance_regression | all" },
-      { name: "performance_threshold", type: "number", default: "20", description: "% change threshold for regression/improvement" },
-    ],
-    responseFields: [
-      "baseline, current: Execution metadata (id, branch, commit, status)",
-      "summary: Pass rate delta, duration delta, test count changes",
-      "performanceSummary: Count of regressions, improvements, stable tests",
-      "tests: Array with diff categories and duration categories",
-      "Diff categories: new_failure, fixed, new_test, removed_test, unchanged",
-      "Duration categories: regression, improvement, stable",
-    ],
-    example: `"Compare the last two runs and show performance regressions"`,
-  },
-]
-
-// Metadata Tools
-const metadataTools = [
-  {
-    name: "list_branches",
-    description: "Get list of branches with test run statistics.",
+    name: "get_semantic_definition",
+    description: "Get metric definitions to prevent AI hallucinations. Returns formula, thresholds, unit, and related tools for any metric.",
     category: "metadata" as const,
     parameters: [
-      { name: "days", type: "number", default: "30", description: "Include branches with runs in last N days (max: 365)" },
+      {
+        name: "metric_id",
+        type: "string",
+        required: true,
+        description: "Metric identifier (e.g., pass_rate, flaky_rate, reliability_score)"
+      },
     ],
     responseFields: [
-      "branch: string - Branch name",
-      "last_run: ISO datetime - Most recent execution",
-      "execution_count: number - Total runs in period",
-      "pass_rate: number (0-100) - Average success rate",
-      "last_status: success | failure | running - Most recent result",
+      "formula: Exact calculation formula",
+      "thresholds: healthy/warning/critical values",
+      "unit: %, count, duration, score, rate",
+      "description: What the metric measures",
+      "relatedTools: Which tools provide this metric",
     ],
+    example: `"How is pass rate calculated?"`,
+    replaces: ["(New tool - prevents metric hallucinations)"],
   },
-  {
-    name: "list_suites",
-    description: "Get list of test suites with run statistics.",
-    category: "metadata" as const,
-    parameters: [
-      { name: "days", type: "number", default: "30", description: "Include suites with runs in last N days (max: 365)" },
-    ],
-    responseFields: [
-      "suite: string - Suite name",
-      "last_run: ISO datetime - Most recent execution",
-      "execution_count: number - Total runs in period",
-      "pass_rate: number (0-100) - Average success rate",
-      "last_status: success | failure | running - Most recent result",
-    ],
-  },
-]
-
-// Installation & Auto-Triage Tools
-const autoTriageTools = [
   {
     name: "get_installation_config",
-    description: "Get installation configuration for connecting Claude Code or other IDEs to Exolar QA. Returns ready-to-use config snippets.",
+    description: "Get CI/CD integration code snippets and setup instructions. Returns ready-to-use config for Playwright reporter, GitHub Actions, and environment variables.",
     category: "metadata" as const,
     parameters: [
-      { name: "ide", type: "string", description: "Target IDE: claude_desktop | cursor | claude_code_cli | all" },
+      {
+        name: "section",
+        type: "string",
+        description: "Section: api_endpoint | playwright_reporter | github_actions | env_variables | all"
+      },
     ],
     responseFields: [
-      "claude_desktop: Config snippet for Claude Desktop",
-      "cursor: Config snippet for Cursor IDE",
-      "claude_code_cli: Commands for Claude Code CLI",
-      "setup_steps: Step-by-step installation guide",
-      "credentials_location: Where tokens are stored",
-      "docs_url: Link to settings page",
+      "api_endpoint: Dashboard API URL and authentication",
+      "playwright_reporter: Reporter configuration code",
+      "github_actions: Workflow YAML snippet",
+      "env_variables: Required environment variables",
     ],
-    example: `"Install Exolar QA skills in my IDE"`,
+    example: `"How do I set up CI integration?"`,
+    replaces: ["(Unchanged from previous version)"],
   },
-  {
-    name: "classify_failure",
-    description: "Classify a test failure as FLAKE vs BUG. Returns structured data with classification signals, historical metrics, and confidence score.",
-    category: "analysis" as const,
-    parameters: [
-      { name: "test_id", type: "number", description: "Test result ID (from test_results table)" },
-      { name: "execution_id", type: "number", description: "Execution ID (alternative to test_id)" },
-      { name: "test_name", type: "string", description: "Test name (required with execution_id)" },
-      { name: "test_file", type: "string", description: "Test file path (optional, disambiguates)" },
-    ],
-    responseFields: [
-      "current_failure: Error details, retry count, status",
-      "historical_metrics: Total runs, flaky runs, flakiness rate",
-      "recent_runs: Last 10 executions with status",
-      "classification_signals: Weighted FLAKE vs BUG indicators",
-      "suggested_classification: FLAKE | BUG | UNKNOWN",
-      "confidence: 0.0-1.0 score",
-      "reasoning: Explanation of classification",
-    ],
-    example: `"Is this test failure a flake or a real bug?"`,
-  },
+]
+
+// 14 Available Datasets via query_exolar_data
+const datasets = [
+  { name: "executions", description: "List test executions with optional filters (branch, suite, status, dates)" },
+  { name: "execution_details", description: "Full execution data with all test results and artifacts (requires execution_id)" },
+  { name: "failures", description: "Failed tests with AI-enriched context and error details" },
+  { name: "flaky_tests", description: "Tests with flakiness history (min_runs, include_resolved filters)" },
+  { name: "trends", description: "Time-series metrics with flexible granularity (hour, day, week, month)" },
+  { name: "dashboard_stats", description: "Overall metrics summary (total executions, pass rate, avg duration)" },
+  { name: "error_analysis", description: "Error type distribution breakdown" },
+  { name: "test_search", description: "Search tests by name or file path (requires query param)" },
+  { name: "test_history", description: "Execution history for a specific test (requires test_signature)" },
+  { name: "flakiness_summary", description: "Overall flakiness metrics and worst offenders" },
+  { name: "reliability_score", description: "Suite health score (0-100) with breakdown and trend" },
+  { name: "performance_regressions", description: "Tests slower than historical baseline" },
+  { name: "execution_summary", description: "Aggregated execution overview without full test list" },
+  { name: "execution_failures", description: "Only failed tests from an execution with error grouping" },
 ]
 
 const usageExamples = [
-  "Show me recent test failures",
-  "What are our flakiest tests?",
+  // Discovery
+  "Show me what datasets are available",
+  "List all branches with their stats",
+  "What metrics can I query?",
+
+  // Querying Data
+  "Get recent test failures on main branch",
+  "Show me the flakiest tests with at least 5 runs",
+  "What were the test results from the last CI run?",
   "Search for tests related to login",
-  "Get the dashboard metrics for the last 7 days",
-  "Show me the error distribution from this week",
-  "What's the test history for the checkout test?",
+  "Get metrics for the past week",
+
+  // Analysis
   "What's the health score for my test suite?",
-  "Are there any performance regressions on main?",
-  "Generate a failure report for execution 123",
+  "Are there any performance regressions on the main branch?",
+  "Show me tests that got slower in the last 24 hours",
+  "What's the error distribution for failed tests?",
+
+  // Comparison
   "Compare the last two runs on main branch",
   "What tests broke in the feature branch compared to main?",
-  "Show me new failures between execution 123 and 456",
-  "Install Exolar QA skills in my IDE",
+  "Show me new failures between main and feature-auth",
+
+  // Classification
   "Is this test failure a flake or a real bug?",
   "Classify the failure in test 'should login successfully'",
+
+  // Setup
   "Help me set up MCP integration",
+  "How do I configure GitHub Actions?",
+
+  // Definitions
+  "What's the formula for pass rate?",
+  "How is reliability score calculated?",
 ]
 
 export default function MCPDocsPage() {
@@ -440,8 +203,11 @@ export default function MCPDocsPage() {
 
       {/* Hero */}
       <div className="space-y-4">
+        <div className="inline-block px-3 py-1 rounded-full glass-panel text-xs sm:text-sm font-medium mb-2">
+          New: Router Pattern • HTTP Streamable • 83% Token Reduction
+        </div>
         <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
+          className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
           style={{
             background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
             WebkitBackgroundClip: "text",
@@ -450,10 +216,37 @@ export default function MCPDocsPage() {
           }}
         >MCP Integration</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-          Connect Claude Code to your E2E test data using the Model Context Protocol (MCP).
-          Give your AI coding assistant direct access to test results, failures, and trends.
+          Connect Claude Code to your test data using the Model Context Protocol (MCP).
+          Now with <strong>5 consolidated tools</strong> (down from 24) using an efficient router pattern.
         </p>
       </div>
+
+      {/* What's New */}
+      <section className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow space-y-3">
+        <h2 className="text-lg sm:text-xl font-semibold">What's New in v2.0</h2>
+        <ul className="space-y-2 text-sm sm:text-base text-muted-foreground">
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+            <span><strong>5 tools instead of 24</strong> - Router pattern with ~83% token reduction</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+            <span><strong>HTTP Streamable transport</strong> - More reliable than legacy SSE</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+            <span><strong>14 queryable datasets</strong> - Unified filter interface via query_exolar_data</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+            <span><strong>Semantic definitions</strong> - Metric formulas prevent AI hallucinations</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+            <span><strong>Markdown output</strong> - ~70% fewer tokens than JSON</span>
+          </li>
+        </ul>
+      </section>
 
       {/* Installation */}
       <section id="installation" className="space-y-4 sm:space-y-6 scroll-mt-20">
@@ -463,180 +256,247 @@ export default function MCPDocsPage() {
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
-              Authenticate
+              Get Your Token
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Run this command to open your browser and log in to the dashboard:
-            </p>
-            <CodeBlock code="npx @exolar-qa/mcp-server --login" />
-            <p className="text-xs text-muted-foreground mt-3">
-              This will store your credentials securely in <code className="px-1 py-0.5 rounded glass-panel">~/.e2e-dashboard-mcp/config.json</code>
+              Log into the dashboard and copy your authentication token from browser dev tools (F12 → Network → Authorization header)
             </p>
           </div>
 
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
-              Add to Claude Code
+              Configure Claude Code
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Register the MCP server with Claude Code:
+              Add to your <code className="px-1 py-0.5 rounded glass-panel">~/.claude.json</code>:
             </p>
-            <CodeBlock code="claude mcp add --transport stdio exolar -- npx -y @exolar-qa/mcp-server" />
+            <CodeBlock code={`{
+  "mcpServers": {
+    "exolar-qa": {
+      "url": "https://your-domain.vercel.app/api/mcp/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}`} />
+            <p className="text-xs text-muted-foreground mt-3">
+              Note: URL path is <code className="px-1 py-0.5 rounded glass-panel">/api/mcp/mcp</code> (not /api/mcp)
+            </p>
+          </div>
+
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+            <h3 className="font-semibold mb-2 flex items-center gap-3">
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">3</span>
+              Start Using
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Restart Claude Code and start asking questions about your test data!
+            </p>
           </div>
         </div>
       </section>
 
-      {/* CLI Commands */}
-      <section id="cli-commands" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">CLI Commands</h2>
-        <CodeBlock
-          code={`# Authenticate with the dashboard (opens browser)
-npx @exolar-qa/mcp-server --login
+      {/* Architecture */}
+      <section id="architecture" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Architecture: Router Pattern</h2>
+        <p className="text-muted-foreground">
+          Instead of 24 individual tools, the MCP server uses a <strong>two-level router pattern</strong>:
+        </p>
 
-# Check authentication status
-npx @exolar-qa/mcp-server --status
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl glass-card">
+            <div className="text-sm font-medium mb-2">Level 1: Tool</div>
+            <div className="text-xs text-muted-foreground">Which category?</div>
+            <ul className="mt-2 space-y-1 text-sm">
+              <li>• explore (discovery)</li>
+              <li>• query (data retrieval)</li>
+              <li>• action (heavy ops)</li>
+              <li>• definition (semantics)</li>
+              <li>• config (setup)</li>
+            </ul>
+          </div>
+          <div className="p-4 rounded-xl glass-card">
+            <div className="text-sm font-medium mb-2">Level 2: Dataset/Action</div>
+            <div className="text-xs text-muted-foreground">Which specific data?</div>
+            <ul className="mt-2 space-y-1 text-sm">
+              <li>• executions, failures</li>
+              <li>• flaky_tests, trends</li>
+              <li>• compare, classify</li>
+              <li>• metric formulas</li>
+              <li>• CI/CD snippets</li>
+            </ul>
+          </div>
+        </div>
 
-# Clear stored credentials
-npx @exolar-qa/mcp-server --logout
-
-# Show help
-npx @exolar-qa/mcp-server --help
-
-# Use a custom dashboard URL
-npx @exolar-qa/mcp-server --login --url https://your-dashboard.com`}
-        />
+        <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+          <h3 className="font-semibold mb-3">Benefits</h3>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+              <span><strong>83% fewer tokens</strong> - Tool definitions reduced from ~3,000 to ~500 tokens</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+              <span><strong>Unified filters</strong> - Consistent interface across all datasets</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+              <span><strong>Better discovery</strong> - explore_exolar_index shows what's available</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+              <span><strong>Flexible routing</strong> - Easy to add new datasets</span>
+            </li>
+          </ul>
+        </div>
       </section>
 
-      {/* Core Tools */}
-      <section id="core-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Core Tools</h2>
+      {/* Available Tools */}
+      <section id="tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Available Tools (5 Total)</h2>
         <p className="text-muted-foreground">
-          Essential tools for retrieving test execution data.
+          All tools support organization-scoped access with automatic filtering.
         </p>
         <div className="grid gap-4">
-          {coreTools.map((tool) => (
+          {consolidatedTools.map((tool) => (
             <ToolCard key={tool.name} {...tool} />
           ))}
         </div>
       </section>
 
-      {/* Analysis Tools */}
-      <section id="analysis-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Analysis Tools</h2>
+      {/* Available Datasets */}
+      <section id="datasets" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Available Datasets</h2>
         <p className="text-muted-foreground">
-          Tools for analyzing test results, failures, and trends.
+          Use <code className="px-1 py-0.5 rounded glass-panel">query_exolar_data</code> with these datasets:
         </p>
-        <div className="grid gap-4">
-          {analysisTools.map((tool) => (
-            <ToolCard key={tool.name} {...tool} />
+        <div className="grid gap-3">
+          {datasets.map((dataset, idx) => (
+            <div key={dataset.name} className="p-3 sm:p-4 rounded-lg glass-card">
+              <div className="flex items-start gap-3">
+                <span className="text-xs text-muted-foreground shrink-0 mt-1">{(idx + 1).toString().padStart(2, '0')}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-sm font-medium mb-1 break-all">{dataset.name}</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground">{dataset.description}</div>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       </section>
 
-      {/* Flakiness Tools */}
-      <section id="flakiness-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Flakiness Tools</h2>
+      {/* Migration Guide */}
+      <section id="migration" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Migration from v1.0</h2>
         <p className="text-muted-foreground">
-          Tools for detecting and analyzing flaky tests.
+          If you were using the previous 24-tool version, here's how to migrate:
         </p>
-        <div className="grid gap-4">
-          {flakinessTools.map((tool) => (
-            <ToolCard key={tool.name} {...tool} />
-          ))}
-        </div>
-      </section>
 
-      {/* Aggregation Tools */}
-      <section id="aggregation-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Aggregation Tools</h2>
-        <p className="text-muted-foreground">
-          Lighter, faster alternatives for quick analysis without full test lists.
-        </p>
-        <div className="grid gap-4">
-          {aggregationTools.map((tool) => (
-            <ToolCard key={tool.name} {...tool} />
-          ))}
-        </div>
-      </section>
-
-      {/* Performance Tools */}
-      <section id="performance-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Performance & Reliability</h2>
-        <p className="text-muted-foreground">
-          Tools for monitoring test suite health and detecting performance regressions.
-        </p>
-        <div className="grid gap-4">
-          {performanceTools.map((tool) => (
-            <ToolCard key={tool.name} {...tool} />
-          ))}
-        </div>
-      </section>
-
-      {/* Metadata Tools */}
-      <section id="metadata-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Metadata Tools</h2>
-        <p className="text-muted-foreground">
-          Tools for listing available branches and suites.
-        </p>
-        <div className="grid gap-4">
-          {metadataTools.map((tool) => (
-            <ToolCard key={tool.name} {...tool} />
-          ))}
-        </div>
-      </section>
-
-      {/* Installation & Auto-Triage Tools */}
-      <section id="auto-triage-tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Installation & Auto-Triage</h2>
-        <p className="text-muted-foreground">
-          Tools for quick IDE setup and automatic failure classification (FLAKE vs BUG).
-        </p>
-        <div className="grid gap-4">
-          {autoTriageTools.map((tool) => (
-            <ToolCard key={tool.name} {...tool} />
-          ))}
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead>
+              <tr className="border-b border-border/40">
+                <th className="text-left p-3 font-medium">Old Tool</th>
+                <th className="text-left p-3 font-medium">New Tool</th>
+                <th className="text-left p-3 font-medium">Parameters</th>
+              </tr>
+            </thead>
+            <tbody className="text-muted-foreground">
+              <tr className="border-b border-border/20">
+                <td className="p-3"><code className="text-xs">list_branches</code></td>
+                <td className="p-3"><code className="text-xs">explore_exolar_index</code></td>
+                <td className="p-3"><code className="text-xs">{`{ category: "branches" }`}</code></td>
+              </tr>
+              <tr className="border-b border-border/20">
+                <td className="p-3"><code className="text-xs">get_executions</code></td>
+                <td className="p-3"><code className="text-xs">query_exolar_data</code></td>
+                <td className="p-3"><code className="text-xs">{`{ dataset: "executions" }`}</code></td>
+              </tr>
+              <tr className="border-b border-border/20">
+                <td className="p-3"><code className="text-xs">get_flaky_tests</code></td>
+                <td className="p-3"><code className="text-xs">query_exolar_data</code></td>
+                <td className="p-3"><code className="text-xs">{`{ dataset: "flaky_tests" }`}</code></td>
+              </tr>
+              <tr className="border-b border-border/20">
+                <td className="p-3"><code className="text-xs">compare_executions</code></td>
+                <td className="p-3"><code className="text-xs">perform_exolar_action</code></td>
+                <td className="p-3"><code className="text-xs">{`{ action: "compare" }`}</code></td>
+              </tr>
+              <tr>
+                <td className="p-3 text-xs" colSpan={3}>
+                  See full mapping in <a href="/docs/mcp" className="text-primary hover:underline">documentation</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
       {/* Usage Examples */}
-      <section className="space-y-4 sm:space-y-6">
+      <section id="examples" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Usage Examples</h2>
         <p className="text-muted-foreground">
           After connecting, you can ask Claude things like:
         </p>
-        <div className="grid gap-2">
+        <div className="grid sm:grid-cols-2 gap-2">
           {usageExamples.map((example) => (
-            <div key={example} className="p-3 rounded-lg glass-panel text-sm">
+            <div key={example} className="p-3 rounded-lg glass-panel text-xs sm:text-sm">
               &ldquo;{example}&rdquo;
             </div>
           ))}
         </div>
       </section>
 
+      {/* Output Formats */}
+      <section id="output-formats" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Output Formats</h2>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl glass-card">
+            <h3 className="font-semibold mb-2">Markdown (Default)</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>• CLI-friendly tables</li>
+              <li>• ~70% fewer tokens than JSON</li>
+              <li>• Human-readable</li>
+              <li>• Easier to scan</li>
+            </ul>
+          </div>
+          <div className="p-4 rounded-xl glass-card">
+            <h3 className="font-semibold mb-2">JSON</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>• Structured data</li>
+              <li>• Programmatic parsing</li>
+              <li>• Full details</li>
+              <li>• API integration</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* Security */}
       <section id="security" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Security</h2>
-        <ul className="space-y-2 text-muted-foreground">
+        <ul className="space-y-2 text-sm sm:text-base text-muted-foreground">
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span>Tokens are stored with <code className="px-1 py-0.5 rounded bg-muted">0600</code> permissions (owner read/write only)</span>
+            <span>JWT tokens verified using Neon Auth JWKS</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span>Tokens are JWT-signed and validated server-side</span>
+            <span>All data automatically scoped to your organization</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span>All data is scoped to your organization</span>
+            <span>Database-level RLS policies for additional protection</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span>Tokens expire after 30 days - run <code className="px-1 py-0.5 rounded bg-muted">--login</code> again to refresh</span>
+            <span>HTTPS-only communication (encrypted in transit)</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span>Revoke access anytime with <code className="px-1 py-0.5 rounded bg-muted">--logout</code></span>
+            <span>No cross-tenant access - users only see their org's data</span>
           </li>
         </ul>
       </section>
@@ -646,30 +506,40 @@ npx @exolar-qa/mcp-server --login --url https://your-dashboard.com`}
         <h2 className="text-xl sm:text-2xl font-semibold">Troubleshooting</h2>
         <div className="space-y-3 sm:space-y-4">
           <div className="p-3 sm:p-4 rounded-xl glass-card">
-            <h3 className="font-semibold mb-2">&ldquo;Not authenticated&rdquo; error</h3>
-            <p className="text-sm text-muted-foreground">
-              Run <code className="px-1 py-0.5 rounded glass-panel">npx @exolar-qa/mcp-server --login</code> to authenticate.
+            <h3 className="font-semibold mb-2 text-sm sm:text-base">&ldquo;Invalid or expired token&rdquo;</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Get a new token from browser dev tools (F12 → Network → Authorization header). Tokens expire periodically.
             </p>
           </div>
           <div className="p-3 sm:p-4 rounded-xl glass-card">
-            <h3 className="font-semibold mb-2">&ldquo;Token expired&rdquo; error</h3>
-            <p className="text-sm text-muted-foreground">
-              Your token has expired. Run <code className="px-1 py-0.5 rounded glass-panel">--login</code> again to get a new one.
+            <h3 className="font-semibold mb-2 text-sm sm:text-base">&ldquo;User not found&rdquo;</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Ensure you're logged into the dashboard and have an organization assigned. Use token from the same session.
             </p>
           </div>
           <div className="p-3 sm:p-4 rounded-xl glass-card">
-            <h3 className="font-semibold mb-2">&ldquo;Connection failed&rdquo; error</h3>
-            <p className="text-sm text-muted-foreground">
-              Check your internet connection and that the dashboard is accessible.
+            <h3 className="font-semibold mb-2 text-sm sm:text-base">&ldquo;Tool not found&rdquo;</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              You may be using old tool names. Use the 5 consolidated tools: explore_exolar_index, query_exolar_data, perform_exolar_action, get_semantic_definition, get_installation_config.
             </p>
           </div>
           <div className="p-3 sm:p-4 rounded-xl glass-card">
-            <h3 className="font-semibold mb-2">Browser doesn&apos;t open</h3>
-            <p className="text-sm text-muted-foreground">
-              If the browser doesn&apos;t open automatically, copy the URL shown in the terminal and paste it in your browser.
+            <h3 className="font-semibold mb-2 text-sm sm:text-base">Connection fails</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Check: (1) Dashboard is accessible, (2) NEON_AUTH_JWKS_URL is set in Vercel, (3) URL is correct (/api/mcp/mcp not /api/mcp).
             </p>
           </div>
         </div>
+      </section>
+
+      {/* Resources */}
+      <section className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+        <h2 className="text-lg sm:text-xl font-semibold mb-4">Additional Resources</h2>
+        <ul className="space-y-2 text-sm text-muted-foreground">
+          <li>• <a href="/settings/mcp" className="text-primary hover:underline">Settings Page</a> - Get your configuration</li>
+          <li>• <a href="https://github.com/anthropics/claude-code" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Claude Code Docs</a> - Official Claude Code documentation</li>
+          <li>• <a href="https://spec.modelcontextprotocol.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">MCP Specification</a> - Model Context Protocol spec</li>
+        </ul>
       </section>
     </div>
   )
