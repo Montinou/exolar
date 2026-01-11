@@ -8,15 +8,16 @@ import { Check, Loader2, Terminal } from "lucide-react"
 
 function MCPAuthContent() {
   const searchParams = useSearchParams()
-  // Get port from URL params, or fallback to sessionStorage
+  // Get port from URL params (legacy flow), or check for OAuth flow
   const urlPort = searchParams.get("port")
+  const isOAuthFlow = searchParams.get("oauth") === "1"
   const [callbackPort, setCallbackPort] = useState<string | null>(urlPort)
   const [status, setStatus] = useState<"loading" | "ready" | "authorizing" | "success" | "error">("loading")
   const [error, setError] = useState<string | null>(null)
 
   // On mount, check sessionStorage if port not in URL
   useEffect(() => {
-    if (!urlPort) {
+    if (!urlPort && !isOAuthFlow) {
       const storedPort = sessionStorage.getItem("mcp_callback_port")
       if (storedPort) {
         setCallbackPort(storedPort)
@@ -24,7 +25,7 @@ function MCPAuthContent() {
         sessionStorage.removeItem("mcp_callback_port")
       }
     }
-  }, [urlPort])
+  }, [urlPort, isOAuthFlow])
 
   useEffect(() => {
     // Check if user is authenticated
@@ -33,6 +34,11 @@ function MCPAuthContent() {
         const res = await fetch("/api/auth/session")
         if (res.ok) {
           setStatus("ready")
+          
+          // If OAuth flow and user is already logged in, auto-authorize
+          if (isOAuthFlow) {
+            authorizeOAuth()
+          }
         } else {
           // Store the port in sessionStorage as backup
           if (callbackPort) {
@@ -49,9 +55,40 @@ function MCPAuthContent() {
       }
     }
     checkAuth()
-  }, [callbackPort])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callbackPort, isOAuthFlow])
 
+  // OAuth flow - POST to authorize endpoint to complete the flow
+  async function authorizeOAuth() {
+    setStatus("authorizing")
+    try {
+      const res = await fetch("/api/mcp/oauth/authorize", {
+        method: "POST",
+        credentials: "include",
+      })
+      
+      if (res.redirected) {
+        // Success - follow the redirect to the client callback
+        setStatus("success")
+        setTimeout(() => {
+          window.location.href = res.url
+        }, 500)
+      } else if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error_description || data.error || "Authorization failed")
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authorization failed")
+      setStatus("error")
+    }
+  }
+
+  // Legacy flow - generate token and redirect to localhost port
   async function authorizeAndRedirect() {
+    if (isOAuthFlow) {
+      return authorizeOAuth()
+    }
+
     if (!callbackPort) {
       setError("Missing callback port. Please restart the MCP authentication flow.")
       setStatus("error")

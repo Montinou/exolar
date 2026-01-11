@@ -420,13 +420,20 @@ See `docs/MULTITENANCY_COMPLETED.md` for full implementation details.
 
 The dashboard exposes a MCP server for Claude Code integration at `/api/mcp/[transport]`.
 
-### Transport: HTTP Streamable
+### Transport: HTTP Streamable (recommended)
 - Uses Vercel's `mcp-handler` package (v1.0.7)
 - HTTP Streamable is the new MCP standard (replaces SSE)
 - More reliable with automatic retry logic
 - Better payload chunking for large responses
 
+### Transport: SSE (legacy)
+- Available at `/api/mcp/sse` for backward compatibility
+- Simpler setup with query param auth: `?token=your_token`
+- Works with all MCP clients that support SSE
+
 ### Configuration URL
+
+**HTTP Streamable (recommended for Claude Code):**
 ```json
 {
   "mcpServers": {
@@ -435,6 +442,17 @@ The dashboard exposes a MCP server for Claude Code integration at `/api/mcp/[tra
       "headers": {
         "Authorization": "Bearer <token>"
       }
+    }
+  }
+}
+```
+
+**SSE (simpler setup):**
+```json
+{
+  "mcpServers": {
+    "exolar-qa": {
+      "url": "https://your-domain.vercel.app/api/mcp/sse?token=<token>"
     }
   }
 }

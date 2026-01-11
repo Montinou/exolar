@@ -64,7 +64,9 @@ Your Neon Auth token can be obtained from the browser developer tools:
 
 ## Architecture
 
-### Transport: HTTP Streamable
+### Transport Options
+
+#### HTTP Streamable (Recommended)
 
 The MCP server uses Vercel's official `mcp-handler` package with **HTTP Streamable transport**:
 
@@ -72,7 +74,29 @@ The MCP server uses Vercel's official `mcp-handler` package with **HTTP Streamab
 - **Reliable**: Automatic retry logic built-in
 - **Efficient**: Better payload chunking for large responses
 - **Streaming**: JSON-RPC 2.0 over HTTP with streaming support
-- **Replaces**: Previous SSE (Server-Sent Events) implementation
+
+**Endpoint**: `/api/mcp/mcp`
+
+#### SSE (Legacy)
+
+For backward compatibility with older MCP clients:
+
+- **Simple auth**: Use query param `?token=your_token`
+- **No headers needed**: Works with clients that don't support custom headers
+- **Two endpoints**: 
+  - GET `/api/mcp/sse?token=xxx` — Opens SSE stream
+  - POST `/api/mcp/sse/message?token=xxx` — Sends messages
+
+**Configuration (SSE)**:
+```json
+{
+  "mcpServers": {
+    "exolar-qa": {
+      "url": "https://your-dashboard.vercel.app/api/mcp/sse?token=<your-token>"
+    }
+  }
+}
+```
 
 ### Router Pattern
 
