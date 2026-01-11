@@ -2,13 +2,6 @@ import Link from "next/link"
 import { CHANGELOG_ENTRIES } from "@/lib/changelog/data"
 import type { ChangelogEntry } from "@/lib/changelog/data"
 import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 
 export const metadata = {
   title: "What's New - Exolar QA",
@@ -76,8 +69,8 @@ export default function WhatsNewPage() {
             </div>
 
             {/* Entry Card */}
-            <Card className="border-primary/20">
-              <CardHeader className="pb-4">
+            <div className="glass-card glass-card-glow">
+              <div className="p-6 pb-4 border-b border-border/20">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-3">
                     <Badge variant={getTypeBadgeVariant(entry.type)}>
@@ -91,13 +84,13 @@ export default function WhatsNewPage() {
                     {formatDate(entry.date)}
                   </time>
                 </div>
-                <CardTitle className="text-2xl">{entry.title}</CardTitle>
-                <CardDescription className="text-base mt-2">
+                <h2 className="text-2xl font-bold tracking-tight">{entry.title}</h2>
+                <p className="text-base text-muted-foreground mt-2">
                   {entry.description}
-                </CardDescription>
-              </CardHeader>
+                </p>
+              </div>
 
-              <CardContent className="space-y-6">
+              <div className="p-6 space-y-6">
                 {/* Features Grid */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -158,8 +151,8 @@ export default function WhatsNewPage() {
                     </Link>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         ))}
 
@@ -176,13 +169,11 @@ export default function WhatsNewPage() {
 
       {/* Empty State (if no entries) */}
       {CHANGELOG_ENTRIES.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground text-center">
-              No updates yet. Check back soon for the latest features and improvements!
-            </p>
-          </CardContent>
-        </Card>
+        <div className="glass-card glass-card-glow p-12">
+          <p className="text-muted-foreground text-center">
+            No updates yet. Check back soon for the latest features and improvements!
+          </p>
+        </div>
       )}
     </div>
   )
