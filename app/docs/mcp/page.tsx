@@ -272,13 +272,23 @@ export default function MCPDocsPage() {
               Add to Claude Code
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Copy the JSON configuration from the settings page and add it to your Claude Code MCP settings:
+              <strong>Option A: Command Line (Recommended)</strong>
+            </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Run this command in your terminal (replace with your actual token):
+            </p>
+            <CodeBlock code={`claude mcp add exolar-qa --url https://exolar.ai-innovation.site/api/mcp/mcp --header "Authorization: Bearer YOUR_TOKEN_HERE"`} />
+
+            <div className="my-4 border-t border-border/50" />
+
+            <p className="text-sm text-muted-foreground mb-4">
+              <strong>Option B: Manual Configuration</strong>
             </p>
             <ul className="text-xs sm:text-sm text-muted-foreground space-y-2 list-decimal list-inside mb-3">
               <li>Open Claude Code settings</li>
               <li>Navigate to MCP Servers section</li>
               <li>Click "Add Server" or edit configuration file</li>
-              <li>Paste the JSON configuration</li>
+              <li>Paste the JSON configuration from settings page</li>
             </ul>
             <p className="text-xs text-muted-foreground">
               The configuration will look like this (with your actual token):

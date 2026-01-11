@@ -200,15 +200,28 @@ export default function MCPSettingsPage() {
                   </pre>
                 </div>
 
-                <div className="pt-4 border-t border-border/50 space-y-3">
-                  <p className="text-sm font-medium">How to Add to Claude Code:</p>
-                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-                    <li>Open Claude Code settings</li>
-                    <li>Navigate to MCP Servers section</li>
-                    <li>Click "Add Server" or edit your configuration file</li>
-                    <li>Paste the JSON configuration above</li>
-                    <li>Restart Claude Code to apply changes</li>
-                  </ol>
+                <div className="pt-4 border-t border-border/50 space-y-4">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Option A: Command Line (Recommended)</p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Run this command in your terminal:
+                    </p>
+                    <pre className="glass-panel p-3 text-xs overflow-x-auto font-mono">
+                      {`claude mcp add exolar-qa --url ${dashboardUrl}/api/mcp/mcp --header "Authorization: Bearer ${token.substring(0, 20)}..."`}
+                    </pre>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium mb-2">Option B: Manual Configuration</p>
+                    <ol className="text-xs sm:text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                      <li>Open Claude Code settings</li>
+                      <li>Navigate to MCP Servers section</li>
+                      <li>Click "Add Server" or edit your configuration file</li>
+                      <li>Paste the JSON configuration above</li>
+                      <li>Restart Claude Code to apply changes</li>
+                    </ol>
+                  </div>
+
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
                     <span className="text-amber-500 shrink-0">⚠️</span>
                     <p className="text-amber-500/90">
