@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AnimatedLogo } from "@/components/ui/animated-logo"
 import {
   Card,
@@ -10,57 +10,87 @@ import {
   CardContent,
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Copy, Check, RefreshCw, ArrowLeft, Terminal } from "lucide-react"
+import { Copy, Check, RefreshCw, ArrowLeft, Terminal, Sparkles, ExternalLink } from "lucide-react"
 import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 
 export default function MCPSettingsPage() {
-  const [copiedInstall, setCopiedInstall] = useState(false)
-  const [copiedAdd, setCopiedAdd] = useState(false)
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
+  const [copiedConfig, setCopiedConfig] = useState(false)
+  const [token, setToken] = useState<string | null>(null)
+  const [tokenError, setTokenError] = useState<string | null>(null)
+  const [generatingToken, setGeneratingToken] = useState(false)
 
-  const installCommand = "npx @exolar-qa/mcp-server --login"
-  const addCommand = "claude mcp add --transport stdio exolar-qa -- npx -y @exolar-qa/mcp-server"
+  // Generate MCP token on mount
+  useEffect(() => {
+    generateToken()
+  }, [])
 
-  async function copyInstallCommand() {
-    await navigator.clipboard.writeText(installCommand)
-    setCopiedInstall(true)
-    setTimeout(() => setCopiedInstall(false), 2000)
-  }
-
-  async function copyAddCommand() {
-    await navigator.clipboard.writeText(addCommand)
-    setCopiedAdd(true)
-    setTimeout(() => setCopiedAdd(false), 2000)
-  }
-
-  async function testConnection() {
-    setTesting(true)
-    setTestResult(null)
-
+  async function generateToken() {
+    setGeneratingToken(true)
+    setTokenError(null)
     try {
-      const res = await fetch("/api/mcp")
-      setTestResult(res.ok ? "success" : "error")
-    } catch {
-      setTestResult("error")
+      const res = await fetch("/api/auth/mcp-token", { method: "POST" })
+      const data = await res.json()
+
+      if (res.ok && data.token) {
+        setToken(data.token)
+      } else {
+        setTokenError(data.error || "Failed to generate token")
+      }
+    } catch (error) {
+      setTokenError("Network error. Please try again.")
     } finally {
-      setTesting(false)
+      setGeneratingToken(false)
     }
   }
 
+  const dashboardUrl = typeof window !== "undefined"
+    ? window.location.origin
+    : "https://exolar.ai-innovation.site"
+
+  const mcpConfig = token ? JSON.stringify({
+    mcpServers: {
+      "exolar-qa": {
+        url: `${dashboardUrl}/api/mcp/mcp`,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    }
+  }, null, 2) : "// Generating token..."
+
+  async function copyConfig() {
+    await navigator.clipboard.writeText(mcpConfig)
+    setCopiedConfig(true)
+    setTimeout(() => setCopiedConfig(false), 2000)
+  }
+
   const tools = [
-    { name: "get_executions", description: "List test executions with filters" },
-    { name: "get_execution_details", description: "Get detailed test results for an execution" },
-    { name: "search_tests", description: "Search tests by name or file" },
-    { name: "get_test_history", description: "Get history for a specific test" },
-    { name: "get_failed_tests", description: "List failed tests with AI context" },
-    { name: "get_dashboard_metrics", description: "Pass rate, failure counts, avg duration" },
-    { name: "get_trends", description: "Time-series pass/fail data" },
-    { name: "get_error_distribution", description: "Breakdown of error types" },
-    { name: "get_flaky_tests", description: "Identify flaky tests" },
-    { name: "get_flakiness_summary", description: "Overall flakiness metrics" },
-    { name: "list_branches", description: "Branches with test runs in last 30 days" },
-    { name: "list_suites", description: "Test suites with recent runs" },
+    {
+      name: "explore_exolar_index",
+      description: "Discovery tool for available datasets, branches, suites, and metric definitions",
+      badge: "Discovery"
+    },
+    {
+      name: "query_exolar_data",
+      description: "Universal data retrieval with 14 datasets (executions, failures, trends, flaky tests, etc.)",
+      badge: "Data Access"
+    },
+    {
+      name: "perform_exolar_action",
+      description: "Heavy operations: compare runs, generate reports, classify test failures",
+      badge: "Actions"
+    },
+    {
+      name: "get_semantic_definition",
+      description: "Get metric definitions with formulas and thresholds (prevents AI hallucinations)",
+      badge: "AI Safety"
+    },
+    {
+      name: "get_installation_config",
+      description: "Get CI/CD integration guide and setup instructions",
+      badge: "Setup"
+    },
   ]
 
   return (
@@ -78,120 +108,116 @@ export default function MCPSettingsPage() {
 
         <div className="flex items-center gap-3 mb-2">
           <AnimatedLogo size="md" />
-          <h1
-            className="text-2xl font-bold"
-            style={{
-              background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >MCP Integration</h1>
+          <div className="flex items-center gap-3">
+            <h1
+              className="text-2xl font-bold"
+              style={{
+                background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >MCP Integration</h1>
+            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+              <Sparkles className="h-3 w-3 mr-1" />
+              v2.0
+            </Badge>
+          </div>
         </div>
         <p className="text-muted-foreground mb-6">
-          Connect Claude Code to access your test data directly
+          Query your test data directly from Claude Code with HTTP Streamable transport
         </p>
+
+        {/* What's New Banner */}
+        <div className="glass-card glass-card-glow mb-6 p-4 border-l-4 border-primary">
+          <div className="flex items-start gap-3">
+            <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-sm mb-1">New in v2.0: Router Pattern & Semantic Layer</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                83% token savings with 5-tool consolidation, AI safety definitions, and HTTP Streamable transport.
+              </p>
+              <Link href="/docs/whats-new" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+                Learn more <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
+        </div>
 
         <Card className="mb-6 glass-card glass-card-glow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Terminal className="h-5 w-5" />
-              Quick Setup
+              One-Click Setup
             </CardTitle>
             <CardDescription>
-              Install and connect in 2 simple steps
+              Add this configuration to Claude Code's MCP settings
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <h4 className="font-medium mb-2 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
-                Authenticate
-              </h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                Run this command to open your browser and log in:
-              </p>
-              <div className="relative">
-                <pre className="glass-panel p-4 text-sm overflow-x-auto font-mono">
-                  {installCommand}
-                </pre>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="absolute top-2 right-2"
-                  onClick={copyInstallCommand}
-                >
-                  {copiedInstall ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
+          <CardContent className="space-y-4">
+            {generatingToken && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Generating authentication token...
+              </div>
+            )}
+
+            {tokenError && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                {tokenError}
+                <Button size="sm" variant="outline" onClick={generateToken} className="ml-3">
+                  Retry
                 </Button>
               </div>
-            </div>
+            )}
 
-            <div>
-              <h4 className="font-medium mb-2 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
-                Add to Claude Code
-              </h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                Then add the MCP server to Claude Code:
-              </p>
-              <div className="relative">
-                <pre className="glass-panel p-4 text-sm overflow-x-auto font-mono whitespace-pre-wrap">
-                  {addCommand}
-                </pre>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="absolute top-2 right-2"
-                  onClick={copyAddCommand}
-                >
-                  {copiedAdd ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
+            {token && (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium">Configuration JSON</label>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={copyConfig}
+                      className="h-8"
+                    >
+                      {copiedConfig ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <pre className="glass-panel p-4 text-xs overflow-x-auto font-mono">
+                    {mcpConfig}
+                  </pre>
+                </div>
 
-            <div className="pt-4 border-t border-border/50">
-              <p className="text-sm text-muted-foreground">
-                That&apos;s it! After authentication, Claude Code will have access to your test data.
-                Your credentials are stored securely in <code className="glass-panel px-1.5 py-0.5 text-xs">~/.e2e-dashboard-mcp/config.json</code>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="mb-6 glass-card glass-card-glow">
-          <CardHeader>
-            <CardTitle>Test Connection</CardTitle>
-            <CardDescription>
-              Verify that the MCP server is reachable
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4 items-center">
-              <Button className="btn-amber" onClick={testConnection} disabled={testing}>
-                {testing && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-                Test Connection
-              </Button>
-
-              {testResult === "success" && (
-                <span className="text-sm text-green-400 bg-green-950/30 px-3 py-1.5 rounded-md border border-green-500/30">
-                  ✓ Connection successful! MCP server is reachable.
-                </span>
-              )}
-
-              {testResult === "error" && (
-                <span className="text-sm text-red-400 bg-red-950/30 px-3 py-1.5 rounded-md border border-red-500/30">
-                  ✗ Connection failed. Check your network or server status.
-                </span>
-              )}
-            </div>
+                <div className="pt-4 border-t border-border/50 space-y-3">
+                  <p className="text-sm font-medium">How to Add to Claude Code:</p>
+                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+                    <li>Open Claude Code settings</li>
+                    <li>Navigate to MCP Servers section</li>
+                    <li>Click "Add Server" or edit your configuration file</li>
+                    <li>Paste the JSON configuration above</li>
+                    <li>Restart Claude Code to apply changes</li>
+                  </ol>
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
+                    <span className="text-amber-500 shrink-0">⚠️</span>
+                    <p className="text-amber-500/90">
+                      Keep your token secure. This token provides access to your organization's test data.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -199,22 +225,29 @@ export default function MCPSettingsPage() {
           <CardHeader>
             <CardTitle>Available Tools ({tools.length})</CardTitle>
             <CardDescription>
-              These tools will be available in Claude Code after setup
+              5 consolidated tools replace 24 individual tools for 83% token savings
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {tools.map((tool) => (
                 <div
                   key={tool.name}
-                  className="flex items-start gap-3 p-3 rounded-lg glass-panel"
+                  className="flex items-start gap-3 p-3 rounded-lg glass-panel group hover:border-primary/30 transition-colors"
                 >
-                  <code className="text-sm font-mono bg-muted/50 px-2 py-0.5 rounded shrink-0">
-                    {tool.name}
-                  </code>
-                  <span className="text-sm text-muted-foreground">
-                    {tool.description}
-                  </span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <code className="text-sm font-mono bg-muted/50 px-2 py-0.5 rounded">
+                        {tool.name}
+                      </code>
+                      <Badge variant="outline" className="text-xs">
+                        {tool.badge}
+                      </Badge>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {tool.description}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -223,25 +256,49 @@ export default function MCPSettingsPage() {
 
         <Card className="glass-card glass-card-glow">
           <CardHeader>
-            <CardTitle>Other Commands</CardTitle>
+            <CardTitle>Need Help?</CardTitle>
+            <CardDescription>
+              Documentation and resources
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg glass-panel gap-2">
-              <div>
-                <code className="text-sm font-mono">npx @exolar-qa/mcp-server --status</code>
-                <p className="text-xs text-muted-foreground mt-1">Check authentication status</p>
+            <Link
+              href="/docs/mcp"
+              className="flex items-center justify-between p-3 rounded-lg glass-panel hover:border-primary/30 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <Terminal className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm font-medium">MCP Documentation</p>
+                  <p className="text-xs text-muted-foreground">Architecture, tools, datasets, and examples</p>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg glass-panel gap-2">
-              <div>
-                <code className="text-sm font-mono">npx @exolar-qa/mcp-server --logout</code>
-                <p className="text-xs text-muted-foreground mt-1">Clear stored credentials</p>
+              <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </Link>
+
+            <Link
+              href="/docs/whats-new"
+              className="flex items-center justify-between p-3 rounded-lg glass-panel hover:border-primary/30 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                <div>
+                  <p className="text-sm font-medium">What's New in v2.0</p>
+                  <p className="text-xs text-muted-foreground">Router pattern, semantic layer, and migration guide</p>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg glass-panel gap-2">
-              <div>
-                <code className="text-sm font-mono">npx @exolar-qa/mcp-server --help</code>
-                <p className="text-xs text-muted-foreground mt-1">Show all available options</p>
+              <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </Link>
+
+            <div className="p-3 rounded-lg glass-panel border-border/30">
+              <div className="flex items-center gap-3">
+                <RefreshCw className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Token Refresh</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tokens expire after 30 days. Return to this page to generate a new one.
+                  </p>
+                </div>
               </div>
             </div>
           </CardContent>
