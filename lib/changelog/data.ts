@@ -32,6 +32,45 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: "oauth-authentication",
+    date: "2026-01-11",
+    version: "v2.2",
+    title: "OAuth 2.1 Authentication - No Token Copying Needed",
+    description:
+      "Seamless MCP authentication via browser login. Simply run the add command and authenticate in your browser — no more copying tokens from the dashboard. Uses OAuth 2.1 with PKCE for security.",
+    type: "feature",
+    features: [
+      {
+        icon: "🔐",
+        title: "One-Command Setup",
+        description:
+          "Run 'claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp' and authenticate via browser. Done!",
+        docsUrl: "/docs/mcp#installation",
+      },
+      {
+        icon: "🌐",
+        title: "Browser-Based Login",
+        description:
+          "When you add the MCP server, Claude Code automatically opens your browser to log in. After authentication, you're connected — no tokens to copy or paste.",
+        docsUrl: "/docs/mcp#installation",
+      },
+      {
+        icon: "🛡️",
+        title: "OAuth 2.1 with PKCE",
+        description:
+          "Industry-standard security using OAuth 2.1 Authorization Code flow with PKCE (Proof Key for Code Exchange). Tokens are securely exchanged without exposure.",
+        docsUrl: "/docs/mcp#security",
+      },
+      {
+        icon: "⏳",
+        title: "30-Day Token Validity",
+        description:
+          "Access tokens are valid for 30 days. When they expire, simply re-authenticate via the same browser flow — no manual token management required.",
+        docsUrl: "/docs/mcp#troubleshooting",
+      },
+    ],
+  },
+  {
     id: "integration-engineer-persona",
     date: "2026-01-11",
     version: "v2.1",

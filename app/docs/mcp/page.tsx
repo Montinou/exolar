@@ -253,83 +253,46 @@ export default function MCPDocsPage() {
         <h2 className="text-xl sm:text-2xl font-semibold">Installation</h2>
 
         <div className="space-y-4">
-          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+          {/* OAuth Method - Primary */}
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow border-2 border-primary/30">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
-              Get Your Configuration
+              Quick Start (OAuth - Recommended)
             </h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              Visit the <a href="/settings/mcp" className="text-primary hover:underline">MCP Settings page</a> to automatically generate your token and get the complete JSON configuration.
+            <p className="text-sm text-muted-foreground mb-4">
+              Run this command and authenticate via browser — no token copying needed:
             </p>
-            <p className="text-xs text-muted-foreground">
-              The page will generate a secure JWT token (valid for 30 days) with your organization context and display the ready-to-use JSON config.
+            <CodeBlock code={`claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp`} />
+            <p className="text-xs text-muted-foreground mt-3">
+              When prompted, select <strong>&quot;Authenticate&quot;</strong> → browser opens → log in → done!
             </p>
           </div>
 
-          {/* NEW: AI-Guided Setup Callout */}
-          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow bg-cyan-500/5 border border-cyan-500/30">
+          {/* Alternative: Manual Token */}
+          <div className="p-4 sm:p-6 rounded-xl glass-card">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
-              <span className="text-2xl">🤖</span>
-              AI-Guided CI/CD Setup (Recommended)
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
+              Alternative: Manual Token
             </h3>
             <p className="text-sm text-muted-foreground mb-3">
-              After connecting MCP, simply ask Claude Code:
+              If OAuth doesn&apos;t work, get a token from <a href="/settings/mcp" className="text-primary hover:underline">/settings/mcp</a>:
+            </p>
+            <CodeBlock code={`claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp \\
+  --header "Authorization: Bearer YOUR_TOKEN_HERE"`} />
+          </div>
+
+          {/* AI-Guided Setup */}
+          <div className="p-4 sm:p-6 rounded-xl glass-card bg-cyan-500/5 border border-cyan-500/30">
+            <h3 className="font-semibold mb-2 flex items-center gap-3">
+              <span className="text-2xl">🤖</span>
+              AI-Guided CI/CD Setup
+            </h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              After connecting, ask Claude Code:
             </p>
             <CodeBlock code={`"Help me integrate Exolar with my Playwright tests"`} />
             <p className="text-xs text-muted-foreground mt-3">
-              Claude will adopt an Integration Engineer persona, ask about your CI provider (GitHub Actions recommended) and project structure, then provide tailored instructions for your specific environment. No more guessing where to put tokens or how to merge config files!
-            </p>
-            <p className="text-xs text-cyan-400 mt-2">
-              Learn more in the <a href="#conversational-setup" className="underline">Conversational CI/CD Setup</a> section below.
-            </p>
-          </div>
-
-          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
-            <h3 className="font-semibold mb-2 flex items-center gap-3">
-              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
-              Add to Claude Code
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              <strong>Option A: Command Line (Recommended)</strong>
-            </p>
-            <p className="text-xs text-muted-foreground mb-2">
-              Run this command in your terminal (replace with your actual token):
-            </p>
-            <CodeBlock code={`claude mcp add exolar-qa --url https://exolar.ai-innovation.site/api/mcp/mcp --header "Authorization: Bearer YOUR_TOKEN_HERE"`} />
-
-            <div className="my-4 border-t border-border/50" />
-
-            <p className="text-sm text-muted-foreground mb-4">
-              <strong>Option B: Manual Configuration</strong>
-            </p>
-            <ul className="text-xs sm:text-sm text-muted-foreground space-y-2 list-decimal list-inside mb-3">
-              <li>Open Claude Code settings</li>
-              <li>Navigate to MCP Servers section</li>
-              <li>Click "Add Server" or edit configuration file</li>
-              <li>Paste the JSON configuration from settings page</li>
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              The configuration will look like this (with your actual token):
-            </p>
-            <CodeBlock code={`{
-  "mcpServers": {
-    "exolar-qa": {
-      "url": "https://exolar.ai-innovation.site/api/mcp/mcp",
-      "headers": {
-        "Authorization": "Bearer eyJ..."
-      }
-    }
-  }
-}`} />
-          </div>
-
-          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
-            <h3 className="font-semibold mb-2 flex items-center gap-3">
-              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">3</span>
-              Restart and Use
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Restart Claude Code to apply changes, then start asking questions about your test data!
+              Claude uses an Integration Engineer persona to guide you through GitHub Actions setup with step-by-step instructions.
             </p>
           </div>
         </div>

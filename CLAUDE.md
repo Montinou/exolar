@@ -418,45 +418,32 @@ See `docs/MULTITENANCY_COMPLETED.md` for full implementation details.
 
 ## MCP Integration
 
-The dashboard exposes a MCP server for Claude Code integration at `/api/mcp/[transport]`.
+The dashboard exposes a MCP server for Claude Code integration at `/api/mcp/mcp`.
 
-### Transport: HTTP Streamable (recommended)
-- Uses Vercel's `mcp-handler` package (v1.0.7)
-- HTTP Streamable is the new MCP standard (replaces SSE)
-- More reliable with automatic retry logic
-- Better payload chunking for large responses
+### Quick Start (OAuth - Recommended)
 
-### Transport: SSE (legacy)
-- Available at `/api/mcp/sse` for backward compatibility
-- Simpler setup with query param auth: `?token=your_token`
-- Works with all MCP clients that support SSE
-
-### Configuration URL
-
-**HTTP Streamable (recommended for Claude Code):**
-```json
-{
-  "mcpServers": {
-    "exolar-qa": {
-      "url": "https://your-domain.vercel.app/api/mcp/mcp",
-      "headers": {
-        "Authorization": "Bearer <token>"
-      }
-    }
-  }
-}
+```bash
+# Add the MCP server (one-time setup)
+claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp
 ```
 
-**SSE (simpler setup):**
-```json
-{
-  "mcpServers": {
-    "exolar-qa": {
-      "url": "https://your-domain.vercel.app/api/mcp/sse?token=<token>"
-    }
-  }
-}
+When prompted to **Authenticate**, your browser opens → log in → done! No token copying needed.
+
+### Alternative: Manual Token
+
+If OAuth isn't working, get a token from `/settings/mcp` and use:
+
+```bash
+claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp \
+  --header "Authorization: Bearer <token>"
 ```
+
+### Transport Options
+
+| Transport | URL | Auth | Use Case |
+|-----------|-----|------|----------|
+| HTTP Streamable (recommended) | `/api/mcp/mcp` | OAuth or Bearer token | Claude Code |
+| SSE (legacy) | `/api/mcp/sse?token=xxx` | Query param | Older clients |
 
 ### Architecture: Router Pattern
 The MCP server uses a consolidated router pattern with **5 tools** (reduced from 24):

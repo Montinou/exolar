@@ -13,54 +13,43 @@ Exolar QA includes a built-in MCP server that allows Claude Code to access your 
 - **Semantic definitions** to prevent AI hallucinations
 - **HTTP Streamable transport** - more reliable than legacy SSE
 
-## Quick Start
+## Quick Start (OAuth - Recommended)
 
-1. **Get Your Configuration**
-   - Log into the dashboard at your deployed URL
-   - Go to `/settings/mcp`
-   - Copy the configuration JSON
+Run this command in your terminal — no token copying needed:
 
-2. **Add to Claude Code**
-   - Open or create `~/.claude.json`
-   - Add the configuration to `mcpServers`
-   - Replace `<your-token>` with your actual token
+```bash
+claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp
+```
 
-3. **Use Claude Code**
-   - Restart Claude Code if already running
-   - Ask Claude to access your test data
-   - Example: "Show me what datasets are available"
+When prompted, select **"Authenticate"** → browser opens → log in → done!
 
-## Configuration
+## Alternative: Manual Token Setup
 
-Add this to your `~/.claude.json`:
+If OAuth doesn't work, get a token from `/settings/mcp` and use:
+
+```bash
+claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+## Configuration (Manual JSON)
+
+If you prefer manual configuration, add this to your `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "exolar-qa": {
-      "url": "https://your-dashboard.vercel.app/api/mcp/mcp",
+      "url": "https://exolar.ai-innovation.site/api/mcp/mcp",
       "headers": {
-        "Authorization": "Bearer <your-neon-auth-token>"
+        "Authorization": "Bearer <your-token>"
       }
     }
   }
 }
 ```
 
-> **Note**: The URL path is `/api/mcp/mcp` (not `/api/mcp`)
-
-## Getting Your Token
-
-Your Neon Auth token can be obtained from the browser developer tools:
-
-1. Log into the dashboard
-2. Open Developer Tools (F12)
-3. Go to Network tab
-4. Make any request (reload the page)
-5. Look for the `Authorization` header in the request headers
-6. Copy the token value after `Bearer `
-
-> **Important**: Tokens expire after a period of time. You may need to get a new token periodically.
+> **Note**: Get your token from `/settings/mcp` in the dashboard. Tokens are valid for 30 days.
 
 ## Architecture
 
