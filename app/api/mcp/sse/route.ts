@@ -20,6 +20,10 @@ import { validateMCPToken } from "@/lib/mcp/auth"
 import { allTools, handleToolCall } from "@/lib/mcp/tools"
 import type { MCPAuthContext } from "@/lib/mcp/auth"
 
+// Vercel config for streaming
+export const dynamic = "force-dynamic"
+export const maxDuration = 300 // 5 minutes max for SSE
+
 // In-memory session store (works for single Vercel function invocation)
 // For production with persistent SSE, you'd need Redis or similar
 const sessions = new Map<string, {
