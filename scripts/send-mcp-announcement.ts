@@ -2,24 +2,28 @@
  * Send MCP Integration Announcement Emails
  * Sends feature update emails to all dashboard users
  *
- * Usage: RESEND_API_KEY=your_key npx tsx scripts/send-mcp-announcement.ts
+ * Usage: npx tsx scripts/send-mcp-announcement.ts
  */
 
+import { config } from "dotenv"
 import { getAllUsers } from "../lib/db/users"
 import { sendEmail } from "../lib/email/resend"
 import { renderFeatureUpdateEmail } from "../lib/email/templates/simple-templates"
 
+// Load environment variables
+config()
+
 // Check if API key is set
 if (!process.env.RESEND_API_KEY) {
   console.error("❌ Error: RESEND_API_KEY environment variable is not set")
-  console.error("   Run: RESEND_API_KEY=your_key npx tsx scripts/send-mcp-announcement.ts")
+  console.error("   Make sure it's in your .env file")
   process.exit(1)
 }
 
 // Check if DATABASE_URL is set
 if (!process.env.DATABASE_URL) {
   console.error("❌ Error: DATABASE_URL environment variable is not set")
-  console.error("   Set DATABASE_URL to connect to the database")
+  console.error("   Make sure it's in your .env file")
   process.exit(1)
 }
 

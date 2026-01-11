@@ -2,16 +2,20 @@
  * Test MCP Announcement Email
  * Sends a single test email to review the MCP announcement
  *
- * Usage: RESEND_API_KEY=your_key npx tsx scripts/test-mcp-email.ts
+ * Usage: npx tsx scripts/test-mcp-email.ts
  */
 
+import { config } from "dotenv"
 import { sendEmail } from "../lib/email/resend"
 import { renderFeatureUpdateEmail } from "../lib/email/templates/simple-templates"
+
+// Load environment variables
+config()
 
 // Check if API key is set
 if (!process.env.RESEND_API_KEY) {
   console.error("❌ Error: RESEND_API_KEY environment variable is not set")
-  console.error("   Run: RESEND_API_KEY=your_key npx tsx scripts/test-mcp-email.ts")
+  console.error("   Make sure it's in your .env file")
   process.exit(1)
 }
 
