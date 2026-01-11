@@ -98,8 +98,8 @@ async function sendMCPAnnouncement() {
     const html = renderFeatureUpdateEmail({
       name,
       features: mcpFeatures,
-      ctaUrl: `${DASHBOARD_URL}/docs/mcp`,
-      ctaText: "View Documentation",
+      ctaUrl: `${DASHBOARD_URL}/settings/mcp`,
+      ctaText: "Get Started",
       dashboardUrl: DASHBOARD_URL,
       updateTitle: "MCP Integration Now Available",
       updateDescription:

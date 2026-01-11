@@ -86,7 +86,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     migration: {
       title: "Migration from v1.x",
       steps: [
-        "Old tool names still work but are deprecated. Update your prompts to use the new 5-tool pattern.",
+        "BREAKING: Old tool names (get_executions, get_flaky_tests, etc.) no longer work. Use the migration table in the documentation to update your prompts to the new 5-tool pattern.",
         "If using custom MCP clients: Update transport to HTTP Streamable (endpoint: /api/mcp/mcp)",
         "Regenerate your MCP token at /settings/mcp for the latest security improvements",
         "Review the semantic definitions to understand exact metric calculations",

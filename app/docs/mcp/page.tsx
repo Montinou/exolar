@@ -256,43 +256,52 @@ export default function MCPDocsPage() {
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
-              Get Your Token
+              Get Your Configuration
             </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Log into the dashboard and copy your authentication token from browser dev tools (F12 → Network → Authorization header)
+            <p className="text-sm text-muted-foreground mb-3">
+              Visit the <a href="/settings/mcp" className="text-primary hover:underline">MCP Settings page</a> to automatically generate your token and get the complete JSON configuration.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The page will generate a secure JWT token (valid for 30 days) with your organization context and display the ready-to-use JSON config.
             </p>
           </div>
 
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
-              Configure Claude Code
+              Add to Claude Code
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add to your <code className="px-1 py-0.5 rounded glass-panel">~/.claude.json</code>:
+              Copy the JSON configuration from the settings page and add it to your Claude Code MCP settings:
+            </p>
+            <ul className="text-xs sm:text-sm text-muted-foreground space-y-2 list-decimal list-inside mb-3">
+              <li>Open Claude Code settings</li>
+              <li>Navigate to MCP Servers section</li>
+              <li>Click "Add Server" or edit configuration file</li>
+              <li>Paste the JSON configuration</li>
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              The configuration will look like this (with your actual token):
             </p>
             <CodeBlock code={`{
   "mcpServers": {
     "exolar-qa": {
-      "url": "https://your-domain.vercel.app/api/mcp/mcp",
+      "url": "https://exolar.ai-innovation.site/api/mcp/mcp",
       "headers": {
-        "Authorization": "Bearer <your-token>"
+        "Authorization": "Bearer eyJ..."
       }
     }
   }
 }`} />
-            <p className="text-xs text-muted-foreground mt-3">
-              Note: URL path is <code className="px-1 py-0.5 rounded glass-panel">/api/mcp/mcp</code> (not /api/mcp)
-            </p>
           </div>
 
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">3</span>
-              Start Using
+              Restart and Use
             </h3>
             <p className="text-sm text-muted-foreground">
-              Restart Claude Code and start asking questions about your test data!
+              Restart Claude Code to apply changes, then start asking questions about your test data!
             </p>
           </div>
         </div>
@@ -508,13 +517,13 @@ export default function MCPDocsPage() {
           <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2 text-sm sm:text-base">&ldquo;Invalid or expired token&rdquo;</h3>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Get a new token from browser dev tools (F12 → Network → Authorization header). Tokens expire periodically.
+              Visit <a href="/settings/mcp" className="text-primary hover:underline">/settings/mcp</a> to generate a new token. Tokens expire after 30 days.
             </p>
           </div>
           <div className="p-3 sm:p-4 rounded-xl glass-card">
             <h3 className="font-semibold mb-2 text-sm sm:text-base">&ldquo;User not found&rdquo;</h3>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Ensure you're logged into the dashboard and have an organization assigned. Use token from the same session.
+              Ensure you're logged into the dashboard and have an organization assigned. Generate a new token from <a href="/settings/mcp" className="text-primary hover:underline">/settings/mcp</a> after logging in.
             </p>
           </div>
           <div className="p-3 sm:p-4 rounded-xl glass-card">
