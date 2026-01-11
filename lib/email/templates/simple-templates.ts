@@ -183,6 +183,136 @@ export function renderAttorneyShareEmail(props: EmailTemplateProps): string {
   `.trim()
 }
 
+export interface FeatureUpdateEmailProps {
+  name: string
+  features: Array<{
+    icon: string
+    title: string
+    description: string
+    color: "cyan" | "amber" | "purple"
+  }>
+  ctaUrl: string
+  ctaText: string
+  dashboardUrl: string
+  updateTitle: string
+  updateDescription: string
+}
+
+export function renderFeatureUpdateEmail(props: FeatureUpdateEmailProps): string {
+  const { name, features, ctaUrl, ctaText, dashboardUrl, updateTitle, updateDescription } = props
+
+  const colorMap = {
+    cyan: { bg: "rgba(77, 208, 225, 0.05)", border: "rgba(77, 208, 225, 0.1)", text: "#4dd0e1" },
+    amber: { bg: "rgba(245, 166, 35, 0.05)", border: "rgba(245, 166, 35, 0.1)", text: "#f5a623" },
+    purple: { bg: "rgba(139, 92, 246, 0.06)", border: "rgba(139, 92, 246, 0.15)", text: "#a78bfa" },
+  }
+
+  const featuresHtml = features
+    .map((feature) => {
+      const colors = colorMap[feature.color]
+      return `
+              <tr>
+                <td style="padding: 12px 16px; background: ${colors.bg}; border-radius: 8px; border: 1px solid ${colors.border}; vertical-align: top;">
+                  <span style="color: ${colors.text}; font-size: 14px;">${feature.icon}</span>
+                  <span style="color: #b8bcc8; font-size: 14px; margin-left: 10px; font-weight: 600;">${feature.title}</span>
+                  <p style="margin: 8px 0 0 34px; font-size: 13px; color: #7a7f8c; line-height: 20px;">${feature.description}</p>
+                </td>
+              </tr>
+`
+    })
+    .join("")
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #080a14;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #080a14; padding: 48px 20px;">
+    <tr>
+      <td align="center">
+        <!-- Outer glow container -->
+        <table width="620" cellpadding="0" cellspacing="0" style="background: linear-gradient(135deg, rgba(245, 166, 35, 0.15), rgba(139, 92, 246, 0.12), rgba(77, 208, 225, 0.08)); border-radius: 20px; padding: 2px;">
+          <tr>
+            <td>
+              <!-- Main card with glass effect -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: linear-gradient(180deg, #0f1219 0%, #0a0d14 100%); border-radius: 18px; border: 1px solid rgba(139, 92, 246, 0.25); box-shadow: 0 4px 60px rgba(245, 166, 35, 0.12), 0 0 80px rgba(139, 92, 246, 0.15), 0 0 120px rgba(77, 208, 225, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05);">
+                <!-- Header with gradient accent -->
+                <tr>
+                  <td style="padding: 0;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="height: 4px; background: linear-gradient(90deg, #f5a623, #8b5cf6, #4dd0e1); border-radius: 18px 18px 0 0;"></td>
+                      </tr>
+                    </table>
+                    <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 40px 24px;">
+                      <tr>
+                        <td align="center">
+                          <h1 style="margin: 0 0 8px; font-size: 26px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">${updateTitle}</h1>
+                          <p style="margin: 0; font-size: 14px; color: rgba(245, 166, 35, 0.9); text-transform: uppercase; letter-spacing: 2px;">Product Update</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                  <td style="padding: 24px 40px 32px;">
+                    <p style="margin: 0 0 16px; font-size: 16px; line-height: 26px; color: #b8bcc8;">Hi <strong style="color: #ffffff;">${name}</strong>,</p>
+
+                    <p style="margin: 0 0 28px; font-size: 16px; line-height: 26px; color: #b8bcc8;">
+                      ${updateDescription}
+                    </p>
+
+                    <!-- Features List -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin: 32px 0;">
+                      <tr>
+                        <td>
+                          <h3 style="margin: 0 0 20px; font-size: 15px; font-weight: 600; color: #ffffff; text-transform: uppercase; letter-spacing: 1px;">What's New</h3>
+                          <table width="100%" cellpadding="0" cellspacing="8">
+                            ${featuresHtml}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- CTA Button with enhanced glow -->
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin: 36px 0;">
+                      <tr>
+                        <td align="center">
+                          <a href="${ctaUrl}" style="display: inline-block; background: linear-gradient(135deg, #f5a623 0%, #ff8f00 50%, #e68900 100%); color: #080a14; padding: 16px 40px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px; box-shadow: 0 4px 24px rgba(245, 166, 35, 0.4), 0 0 40px rgba(245, 166, 35, 0.15); letter-spacing: 0.5px;">${ctaText} →</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 24px 40px 32px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+                    <p style="margin: 0 0 8px; font-size: 13px; line-height: 20px; color: #7a7f8c; text-align: center;">
+                      Need help? Check our <a href="${dashboardUrl}/docs" style="color: #f5a623; text-decoration: none;">documentation</a> or contact support.
+                    </p>
+                    <p style="margin: 0; font-size: 11px; line-height: 18px; color: #4a4f5c; text-align: center;">
+                      © 2026 Exolar Testing Dashboard. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `.trim()
+}
+
 export function renderExolarEmail(props: EmailTemplateProps): string {
   const { name, email, password, role, dashboardUrl } = props
   const roleDisplay = role === "admin" ? "Administrator" : "Team Member"

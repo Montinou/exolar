@@ -13,6 +13,7 @@ import {
   Gauge,
   ArrowLeft,
   ChevronRight,
+  Sparkles,
 } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import {
@@ -42,6 +43,7 @@ import {
 // Navigation items with optional sub-items
 const navigation = [
   { name: "Getting Started", href: "/docs", icon: Book },
+  { name: "What's New", href: "/docs/whats-new", icon: Sparkles },
   { name: "Quick Start", href: "/docs/quickstart", icon: Rocket },
   { 
     name: "Playwright Reporter", 

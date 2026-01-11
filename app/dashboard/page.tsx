@@ -20,6 +20,7 @@ import { SlowestTestsCard } from "@/components/dashboard/slowest-tests-card"
 import { SuitePassRatesCard } from "@/components/dashboard/suite-pass-rates-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BrandLogo } from "@/components/ui/brand-logo"
+import { AnnouncementBanner } from "@/components/dashboard/announcement-banner"
 
 export const dynamic = "force-dynamic"
 
@@ -211,6 +212,9 @@ export default async function DashboardPage({
           </div>
         </div>
       </div>
+
+      {/* Announcement Banner */}
+      <AnnouncementBanner />
 
       <div className="container mx-auto px-4 py-4 sm:py-8">
         <Suspense fallback={<DashboardSkeleton />}>
