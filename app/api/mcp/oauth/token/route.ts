@@ -5,25 +5,17 @@
  * Validates PKCE code_verifier.
  *
  * URL: /api/mcp/oauth/token
+ *
+ * The authorization code is a self-contained signed JWT,
+ * so no database lookup is required.
  */
 
 import { NextResponse } from "next/server"
 import { getSql } from "@/lib/db"
 import * as jose from "jose"
 
-// Secret for signing tokens
+// Secret for signing/verifying tokens
 const MCP_TOKEN_SECRET = process.env.MCP_TOKEN_SECRET || process.env.DATABASE_URL || "mcp-token-secret"
-
-// In-memory fallback for auth codes (when DB table doesn't exist)
-const inMemoryAuthCodes = new Map<string, {
-  clientId: string
-  userId: number
-  organizationId: number
-  redirectUri: string
-  codeChallenge: string
-  codeChallengeMethod: string
-  expiresAt: Date
-}>()
 
 export async function POST(request: Request) {
   // Parse form data or JSON
@@ -58,61 +50,34 @@ export async function POST(request: Request) {
     )
   }
 
-  // Retrieve authorization code from database
-  const sql = getSql()
-  let authCode: {
-    client_id: string
-    user_id: number
-    organization_id: number
-    redirect_uri: string
-    code_challenge: string
-    code_challenge_method: string
-    expires_at: Date
-  } | null = null
+  // Verify the authorization code (it's a signed JWT)
+  const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
+  let authCodePayload: jose.JWTPayload
 
   try {
-    const result = await sql`
-      SELECT client_id, user_id, organization_id, redirect_uri, 
-             code_challenge, code_challenge_method, expires_at
-      FROM oauth_authorization_codes
-      WHERE code = ${code}
-    `
-    if (result.length > 0) {
-      authCode = result[0] as typeof authCode
-    }
-  } catch {
-    // Table might not exist, check in-memory
-    const memCode = inMemoryAuthCodes.get(code)
-    if (memCode) {
-      authCode = {
-        client_id: memCode.clientId,
-        user_id: memCode.userId,
-        organization_id: memCode.organizationId,
-        redirect_uri: memCode.redirectUri,
-        code_challenge: memCode.codeChallenge,
-        code_challenge_method: memCode.codeChallengeMethod,
-        expires_at: memCode.expiresAt,
-      }
-    }
-  }
-
-  if (!authCode) {
+    const { payload } = await jose.jwtVerify(code, secret, {
+      issuer: "exolar-qa",
+      audience: "mcp-oauth",
+    })
+    authCodePayload = payload
+  } catch (error) {
+    console.error("[oauth/token] Invalid auth code:", error)
     return NextResponse.json(
-      { error: "invalid_grant", error_description: "Authorization code not found or expired" },
+      { error: "invalid_grant", error_description: "Authorization code is invalid or expired" },
       { status: 400 }
     )
   }
 
-  // Validate code hasn't expired
-  if (new Date(authCode.expires_at) < new Date()) {
+  // Verify it's an auth code (not an access token)
+  if (authCodePayload.type !== "auth_code") {
     return NextResponse.json(
-      { error: "invalid_grant", error_description: "Authorization code expired" },
+      { error: "invalid_grant", error_description: "Invalid authorization code" },
       { status: 400 }
     )
   }
 
   // Validate client_id
-  if (authCode.client_id !== clientId) {
+  if (authCodePayload.client_id !== clientId) {
     return NextResponse.json(
       { error: "invalid_grant", error_description: "Client ID mismatch" },
       { status: 400 }
@@ -120,7 +85,7 @@ export async function POST(request: Request) {
   }
 
   // Validate redirect_uri
-  if (authCode.redirect_uri !== redirectUri) {
+  if (authCodePayload.redirect_uri !== redirectUri) {
     return NextResponse.json(
       { error: "invalid_grant", error_description: "Redirect URI mismatch" },
       { status: 400 }
@@ -128,7 +93,10 @@ export async function POST(request: Request) {
   }
 
   // Validate PKCE code_verifier
-  const validPkce = await validatePkce(codeVerifier, authCode.code_challenge, authCode.code_challenge_method)
+  const codeChallenge = authCodePayload.code_challenge as string
+  const codeChallengeMethod = authCodePayload.code_challenge_method as string
+
+  const validPkce = await validatePkce(codeVerifier, codeChallenge, codeChallengeMethod)
   if (!validPkce) {
     return NextResponse.json(
       { error: "invalid_grant", error_description: "Invalid code_verifier" },
@@ -136,45 +104,37 @@ export async function POST(request: Request) {
     )
   }
 
-  // Delete the authorization code (one-time use)
-  try {
-    await sql`DELETE FROM oauth_authorization_codes WHERE code = ${code}`
-  } catch {
-    inMemoryAuthCodes.delete(code)
-  }
+  // Extract user info from auth code
+  const userId = parseInt(authCodePayload.sub as string, 10)
+  const organizationId = authCodePayload.org_id as number
+  const orgSlug = authCodePayload.org_slug as string
+  const email = authCodePayload.email as string
+  const orgRole = authCodePayload.org_role as string
 
-  // Get user info for token
-  let userEmail = ""
-  let orgSlug = ""
-  let orgRole = "viewer"
-
+  // Get user's role from database
+  let userRole = "viewer"
   try {
-    const userResult = await sql`
-      SELECT u.email, o.slug as org_slug, om.role as org_role
-      FROM dashboard_users u
-      LEFT JOIN organizations o ON o.id = ${authCode.organization_id}
-      LEFT JOIN organization_members om ON om.user_id = u.id AND om.organization_id = o.id
-      WHERE u.id = ${authCode.user_id}
+    const sql = getSql()
+    const result = await sql`
+      SELECT role as user_role FROM dashboard_users WHERE id = ${userId}
     `
-    if (userResult.length > 0) {
-      userEmail = userResult[0].email as string
-      orgSlug = userResult[0].org_slug as string
-      orgRole = (userResult[0].org_role as string) || "viewer"
+    if (result.length > 0) {
+      userRole = result[0].user_role as string
     }
   } catch (error) {
-    console.error("[oauth/token] Failed to get user info:", error)
+    console.log("[oauth/token] Could not fetch user role:", error)
   }
 
   // Generate access token (JWT)
-  const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
 
   const accessToken = await new jose.SignJWT({
-    sub: authCode.user_id.toString(),
-    email: userEmail,
-    org_id: authCode.organization_id,
+    sub: userId.toString(),
+    email,
+    org_id: organizationId,
     org_slug: orgSlug,
     org_role: orgRole,
+    user_role: userRole,
     type: "mcp",
     client_id: clientId,
   })
@@ -231,6 +191,3 @@ export async function OPTIONS() {
     },
   })
 }
-
-// Export for use by authorize endpoint
-export { inMemoryAuthCodes }

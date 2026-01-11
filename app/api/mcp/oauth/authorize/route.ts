@@ -4,16 +4,17 @@
  * Handles authorization code flow with PKCE.
  * URL: /api/mcp/oauth/authorize
  *
- * Flow:
- * 1. Client redirects user here with code_challenge
- * 2. We store the request and redirect to /auth/mcp for login
- * 3. After login, /auth/mcp calls back to generate auth code
+ * The authorization code is a signed JWT containing all necessary data,
+ * so no database storage is required (serverless-compatible).
  */
 
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { getSql } from "@/lib/db"
 import { getSessionContext } from "@/lib/session-context"
+import * as jose from "jose"
+
+// Secret for signing authorization codes
+const MCP_TOKEN_SECRET = process.env.MCP_TOKEN_SECRET || process.env.DATABASE_URL || "mcp-token-secret"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -71,18 +72,13 @@ export async function GET(request: Request) {
     )
   }
 
-  // Generate a request ID to track this authorization
-  const requestId = crypto.randomUUID()
-
-  // Store the authorization request in a cookie (short-lived)
+  // Store the authorization request in a cookie for the login flow
   const authRequest = {
     clientId,
     redirectUri,
     state,
     codeChallenge,
     codeChallengeMethod,
-    requestId,
-    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
   }
 
   const cookieStore = await cookies()
@@ -105,7 +101,6 @@ export async function GET(request: Request) {
   // Redirect to login page with callback
   const loginUrl = new URL("/auth/mcp", url.origin)
   loginUrl.searchParams.set("oauth", "1")
-  loginUrl.searchParams.set("request_id", requestId)
 
   return NextResponse.redirect(loginUrl)
 }
@@ -126,15 +121,6 @@ export async function POST(request: Request) {
 
   const authRequest = JSON.parse(authRequestCookie.value)
 
-  // Check expiration
-  if (Date.now() > authRequest.expiresAt) {
-    cookieStore.delete("mcp_oauth_request")
-    return NextResponse.json(
-      { error: "expired_request", error_description: "Authorization request expired" },
-      { status: 400 }
-    )
-  }
-
   // Get user context
   const context = await getSessionContext()
   if (!context) {
@@ -151,8 +137,6 @@ interface AuthRequest {
   state: string | null
   codeChallenge: string
   codeChallengeMethod: string
-  requestId: string
-  expiresAt: number
 }
 
 interface SessionContext {
@@ -163,32 +147,39 @@ interface SessionContext {
   orgRole: string
 }
 
+/**
+ * Generate a self-contained authorization code (signed JWT)
+ * This allows the token endpoint to verify it without database lookup
+ */
 async function generateAuthorizationCode(
   authRequest: AuthRequest,
   context: SessionContext
 ): Promise<NextResponse> {
-  // Generate authorization code
-  const code = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "")
+  const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
 
-  // Store authorization code in database
-  const sql = getSql()
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
-
-  try {
-    await sql`
-      INSERT INTO oauth_authorization_codes (
-        code, client_id, user_id, organization_id, redirect_uri,
-        code_challenge, code_challenge_method, expires_at
-      ) VALUES (
-        ${code}, ${authRequest.clientId}, ${context.userId}, ${context.organizationId},
-        ${authRequest.redirectUri}, ${authRequest.codeChallenge}, ${authRequest.codeChallengeMethod},
-        ${expiresAt.toISOString()}
-      )
-    `
-  } catch (error) {
-    console.error("[oauth/authorize] Failed to store auth code:", error)
-    // If table doesn't exist, we'll store in memory (not ideal for production)
-  }
+  // Create a signed JWT containing all the authorization data
+  // This is the authorization code - it's self-contained and verifiable
+  const code = await new jose.SignJWT({
+    // User info
+    sub: context.userId.toString(),
+    org_id: context.organizationId,
+    org_slug: context.organizationSlug,
+    email: context.email,
+    org_role: context.orgRole,
+    // OAuth params for validation
+    client_id: authRequest.clientId,
+    redirect_uri: authRequest.redirectUri,
+    code_challenge: authRequest.codeChallenge,
+    code_challenge_method: authRequest.codeChallengeMethod,
+    // Type marker
+    type: "auth_code",
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("5m") // 5 minute expiry
+    .setIssuer("exolar-qa")
+    .setAudience("mcp-oauth")
+    .sign(secret)
 
   // Clear the auth request cookie
   const cookieStore = await cookies()
