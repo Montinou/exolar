@@ -107,6 +107,59 @@ https://e2e-test-dashboard.vercel.app/docs
 
 ---
 
+## Template 3: Feature Update - Integration Engineer Persona
+
+### Subject Line
+```
+🤖 New: AI-Guided CI/CD Setup for Exolar QA
+```
+
+### Email Body
+```
+Hi [NAME],
+
+We've just released a major improvement to our MCP integration: **AI-Guided CI/CD Setup**.
+
+Say goodbye to confusing configuration dumps. Claude Code now acts as your Integration Engineer, asking about your environment first (CI provider, monorepo structure), then providing tailored instructions for your specific setup.
+
+WHAT'S NEW:
+🤖 Conversational setup experience
+🎯 CI-specific instructions (GitHub Actions focused in v2.1)
+📦 Monorepo-aware guidance
+✅ Built-in validation with dry run commands
+
+HOW TO USE:
+1. Ensure your MCP integration is connected (/settings/mcp)
+2. Ask Claude Code: "Help me integrate Exolar with my Playwright tests"
+3. Answer Claude's questions about your environment
+4. Get tailored instructions for GitHub Actions
+
+No more guessing where to put tokens or how to merge config files!
+
+👉 Learn More: https://exolar.ai-innovation.site/docs/mcp#conversational-setup
+
+---
+© 2026 Exolar QA. All rights reserved.
+```
+
+---
+
+### Personalization
+Replace [NAME] with recipient's name from database.
+
+### Sending Script
+Use the automated script to send this template to all users:
+
+```bash
+# Dry run first (test without sending)
+DRY_RUN=true npx tsx scripts/send-integration-engineer-announcement.ts
+
+# Send to all users
+npx tsx scripts/send-integration-engineer-announcement.ts
+```
+
+---
+
 ## Personalization Guide
 
 Replace the following placeholders in each template:

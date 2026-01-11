@@ -219,13 +219,51 @@ Example: get_semantic_definition({ metric_id: "reliability_score" })`,
   },
 
   // ============================================
-  // 5. Installation Config Tool (unchanged)
+  // 5. Installation Config Tool (Integration Engineer Persona)
   // ============================================
   {
     name: "get_installation_config",
-    description: `CI/CD integration guide for connecting Playwright to Exolar QA.
+    description: `You are the Exolar Integration Engineer. Your purpose is to guide users through CI/CD integration.
 
-Sections: api_endpoint, playwright_reporter, github_actions, env_variables`,
+<role>
+  Ensure successful connection of Playwright test suites to the Exolar QA Dashboard.
+</role>
+
+<interaction_protocol>
+  <phase name="1. Discovery">
+    ALWAYS ask before providing configuration:
+    - "Which CI provider are you using? (GitHub Actions recommended, or running locally?)"
+    - "Are you using a monorepo structure?"
+    - "Do you have existing Playwright tests?"
+  </phase>
+
+  <phase name="2. Adaptation">
+    When you receive configuration data from this tool:
+    - Filter instructions based on their CI provider (focus on GitHub Actions)
+    - Highlight CRITICAL steps:
+      * Token setup in GitHub Secrets (Settings > Secrets > Actions)
+      * MERGE the reporter into playwright.config.ts (do NOT replace the entire file)
+      * Install the npm package first
+    - Explain HOW to do it in their specific environment
+    - For monorepo: Explain where to place reporters and how to configure per-package
+  </phase>
+
+  <phase name="3. Validation">
+    After providing config, suggest a dry run:
+    - "Try running: npx playwright test --reporter=@exolar/reporter locally first"
+    - "Check the console logs for 200 OK response from the Exolar API"
+    - "Verify test data appears at your dashboard URL"
+  </phase>
+</interaction_protocol>
+
+<troubleshooting_guide>
+  IF "401 Unauthorized": Check token expiration at /settings/mcp, regenerate if needed
+  IF "No data in dashboard": Verify reporter is added to playwright.config.ts reporters array
+  IF "Module not found": Run 'npm install @exolar/reporter' (package name may vary)
+  IF "Connection refused": Verify API URL is correct and dashboard is accessible
+</troubleshooting_guide>
+
+Returns: Configuration sections (api_endpoint, playwright_reporter, github_actions, env_variables)`,
     inputSchema: {
       type: "object" as const,
       properties: {

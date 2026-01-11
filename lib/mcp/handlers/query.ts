@@ -32,6 +32,7 @@ const QueryInputSchema = z.object({
     "performance_regressions",
     "execution_summary",
     "execution_failures",
+    "setup_guide", // NEW: Integration Engineer persona CI/CD setup guide
   ]),
   filters: z
     .object({
@@ -60,6 +61,11 @@ const QueryInputSchema = z.object({
       include_retries: z.boolean().optional(),
       include_stack_traces: z.boolean().optional(),
       lastRunOnly: z.boolean().optional(),
+      // NEW: Setup guide filters
+      ci_provider: z.enum(["github", "local"]).optional(), // Focus on GitHub Actions (v2.1)
+      framework: z.enum(["playwright"]).optional().default("playwright"),
+      monorepo: z.boolean().optional(),
+      section: z.enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"]).optional(),
     })
     .optional()
     .default({}),
@@ -598,6 +604,36 @@ export async function handleQuery(
         }
 
         return textResponse(output)
+      }
+
+      // ============================================
+      // Setup Guide (v2.1: Integration Engineer Persona)
+      // ============================================
+      case "setup_guide": {
+        // For v2.1, we delegate to the standard installation config handler
+        // Future enhancement: Add CI-specific filtering for GitLab, Azure, CircleCI
+        const { handleInstallationConfig } = await import("@/lib/mcp/tools")
+
+        const configResult = await handleInstallationConfig(
+          { section: f.section || "all" },
+          authContext
+        )
+
+        // Wrap the result with metadata about the filters used
+        const configData = JSON.parse(configResult.content[0].text)
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          dataset: "setup_guide",
+          filters: {
+            ci_provider: f.ci_provider || "github", // v2.1 defaults to GitHub Actions
+            framework: f.framework || "playwright",
+            monorepo: f.monorepo || false,
+            section: f.section || "all"
+          },
+          note: "v2.1: Focus on GitHub Actions. Use get_installation_config tool with Integration Engineer persona for conversational setup.",
+          data: configData
+        })
       }
 
       default:

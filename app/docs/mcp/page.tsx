@@ -266,6 +266,24 @@ export default function MCPDocsPage() {
             </p>
           </div>
 
+          {/* NEW: AI-Guided Setup Callout */}
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow bg-cyan-500/5 border border-cyan-500/30">
+            <h3 className="font-semibold mb-2 flex items-center gap-3">
+              <span className="text-2xl">🤖</span>
+              AI-Guided CI/CD Setup (Recommended)
+            </h3>
+            <p className="text-sm text-muted-foreground mb-3">
+              After connecting MCP, simply ask Claude Code:
+            </p>
+            <CodeBlock code={`"Help me integrate Exolar with my Playwright tests"`} />
+            <p className="text-xs text-muted-foreground mt-3">
+              Claude will adopt an Integration Engineer persona, ask about your CI provider (GitHub Actions recommended) and project structure, then provide tailored instructions for your specific environment. No more guessing where to put tokens or how to merge config files!
+            </p>
+            <p className="text-xs text-cyan-400 mt-2">
+              Learn more in the <a href="#conversational-setup" className="underline">Conversational CI/CD Setup</a> section below.
+            </p>
+          </div>
+
           <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
             <h3 className="font-semibold mb-2 flex items-center gap-3">
               <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
@@ -465,6 +483,99 @@ export default function MCPDocsPage() {
               &ldquo;{example}&rdquo;
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Conversational CI/CD Setup (NEW in v2.1) */}
+      <section id="conversational-setup" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Conversational CI/CD Setup</h2>
+        <p className="text-muted-foreground">
+          The <code className="px-1 py-0.5 rounded glass-panel">get_installation_config</code> tool
+          uses an <strong>Integration Engineer persona</strong> that guides you through setup step-by-step.
+        </p>
+
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl glass-card">
+            <div className="text-2xl mb-2">🔍</div>
+            <h3 className="font-semibold mb-2 text-sm">Discovery</h3>
+            <p className="text-xs text-muted-foreground">
+              Claude asks about your CI provider (GitHub Actions recommended), monorepo structure, and existing tests
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl glass-card">
+            <div className="text-2xl mb-2">🎯</div>
+            <h3 className="font-semibold mb-2 text-sm">Adaptation</h3>
+            <p className="text-xs text-muted-foreground">
+              Receives CI-specific instructions with exact secrets management steps for GitHub Actions
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl glass-card">
+            <div className="text-2xl mb-2">✅</div>
+            <h3 className="font-semibold mb-2 text-sm">Validation</h3>
+            <p className="text-xs text-muted-foreground">
+              Gets dry run commands to verify integration before pushing to CI
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+          <h3 className="font-semibold mb-3">Example Conversation</h3>
+          <div className="space-y-3 text-sm">
+            <div className="p-3 rounded glass-panel">
+              <strong>You:</strong> &ldquo;Help me integrate Exolar with my Playwright tests&rdquo;
+            </div>
+            <div className="p-3 rounded glass-panel bg-primary/5">
+              <strong>Claude (Integration Engineer):</strong> &ldquo;I&apos;ll help you set up Exolar! First,
+              which CI provider are you using? (GitHub Actions recommended, or running locally?)&rdquo;
+            </div>
+            <div className="p-3 rounded glass-panel">
+              <strong>You:</strong> &ldquo;GitHub Actions&rdquo;
+            </div>
+            <div className="p-3 rounded glass-panel bg-primary/5">
+              <strong>Claude:</strong> &ldquo;Perfect! Here are your GitHub Actions setup instructions:
+
+              1. Add this secret in Settings &gt; Secrets &gt; Actions:
+                 Name: EXOLAR_API_KEY
+                 Value: [from /settings/mcp]
+
+              2. Install the package: npm install @exolar/reporter
+
+              3. MERGE (don&apos;t replace!) the reporter into your playwright.config.ts reporters array
+
+              4. Update your .github/workflows/playwright.yml with...
+
+              Would you like me to explain how to merge the reporter config?&rdquo;
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 rounded-xl glass-card">
+          <h3 className="font-semibold mb-3 text-sm">Key Benefits</h3>
+          <ul className="space-y-2 text-xs sm:text-sm text-muted-foreground">
+            <li>• No guessing where to put the EXOLAR_API_KEY</li>
+            <li>• Clear instructions: MERGE vs REPLACE config files</li>
+            <li>• GitHub Actions-specific secrets management path</li>
+            <li>• Monorepo-aware guidance (where to place reporters, per-package config)</li>
+            <li>• Built-in validation commands (dry run locally before CI push)</li>
+          </ul>
+        </div>
+
+        <div className="p-4 sm:p-6 rounded-xl glass-card bg-amber-500/5 border border-amber-500/30">
+          <h3 className="font-semibold mb-2 text-sm text-amber-500">Router Pattern Alternative</h3>
+          <p className="text-xs text-muted-foreground mb-3">
+            You can also use the router pattern to get pre-filtered configuration programmatically:
+          </p>
+          <CodeBlock code={`query_exolar_data({
+  dataset: "setup_guide",
+  filters: {
+    ci_provider: "github",  // or "local" (v2.1)
+    framework: "playwright",
+    monorepo: false,        // or true
+    section: "all"          // or specific section
+  }
+})`} />
         </div>
       </section>
 

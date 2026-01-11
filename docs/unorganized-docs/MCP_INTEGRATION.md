@@ -370,6 +370,64 @@ get_installation_config({ section: "github_actions" })
 
 **Unchanged**: Same functionality as before consolidation.
 
+### 5.1 Using the Integration Engineer Persona (NEW in v2.1)
+
+When using `get_installation_config`, Claude Code automatically adopts the **Integration Engineer** persona to guide you through setup.
+
+**Conversational Flow:**
+1. **Discovery**: Claude will ask about your CI provider (GitHub Actions recommended) and project structure (monorepo?)
+2. **Adaptation**: You'll receive configuration specific to your environment with highlighted critical steps
+3. **Validation**: Claude will suggest dry run commands to verify the integration before pushing to CI
+
+**Example Conversation:**
+```
+You: "Help me integrate Exolar with my Playwright tests"
+
+Claude (Integration Engineer): "I'll help you set up Exolar! First, which CI provider
+are you using? (GitHub Actions recommended, or running locally?)"
+
+You: "GitHub Actions"
+
+Claude: "Perfect! Here are your GitHub Actions setup instructions:
+
+1. Add EXOLAR_API_KEY secret in Settings > Secrets > Actions
+2. Install the package: npm install @exolar/reporter
+3. MERGE (don't replace!) the reporter into your playwright.config.ts reporters array
+4. Update your .github/workflows/playwright.yml with...
+
+Would you like me to explain how to merge the reporter config?"
+```
+
+**Alternative: Router Pattern with Filters**
+
+You can also use the router pattern to get pre-filtered configuration:
+
+```typescript
+query_exolar_data({
+  dataset: "setup_guide",
+  filters: {
+    ci_provider: "github",    // or "local" (v2.1 focus)
+    framework: "playwright",
+    monorepo: false,          // or true
+    section: "all"            // or specific section
+  }
+})
+```
+
+This returns the same configuration but wrapped with metadata about the filters used.
+
+**Benefits:**
+- No guessing about where to put the EXOLAR_TOKEN
+- Clear instructions: MERGE vs REPLACE config files
+- CI-specific secrets management steps (GitHub Actions path: Settings > Secrets > Actions)
+- Monorepo-aware guidance (where to place reporters, per-package config)
+- Built-in validation commands (dry run locally before CI push)
+
+**Future Enhancements (post-v2.1):**
+- GitLab CI specific instructions
+- Azure DevOps pipeline configuration
+- CircleCI orb integration
+
 ---
 
 ## Filter Reference

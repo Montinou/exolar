@@ -32,6 +32,59 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: "integration-engineer-persona",
+    date: "2026-01-11",
+    version: "v2.1",
+    title: "AI-Guided CI/CD Setup with Integration Engineer Persona",
+    description:
+      "Transform CI/CD setup from confusing config dumps to conversational pair programming. Claude Code now adopts an Integration Engineer persona that asks about your environment first, then provides tailored instructions for your specific CI provider and project structure.",
+    type: "improvement",
+    features: [
+      {
+        icon: "🤖",
+        title: "Conversational Setup Experience",
+        description:
+          "Claude asks discovery questions (CI provider, monorepo structure) before providing configuration. No more guessing where to put tokens or how to merge config files.",
+        docsUrl: "/docs/mcp#conversational-setup",
+      },
+      {
+        icon: "🎯",
+        title: "GitHub Actions-Specific Instructions",
+        description:
+          "Get GitHub Actions-specific instructions with exact secrets management steps (Settings > Secrets > Actions path). Currently focused on GitHub Actions with more CI providers coming soon.",
+        docsUrl: "/docs/mcp#installation",
+      },
+      {
+        icon: "📦",
+        title: "Monorepo-Aware Guidance",
+        description:
+          "Claude explicitly asks if you're using a monorepo and provides guidance on where to place reporters, how to configure per-package Playwright configs, and manage environment variables.",
+        docsUrl: "/docs/mcp#conversational-setup",
+      },
+      {
+        icon: "✅",
+        title: "Built-in Validation",
+        description:
+          "Claude suggests dry run commands to verify integration locally before pushing to CI. Catch configuration issues early with 'npx playwright test --reporter=@exolar/reporter'.",
+        docsUrl: "/docs/mcp#troubleshooting",
+      },
+      {
+        icon: "🔧",
+        title: "Contextual Troubleshooting",
+        description:
+          "Get instant help for common issues: 401 Unauthorized (token expiration), missing data (reporter not in config), module errors (missing npm install). Claude provides exact fix steps based on your error.",
+        docsUrl: "/docs/mcp#troubleshooting",
+      },
+      {
+        icon: "🚀",
+        title: "Setup Guide Dataset",
+        description:
+          "New 'setup_guide' dataset in query_exolar_data allows programmatic access to filtered configuration with ci_provider, framework, monorepo, and section filters.",
+        docsUrl: "/docs/mcp#datasets",
+      },
+    ],
+  },
+  {
     id: "mcp-v2-launch",
     date: "2026-01-10",
     version: "v2.0",

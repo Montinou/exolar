@@ -23,6 +23,18 @@ export interface Announcement {
  */
 export const ACTIVE_ANNOUNCEMENTS: Announcement[] = [
   {
+    id: "integration-engineer-v21",
+    title: "🤖 AI-Guided CI/CD Setup",
+    description:
+      "Claude now guides you through integration with conversational setup. No more config confusion!",
+    ctaText: "Try It Now",
+    ctaUrl: "/docs/mcp#conversational-setup",
+    icon: null,
+    variant: "feature",
+    expiresAt: new Date("2026-02-15"), // 35 days from launch
+    priority: 9,
+  },
+  {
     id: "mcp-v2-launch",
     title: "🚀 MCP Integration Now Available",
     description:
