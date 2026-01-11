@@ -9,6 +9,7 @@
 export interface DashboardUser {
   id: number
   email: string
+  name: string | null
   role: "admin" | "viewer"
   invited_by: number | null
   default_org_id: number | null

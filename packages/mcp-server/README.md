@@ -1,6 +1,25 @@
 # Exolar QA MCP Server
 
-An MCP (Model Context Protocol) server that provides Claude Code with direct access to your E2E test execution data from the Exolar QA Dashboard.
+> ⚠️ **DEPRECATED - Use HTTP Streamable Instead**
+>
+> This stdio-based MCP server (v1.0) is deprecated in favor of the **HTTP Streamable** transport (v2.0+).
+>
+> **Why migrate?**
+> - ✅ **83% token savings** - 5 consolidated tools instead of 24
+> - ✅ **More reliable** - HTTP with automatic retry
+> - ✅ **Better features** - Router pattern, semantic layer, Integration Engineer persona
+> - ✅ **Easier setup** - No local OAuth flow, just get a token from dashboard
+>
+> **New Installation (Recommended):**
+> 1. Visit [https://exolar.ai-innovation.site/settings/mcp](https://exolar.ai-innovation.site/settings/mcp)
+> 2. Copy your authentication token
+> 3. Run: `claude mcp add exolar-qa --url https://exolar.ai-innovation.site/api/mcp/mcp --header "Authorization: Bearer YOUR_TOKEN"`
+>
+> See [MCP Integration Guide](https://exolar.ai-innovation.site/docs/mcp) for full documentation.
+>
+> ---
+>
+> **Legacy Documentation Below** (for stdio transport, not recommended)
 
 ## Quick Start
 

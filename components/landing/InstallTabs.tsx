@@ -4,13 +4,17 @@ import { useState } from "react"
 import { Check, Copy } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-const step1Command = `npx @exolar-qa/mcp-server setup`
+const step1Command = `claude mcp add exolar-qa \\
+  --url https://exolar.ai-innovation.site/api/mcp/mcp \\
+  --header "Authorization: Bearer YOUR_TOKEN_HERE"`
 
 const manualConfig = `{
   "mcpServers": {
     "exolar-qa": {
-      "command": "npx",
-      "args": ["-y", "@exolar-qa/mcp-server"]
+      "url": "https://exolar.ai-innovation.site/api/mcp/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN_HERE"
+      }
     }
   }
 }`
@@ -89,24 +93,29 @@ export function InstallTabs() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
-                    Run the setup command
+                    1. Get your token from <a href="https://exolar.ai-innovation.site/settings/mcp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">Settings → MCP Integration</a>
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 mt-4">
+                  <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
+                    2. Run the setup command
                   </p>
                 </div>
                 <CodeBlock code={step1Command} language="bash" />
               </div>
 
               <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>
-                That&apos;s it! Claude Code now has access to your test data.
+                That&apos;s it! Claude Code now has access to your test data via HTTP Streamable transport.
               </p>
             </TabsContent>
 
             <TabsContent value="manual" className="space-y-4">
               <p className="text-sm" style={{ color: "oklch(0.6 0 0)" }}>
-                Add this to your <code className="px-2 py-1 rounded glass-panel text-xs">claude_desktop_config.json</code>:
+                Add this to your Claude Code MCP settings:
               </p>
               <CodeBlock code={manualConfig} language="json" />
               <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>
-                Note: Run <code className="px-1 rounded glass-panel">npx @exolar-qa/mcp-server --login</code> first to authenticate.
+                Note: Get your authentication token from <a href="https://exolar.ai-innovation.site/settings/mcp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">Settings → MCP Integration</a>
               </p>
             </TabsContent>
           </Tabs>
