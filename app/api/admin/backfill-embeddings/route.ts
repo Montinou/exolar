@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { getSessionContext } from "@/lib/session-context"
+import { getSessionContext, isSystemAdmin } from "@/lib/session-context"
 import { getTestsNeedingEmbeddingsV2, countTestsWithEmbeddings } from "@/lib/db/embeddings"
 import { generateEmbeddingsWithProgress } from "@/lib/services/embedding-service"
 
@@ -17,9 +17,9 @@ export const maxDuration = 300 // 5 minutes
 
 export async function POST(request: Request) {
   try {
-    // Require admin
+    // Require system admin
     const context = await getSessionContext()
-    if (!context?.isAdmin) {
+    if (!context || !isSystemAdmin(context)) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 }
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const context = await getSessionContext()
-    if (!context?.isAdmin) {
+    if (!context || !isSystemAdmin(context)) {
       return NextResponse.json(
         { error: "Admin access required" },
         { status: 403 }
