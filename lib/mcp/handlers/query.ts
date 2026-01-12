@@ -32,7 +32,11 @@ const QueryInputSchema = z.object({
     "performance_regressions",
     "execution_summary",
     "execution_failures",
-    "setup_guide", // NEW: Integration Engineer persona CI/CD setup guide
+    "setup_guide", // Integration Engineer persona CI/CD setup guide
+    // Suite and test tracking (Phase 14)
+    "org_suites", // List suites with stats
+    "suite_tests", // Tests for a suite
+    "inactive_tests", // Tests that haven't run in 30 days
   ]),
   filters: z
     .object({
@@ -61,11 +65,17 @@ const QueryInputSchema = z.object({
       include_retries: z.boolean().optional(),
       include_stack_traces: z.boolean().optional(),
       lastRunOnly: z.boolean().optional(),
-      // NEW: Setup guide filters
-      ci_provider: z.enum(["github", "local"]).optional(), // Focus on GitHub Actions (v2.1)
+      // Setup guide filters
+      ci_provider: z.enum(["github", "local"]).optional(), // Focus on GitHub Actions
       framework: z.enum(["playwright"]).optional().default("playwright"),
       monorepo: z.boolean().optional(),
       section: z.enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"]).optional(),
+      // Suite and test tracking filters (Phase 14)
+      suite_id: z.number().optional(),
+      tech_stack: z.enum(["playwright", "cypress", "vitest", "jest", "mocha", "pytest", "other"]).optional(),
+      is_active: z.boolean().optional(),
+      is_critical: z.boolean().optional(),
+      test_file: z.string().optional(),
     })
     .optional()
     .default({}),
@@ -634,6 +644,118 @@ export async function handleQuery(
           note: "v2.1: Focus on GitHub Actions. Use get_installation_config tool with Integration Engineer persona for conversational setup.",
           data: configData
         })
+      }
+
+      // ============================================
+      // Suite and Test Tracking (Phase 14)
+      // ============================================
+      case "org_suites": {
+        const suites = await db.getSuitesWithStats(orgId)
+        const summary = await db.getSuiteCountsSummary(orgId)
+
+        // Filter by tech_stack if provided
+        const filteredSuites = f.tech_stack
+          ? suites.filter((s) => s.tech_stack === f.tech_stack)
+          : suites
+
+        // Filter by is_active if provided
+        const activeFilteredSuites = f.is_active !== undefined
+          ? filteredSuites.filter((s) => s.is_active === f.is_active)
+          : filteredSuites
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "org_suites",
+            filters: { tech_stack: f.tech_stack, is_active: f.is_active },
+            count: activeFilteredSuites.length,
+            summary,
+            data: activeFilteredSuites,
+          })
+        }
+
+        let output = `## Registered Suites (${activeFilteredSuites.length})\n\n`
+        output += `**Summary:** ${summary.total_suites} suites, ${summary.active_tests} active tests, ${summary.inactive_tests} inactive tests\n\n`
+        output += "| Suite | Tech Stack | Tests | Pass Rate | Last Run |\n"
+        output += "|-------|------------|-------|-----------|----------|\n"
+        for (const suite of activeFilteredSuites) {
+          const lastRun = suite.last_execution_at
+            ? new Date(suite.last_execution_at).toLocaleDateString()
+            : "Never"
+          output += `| ${suite.name} | ${suite.tech_stack} | ${suite.active_test_count} | ${suite.pass_rate?.toFixed(1) || 0}% | ${lastRun} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "suite_tests": {
+        const suiteId = f.suite_id
+        const suiteName = f.suite
+
+        if (!suiteId && !suiteName) {
+          return errorResponse("suite_tests requires filters.suite_id or filters.suite")
+        }
+
+        const tests = await db.getSuiteTests(orgId, {
+          suiteId,
+          suiteName,
+          isActive: f.is_active,
+          isCritical: f.is_critical,
+          testFile: f.test_file,
+          limit: f.limit ?? 50,
+          offset: f.offset ?? 0,
+        })
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "suite_tests",
+            filters: { suite_id: suiteId, suite: suiteName, is_active: f.is_active, is_critical: f.is_critical },
+            count: tests.length,
+            pagination: { offset: f.offset ?? 0, limit: f.limit ?? 50, has_more: tests.length === (f.limit ?? 50) },
+            data: tests,
+          })
+        }
+
+        let output = `## Suite Tests (${tests.length} results)\n\n`
+        output += "| Test | File | Status | Runs | Pass Rate | Last Seen |\n"
+        output += "|------|------|--------|------|-----------|----------|\n"
+        for (const t of tests) {
+          const passRate = t.run_count > 0 ? ((t.pass_count / t.run_count) * 100).toFixed(1) : "0"
+          const lastSeen = new Date(t.last_seen_at).toLocaleDateString()
+          const status = t.is_active ? (t.last_status || "?") : "inactive"
+          output += `| ${t.test_name.slice(0, 30)} | ${t.test_file.split("/").pop()?.slice(0, 20) || ""} | ${status} | ${t.run_count} | ${passRate}% | ${lastSeen} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "inactive_tests": {
+        const tests = await db.getInactiveTests(orgId, f.limit ?? 50)
+        const summary = await db.getSuiteCountsSummary(orgId)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "inactive_tests",
+            count: tests.length,
+            total_inactive: summary.inactive_tests,
+            note: "Tests that haven't run in 30+ days",
+            data: tests,
+          })
+        }
+
+        let output = `## Inactive Tests (${tests.length} of ${summary.inactive_tests} total)\n\n`
+        output += "_Tests that haven't run in 30+ days_\n\n"
+        output += "| Test | File | Suite | Last Seen | Runs |\n"
+        output += "|------|------|-------|-----------|------|\n"
+        for (const t of tests) {
+          const lastSeen = new Date(t.last_seen_at).toLocaleDateString()
+          const suite = t.suite_name || "—"
+          output += `| ${t.test_name.slice(0, 30)} | ${t.test_file.split("/").pop()?.slice(0, 20) || ""} | ${suite} | ${lastSeen} | ${t.run_count} |\n`
+        }
+
+        return textResponse(output)
       }
 
       default:

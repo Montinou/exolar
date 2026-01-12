@@ -188,6 +188,7 @@ export interface ExecutionRequest {
   triggered_by?: string
   workflow_name?: string
   suite?: string
+  reporter?: string // Reporter name for tech stack detection (e.g., "@playwright/test", "cypress")
   status: "success" | "failure" | "running"
   total_tests: number
   passed: number
@@ -649,4 +650,112 @@ export interface ClassificationOptions {
   executionId?: number
   testName?: string
   testFile?: string
+}
+
+// ============================================
+// Suite and Test Tracking Types (Phase 14)
+// ============================================
+
+/**
+ * Supported test frameworks/tech stacks
+ */
+export type TechStack =
+  | "playwright"
+  | "cypress"
+  | "vitest"
+  | "jest"
+  | "mocha"
+  | "pytest"
+  | "other"
+
+/**
+ * Registered suite for an organization
+ */
+export interface OrgSuite {
+  id: number
+  organization_id: number
+  name: string
+  tech_stack: TechStack
+  description: string | null
+  repository_url: string | null
+  is_active: boolean
+  test_count: number
+  last_execution_id: number | null
+  last_execution_at: string | null
+  first_seen_at: string
+  updated_at: string
+}
+
+/**
+ * Individual test tracked within a suite
+ */
+export interface SuiteTest {
+  id: number
+  organization_id: number
+  suite_id: number | null
+  test_signature: string
+  test_name: string
+  test_file: string
+  is_active: boolean
+  is_critical: boolean
+  run_count: number
+  pass_count: number
+  fail_count: number
+  skip_count: number
+  last_status: "passed" | "failed" | "skipped" | "timedout" | null
+  last_duration_ms: number | null
+  avg_duration_ms: number
+  first_seen_at: string
+  last_seen_at: string
+  updated_at: string
+}
+
+/**
+ * Suite with aggregated test statistics
+ */
+export interface SuiteWithStats extends OrgSuite {
+  active_test_count: number
+  inactive_test_count: number
+  pass_rate: number
+  avg_test_duration_ms: number
+}
+
+/**
+ * Suite test with suite name (for display)
+ */
+export interface SuiteTestWithSuite extends SuiteTest {
+  suite_name: string | null
+}
+
+/**
+ * Options for querying suites
+ */
+export interface GetSuitesOptions {
+  techStack?: TechStack
+  isActive?: boolean
+  limit?: number
+  offset?: number
+}
+
+/**
+ * Options for querying suite tests
+ */
+export interface GetSuiteTestsOptions {
+  suiteId?: number
+  suiteName?: string
+  isActive?: boolean
+  isCritical?: boolean
+  testFile?: string
+  limit?: number
+  offset?: number
+}
+
+/**
+ * Request to update suite metadata
+ */
+export interface UpdateSuiteRequest {
+  description?: string
+  repository_url?: string
+  tech_stack?: TechStack
+  is_active?: boolean
 }

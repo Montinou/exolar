@@ -1,14 +1,29 @@
 import { getSql } from "./connection"
 import { generateTestSignature, isTestFlaky } from "./utils"
 import { updateFlakinessHistory } from "./flakiness"
+import { detectTechStack, upsertSuite, upsertSuiteTest, updateSuiteTestCounts } from "./suites"
 import type { ExecutionRequest, TestResultRequest, ArtifactRequest } from "../types"
 
 // ============================================
 // Insert Functions for Data Ingestion
 // ============================================
 
-export async function insertExecution(organizationId: number, data: ExecutionRequest): Promise<number> {
+/**
+ * Insert execution and auto-register suite
+ * @returns Object with execution_id and suite_id
+ */
+export async function insertExecution(
+  organizationId: number,
+  data: ExecutionRequest
+): Promise<{ executionId: number; suiteId: number | null }> {
   const sql = getSql()
+
+  // Auto-register suite if provided
+  let suiteId: number | null = null
+  if (data.suite) {
+    const techStack = detectTechStack(data.reporter)
+    suiteId = await upsertSuite(organizationId, data.suite, techStack)
+  }
 
   const result = await sql`
     INSERT INTO test_executions (
@@ -20,6 +35,7 @@ export async function insertExecution(organizationId: number, data: ExecutionReq
       triggered_by,
       workflow_name,
       suite,
+      suite_id,
       status,
       total_tests,
       passed,
@@ -37,6 +53,7 @@ export async function insertExecution(organizationId: number, data: ExecutionReq
       ${data.triggered_by ?? "unknown"},
       ${data.workflow_name ?? "E2E Tests"},
       ${data.suite ?? null},
+      ${suiteId},
       ${data.status},
       ${data.total_tests},
       ${data.passed},
@@ -49,13 +66,25 @@ export async function insertExecution(organizationId: number, data: ExecutionReq
     RETURNING id
   `
 
-  return result[0].id as number
+  const executionId = result[0].id as number
+
+  // Update suite's last_execution_id
+  if (suiteId) {
+    await sql`
+      UPDATE org_suites
+      SET last_execution_id = ${executionId}, last_execution_at = NOW()
+      WHERE id = ${suiteId}
+    `
+  }
+
+  return { executionId, suiteId }
 }
 
 export async function insertTestResults(
   organizationId: number,
   executionId: number,
-  results: TestResultRequest[]
+  results: TestResultRequest[],
+  suiteId?: number | null
 ): Promise<Map<string, number>> {
   const sql = getSql()
   const signatureToIdMap = new Map<string, number>()
@@ -66,6 +95,7 @@ export async function insertTestResults(
     const signature = generateTestSignature(result.test_file, result.test_name)
     const retryCount = result.retry_count ?? 0
     const flaky = isTestFlaky(retryCount, result.status)
+    const isCritical = result.is_critical ?? false
 
     const inserted = await sql`
       INSERT INTO test_results (
@@ -92,7 +122,7 @@ export async function insertTestResults(
         ${signature},
         ${result.status},
         ${result.duration_ms},
-        ${result.is_critical ?? false},
+        ${isCritical},
         ${flaky},
         ${result.error_message ?? null},
         ${result.stack_trace ?? null},
@@ -118,6 +148,23 @@ export async function insertTestResults(
       retryCount,
       result.duration_ms
     )
+
+    // Auto-register test in suite_tests table
+    await upsertSuiteTest(
+      organizationId,
+      signature,
+      result.test_name,
+      result.test_file,
+      result.status,
+      result.duration_ms,
+      isCritical,
+      suiteId ?? null
+    )
+  }
+
+  // Update suite test count if suiteId is provided
+  if (suiteId) {
+    await updateSuiteTestCounts(organizationId)
   }
 
   return signatureToIdMap

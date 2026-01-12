@@ -160,12 +160,39 @@ export {
   getWishlistCount,
 } from "./wishlist"
 
+// Suite and test tracking (Phase 14)
+export {
+  detectTechStack,
+  getSuiteRegistry,
+  getSuiteByName,
+  getSuiteById,
+  upsertSuite,
+  updateSuite,
+  getSuitesWithStats,
+  getSuiteTests,
+  upsertSuiteTest,
+  markInactiveTests,
+  updateSuiteTestCounts,
+  getInactiveTests,
+  getSuiteTestBySignature,
+  getSuiteTestsWithSuiteName,
+  getSuiteCountsSummary,
+} from "./suites"
+
 // ============================================
 // Org-Bound Query Helper
 // ============================================
 
 // Re-export types needed for parameters
-import type { TestResultRequest, ExecutionRequest, ClassificationOptions } from "../types"
+import type {
+  TestResultRequest,
+  ExecutionRequest,
+  ClassificationOptions,
+  TechStack,
+  GetSuitesOptions,
+  GetSuiteTestsOptions,
+  UpdateSuiteRequest,
+} from "../types"
 import type {
   DateRangeFilter,
   TrendOptions,
@@ -226,6 +253,19 @@ import {
   insertExecution,
   insertTestResults,
 } from "./ingestion"
+import {
+  getSuiteRegistry,
+  getSuiteById,
+  upsertSuite,
+  updateSuite,
+  getSuitesWithStats,
+  getSuiteTests,
+  upsertSuiteTest,
+  markInactiveTests,
+  updateSuiteTestCounts,
+  getInactiveTests,
+  getSuiteCountsSummary,
+} from "./suites"
 import {
   getOrganizationMembers,
   getOrgInvites,
@@ -304,10 +344,10 @@ export function getQueriesForOrg(organizationId: number) {
       getSlowestTests(organizationId, limit, minRuns),
     getSuitePassRates: () => getSuitePassRates(organizationId),
 
-    // Insert functions
+    // Insert functions (auto-registers suites and tests)
     insertExecution: (data: ExecutionRequest) => insertExecution(organizationId, data),
-    insertTestResults: (executionId: number, results: TestResultRequest[]) =>
-      insertTestResults(organizationId, executionId, results),
+    insertTestResults: (executionId: number, results: TestResultRequest[], suiteId?: number | null) =>
+      insertTestResults(organizationId, executionId, results, suiteId),
 
     // API key functions
     createApiKey: (name: string, keyHash: string, keyPrefix: string, createdBy: number | null) =>
@@ -341,5 +381,41 @@ export function getQueriesForOrg(organizationId: number) {
     getOrganizationMembers: () => getOrganizationMembers(organizationId),
     getOrgInvites: () => getOrgInvites(organizationId),
     isUserMemberOfOrg: (userId: number) => isUserMemberOfOrg(userId, organizationId),
+
+    // Suite and test tracking (Phase 14)
+    getSuiteRegistry: (options?: GetSuitesOptions) =>
+      getSuiteRegistry(organizationId, options),
+    getSuiteById: (suiteId: number) => getSuiteById(organizationId, suiteId),
+    upsertSuite: (name: string, techStack?: TechStack, executionId?: number) =>
+      upsertSuite(organizationId, name, techStack, executionId),
+    updateSuite: (suiteId: number, updates: UpdateSuiteRequest) =>
+      updateSuite(organizationId, suiteId, updates),
+    getSuitesWithStats: () => getSuitesWithStats(organizationId),
+    getSuiteTests: (options?: GetSuiteTestsOptions) =>
+      getSuiteTests(organizationId, options),
+    upsertSuiteTest: (
+      testSignature: string,
+      testName: string,
+      testFile: string,
+      status: string,
+      durationMs: number,
+      isCritical: boolean,
+      suiteId: number | null
+    ) =>
+      upsertSuiteTest(
+        organizationId,
+        testSignature,
+        testName,
+        testFile,
+        status,
+        durationMs,
+        isCritical,
+        suiteId
+      ),
+    markInactiveTests: (inactiveDays?: number) =>
+      markInactiveTests(organizationId, inactiveDays),
+    updateSuiteTestCounts: () => updateSuiteTestCounts(organizationId),
+    getInactiveTests: (limit?: number) => getInactiveTests(organizationId, limit),
+    getSuiteCountsSummary: () => getSuiteCountsSummary(organizationId),
   }
 }

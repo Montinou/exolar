@@ -43,6 +43,10 @@ const AVAILABLE_DATASETS = [
   { id: "performance_regressions", description: "Tests running slower than baseline", filters: "threshold, branch, suite" },
   { id: "execution_summary", description: "Lightweight execution overview (~5KB)", filters: "execution_id (required)" },
   { id: "execution_failures", description: "Failed tests grouped by file/error type", filters: "execution_id (required)" },
+  // Suite and test tracking (Phase 14)
+  { id: "org_suites", description: "Registered suites with tech stack and stats", filters: "tech_stack, is_active" },
+  { id: "suite_tests", description: "Individual tests in a suite", filters: "suite_id or suite (required), is_active, is_critical" },
+  { id: "inactive_tests", description: "Tests that haven't run in 30+ days", filters: "limit" },
 ]
 
 export async function handleExplore(

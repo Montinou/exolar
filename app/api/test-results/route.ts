@@ -124,11 +124,11 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
     // Use org-bound queries with the authenticated organization
     const db = getQueriesForOrg(organizationId)
 
-    // 4. Insert execution record
-    const executionId = await db.insertExecution(execution)
+    // 4. Insert execution record (auto-registers suite if provided)
+    const { executionId, suiteId } = await db.insertExecution(execution)
 
-    // 5. Insert test results
-    const signatureToIdMap = await db.insertTestResults(executionId, results)
+    // 5. Insert test results (auto-registers tests in suite_tests table)
+    const signatureToIdMap = await db.insertTestResults(executionId, results, suiteId)
 
     // 6. Upload artifacts to R2 and insert records (if any)
     let artifactsCount = 0
