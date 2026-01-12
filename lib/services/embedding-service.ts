@@ -3,18 +3,35 @@
  *
  * Handles generating and storing embeddings for test results.
  * Designed to be called during ingestion or as a background job.
+ *
+ * Primary: Jina v3 (512-dim, stored in error_embedding_v2)
+ * Fallback: Gemini (768-dim, stored in error_embedding)
  */
 
 import {
-  generateEmbedding,
-  generateEmbeddingsBatch,
+  generateEmbeddingWithProvider,
+  generateEmbeddingsBatchWithProvider,
   prepareErrorForEmbedding,
+  getDefaultProvider,
+  getDimensionsForProvider,
 } from "@/lib/ai"
-import { storeEmbedding, storeEmbeddingsBatch } from "@/lib/db/embeddings"
-import type { EmbeddingResult } from "@/lib/ai/types"
+import {
+  storeEmbeddingV2,
+  storeEmbeddingsBatchV2,
+  storeEmbedding,
+  storeEmbeddingsBatch,
+  generateChunkHash,
+} from "@/lib/db/embeddings"
+import type { EmbeddingResult, EmbeddingProvider } from "@/lib/ai/types"
+
+// ============================================
+// Single Embedding Generation
+// ============================================
 
 /**
  * Generate and store embedding for a single test result
+ *
+ * Uses the configured provider (Jina by default).
  *
  * @param testResultId - ID of the test result
  * @param errorMessage - Error message from the test
@@ -38,12 +55,24 @@ export async function generateAndStoreEmbedding(
 
     // Prepare error text for embedding
     const text = prepareErrorForEmbedding(errorMessage, stackTrace)
+    const chunkHash = generateChunkHash(errorMessage, stackTrace)
 
-    // Generate embedding
-    const embedding = await generateEmbedding(text)
+    // Get provider info
+    const provider = getDefaultProvider()
+    const dimensions = getDimensionsForProvider(provider)
 
-    // Store in database
-    await storeEmbedding(testResultId, embedding)
+    // Generate embedding using provider
+    const embedding = await generateEmbeddingWithProvider(text, {
+      provider,
+      task: "retrieval.passage", // Documents are indexed as passages
+    })
+
+    // Store based on provider
+    if (provider === "jina") {
+      await storeEmbeddingV2(testResultId, embedding, chunkHash)
+    } else {
+      await storeEmbedding(testResultId, embedding)
+    }
 
     return {
       testResultId,
@@ -65,10 +94,15 @@ export async function generateAndStoreEmbedding(
   }
 }
 
+// ============================================
+// Batch Embedding Generation
+// ============================================
+
 /**
  * Generate embeddings for multiple test results
  *
  * Optimized for batch processing with parallel API calls.
+ * Uses the configured provider (Jina by default).
  *
  * @param testResults - Array of test results needing embeddings
  * @returns Array of results (success/failure per test)
@@ -84,12 +118,16 @@ export async function generateAndStoreEmbeddingsBatch(
     return []
   }
 
+  const provider = getDefaultProvider()
+  const expectedDimensions = getDimensionsForProvider(provider)
+
   // Prepare all texts
   const textsWithIds = testResults
     .filter((tr) => tr.error_message || tr.stack_trace)
     .map((tr) => ({
       id: tr.id,
       text: prepareErrorForEmbedding(tr.error_message, tr.stack_trace),
+      chunkHash: generateChunkHash(tr.error_message, tr.stack_trace),
     }))
 
   if (textsWithIds.length === 0) {
@@ -102,25 +140,27 @@ export async function generateAndStoreEmbeddingsBatch(
 
   // Generate embeddings in batch
   const texts = textsWithIds.map((t) => t.text)
-  const embeddings = await generateEmbeddingsBatch(texts)
+  const embeddings = await generateEmbeddingsBatchWithProvider(texts, {
+    provider,
+    task: "retrieval.passage",
+  })
 
   // Prepare results and store valid embeddings
   const results: EmbeddingResult[] = []
-  const validEmbeddings: Array<{ testResultId: number; embedding: number[] }> =
-    []
+  const validEmbeddings: Array<{ testResultId: number; embedding: number[]; chunkHash: string }> = []
 
   for (let i = 0; i < textsWithIds.length; i++) {
-    const { id } = textsWithIds[i]
+    const { id, chunkHash } = textsWithIds[i]
     const embedding = embeddings[i]
 
-    if (embedding && embedding.length === 768) {
+    if (embedding && embedding.length === expectedDimensions) {
       results.push({ testResultId: id, success: true, embedding })
-      validEmbeddings.push({ testResultId: id, embedding })
+      validEmbeddings.push({ testResultId: id, embedding, chunkHash })
     } else {
       results.push({
         testResultId: id,
         success: false,
-        error: "Embedding generation failed or returned invalid dimensions",
+        error: `Embedding generation failed or returned invalid dimensions (expected ${expectedDimensions})`,
       })
     }
   }
@@ -128,7 +168,13 @@ export async function generateAndStoreEmbeddingsBatch(
   // Batch store valid embeddings
   if (validEmbeddings.length > 0) {
     try {
-      await storeEmbeddingsBatch(validEmbeddings)
+      if (provider === "jina") {
+        await storeEmbeddingsBatchV2(validEmbeddings)
+      } else {
+        await storeEmbeddingsBatch(
+          validEmbeddings.map(({ testResultId, embedding }) => ({ testResultId, embedding }))
+        )
+      }
     } catch (error) {
       console.error("Failed to store embeddings batch:", error)
       // Mark all as failed
@@ -156,6 +202,10 @@ export async function generateAndStoreEmbeddingsBatch(
   return results
 }
 
+// ============================================
+// Progress Tracking
+// ============================================
+
 /**
  * Stats from embedding generation
  */
@@ -165,6 +215,8 @@ export interface EmbeddingStats {
   failed: number
   skipped: number
   durationMs: number
+  provider: EmbeddingProvider
+  dimensions: number
 }
 
 /**
@@ -182,12 +234,16 @@ export async function generateEmbeddingsWithProgress(
   onProgress?: (processed: number, total: number) => void
 ): Promise<EmbeddingStats> {
   const startTime = Date.now()
+  const provider = getDefaultProvider()
+
   const stats: EmbeddingStats = {
     total: testResults.length,
     succeeded: 0,
     failed: 0,
     skipped: 0,
     durationMs: 0,
+    provider,
+    dimensions: getDimensionsForProvider(provider),
   }
 
   if (testResults.length === 0) {
@@ -216,4 +272,24 @@ export async function generateEmbeddingsWithProgress(
 
   stats.durationMs = Date.now() - startTime
   return stats
+}
+
+// ============================================
+// Provider Info
+// ============================================
+
+/**
+ * Get current embedding configuration
+ */
+export function getEmbeddingConfig(): {
+  provider: EmbeddingProvider
+  dimensions: number
+  storageColumn: string
+} {
+  const provider = getDefaultProvider()
+  return {
+    provider,
+    dimensions: getDimensionsForProvider(provider),
+    storageColumn: provider === "jina" ? "error_embedding_v2" : "error_embedding",
+  }
 }

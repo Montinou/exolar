@@ -162,11 +162,22 @@ export {
 
 // Embedding operations (AI vector search)
 export {
+  // V1 (Gemini 768-dim)
   storeEmbedding,
   storeEmbeddingsBatch,
   getTestsNeedingEmbeddings,
   getEmbedding,
   findSimilarFailures,
+  // V2 (Jina 512-dim)
+  storeEmbeddingV2,
+  storeEmbeddingsBatchV2,
+  getTestsNeedingEmbeddingsV2,
+  getEmbeddingV2,
+  findSimilarFailuresV2,
+  // Unified
+  storeEmbeddingAuto,
+  getBestEmbedding,
+  generateChunkHash,
   countTestsWithEmbeddings,
 } from "./embeddings"
 
@@ -298,8 +309,12 @@ import {
 } from "./orgs"
 import {
   getTestsNeedingEmbeddings,
+  getTestsNeedingEmbeddingsV2,
   getEmbedding,
+  getEmbeddingV2,
+  getBestEmbedding,
   findSimilarFailures,
+  findSimilarFailuresV2,
   countTestsWithEmbeddings,
 } from "./embeddings"
 import {
@@ -459,7 +474,7 @@ export function getQueriesForOrg(organizationId: number) {
     getInactiveTests: (limit?: number) => getInactiveTests(organizationId, limit),
     getSuiteCountsSummary: () => getSuiteCountsSummary(organizationId),
 
-    // Embedding operations (AI vector search)
+    // Embedding operations (AI vector search) - V1 (Gemini 768-dim)
     getTestsNeedingEmbeddings: (limit?: number) =>
       getTestsNeedingEmbeddings(organizationId, limit),
     getEmbedding: (testResultId: number) => getEmbedding(testResultId),
@@ -468,6 +483,16 @@ export function getQueriesForOrg(organizationId: number) {
       options?: { executionId?: number; threshold?: number; limit?: number }
     ) => findSimilarFailures(embedding, { ...options, organizationId }),
     countTestsWithEmbeddings: () => countTestsWithEmbeddings(organizationId),
+
+    // Embedding operations (AI vector search) - V2 (Jina 512-dim)
+    getTestsNeedingEmbeddingsV2: (limit?: number) =>
+      getTestsNeedingEmbeddingsV2(organizationId, limit),
+    getEmbeddingV2: (testResultId: number) => getEmbeddingV2(testResultId),
+    getBestEmbedding: (testResultId: number) => getBestEmbedding(testResultId),
+    findSimilarFailuresV2: (
+      embedding: number[],
+      options?: { executionId?: number; threshold?: number; limit?: number }
+    ) => findSimilarFailuresV2(embedding, { ...options, organizationId }),
 
     // Clustering operations (AI vector search)
     clusterFailures: (executionId: number, options?: { distanceThreshold?: number; minClusterSize?: number; maxClusters?: number }) =>

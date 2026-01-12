@@ -1,12 +1,22 @@
 /**
  * Database functions for vector embeddings
+ *
+ * Supports dual storage:
+ * - v1: 768-dim Gemini embeddings (error_embedding)
+ * - v2: 512-dim Jina embeddings (error_embedding_v2)
  */
 
 import { getSql } from "./connection"
-import { toVectorString } from "@/lib/ai"
+import { toVectorString, EMBEDDING_DIMENSIONS } from "@/lib/ai"
+import type { EmbeddingProvider } from "@/lib/ai/types"
+import { createHash } from "crypto"
+
+// ============================================
+// V1 Storage (768-dim, Gemini) - Legacy
+// ============================================
 
 /**
- * Store an embedding for a test result
+ * Store a v1 embedding for a test result (768-dim Gemini)
  *
  * @param testResultId - ID of the test result
  * @param embedding - 768-dimensional embedding vector
@@ -30,8 +40,69 @@ export async function storeEmbedding(
   `
 }
 
+// ============================================
+// V2 Storage (512-dim, Jina) - Primary
+// ============================================
+
 /**
- * Store embeddings for multiple test results
+ * Store a v2 embedding for a test result (512-dim Jina)
+ *
+ * @param testResultId - ID of the test result
+ * @param embedding - 512-dimensional embedding vector
+ * @param chunkHash - Hash of the source text (for incremental updates)
+ */
+export async function storeEmbeddingV2(
+  testResultId: number,
+  embedding: number[],
+  chunkHash?: string
+): Promise<void> {
+  const sql = getSql()
+
+  if (embedding.length !== 512) {
+    throw new Error(
+      `Invalid v2 embedding dimensions: expected 512, got ${embedding.length}`
+    )
+  }
+
+  await sql`
+    UPDATE test_results
+    SET error_embedding_v2 = ${toVectorString(embedding)}::vector,
+        embedding_chunk_hash = ${chunkHash ?? null}
+    WHERE id = ${testResultId}
+  `
+}
+
+/**
+ * Store embeddings based on provider (auto-detect dimensions)
+ *
+ * @param testResultId - ID of the test result
+ * @param embedding - Embedding vector (512 or 768 dimensions)
+ * @param provider - Provider that generated the embedding
+ * @param chunkHash - Optional hash for v2 embeddings
+ */
+export async function storeEmbeddingAuto(
+  testResultId: number,
+  embedding: number[],
+  provider: EmbeddingProvider,
+  chunkHash?: string
+): Promise<void> {
+  const expectedDim = EMBEDDING_DIMENSIONS[provider]
+
+  if (embedding.length !== expectedDim) {
+    throw new Error(
+      `Invalid ${provider} embedding dimensions: expected ${expectedDim}, got ${embedding.length}`
+    )
+  }
+
+  if (provider === "jina") {
+    await storeEmbeddingV2(testResultId, embedding, chunkHash)
+  } else {
+    await storeEmbedding(testResultId, embedding)
+  }
+}
+
+/**
+ * Store v1 embeddings for multiple test results (768-dim)
  *
  * @param embeddings - Array of {testResultId, embedding} pairs
  */
@@ -58,9 +129,37 @@ export async function storeEmbeddingsBatch(
 }
 
 /**
- * Get test results that need embeddings
+ * Store v2 embeddings for multiple test results (512-dim)
  *
- * Returns failed tests without embeddings, ordered by most recent first.
+ * @param embeddings - Array of {testResultId, embedding, chunkHash?} entries
+ */
+export async function storeEmbeddingsBatchV2(
+  embeddings: Array<{ testResultId: number; embedding: number[]; chunkHash?: string }>
+): Promise<void> {
+  const sql = getSql()
+
+  if (embeddings.length === 0) return
+
+  // Filter valid embeddings
+  const valid = embeddings.filter((e) => e.embedding.length === 512)
+
+  if (valid.length === 0) return
+
+  // Update each one individually
+  for (const { testResultId, embedding, chunkHash } of valid) {
+    await sql`
+      UPDATE test_results
+      SET error_embedding_v2 = ${toVectorString(embedding)}::vector,
+          embedding_chunk_hash = ${chunkHash ?? null}
+      WHERE id = ${testResultId}
+    `
+  }
+}
+
+/**
+ * Get test results that need v1 embeddings (legacy Gemini)
+ *
+ * Returns failed tests without v1 embeddings, ordered by most recent first.
  *
  * @param organizationId - Filter by organization
  * @param limit - Max results to return
@@ -97,7 +196,59 @@ export async function getTestsNeedingEmbeddings(
 }
 
 /**
- * Get embedding for a specific test result
+ * Get test results that need v2 embeddings (Jina)
+ *
+ * Returns failed tests without v2 embeddings, ordered by most recent first.
+ * Optionally filter by changed content (using chunk hash).
+ *
+ * @param organizationId - Filter by organization
+ * @param limit - Max results to return
+ * @param includeWithStaleHash - Include tests where hash doesn't match current content
+ */
+export async function getTestsNeedingEmbeddingsV2(
+  organizationId: number,
+  limit: number = 100
+): Promise<
+  Array<{
+    id: number
+    error_message: string | null
+    stack_trace: string | null
+    current_hash: string | null
+  }>
+> {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT tr.id, tr.error_message, tr.stack_trace, tr.embedding_chunk_hash as current_hash
+    FROM test_results tr
+    INNER JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND tr.status IN ('failed', 'timedout')
+      AND tr.error_embedding_v2 IS NULL
+      AND (tr.error_message IS NOT NULL OR tr.stack_trace IS NOT NULL)
+    ORDER BY tr.created_at DESC
+    LIMIT ${limit}
+  `
+
+  return results as Array<{
+    id: number
+    error_message: string | null
+    stack_trace: string | null
+    current_hash: string | null
+  }>
+}
+
+/**
+ * Generate a hash for embedding source text
+ * Used to detect changes for incremental re-indexing
+ */
+export function generateChunkHash(errorMessage: string | null, stackTrace: string | null): string {
+  const content = [errorMessage ?? "", stackTrace ?? ""].join("\n")
+  return createHash("md5").update(content).digest("hex")
+}
+
+/**
+ * Get v1 embedding for a specific test result (768-dim)
  *
  * @param testResultId - ID of the test result
  * @returns Embedding as number array, or null if not found
@@ -124,6 +275,59 @@ export async function getEmbedding(
     .replace(/^\[|\]$/g, "")
     .split(",")
     .map(Number)
+}
+
+/**
+ * Get v2 embedding for a specific test result (512-dim)
+ *
+ * @param testResultId - ID of the test result
+ * @returns Embedding as number array, or null if not found
+ */
+export async function getEmbeddingV2(
+  testResultId: number
+): Promise<number[] | null> {
+  const sql = getSql()
+
+  const result = await sql`
+    SELECT error_embedding_v2::text as embedding
+    FROM test_results
+    WHERE id = ${testResultId}
+      AND error_embedding_v2 IS NOT NULL
+  `
+
+  if (result.length === 0 || !result[0].embedding) {
+    return null
+  }
+
+  const vectorStr = result[0].embedding as string
+  return vectorStr
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map(Number)
+}
+
+/**
+ * Get the best available embedding (prefers v2)
+ *
+ * @param testResultId - ID of the test result
+ * @returns {embedding, version} or null
+ */
+export async function getBestEmbedding(
+  testResultId: number
+): Promise<{ embedding: number[]; version: "v1" | "v2" } | null> {
+  // Try v2 first (Jina, 512-dim)
+  const v2 = await getEmbeddingV2(testResultId)
+  if (v2) {
+    return { embedding: v2, version: "v2" }
+  }
+
+  // Fall back to v1 (Gemini, 768-dim)
+  const v1 = await getEmbedding(testResultId)
+  if (v1) {
+    return { embedding: v1, version: "v1" }
+  }
+
+  return null
 }
 
 /**
@@ -217,12 +421,13 @@ export async function findSimilarFailures(
  */
 export async function countTestsWithEmbeddings(
   organizationId: number
-): Promise<{ withEmbedding: number; total: number }> {
+): Promise<{ withEmbedding: number; withEmbeddingV2: number; total: number }> {
   const sql = getSql()
 
   const [result] = await sql`
     SELECT
       COUNT(*) FILTER (WHERE tr.error_embedding IS NOT NULL) as with_embedding,
+      COUNT(*) FILTER (WHERE tr.error_embedding_v2 IS NOT NULL) as with_embedding_v2,
       COUNT(*) as total
     FROM test_results tr
     INNER JOIN test_executions te ON tr.execution_id = te.id
@@ -232,6 +437,94 @@ export async function countTestsWithEmbeddings(
 
   return {
     withEmbedding: Number(result.with_embedding),
+    withEmbeddingV2: Number(result.with_embedding_v2),
     total: Number(result.total),
   }
+}
+
+/**
+ * Find similar failures using v2 embeddings (512-dim Jina)
+ *
+ * @param embedding - Query embedding (512-dim)
+ * @param options - Search options
+ */
+export async function findSimilarFailuresV2(
+  embedding: number[],
+  options: {
+    executionId?: number
+    organizationId?: number
+    threshold?: number
+    limit?: number
+  } = {}
+): Promise<
+  Array<{
+    id: number
+    test_name: string
+    test_file: string
+    error_message: string | null
+    similarity: number
+    execution_id: number
+  }>
+> {
+  const sql = getSql()
+  const { executionId, organizationId, threshold = 0.15, limit = 20 } = options
+
+  if (embedding.length !== 512) {
+    throw new Error(`Expected 512-dim embedding, got ${embedding.length}`)
+  }
+
+  const vectorStr = toVectorString(embedding)
+
+  if (executionId) {
+    // Search within single execution
+    return (await sql`
+      SELECT
+        id,
+        test_name,
+        test_file,
+        error_message,
+        execution_id,
+        1 - (error_embedding_v2 <=> ${vectorStr}::vector) as similarity
+      FROM test_results
+      WHERE execution_id = ${executionId}
+        AND error_embedding_v2 IS NOT NULL
+        AND error_embedding_v2 <=> ${vectorStr}::vector < ${threshold}
+      ORDER BY error_embedding_v2 <=> ${vectorStr}::vector
+      LIMIT ${limit}
+    `) as Array<{
+      id: number
+      test_name: string
+      test_file: string
+      error_message: string | null
+      similarity: number
+      execution_id: number
+    }>
+  } else if (organizationId) {
+    // Search across organization
+    return (await sql`
+      SELECT
+        tr.id,
+        tr.test_name,
+        tr.test_file,
+        tr.error_message,
+        tr.execution_id,
+        1 - (tr.error_embedding_v2 <=> ${vectorStr}::vector) as similarity
+      FROM test_results tr
+      INNER JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND tr.error_embedding_v2 IS NOT NULL
+        AND tr.error_embedding_v2 <=> ${vectorStr}::vector < ${threshold}
+      ORDER BY tr.error_embedding_v2 <=> ${vectorStr}::vector
+      LIMIT ${limit}
+    `) as Array<{
+      id: number
+      test_name: string
+      test_file: string
+      error_message: string | null
+      similarity: number
+      execution_id: number
+    }>
+  }
+
+  throw new Error("Either executionId or organizationId must be provided")
 }

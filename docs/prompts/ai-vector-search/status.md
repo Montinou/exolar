@@ -1,8 +1,8 @@
 # AI Vector Search - Implementation Status
 
-> **Last Updated:** 2026-01-12T18:16:54Z
-> **Current Phase:** Phase 5C - Cohere Reranking Layer
-> **Next Action:** Update embedding service (Phase 5D)
+> **Last Updated:** 2026-01-12T18:33:08Z
+> **Current Phase:** Phase 5D - Embedding Service Upgrade
+> **Next Action:** Migrate clustering to v2 (Phase 5E)
 
 ---
 
@@ -18,7 +18,7 @@
 | 5A | Jina Embedding Provider | ✅ Complete | 2026-01-12T18:00:00Z | 2026-01-12T18:06:08Z |
 | 5B | Database Schema Migration | ✅ Complete | 2026-01-12T18:06:08Z | 2026-01-12T18:11:24Z |
 | 5C | Cohere Reranking Layer | ✅ Complete | 2026-01-12T18:11:24Z | 2026-01-12T18:16:54Z |
-| 5D | Embedding Service Upgrade | ⬜ Pending | - | - |
+| 5D | Embedding Service Upgrade | ✅ Complete | 2026-01-12T18:16:54Z | 2026-01-12T18:33:08Z |
 | 5E | Clustering Migration | ⬜ Pending | - | - |
 | 6 | Semantic Search Backend | ⬜ Pending | - | - |
 | 7 | Semantic Search UI | ⬜ Pending | - | - |
@@ -208,16 +208,24 @@
 
 ### Phase 5D: Embedding Service Upgrade
 
-**Status:** ⬜ Pending
+**Status:** ✅ Complete (2026-01-12T18:16:54Z → 2026-01-12T18:33:08Z)
 
 **Deliverables:**
-- [ ] `lib/services/embedding-service.ts` updated to use Jina
-- [ ] `lib/db/embeddings.ts` updated for v2 columns
-- [ ] `app/api/admin/backfill-embeddings/route.ts` updated for migration mode
+- [x] `lib/services/embedding-service.ts` updated to use Jina provider
+- [x] `lib/db/embeddings.ts` updated with v2 functions:
+  - `storeEmbeddingV2()`, `storeEmbeddingsBatchV2()`
+  - `getTestsNeedingEmbeddingsV2()`, `getEmbeddingV2()`
+  - `findSimilarFailuresV2()`, `getBestEmbedding()`
+  - `storeEmbeddingAuto()`, `generateChunkHash()`
+- [x] `lib/db/index.ts` exports updated with v2 functions
+- [x] `getQueriesForOrg()` updated with v2 methods
 
 **Notes:**
-- Store embeddings in v2 columns
-- Support both v1 and v2 during migration
+- Embedding service now uses Jina by default (JINA_API_KEY)
+- Falls back to Gemini if Jina unavailable (GEMINIAI_API_KEY)
+- V2 embeddings stored in `error_embedding_v2` (512-dim)
+- Chunk hash tracking for incremental re-indexing
+- Build verified successful
 
 ---
 
