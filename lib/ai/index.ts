@@ -22,4 +22,15 @@ export {
   getDefaultProvider,
   getDimensionsForProvider,
   getProviderInfo,
+  cohereRerank,
+  isCohereAvailable,
+  getCohereModelInfo,
 } from "./providers"
+
+// Reranker exports
+export {
+  rerankSimilarFailures,
+  rerankItems,
+  isRerankingAvailable,
+} from "./reranker"
+export type { SimilarFailureCandidate, RankedFailure, RerankOptions } from "./reranker"

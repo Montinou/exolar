@@ -1,8 +1,8 @@
 # AI Vector Search - Implementation Status
 
-> **Last Updated:** 2026-01-12T18:11:24Z
-> **Current Phase:** Phase 5B - Database Schema Migration
-> **Next Action:** Create Cohere reranking layer (Phase 5C)
+> **Last Updated:** 2026-01-12T18:16:54Z
+> **Current Phase:** Phase 5C - Cohere Reranking Layer
+> **Next Action:** Update embedding service (Phase 5D)
 
 ---
 
@@ -17,7 +17,7 @@
 | 4 | Clustering UI | ✅ Complete | 2026-01-12T09:10:49Z | 2026-01-12T09:16:06Z |
 | 5A | Jina Embedding Provider | ✅ Complete | 2026-01-12T18:00:00Z | 2026-01-12T18:06:08Z |
 | 5B | Database Schema Migration | ✅ Complete | 2026-01-12T18:06:08Z | 2026-01-12T18:11:24Z |
-| 5C | Cohere Reranking Layer | ⬜ Pending | - | - |
+| 5C | Cohere Reranking Layer | ✅ Complete | 2026-01-12T18:11:24Z | 2026-01-12T18:16:54Z |
 | 5D | Embedding Service Upgrade | ⬜ Pending | - | - |
 | 5E | Clustering Migration | ⬜ Pending | - | - |
 | 6 | Semantic Search Backend | ⬜ Pending | - | - |
@@ -188,16 +188,21 @@
 
 ### Phase 5C: Cohere Reranking Layer
 
-**Status:** ⬜ Pending
+**Status:** ✅ Complete (2026-01-12T18:11:24Z → 2026-01-12T18:16:54Z)
 
 **Deliverables:**
-- [ ] `lib/ai/providers/cohere.ts` created
-- [ ] `lib/ai/reranker.ts` created
-- [ ] Two-stage retrieval support added
+- [x] `lib/ai/providers/cohere.ts` created
+- [x] `lib/ai/reranker.ts` created
+- [x] Two-stage retrieval support added
+- [x] `lib/ai/providers/index.ts` updated with Cohere exports
+- [x] `lib/ai/index.ts` updated with reranker exports
 
 **Notes:**
 - Cohere rerank-english-v3.0 for precision after vector recall
 - Free tier: 1,000 requests/month
+- Functions: `cohereRerank()`, `rerankSimilarFailures()`, `rerankItems()`
+- Automatic fallback to vector results if Cohere unavailable
+- Weighted score combination: 70% rerank + 30% vector similarity
 
 ---
 

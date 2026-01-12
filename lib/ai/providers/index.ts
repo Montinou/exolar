@@ -151,3 +151,5 @@ export function getProviderInfo(): {
 
 export { generateJinaEmbedding, generateJinaEmbeddingsBatch, getJinaDimensions } from "./jina"
 export { generateGeminiEmbedding, generateGeminiBatch }
+export { cohereRerank, isCohereAvailable, getCohereModelInfo } from "./cohere"
+export type { RerankDocument, RerankResult } from "./cohere"
