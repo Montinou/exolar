@@ -493,36 +493,18 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
 
         const version = p.version || "v2"
         const force = p.force ?? false
-        const limit = p.limit
+        const limitCount = p.limit
         const dryRun = p.dry_run ?? false
 
         const sql = db.getSql()
 
-        // Build WHERE clause
-        const whereClauses: string[] = []
-        whereClauses.push(`te.organization_id = ${orgId}`)
+        // Build WHERE clause for stats (base filter)
+        const statsWhereClause = p.execution_id
+          ? `te.organization_id = ${orgId} AND tr.status IN ('failed', 'timedout') AND tr.execution_id = ${p.execution_id}`
+          : `te.organization_id = ${orgId} AND tr.status IN ('failed', 'timedout')`
 
-        if (p.execution_id) {
-          whereClauses.push(`tr.execution_id = ${p.execution_id}`)
-        }
-
-        whereClauses.push("tr.status IN ('failed', 'timedout')")
-        whereClauses.push("(tr.error_message IS NOT NULL OR tr.stack_trace IS NOT NULL)")
-
-        // Add embedding filter if not force mode
-        if (!force) {
-          if (version === "v1") {
-            whereClauses.push("tr.error_embedding IS NULL")
-          } else {
-            whereClauses.push("tr.error_embedding_v2 IS NULL")
-          }
-        }
-
-        const where = whereClauses.join(" AND ")
-        const limitClause = limit ? `LIMIT ${limit}` : ""
-
-        // Get stats first
-        const statsQuery = `
+        // Get stats first using tagged template with sql.unsafe for interpolation
+        const statsResults = await sql`
           SELECT
             COUNT(*) as total_failed,
             COUNT(*) FILTER (WHERE tr.error_embedding IS NOT NULL) as with_v1,
@@ -531,11 +513,8 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
             COUNT(*) FILTER (WHERE tr.error_embedding_v2 IS NULL) as without_v2
           FROM test_results tr
           INNER JOIN test_executions te ON tr.execution_id = te.id
-          WHERE te.organization_id = ${orgId}
-            AND tr.status IN ('failed', 'timedout')
-            ${p.execution_id ? `AND tr.execution_id = ${p.execution_id}` : ""}
-        `
-        const statsResults = await sql.unsafe(statsQuery) as unknown as Array<{
+          WHERE ${sql.unsafe(statsWhereClause)}
+        ` as Array<{
           total_failed: string
           with_v1: string
           with_v2: string
@@ -559,23 +538,44 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
               totalFailed: Number(stats.total_failed),
               withV1: Number(stats.with_v1),
               withV2: Number(stats.with_v2),
-              toProcess: limit ? Math.min(toProcess, limit) : toProcess,
+              toProcess: limitCount ? Math.min(toProcess, limitCount) : toProcess,
               version,
               force,
             },
           })
         }
 
-        // Get tests to process
-        const testsQuery = `
+        // Build WHERE clause for fetching tests
+        const whereClauses: string[] = [
+          `te.organization_id = ${orgId}`,
+          "tr.status IN ('failed', 'timedout')",
+          "(tr.error_message IS NOT NULL OR tr.stack_trace IS NOT NULL)",
+        ]
+
+        if (p.execution_id) {
+          whereClauses.push(`tr.execution_id = ${p.execution_id}`)
+        }
+
+        // Add embedding filter if not force mode
+        if (!force) {
+          if (version === "v1") {
+            whereClauses.push("tr.error_embedding IS NULL")
+          } else {
+            whereClauses.push("tr.error_embedding_v2 IS NULL")
+          }
+        }
+
+        const whereClause = whereClauses.join(" AND ")
+        const limitClause = limitCount ? `LIMIT ${limitCount}` : ""
+        const fullWhereAndLimit = `${whereClause} ORDER BY tr.created_at DESC ${limitClause}`
+
+        // Get tests to process using tagged template
+        const testsToProcess = await sql`
           SELECT tr.id, tr.error_message, tr.stack_trace
           FROM test_results tr
           INNER JOIN test_executions te ON tr.execution_id = te.id
-          WHERE ${where}
-          ORDER BY tr.created_at DESC
-          ${limitClause}
-        `
-        const testsToProcess = await sql.unsafe(testsQuery) as unknown as Array<{
+          WHERE ${sql.unsafe(fullWhereAndLimit)}
+        ` as Array<{
           id: number
           error_message: string | null
           stack_trace: string | null
