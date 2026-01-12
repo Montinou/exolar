@@ -170,6 +170,21 @@ export {
   countTestsWithEmbeddings,
 } from "./embeddings"
 
+// Clustering operations (AI vector search)
+export {
+  clusterFailures,
+  getClusterStats,
+  findHistoricalClusters,
+} from "./clustering"
+
+// Cluster cache operations (AI vector search)
+export {
+  getCachedClusters,
+  invalidateClusterCache,
+  isClustered,
+  getClusterCacheStats,
+} from "./cluster-cache"
+
 // Suite and test tracking (Phase 14)
 export {
   detectTechStack,
@@ -287,6 +302,16 @@ import {
   findSimilarFailures,
   countTestsWithEmbeddings,
 } from "./embeddings"
+import {
+  clusterFailures,
+  getClusterStats,
+  findHistoricalClusters,
+} from "./clustering"
+import {
+  getCachedClusters,
+  invalidateClusterCache,
+  isClustered,
+} from "./cluster-cache"
 
 /**
  * Create org-bound query functions.
@@ -443,5 +468,16 @@ export function getQueriesForOrg(organizationId: number) {
       options?: { executionId?: number; threshold?: number; limit?: number }
     ) => findSimilarFailures(embedding, { ...options, organizationId }),
     countTestsWithEmbeddings: () => countTestsWithEmbeddings(organizationId),
+
+    // Clustering operations (AI vector search)
+    clusterFailures: (executionId: number, options?: { distanceThreshold?: number; minClusterSize?: number; maxClusters?: number }) =>
+      clusterFailures(executionId, options),
+    getClusterStats: (executionId: number) => getClusterStats(executionId),
+    getCachedClusters: (executionId: number, options?: { distanceThreshold?: number; minClusterSize?: number; maxClusters?: number }) =>
+      getCachedClusters(executionId, options),
+    invalidateClusterCache: (executionId: number) => invalidateClusterCache(executionId),
+    isClustered: (executionId: number) => isClustered(executionId),
+    findHistoricalClusters: (embedding: number[], options?: { threshold?: number; limit?: number; daysBack?: number }) =>
+      findHistoricalClusters(embedding, organizationId, options),
   }
 }
