@@ -160,6 +160,16 @@ export {
   getWishlistCount,
 } from "./wishlist"
 
+// Embedding operations (AI vector search)
+export {
+  storeEmbedding,
+  storeEmbeddingsBatch,
+  getTestsNeedingEmbeddings,
+  getEmbedding,
+  findSimilarFailures,
+  countTestsWithEmbeddings,
+} from "./embeddings"
+
 // Suite and test tracking (Phase 14)
 export {
   detectTechStack,
@@ -271,6 +281,12 @@ import {
   getOrgInvites,
   isUserMemberOfOrg,
 } from "./orgs"
+import {
+  getTestsNeedingEmbeddings,
+  getEmbedding,
+  findSimilarFailures,
+  countTestsWithEmbeddings,
+} from "./embeddings"
 
 /**
  * Create org-bound query functions.
@@ -417,5 +433,15 @@ export function getQueriesForOrg(organizationId: number) {
     updateSuiteTestCounts: () => updateSuiteTestCounts(organizationId),
     getInactiveTests: (limit?: number) => getInactiveTests(organizationId, limit),
     getSuiteCountsSummary: () => getSuiteCountsSummary(organizationId),
+
+    // Embedding operations (AI vector search)
+    getTestsNeedingEmbeddings: (limit?: number) =>
+      getTestsNeedingEmbeddings(organizationId, limit),
+    getEmbedding: (testResultId: number) => getEmbedding(testResultId),
+    findSimilarFailures: (
+      embedding: number[],
+      options?: { executionId?: number; threshold?: number; limit?: number }
+    ) => findSimilarFailures(embedding, { ...options, organizationId }),
+    countTestsWithEmbeddings: () => countTestsWithEmbeddings(organizationId),
   }
 }
