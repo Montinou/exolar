@@ -2,21 +2,30 @@
  * MCP Server Route - Using Vercel mcp-handler
  *
  * Supports HTTP Streamable transport (new standard).
- * Uses Neon Auth JWT validation for authentication.
+ * Uses custom JWT validation for authentication.
  *
  * URL: /api/mcp/mcp (for Claude Code config)
  */
 
-import { createMcpHandler } from "mcp-handler"
+import { createMcpHandler, experimental_withMcpAuth } from "mcp-handler"
 import { z } from "zod"
 import { validateMCPToken } from "@/lib/mcp/auth"
 import { allTools, handleToolCall } from "@/lib/mcp/tools"
 import type { MCPAuthContext } from "@/lib/mcp/auth"
 
-// Store auth context for tool calls (per-request)
-let currentAuthContext: MCPAuthContext | null = null
+// Use AsyncLocalStorage for request-scoped auth context (fixes race condition)
+import { AsyncLocalStorage } from "node:async_hooks"
 
-const handler = createMcpHandler(
+const authContextStorage = new AsyncLocalStorage<MCPAuthContext>()
+
+/**
+ * Get auth context for current request (thread-safe)
+ */
+export function getAuthContext(): MCPAuthContext | undefined {
+  return authContextStorage.getStore()
+}
+
+const baseHandler = createMcpHandler(
   (server) => {
     // Register all consolidated tools
     for (const tool of allTools) {
@@ -28,51 +37,100 @@ const handler = createMcpHandler(
           inputSchema: convertToZodSchema(tool.inputSchema),
         },
         async (args) => {
-          if (!currentAuthContext) {
+          const authContext = getAuthContext()
+          if (!authContext) {
+            console.error("[mcp-handler] No auth context available for tool call:", tool.name)
             return {
-              content: [{ type: "text", text: JSON.stringify({ error: "Unauthorized" }) }],
+              content: [{ type: "text", text: JSON.stringify({ error: "Unauthorized - no auth context" }) }],
               isError: true,
             }
           }
 
-          const result = await handleToolCall(tool.name, args as Record<string, unknown>, currentAuthContext)
+          const result = await handleToolCall(tool.name, args as Record<string, unknown>, authContext)
           return result
         }
       )
     }
   },
   {
-    // Context object - available in tool handlers
+    // Server options
   },
   {
     basePath: "/api/mcp",
     maxDuration: 60,
     verboseLogs: process.env.NODE_ENV === "development",
-    capabilities: {
-      tools: {},
-    },
-    // Custom auth handler
-    authenticate: async (request) => {
-      const authHeader = request.headers.get("Authorization")
-      const authContext = await validateMCPToken(authHeader)
-
-      if (!authContext) {
-        throw new Error("Invalid or expired token. Please re-authenticate via the dashboard.")
-      }
-
-      // Store for tool calls
-      currentAuthContext = authContext
-
-      return {
-        userId: authContext.userId,
-        organizationId: authContext.organizationId,
-        organizationSlug: authContext.organizationSlug,
-      }
-    },
   }
 )
 
-export { handler as GET, handler as POST, handler as DELETE }
+/**
+ * Auth verifier function for MCP handler
+ * Returns AuthInfo if valid, undefined otherwise
+ */
+async function verifyToken(_req: Request, bearerToken?: string) {
+  if (!bearerToken) {
+    console.log("[mcp-auth] No bearer token provided")
+    return undefined
+  }
+
+  const authContext = await validateMCPToken(`Bearer ${bearerToken}`)
+
+  if (!authContext) {
+    console.error("[mcp-auth] Token validation failed")
+    return undefined
+  }
+
+  console.log("[mcp-auth] Token valid for user:", authContext.userId, "org:", authContext.organizationSlug)
+
+  // Store context for this request (will be used via AsyncLocalStorage)
+  // The AuthInfo is what mcp-handler expects for its auth system
+  return {
+    token: bearerToken,
+    clientId: `user-${authContext.userId}`,
+    scopes: ["read:tests", "read:metrics"],
+    // Store our full context for later retrieval
+    extra: authContext,
+  }
+}
+
+/**
+ * Wrap with MCP auth middleware
+ * This validates the Bearer token before processing
+ */
+const authedHandler = experimental_withMcpAuth(
+  baseHandler,
+  verifyToken,
+  {
+    required: true,
+    resourceMetadataPath: "/.well-known/oauth-protected-resource",
+  }
+)
+
+/**
+ * Final handler that injects auth context into AsyncLocalStorage
+ * This ensures thread-safe context access in tool handlers
+ */
+async function wrappedHandler(request: Request) {
+  // Pre-validate to get the auth context for AsyncLocalStorage
+  const authHeader = request.headers.get("Authorization")
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined
+
+  if (!bearerToken) {
+    // Let the auth middleware handle the error
+    return authedHandler(request)
+  }
+
+  const authContext = await validateMCPToken(authHeader)
+
+  if (!authContext) {
+    // Let the auth middleware handle the error
+    return authedHandler(request)
+  }
+
+  // Run handler within AsyncLocalStorage context
+  return authContextStorage.run(authContext, () => authedHandler(request))
+}
+
+export { wrappedHandler as GET, wrappedHandler as POST, wrappedHandler as DELETE }
 
 /**
  * Convert our tool inputSchema to Zod schema for mcp-handler

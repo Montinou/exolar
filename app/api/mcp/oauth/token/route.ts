@@ -14,8 +14,9 @@ import { NextResponse } from "next/server"
 import { getSql } from "@/lib/db"
 import * as jose from "jose"
 
-// Secret for signing/verifying tokens
-const MCP_TOKEN_SECRET = process.env.MCP_TOKEN_SECRET || process.env.DATABASE_URL || "mcp-token-secret"
+// Secret for signing/verifying tokens - MUST match lib/mcp/auth.ts
+const MCP_TOKEN_SECRET = process.env.MCP_TOKEN_SECRET || process.env.DATABASE_URL
+const EFFECTIVE_SECRET = MCP_TOKEN_SECRET || "mcp-token-secret-INSECURE-FALLBACK"
 
 export async function POST(request: Request) {
   // Parse form data or JSON
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   }
 
   // Verify the authorization code (it's a signed JWT)
-  const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
+  const secret = new TextEncoder().encode(EFFECTIVE_SECRET)
   let authCodePayload: jose.JWTPayload
 
   try {

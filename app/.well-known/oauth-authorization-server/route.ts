@@ -25,7 +25,7 @@ export async function GET(request: Request) {
 
     // OAuth 2.1 / PKCE support
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "refresh_token"],
+    grant_types_supported: ["authorization_code"], // refresh_token not yet implemented
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"], // Public clients only
 

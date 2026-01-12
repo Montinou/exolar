@@ -13,8 +13,9 @@ import { cookies } from "next/headers"
 import { getSessionContext } from "@/lib/session-context"
 import * as jose from "jose"
 
-// Secret for signing authorization codes
-const MCP_TOKEN_SECRET = process.env.MCP_TOKEN_SECRET || process.env.DATABASE_URL || "mcp-token-secret"
+// Secret for signing authorization codes - MUST match lib/mcp/auth.ts
+const MCP_TOKEN_SECRET = process.env.MCP_TOKEN_SECRET || process.env.DATABASE_URL
+const EFFECTIVE_SECRET = MCP_TOKEN_SECRET || "mcp-token-secret-INSECURE-FALLBACK"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -155,7 +156,7 @@ async function generateAuthorizationCode(
   authRequest: AuthRequest,
   context: SessionContext
 ): Promise<NextResponse> {
-  const secret = new TextEncoder().encode(MCP_TOKEN_SECRET)
+  const secret = new TextEncoder().encode(EFFECTIVE_SECRET)
 
   // Create a signed JWT containing all the authorization data
   // This is the authorization code - it's self-contained and verifiable
