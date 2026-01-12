@@ -5,11 +5,15 @@
  *
  * Given a test result ID (failure), finds semantically similar failures
  * across the organization's history.
+ *
+ * Supports dual embedding versions:
+ * - Uses best available embedding (prefers v2 Jina 512-dim)
+ * - Falls back to v1 Gemini 768-dim if v2 not available
  */
 
 import { NextResponse } from "next/server"
 import { getSessionContext } from "@/lib/session-context"
-import { getEmbedding, findSimilarFailures } from "@/lib/db/embeddings"
+import { getBestEmbedding, findSimilarFailures, findSimilarFailuresV2 } from "@/lib/db/embeddings"
 import { findHistoricalClusters } from "@/lib/db/clustering"
 
 export const dynamic = "force-dynamic"
@@ -38,14 +42,16 @@ export async function GET(request: Request, { params }: RouteParams) {
       )
     }
 
-    // Get embedding for this failure
-    const embedding = await getEmbedding(testResultId)
-    if (!embedding) {
+    // Get best available embedding for this failure (prefers v2)
+    const embeddingResult = await getBestEmbedding(testResultId)
+    if (!embeddingResult) {
       return NextResponse.json(
         { error: "No embedding found for this failure. Ensure embeddings have been generated." },
         { status: 404 }
       )
     }
+
+    const { embedding, version: embeddingVersion } = embeddingResult
 
     // Parse query params
     const url = new URL(request.url)
@@ -64,7 +70,9 @@ export async function GET(request: Request, { params }: RouteParams) {
         )
       }
 
-      const similar = await findSimilarFailures(embedding, {
+      // Use appropriate search function based on embedding version
+      const searchFn = embeddingVersion === "v2" ? findSimilarFailuresV2 : findSimilarFailures
+      const similar = await searchFn(embedding, {
         organizationId: context.organizationId,
         executionId,
         threshold,
@@ -72,18 +80,27 @@ export async function GET(request: Request, { params }: RouteParams) {
       })
 
       // Filter out the source failure
-      const filtered = similar.filter((s) => s.testResultId !== testResultId)
+      const filtered = similar.filter((s) => s.id !== testResultId)
 
       return NextResponse.json({
         sourceTestResultId: testResultId,
         mode: "current",
         executionId,
+        embeddingVersion,
         similarCount: filtered.length,
-        similar: filtered,
+        similar: filtered.map((s) => ({
+          testResultId: s.id,
+          testName: s.test_name,
+          testFile: s.test_file,
+          errorMessage: s.error_message,
+          similarity: s.similarity,
+          executionId: s.execution_id,
+        })),
       })
     }
 
     // Historical mode: Find across all executions
+    // findHistoricalClusters auto-detects version based on embedding dimensions
     const similar = await findHistoricalClusters(
       embedding,
       context.organizationId,
@@ -102,6 +119,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       sourceTestResultId: testResultId,
       mode: "historical",
       daysBack,
+      embeddingVersion,
       similarCount: trimmed.length,
       similar: trimmed.map((s) => ({
         testResultId: s.testResultId,

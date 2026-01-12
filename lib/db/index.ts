@@ -186,6 +186,7 @@ export {
   clusterFailures,
   getClusterStats,
   findHistoricalClusters,
+  type ClusteringOptionsV2,
 } from "./clustering"
 
 // Cluster cache operations (AI vector search)

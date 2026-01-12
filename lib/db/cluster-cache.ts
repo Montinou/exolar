@@ -5,30 +5,37 @@
  * Clusters are computed once and stored, then invalidated when:
  * - New failures are added to the execution
  * - Embeddings are regenerated
+ *
+ * Supports dual embedding versions:
+ * - v2: Jina 512-dim centroids (centroid_embedding_v2)
+ * - v1: Gemini 768-dim centroids (centroid_embedding)
  */
 
 import { getSql } from "./connection"
-import { clusterFailures } from "./clustering"
-import type { FailureCluster, ClusteringOptions } from "@/lib/ai/types"
+import { clusterFailures, type ClusteringOptionsV2 } from "./clustering"
+import type { FailureCluster, ClusteringOptions, EmbeddingVersion } from "@/lib/ai/types"
 import { toVectorString } from "@/lib/ai"
 
 /**
  * Get cached clusters for an execution, computing if not cached
+ *
+ * Returns clusters with the best available centroid (prefers v2)
  */
 export async function getCachedClusters(
   executionId: number,
-  options: ClusteringOptions = {}
+  options: ClusteringOptionsV2 = {}
 ): Promise<FailureCluster[]> {
   const sql = getSql()
 
-  // Check cache
+  // Check cache - load both v1 and v2 centroids, prefer v2
   const cached = await sql`
     SELECT
       fc.id,
       fc.cluster_index,
       fc.representative_error,
       fc.test_count,
-      fc.centroid_embedding::text as centroid,
+      fc.centroid_embedding::text as centroid_v1,
+      fc.centroid_embedding_v2::text as centroid_v2,
       fc.created_at
     FROM failure_clusters fc
     WHERE fc.execution_id = ${executionId}
@@ -54,11 +61,14 @@ export async function getCachedClusters(
         ORDER BY fcm.distance_to_centroid ASC
       `
 
+      // Prefer v2 centroid if available, fall back to v1
+      const centroidStr = (row.centroid_v2 || row.centroid_v1) as string | null
+
       clusters.push({
         clusterId: row.cluster_index as number,
         representativeError: row.representative_error as string,
         testCount: row.test_count as number,
-        centroidEmbedding: parseVectorFromDb(row.centroid as string),
+        centroidEmbedding: centroidStr ? parseVectorFromDb(centroidStr) : undefined,
         tests: members.map((m) => ({
           testResultId: m.test_result_id as number,
           testName: m.test_name as string,
@@ -75,9 +85,10 @@ export async function getCachedClusters(
 
   // Not cached, compute and cache
   const clusters = await clusterFailures(executionId, options)
+  const embeddingVersion = (clusters as { embeddingVersion?: EmbeddingVersion }).embeddingVersion
 
   if (clusters.length > 0) {
-    await cacheClusterResults(executionId, clusters)
+    await cacheClusterResults(executionId, clusters, embeddingVersion)
   }
 
   return clusters
@@ -85,10 +96,15 @@ export async function getCachedClusters(
 
 /**
  * Store cluster results in cache
+ *
+ * Stores centroid in the appropriate column based on embedding version:
+ * - v2: centroid_embedding_v2 (512-dim Jina)
+ * - v1: centroid_embedding (768-dim Gemini)
  */
 async function cacheClusterResults(
   executionId: number,
-  clusters: FailureCluster[]
+  clusters: FailureCluster[],
+  embeddingVersion?: EmbeddingVersion
 ): Promise<void> {
   const sql = getSql()
 
@@ -98,26 +114,49 @@ async function cacheClusterResults(
     WHERE execution_id = ${executionId}
   `
 
-  // Insert clusters
+  // Insert clusters with appropriate centroid column
   for (const cluster of clusters) {
-    const vectorStr = toVectorString(cluster.centroidEmbedding)
+    const vectorStr = cluster.centroidEmbedding
+      ? toVectorString(cluster.centroidEmbedding)
+      : null
 
-    const [inserted] = await sql`
-      INSERT INTO failure_clusters (
-        execution_id,
-        cluster_index,
-        representative_error,
-        test_count,
-        centroid_embedding
-      ) VALUES (
-        ${executionId},
-        ${cluster.clusterId},
-        ${cluster.representativeError},
-        ${cluster.testCount},
-        ${vectorStr}::vector
-      )
-      RETURNING id
-    `
+    // Store in appropriate column based on version
+    const isV2 = embeddingVersion === "v2" ||
+      (cluster.centroidEmbedding && cluster.centroidEmbedding.length === 512)
+
+    const [inserted] = isV2
+      ? await sql`
+          INSERT INTO failure_clusters (
+            execution_id,
+            cluster_index,
+            representative_error,
+            test_count,
+            centroid_embedding_v2
+          ) VALUES (
+            ${executionId},
+            ${cluster.clusterId},
+            ${cluster.representativeError},
+            ${cluster.testCount},
+            ${vectorStr}::vector
+          )
+          RETURNING id
+        `
+      : await sql`
+          INSERT INTO failure_clusters (
+            execution_id,
+            cluster_index,
+            representative_error,
+            test_count,
+            centroid_embedding
+          ) VALUES (
+            ${executionId},
+            ${cluster.clusterId},
+            ${cluster.representativeError},
+            ${cluster.testCount},
+            ${vectorStr}::vector
+          )
+          RETURNING id
+        `
 
     // Insert members
     for (const test of cluster.tests) {

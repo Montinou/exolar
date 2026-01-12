@@ -1,8 +1,8 @@
 # AI Vector Search - Implementation Status
 
-> **Last Updated:** 2026-01-12T18:33:08Z
-> **Current Phase:** Phase 5D - Embedding Service Upgrade
-> **Next Action:** Migrate clustering to v2 (Phase 5E)
+> **Last Updated:** 2026-01-12T18:52:34Z
+> **Current Phase:** Phase 5E - Clustering Migration
+> **Next Action:** Implement Semantic Search Backend (Phase 6)
 
 ---
 
@@ -19,7 +19,7 @@
 | 5B | Database Schema Migration | ✅ Complete | 2026-01-12T18:06:08Z | 2026-01-12T18:11:24Z |
 | 5C | Cohere Reranking Layer | ✅ Complete | 2026-01-12T18:11:24Z | 2026-01-12T18:16:54Z |
 | 5D | Embedding Service Upgrade | ✅ Complete | 2026-01-12T18:16:54Z | 2026-01-12T18:33:08Z |
-| 5E | Clustering Migration | ⬜ Pending | - | - |
+| 5E | Clustering Migration | ✅ Complete | 2026-01-12T18:33:08Z | 2026-01-12T18:52:34Z |
 | 6 | Semantic Search Backend | ⬜ Pending | - | - |
 | 7 | Semantic Search UI | ⬜ Pending | - | - |
 | 8 | MCP Integration | ⬜ Pending | - | - |
@@ -231,16 +231,28 @@
 
 ### Phase 5E: Clustering Migration
 
-**Status:** ⬜ Pending
+**Status:** ✅ Complete (2026-01-12T18:33:08Z → 2026-01-12T18:52:34Z)
 
 **Deliverables:**
-- [ ] `lib/db/clustering.ts` updated to use v2 embeddings
-- [ ] `lib/db/cluster-cache.ts` updated for v2 centroids
-- [ ] API endpoints support version parameter
+- [x] `lib/db/clustering.ts` updated to use v2 embeddings:
+  - `clusterFailures()` auto-detects v2 vs v1 embeddings
+  - `findHistoricalClusters()` auto-detects version from embedding dimensions
+  - Added `ClusteringOptionsV2` type with `embeddingVersion` option
+- [x] `lib/db/cluster-cache.ts` updated for v2 centroids:
+  - `getCachedClusters()` loads v2 centroids when available, falls back to v1
+  - `cacheClusterResults()` stores centroids in appropriate column based on version
+- [x] `app/api/failures/[id]/similar/route.ts` updated:
+  - Uses `getBestEmbedding()` to get best available embedding
+  - Uses appropriate search function based on embedding version
+  - Response includes `embeddingVersion` field
+- [x] `lib/ai/types.ts` updated with `EmbeddingVersion` type
+- [x] Build verified successful
 
 **Notes:**
 - Default to v2 embeddings when available
 - Fallback to v1 for unmigrated data
+- API responses now include embedding version for transparency
+- Cluster cache automatically invalidates and recomputes with correct version
 
 ---
 
@@ -358,6 +370,16 @@ DROP INDEX IF EXISTS idx_test_results_embedding_v2_hnsw;
 
 ## Next Steps
 
-1. **Phase 5B**: Create database schema migration for v2 columns
-2. **Phase 5C**: Add Cohere reranking provider
-3. **Phase 5D**: Update embedding service to use Jina + v2 columns
+1. **Phase 6**: Implement Semantic Search Backend
+   - Create search index table migration
+   - Implement semantic search functions with asymmetric embeddings
+   - Add two-stage retrieval with Cohere rerank
+   - Create API endpoint at `/api/search/semantic`
+
+2. **Phase 7**: Implement Semantic Search UI
+   - Create search component with natural language input
+   - Add mode selector (semantic/keyword/hybrid)
+   - Integrate with dashboard header
+
+3. **Phase 8**: MCP Integration (optional)
+   - Add `clustered_failures` and `semantic_search` datasets

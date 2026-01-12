@@ -12,6 +12,13 @@
 export type EmbeddingProvider = "gemini" | "jina"
 
 /**
+ * Embedding storage versions
+ * - v1: 768-dim Gemini embeddings (error_embedding column)
+ * - v2: 512-dim Jina embeddings (error_embedding_v2 column)
+ */
+export type EmbeddingVersion = "v1" | "v2"
+
+/**
  * Task type for asymmetric embeddings (Jina v3)
  *
  * - retrieval.passage: Use when indexing documents/errors (stored in DB)

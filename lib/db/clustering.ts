@@ -9,48 +9,101 @@
  *    - If similar to existing cluster (distance < threshold), add to it
  *    - Otherwise, create new cluster with this failure as centroid
  * 3. Return clusters sorted by size (largest first)
+ *
+ * Supports dual embedding versions:
+ * - v2: Jina 512-dim (preferred)
+ * - v1: Gemini 768-dim (fallback)
  */
 
 import { getSql } from "./connection"
 import { toVectorString, parseVectorString, cosineSimilarity } from "@/lib/ai"
-import type { FailureCluster, ClusterMember, ClusteringOptions } from "@/lib/ai/types"
+import type { FailureCluster, ClusterMember, ClusteringOptions, EmbeddingVersion } from "@/lib/ai/types"
+
+/**
+ * Extended options for clustering with version support
+ */
+export interface ClusteringOptionsV2 extends ClusteringOptions {
+  /** Force specific embedding version (default: auto-detect, prefer v2) */
+  embeddingVersion?: EmbeddingVersion | "auto"
+}
 
 /**
  * Cluster failures within a single execution
  *
+ * Prefers v2 embeddings (Jina 512-dim) when available,
+ * falls back to v1 embeddings (Gemini 768-dim).
+ *
  * @param executionId - The execution to cluster
  * @param options - Clustering configuration
- * @returns Array of failure clusters
+ * @returns Array of failure clusters with version metadata
  */
 export async function clusterFailures(
   executionId: number,
-  options: ClusteringOptions = {}
-): Promise<FailureCluster[]> {
+  options: ClusteringOptionsV2 = {}
+): Promise<FailureCluster[] & { embeddingVersion?: EmbeddingVersion }> {
   const {
     distanceThreshold = 0.15,
     minClusterSize = 1,
     maxClusters = 20,
+    embeddingVersion = "auto",
   } = options
 
   const sql = getSql()
 
+  // Determine which embedding version to use
+  let useVersion: EmbeddingVersion = "v1"
+
+  if (embeddingVersion === "auto") {
+    // Check if v2 embeddings exist for this execution
+    const [v2Check] = await sql`
+      SELECT COUNT(*) as count
+      FROM test_results
+      WHERE execution_id = ${executionId}
+        AND status IN ('failed', 'timedout')
+        AND error_embedding_v2 IS NOT NULL
+    `
+
+    if (Number(v2Check?.count) > 0) {
+      useVersion = "v2"
+    }
+  } else {
+    useVersion = embeddingVersion
+  }
+
   // Get all failures with embeddings for this execution
-  const failures = await sql`
-    SELECT
-      id,
-      test_name,
-      test_file,
-      error_message,
-      error_embedding::text as embedding
-    FROM test_results
-    WHERE execution_id = ${executionId}
-      AND status IN ('failed', 'timedout')
-      AND error_embedding IS NOT NULL
-    ORDER BY created_at ASC
-  `
+  // Use v2 column if available, otherwise v1
+  const failures = useVersion === "v2"
+    ? await sql`
+        SELECT
+          id,
+          test_name,
+          test_file,
+          error_message,
+          error_embedding_v2::text as embedding
+        FROM test_results
+        WHERE execution_id = ${executionId}
+          AND status IN ('failed', 'timedout')
+          AND error_embedding_v2 IS NOT NULL
+        ORDER BY created_at ASC
+      `
+    : await sql`
+        SELECT
+          id,
+          test_name,
+          test_file,
+          error_message,
+          error_embedding::text as embedding
+        FROM test_results
+        WHERE execution_id = ${executionId}
+          AND status IN ('failed', 'timedout')
+          AND error_embedding IS NOT NULL
+        ORDER BY created_at ASC
+      `
 
   if (failures.length === 0) {
-    return []
+    const result: FailureCluster[] & { embeddingVersion?: EmbeddingVersion } = []
+    result.embeddingVersion = useVersion
+    return result
   }
 
   // Parse embeddings
@@ -130,7 +183,10 @@ export async function clusterFailures(
       }
     })
 
-  return result
+  // Add version metadata to result
+  const resultWithVersion = result as FailureCluster[] & { embeddingVersion?: EmbeddingVersion }
+  resultWithVersion.embeddingVersion = useVersion
+  return resultWithVersion
 }
 
 /**
@@ -198,6 +254,10 @@ export async function getClusterStats(
  *
  * Searches across all executions in an organization to find
  * similar failures from the past.
+ *
+ * Automatically detects embedding version from input dimensions:
+ * - 512 dimensions → uses v2 column (Jina)
+ * - 768 dimensions → uses v1 column (Gemini)
  */
 export async function findHistoricalClusters(
   embedding: number[],
@@ -225,25 +285,50 @@ export async function findHistoricalClusters(
   const since = new Date()
   since.setDate(since.getDate() - daysBack)
 
-  const results = await sql`
-    SELECT
-      tr.id as test_result_id,
-      tr.execution_id,
-      tr.test_name,
-      tr.error_message,
-      tr.created_at,
-      te.branch,
-      1 - (tr.error_embedding <=> ${vectorStr}::vector) as similarity
-    FROM test_results tr
-    INNER JOIN test_executions te ON tr.execution_id = te.id
-    WHERE te.organization_id = ${organizationId}
-      AND tr.status IN ('failed', 'timedout')
-      AND tr.error_embedding IS NOT NULL
-      AND tr.created_at >= ${since.toISOString()}
-      AND tr.error_embedding <=> ${vectorStr}::vector < ${threshold}
-    ORDER BY tr.error_embedding <=> ${vectorStr}::vector
-    LIMIT ${limit}
-  `
+  // Auto-detect version based on embedding dimensions
+  const isV2 = embedding.length === 512
+  const embeddingColumn = isV2 ? "error_embedding_v2" : "error_embedding"
+
+  // Use the appropriate column for search
+  const results = isV2
+    ? await sql`
+        SELECT
+          tr.id as test_result_id,
+          tr.execution_id,
+          tr.test_name,
+          tr.error_message,
+          tr.created_at,
+          te.branch,
+          1 - (tr.error_embedding_v2 <=> ${vectorStr}::vector) as similarity
+        FROM test_results tr
+        INNER JOIN test_executions te ON tr.execution_id = te.id
+        WHERE te.organization_id = ${organizationId}
+          AND tr.status IN ('failed', 'timedout')
+          AND tr.error_embedding_v2 IS NOT NULL
+          AND tr.created_at >= ${since.toISOString()}
+          AND tr.error_embedding_v2 <=> ${vectorStr}::vector < ${threshold}
+        ORDER BY tr.error_embedding_v2 <=> ${vectorStr}::vector
+        LIMIT ${limit}
+      `
+    : await sql`
+        SELECT
+          tr.id as test_result_id,
+          tr.execution_id,
+          tr.test_name,
+          tr.error_message,
+          tr.created_at,
+          te.branch,
+          1 - (tr.error_embedding <=> ${vectorStr}::vector) as similarity
+        FROM test_results tr
+        INNER JOIN test_executions te ON tr.execution_id = te.id
+        WHERE te.organization_id = ${organizationId}
+          AND tr.status IN ('failed', 'timedout')
+          AND tr.error_embedding IS NOT NULL
+          AND tr.created_at >= ${since.toISOString()}
+          AND tr.error_embedding <=> ${vectorStr}::vector < ${threshold}
+        ORDER BY tr.error_embedding <=> ${vectorStr}::vector
+        LIMIT ${limit}
+      `
 
   return results.map((r) => ({
     executionId: r.execution_id as number,
