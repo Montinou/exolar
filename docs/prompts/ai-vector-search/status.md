@@ -1,8 +1,8 @@
 # AI Vector Search - Implementation Status
 
-> **Last Updated:** 2026-01-12T09:02:13Z
-> **Current Phase:** Phase 1 - Embedding Infrastructure
-> **Next Action:** Install Gemini SDK
+> **Last Updated:** 2026-01-12T09:04:47Z
+> **Current Phase:** Phase 2 - Ingestion Pipeline
+> **Next Action:** Create lib/db/embeddings.ts
 
 ---
 
@@ -11,8 +11,8 @@
 | Phase | Name | Status | Started | Completed |
 |-------|------|--------|---------|-----------|
 | 0 | Database Foundation | ✅ Complete | 2026-01-12T09:00:48Z | 2026-01-12T09:02:13Z |
-| 1 | Embedding Infrastructure | 🔄 In Progress | 2026-01-12T09:02:13Z | - |
-| 2 | Ingestion Pipeline | ⬜ Pending | - | - |
+| 1 | Embedding Infrastructure | ✅ Complete | 2026-01-12T09:02:13Z | 2026-01-12T09:04:47Z |
+| 2 | Ingestion Pipeline | 🔄 In Progress | 2026-01-12T09:04:47Z | - |
 | 3 | Clustering Backend | ⬜ Pending | - | - |
 | 4 | Clustering UI | ⬜ Pending | - | - |
 | 5 | Batch Indexing | ⬜ Pending | - | - |
@@ -48,23 +48,26 @@
 
 ### Phase 1: Embedding Infrastructure
 
-**Status:** 🔄 In Progress (Started: 2026-01-12T09:02:13Z)
+**Status:** ✅ Complete (2026-01-12T09:02:13Z → 2026-01-12T09:04:47Z)
 
 **Deliverables:**
-- [ ] `@google/generative-ai` installed
-- [ ] `lib/ai/embeddings.ts` created
-- [ ] `lib/ai/sanitizer.ts` created
-- [ ] `lib/ai/types.ts` created
-- [ ] `lib/ai/index.ts` created
+- [x] `@google/generative-ai` installed
+- [x] `lib/ai/embeddings.ts` created
+- [x] `lib/ai/sanitizer.ts` created
+- [x] `lib/ai/types.ts` created
+- [x] `lib/ai/index.ts` created
 
 **Notes:**
--
+- SDK v0.x installed via npm
+- Embedding functions: generateEmbedding(), generateEmbeddingsBatch()
+- Sanitizer removes UUIDs, timestamps, IPs for consistent embeddings
+- Utility functions: toVectorString(), parseVectorString(), cosineSimilarity()
 
 ---
 
 ### Phase 2: Ingestion Pipeline
 
-**Status:** ⬜ Pending
+**Status:** 🔄 In Progress (Started: 2026-01-12T09:04:47Z)
 
 **Deliverables:**
 - [ ] `lib/db/embeddings.ts` created
