@@ -1,8 +1,8 @@
 # AI Vector Search - Implementation Status
 
-> **Last Updated:** 2026-01-12T18:06:08Z
-> **Current Phase:** Phase 5A - Jina Embedding Provider
-> **Next Action:** Create database schema migration (Phase 5B)
+> **Last Updated:** 2026-01-12T18:11:24Z
+> **Current Phase:** Phase 5B - Database Schema Migration
+> **Next Action:** Create Cohere reranking layer (Phase 5C)
 
 ---
 
@@ -16,7 +16,7 @@
 | 3 | Clustering Backend | ✅ Complete | 2026-01-12T09:07:07Z | 2026-01-12T09:10:49Z |
 | 4 | Clustering UI | ✅ Complete | 2026-01-12T09:10:49Z | 2026-01-12T09:16:06Z |
 | 5A | Jina Embedding Provider | ✅ Complete | 2026-01-12T18:00:00Z | 2026-01-12T18:06:08Z |
-| 5B | Database Schema Migration | ⬜ Pending | - | - |
+| 5B | Database Schema Migration | ✅ Complete | 2026-01-12T18:06:08Z | 2026-01-12T18:11:24Z |
 | 5C | Cohere Reranking Layer | ⬜ Pending | - | - |
 | 5D | Embedding Service Upgrade | ⬜ Pending | - | - |
 | 5E | Clustering Migration | ⬜ Pending | - | - |
@@ -167,19 +167,22 @@
 
 ### Phase 5B: Database Schema Migration
 
-**Status:** ⬜ Pending
+**Status:** ✅ Complete (2026-01-12T18:06:08Z → 2026-01-12T18:11:24Z)
 
 **Deliverables:**
-- [ ] `scripts/016_add_jina_vector_support.sql` created
-- [ ] `error_embedding_v2 vector(512)` column added
-- [ ] `centroid_embedding_v2 vector(512)` column added to clusters
-- [ ] `embedding_chunk_hash` column added for incremental indexing
-- [ ] HNSW index for v2 columns created
-- [ ] `find_similar_failures_v2()` function created
+- [x] `scripts/016_add_jina_vector_support.sql` created
+- [x] `error_embedding_v2 vector(512)` column added
+- [x] `centroid_embedding_v2 vector(512)` column added to clusters
+- [x] `embedding_chunk_hash` column added for incremental indexing
+- [x] HNSW index for v2 columns created
+- [x] `find_similar_failures_v2()` function created
+- [x] `find_similar_failures_global_v2()` function created
+- [x] `find_similar_failures_hybrid()` function created (uses v2, falls back to v1)
 
 **Notes:**
 - Additive migration: new columns alongside existing ones
 - No breaking changes to existing functionality
+- Migration executed successfully on Neon database
 
 ---
 
