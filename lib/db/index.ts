@@ -197,6 +197,17 @@ export {
   getClusterCacheStats,
 } from "./cluster-cache"
 
+// Semantic search operations (AI vector search)
+export {
+  searchFailuresSemantic,
+  searchTestsKeyword,
+  searchHybrid,
+  getEmbeddingCoverage,
+  type SemanticSearchOptions,
+  type SemanticSearchResult,
+  type TestSemanticSearchResult,
+} from "./semantic-search"
+
 // Suite and test tracking (Phase 14)
 export {
   detectTechStack,
