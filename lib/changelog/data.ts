@@ -82,6 +82,26 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
           "New metric category with cluster_reduction (grouping efficiency), similarity_score (vector similarity), embedding_coverage (failures with embeddings), and search_relevance scores.",
         docsUrl: "/docs/mcp#semantic-definitions",
       },
+      {
+        icon: "🖥️",
+        title: "AI Insights Dashboard Card",
+        description:
+          "New dashboard card showing embedding coverage, indexed failures, and cluster reduction stats at a glance.",
+        docsUrl: "/dashboard",
+      },
+      {
+        icon: "🔎",
+        title: "Dedicated AI Search Page",
+        description:
+          "Full-page semantic search at /dashboard/search with mode selector, results table, similarity scores, and CSV export.",
+        docsUrl: "/dashboard/search",
+      },
+      {
+        icon: "📋",
+        title: "Similar Failures in Test History",
+        description:
+          "Test History modal now includes a 'Similar Issues' tab showing related failures from the last 30 days with match percentages.",
+      },
     ],
   },
   {
