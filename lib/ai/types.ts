@@ -2,8 +2,49 @@
  * TypeScript types for AI/Vector features
  */
 
+// ============================================
+// Provider Types
+// ============================================
+
 /**
- * A vector embedding (768 dimensions for Gemini text-embedding-004)
+ * Available embedding providers
+ */
+export type EmbeddingProvider = "gemini" | "jina"
+
+/**
+ * Task type for asymmetric embeddings (Jina v3)
+ *
+ * - retrieval.passage: Use when indexing documents/errors (stored in DB)
+ * - retrieval.query: Use when searching (user's search query)
+ */
+export type EmbeddingTask = "retrieval.passage" | "retrieval.query"
+
+/**
+ * Configuration for embedding generation
+ */
+export interface EmbeddingConfig {
+  /** Which provider to use */
+  provider: EmbeddingProvider
+  /** Task type for asymmetric embeddings (only used by Jina) */
+  task?: EmbeddingTask
+}
+
+/**
+ * Embedding dimensions by provider
+ */
+export const EMBEDDING_DIMENSIONS: Record<EmbeddingProvider, number> = {
+  gemini: 768,
+  jina: 512,
+}
+
+// ============================================
+// Embedding Types
+// ============================================
+
+/**
+ * A vector embedding
+ * - 768 dimensions for Gemini text-embedding-004
+ * - 512 dimensions for Jina v3 (Matryoshka)
  */
 export type Embedding = number[]
 
@@ -87,7 +128,9 @@ export interface TestResultWithEmbedding {
   status: string
   error_message: string | null
   stack_trace: string | null
-  error_embedding: string | null // PostgreSQL vector stored as string
+  error_embedding: string | null // PostgreSQL vector stored as string (768-dim, Gemini)
+  error_embedding_v2: string | null // PostgreSQL vector stored as string (512-dim, Jina)
+  embedding_chunk_hash: string | null // Hash for incremental indexing
   ai_context: unknown | null
 }
 

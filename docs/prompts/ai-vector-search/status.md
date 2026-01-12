@@ -1,8 +1,8 @@
 # AI Vector Search - Implementation Status
 
-> **Last Updated:** 2026-01-12T09:16:06Z
-> **Current Phase:** Phase 5 - Batch Indexing
-> **Next Action:** Create test search index table and batch indexer
+> **Last Updated:** 2026-01-12T18:06:08Z
+> **Current Phase:** Phase 5A - Jina Embedding Provider
+> **Next Action:** Create database schema migration (Phase 5B)
 
 ---
 
@@ -15,12 +15,33 @@
 | 2 | Ingestion Pipeline | ✅ Complete | 2026-01-12T09:04:47Z | 2026-01-12T09:07:07Z |
 | 3 | Clustering Backend | ✅ Complete | 2026-01-12T09:07:07Z | 2026-01-12T09:10:49Z |
 | 4 | Clustering UI | ✅ Complete | 2026-01-12T09:10:49Z | 2026-01-12T09:16:06Z |
-| 5 | Batch Indexing | ⬜ Pending | - | - |
+| 5A | Jina Embedding Provider | ✅ Complete | 2026-01-12T18:00:00Z | 2026-01-12T18:06:08Z |
+| 5B | Database Schema Migration | ⬜ Pending | - | - |
+| 5C | Cohere Reranking Layer | ⬜ Pending | - | - |
+| 5D | Embedding Service Upgrade | ⬜ Pending | - | - |
+| 5E | Clustering Migration | ⬜ Pending | - | - |
 | 6 | Semantic Search Backend | ⬜ Pending | - | - |
 | 7 | Semantic Search UI | ⬜ Pending | - | - |
 | 8 | MCP Integration | ⬜ Pending | - | - |
 
 **Legend:** ⬜ Pending | 🔄 In Progress | ✅ Complete | ❌ Blocked
+
+---
+
+## Architecture Evolution
+
+### Before (Phases 0-4)
+- **Provider:** Google Gemini text-embedding-004
+- **Dimensions:** 768
+- **Storage:** `error_embedding vector(768)`
+- **Search:** Symmetric embeddings only
+
+### After (Phases 5+)
+- **Primary Provider:** Jina v3 (with Gemini fallback)
+- **Dimensions:** 512 (Matryoshka)
+- **Storage:** `error_embedding_v2 vector(512)` (additive)
+- **Search:** Asymmetric embeddings (passage vs query)
+- **Reranking:** Cohere rerank-english-v3.0
 
 ---
 
@@ -125,18 +146,85 @@
 
 ---
 
-### Phase 5: Batch Indexing
+### Phase 5A: Jina Embedding Provider
+
+**Status:** ✅ Complete (2026-01-12T18:00:00Z → 2026-01-12T18:06:08Z)
+
+**Deliverables:**
+- [x] `lib/ai/providers/jina.ts` created
+- [x] `lib/ai/providers/index.ts` created (provider factory)
+- [x] `lib/ai/types.ts` updated with provider types
+- [x] `lib/ai/index.ts` exports updated
+
+**Notes:**
+- Jina v3 API client with asymmetric embedding support
+- Task types: `retrieval.passage` (for indexing) and `retrieval.query` (for search)
+- 512 dimensions using Matryoshka representation learning
+- Automatic fallback to Gemini if Jina fails
+- Provider factory with `generateEmbeddingWithProvider()` and `generateEmbeddingsBatchWithProvider()`
+
+---
+
+### Phase 5B: Database Schema Migration
 
 **Status:** ⬜ Pending
 
 **Deliverables:**
-- [ ] `scripts/016_add_test_search_index.sql` created
-- [ ] `lib/services/test-indexing-service.ts` created
-- [ ] `app/api/admin/index-tests/route.ts` created
-- [ ] Auto-index on ingestion added
+- [ ] `scripts/016_add_jina_vector_support.sql` created
+- [ ] `error_embedding_v2 vector(512)` column added
+- [ ] `centroid_embedding_v2 vector(512)` column added to clusters
+- [ ] `embedding_chunk_hash` column added for incremental indexing
+- [ ] HNSW index for v2 columns created
+- [ ] `find_similar_failures_v2()` function created
 
 **Notes:**
--
+- Additive migration: new columns alongside existing ones
+- No breaking changes to existing functionality
+
+---
+
+### Phase 5C: Cohere Reranking Layer
+
+**Status:** ⬜ Pending
+
+**Deliverables:**
+- [ ] `lib/ai/providers/cohere.ts` created
+- [ ] `lib/ai/reranker.ts` created
+- [ ] Two-stage retrieval support added
+
+**Notes:**
+- Cohere rerank-english-v3.0 for precision after vector recall
+- Free tier: 1,000 requests/month
+
+---
+
+### Phase 5D: Embedding Service Upgrade
+
+**Status:** ⬜ Pending
+
+**Deliverables:**
+- [ ] `lib/services/embedding-service.ts` updated to use Jina
+- [ ] `lib/db/embeddings.ts` updated for v2 columns
+- [ ] `app/api/admin/backfill-embeddings/route.ts` updated for migration mode
+
+**Notes:**
+- Store embeddings in v2 columns
+- Support both v1 and v2 during migration
+
+---
+
+### Phase 5E: Clustering Migration
+
+**Status:** ⬜ Pending
+
+**Deliverables:**
+- [ ] `lib/db/clustering.ts` updated to use v2 embeddings
+- [ ] `lib/db/cluster-cache.ts` updated for v2 centroids
+- [ ] API endpoints support version parameter
+
+**Notes:**
+- Default to v2 embeddings when available
+- Fallback to v1 for unmigrated data
 
 ---
 
@@ -145,13 +233,15 @@
 **Status:** ⬜ Pending
 
 **Deliverables:**
+- [ ] `scripts/017_add_semantic_search_index.sql` created
 - [ ] `lib/db/semantic-search.ts` created
 - [ ] `lib/services/search-service.ts` created
 - [ ] `app/api/search/semantic/route.ts` created
-- [ ] `lib/db/index.ts` exports updated
 
 **Notes:**
--
+- Asymmetric embeddings for search queries
+- Two-stage retrieval with Cohere rerank
+- Hybrid mode (semantic + keyword)
 
 ---
 
@@ -163,10 +253,11 @@
 - [ ] `components/dashboard/semantic-search.tsx` created
 - [ ] `hooks/use-debounce.ts` created
 - [ ] Dashboard header integration
-- [ ] Required shadcn components installed
+- [ ] Mode selector (semantic/keyword/hybrid)
 
 **Notes:**
--
+- Natural language search input
+- Real-time results with relevance scores
 
 ---
 
@@ -179,10 +270,10 @@
 - [ ] `semantic_search` dataset added
 - [ ] `find_similar` action added
 - [ ] Semantic definitions updated
-- [ ] Tool schema updated
 
 **Notes:**
--
+- MCP does NOT expose vector features directly (by design)
+- These are optional datasets for AI-powered queries
 
 ---
 
@@ -201,6 +292,9 @@
 | 2026-01-12 | Async embedding generation | Don't block ingestion response |
 | 2026-01-12 | Cache clusters in database | Instant dashboard loading |
 | 2026-01-12 | Hybrid search as default | Combines semantic + keyword for best results |
+| 2026-01-12 | Upgrade to Jina v3 + Cohere | Better quality, asymmetric support, free tier |
+| 2026-01-12 | Additive schema migration | Non-breaking upgrade, rollback-safe |
+| 2026-01-12 | 512-dim Matryoshka vectors | Smaller storage, faster search, 90%+ quality |
 
 ---
 
@@ -211,7 +305,11 @@
 - [ ] Phase 2: Verify embeddings stored on ingestion
 - [ ] Phase 3: Test clustering API returns grouped failures
 - [ ] Phase 4: Test UI toggle and cluster visualization
-- [ ] Phase 5: Run backfill and verify index populated
+- [ ] Phase 5A: Verify Jina embedding generation (512-dim)
+- [ ] Phase 5B: Run migration, verify v2 columns exist
+- [ ] Phase 5C: Test Cohere rerank API
+- [ ] Phase 5D: Verify embeddings stored in v2 columns
+- [ ] Phase 5E: Test clustering with v2 embeddings
 - [ ] Phase 6: Test semantic search API
 - [ ] Phase 7: Test search UI with natural language
 - [ ] Phase 8: Test MCP tools via Claude Code
@@ -220,7 +318,7 @@
 
 ## Rollback Plan
 
-Each phase has rollback instructions in its respective file. Key rollback commands:
+Each phase has rollback instructions. Key rollback commands:
 
 ```sql
 -- Phase 0 rollback (CAUTION: deletes all embeddings)
@@ -232,15 +330,18 @@ DROP INDEX IF EXISTS idx_test_results_execution_embedding;
 DROP INDEX IF EXISTS idx_test_results_error_embedding_hnsw;
 ALTER TABLE test_results DROP COLUMN IF EXISTS error_embedding;
 
--- Phase 5 rollback
-DROP TABLE IF EXISTS test_search_index;
-DROP FUNCTION IF EXISTS semantic_test_search;
+-- Phase 5B rollback (safe - just removes v2 columns)
+ALTER TABLE test_results DROP COLUMN IF EXISTS error_embedding_v2;
+ALTER TABLE test_results DROP COLUMN IF EXISTS embedding_chunk_hash;
+ALTER TABLE failure_clusters DROP COLUMN IF EXISTS centroid_embedding_v2;
+DROP FUNCTION IF EXISTS find_similar_failures_v2;
+DROP INDEX IF EXISTS idx_test_results_embedding_v2_hnsw;
 ```
 
 ---
 
 ## Next Steps
 
-1. Proceed to Phase 5: Create test search index table
-2. Create batch indexing service
-3. Add admin API for indexing tests
+1. **Phase 5B**: Create database schema migration for v2 columns
+2. **Phase 5C**: Add Cohere reranking provider
+3. **Phase 5D**: Update embedding service to use Jina + v2 columns
