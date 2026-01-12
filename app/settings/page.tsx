@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { authClient } from "@/lib/auth/client"
 import { Loader2, Lock, ArrowLeft, Users, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
+import { EmbeddingStatusCard } from "@/components/settings/embedding-status-card"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -115,6 +116,9 @@ export default function SettingsPage() {
             </Card>
           </Link>
         )}
+
+        {/* AI Embeddings Status - Only shown to admins */}
+        <EmbeddingStatusCard />
 
         <Card className="glass-card glass-card-glow">
           <CardHeader>

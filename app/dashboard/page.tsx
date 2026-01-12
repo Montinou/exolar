@@ -18,6 +18,7 @@ import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
 // TODO: SlowestTestsCard is also in /dashboard/performance - consolidate in future dashboard redesign
 import { SlowestTestsCard } from "@/components/dashboard/slowest-tests-card"
 import { SuitePassRatesCard } from "@/components/dashboard/suite-pass-rates-card"
+import { AiInsightsCard } from "@/components/dashboard/ai-insights-card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { AnnouncementBanner } from "@/components/dashboard/announcement-banner"
@@ -101,10 +102,11 @@ async function DashboardContent({
           <ErrorDistributionChart />
         </div>
 
-        {/* Analysis Row - Flakiest and Slowest Tests */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Analysis Row - Flakiest, Slowest, and AI Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
           <SlowestTestsCard />
+          <AiInsightsCard />
         </div>
 
         {/* Suite Analysis Row */}

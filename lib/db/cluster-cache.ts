@@ -212,22 +212,33 @@ export async function isClustered(executionId: number): Promise<boolean> {
 }
 
 /**
- * Get cache statistics
+ * Get cache statistics for an organization
  */
-export async function getClusterCacheStats(): Promise<{
+export async function getClusterCacheStats(organizationId?: number): Promise<{
   cachedExecutions: number
   totalClusters: number
   totalMembers: number
 }> {
   const sql = getSql()
 
-  const [stats] = await sql`
-    SELECT
-      COUNT(DISTINCT execution_id) as cached_executions,
-      COUNT(*) as total_clusters,
-      COALESCE(SUM(test_count), 0) as total_members
-    FROM failure_clusters
-  `
+  // If organizationId provided, filter by org (RLS safety)
+  const [stats] = organizationId
+    ? await sql`
+        SELECT
+          COUNT(DISTINCT fc.execution_id) as cached_executions,
+          COUNT(*) as total_clusters,
+          COALESCE(SUM(fc.test_count), 0) as total_members
+        FROM failure_clusters fc
+        INNER JOIN test_executions te ON fc.execution_id = te.id
+        WHERE te.organization_id = ${organizationId}
+      `
+    : await sql`
+        SELECT
+          COUNT(DISTINCT execution_id) as cached_executions,
+          COUNT(*) as total_clusters,
+          COALESCE(SUM(test_count), 0) as total_members
+        FROM failure_clusters
+      `
 
   return {
     cachedExecutions: Number(stats?.cached_executions || 0),

@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ChevronRight, GitBranch, GitCommit, TestTube } from "lucide-react"
 import type { TestExecution } from "@/lib/types"
 import { TestDetailModal } from "./test-detail-modal"
+import { ClusterPreviewBadge } from "./cluster-preview-badge"
 
 interface ExecutionsTableProps {
   executions: TestExecution[]
@@ -94,10 +95,13 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
 
                   {/* Test Results */}
                   <div className="flex items-center justify-between text-sm">
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                       <span style={{ color: "var(--status-success)" }}>{execution.passed} passed</span>
                       {execution.failed > 0 && (
-                        <span style={{ color: "var(--status-error)" }}>{execution.failed} failed</span>
+                        <>
+                          <span style={{ color: "var(--status-error)" }}>{execution.failed} failed</span>
+                          <ClusterPreviewBadge executionId={execution.id} failedCount={execution.failed} />
+                        </>
                       )}
                     </div>
                     <span className="text-muted-foreground">{formatDuration(execution.duration_ms)}</span>
@@ -185,10 +189,13 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                       </TableCell>
                       <TableCell>{getStatusBadge(execution.status)}</TableCell>
                       <TableCell>
-                        <div className="flex gap-2 text-sm">
+                        <div className="flex gap-2 text-sm items-center">
                           <span style={{ color: "var(--status-success)" }}>{execution.passed} passed</span>
                           {execution.failed > 0 && (
-                            <span style={{ color: "var(--status-error)" }}>{execution.failed} failed</span>
+                            <>
+                              <span style={{ color: "var(--status-error)" }}>{execution.failed} failed</span>
+                              <ClusterPreviewBadge executionId={execution.id} failedCount={execution.failed} />
+                            </>
                           )}
                         </div>
                       </TableCell>
