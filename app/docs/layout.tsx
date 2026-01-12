@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Sparkles,
+  Brain,
 } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import {
@@ -44,6 +45,17 @@ import {
 const navigation = [
   { name: "Getting Started", href: "/docs", icon: Book },
   { name: "What's New", href: "/docs/whats-new", icon: Sparkles },
+  { 
+    name: "AI Vector Search", 
+    href: "/docs/ai-search", 
+    icon: Brain,
+    subItems: [
+      { name: "Semantic Search", href: "/docs/ai-search#semantic-search" },
+      { name: "Failure Clustering", href: "/docs/ai-search#failure-clustering" },
+      { name: "Similar Failures", href: "/docs/ai-search#similar-failures" },
+      { name: "Admin Controls", href: "/docs/ai-search#admin-managing-embeddings" },
+    ]
+  },
   { name: "Quick Start", href: "/docs/quickstart", icon: Rocket },
   { 
     name: "Playwright Reporter", 

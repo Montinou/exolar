@@ -23,6 +23,18 @@ export interface Announcement {
  */
 export const ACTIVE_ANNOUNCEMENTS: Announcement[] = [
   {
+    id: "ai-vector-search-v23",
+    title: "🧠 AI Vector Search - Smart Clustering & Semantic Search",
+    description:
+      "50+ failures → 3 root causes. Find tests by intent with AI-powered semantic search and clustering.",
+    ctaText: "Read Documentation",
+    ctaUrl: "/docs/ai-search",
+    icon: null,
+    variant: "feature",
+    expiresAt: new Date("2026-02-20"), // 40 days from launch
+    priority: 11, // Highest priority
+  },
+  {
     id: "integration-engineer-v21",
     title: "🤖 AI-Guided CI/CD Setup",
     description:
