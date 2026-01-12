@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, Calendar, GitBranch, Hash, Clock, CheckCircle2, XCircle, AlertTriangle, Copy, Check } from "lucide-react"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { ArrowLeft, Calendar, GitBranch, Hash, Clock, CheckCircle2, XCircle, AlertTriangle, Copy, Check, List, Layers } from "lucide-react"
 import type { TestExecution, TestResult } from "@/lib/types"
 import { TestResultCard } from "@/components/dashboard/test-result-card"
 import { UserMenu } from "@/components/dashboard/user-menu"
+import { ClusteredFailuresView } from "@/components/dashboard/clustered-failures-view"
+import { SimilarFailuresModal } from "@/components/dashboard/similar-failures-modal"
 
 export default function ExecutionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -21,6 +24,9 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [failedViewMode, setFailedViewMode] = useState<"list" | "clustered">("list")
+  const [similarModalTestId, setSimilarModalTestId] = useState<number | null>(null)
+  const [similarModalTestName, setSimilarModalTestName] = useState<string | undefined>()
 
   useEffect(() => {
     loadExecutionData()
@@ -123,6 +129,12 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
   const passedTests = testResults.filter((t) => t.status === "passed")
   const skippedTests = testResults.filter((t) => t.status === "skipped")
   const totalDuration = testResults.reduce((sum, t) => sum + (t.duration_ms || 0), 0)
+
+  function handleFindSimilar(testResultId: number) {
+    const test = testResults.find(t => t.id === testResultId)
+    setSimilarModalTestName(test?.test_name)
+    setSimilarModalTestId(testResultId)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -291,9 +303,46 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
                     <p className="text-sm">No failed tests in this execution.</p>
                   </div>
                 ) : (
-                  failedTests.map((test) => (
-                    <TestResultCard key={test.id} test={test} variant="full" />
-                  ))
+                  <>
+                    {/* View mode toggle */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        {failedTests.length} failed test{failedTests.length !== 1 ? "s" : ""}
+                      </p>
+                      <ToggleGroup
+                        type="single"
+                        value={failedViewMode}
+                        onValueChange={(value) => value && setFailedViewMode(value as "list" | "clustered")}
+                        className="bg-muted rounded-lg p-1"
+                      >
+                        <ToggleGroupItem value="list" aria-label="List view" className="h-7 px-3 text-xs data-[state=on]:bg-background">
+                          <List className="h-3 w-3 mr-1" />
+                          List
+                        </ToggleGroupItem>
+                        <ToggleGroupItem value="clustered" aria-label="Clustered view" className="h-7 px-3 text-xs data-[state=on]:bg-background">
+                          <Layers className="h-3 w-3 mr-1" />
+                          Clustered
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+
+                    {/* List view */}
+                    {failedViewMode === "list" && (
+                      <div className="space-y-4">
+                        {failedTests.map((test) => (
+                          <TestResultCard key={test.id} test={test} variant="full" />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Clustered view */}
+                    {failedViewMode === "clustered" && (
+                      <ClusteredFailuresView
+                        executionId={parseInt(id, 10)}
+                        onFindSimilar={handleFindSimilar}
+                      />
+                    )}
+                  </>
                 )}
               </TabsContent>
 
@@ -328,6 +377,18 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
           </CardContent>
         </Card>
       </div>
+
+      {/* Similar Failures Modal */}
+      {similarModalTestId && (
+        <SimilarFailuresModal
+          testResultId={similarModalTestId}
+          testName={similarModalTestName}
+          onClose={() => {
+            setSimilarModalTestId(null)
+            setSimilarModalTestName(undefined)
+          }}
+        />
+      )}
     </div>
   )
 }
