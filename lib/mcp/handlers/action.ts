@@ -10,7 +10,7 @@ import type { MCPAuthContext } from "../auth"
 import * as db from "@/lib/db"
 
 const ActionInputSchema = z.object({
-  action: z.enum(["compare", "generate_report", "classify", "find_similar"]),
+  action: z.enum(["compare", "generate_report", "classify", "find_similar", "reembed"]),
   params: z
     .object({
       // Para compare
@@ -39,6 +39,12 @@ const ActionInputSchema = z.object({
       scope: z.enum(["current", "historical"]).optional(), // current = same execution, historical = across org
       threshold: z.number().min(0).max(1).optional(), // Similarity threshold (0-1)
       rerank: z.boolean().optional(), // Enable Cohere reranking
+      limit: z.number().optional(), // Limit for find_similar
+
+      // Para reembed
+      version: z.enum(["v1", "v2", "both"]).optional(),
+      force: z.boolean().optional(),
+      dry_run: z.boolean().optional(),
     })
     .optional()
     .default({}),
@@ -471,6 +477,181 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
         } else {
           output += "_No similar failures found with the current threshold_\n"
         }
+
+        return textResponse(output)
+      }
+
+      // ============================================
+      // Reembed Test Failures
+      // ============================================
+      case "reembed": {
+        // Import embedding service
+        const {
+          generateAndStoreEmbeddingsBatch,
+          getEmbeddingConfig,
+        } = await import("@/lib/services/embedding-service")
+
+        const version = p.version || "v2"
+        const force = p.force ?? false
+        const limit = p.limit
+        const dryRun = p.dry_run ?? false
+
+        const sql = db.getSql()
+
+        // Build WHERE clause
+        const whereClauses: string[] = []
+        whereClauses.push(`te.organization_id = ${orgId}`)
+
+        if (p.execution_id) {
+          whereClauses.push(`tr.execution_id = ${p.execution_id}`)
+        }
+
+        whereClauses.push("tr.status IN ('failed', 'timedout')")
+        whereClauses.push("(tr.error_message IS NOT NULL OR tr.stack_trace IS NOT NULL)")
+
+        // Add embedding filter if not force mode
+        if (!force) {
+          if (version === "v1") {
+            whereClauses.push("tr.error_embedding IS NULL")
+          } else {
+            whereClauses.push("tr.error_embedding_v2 IS NULL")
+          }
+        }
+
+        const where = whereClauses.join(" AND ")
+        const limitClause = limit ? `LIMIT ${limit}` : ""
+
+        // Get stats first
+        const statsQuery = `
+          SELECT
+            COUNT(*) as total_failed,
+            COUNT(*) FILTER (WHERE tr.error_embedding IS NOT NULL) as with_v1,
+            COUNT(*) FILTER (WHERE tr.error_embedding_v2 IS NOT NULL) as with_v2,
+            COUNT(*) FILTER (WHERE tr.error_embedding IS NULL) as without_v1,
+            COUNT(*) FILTER (WHERE tr.error_embedding_v2 IS NULL) as without_v2
+          FROM test_results tr
+          INNER JOIN test_executions te ON tr.execution_id = te.id
+          WHERE te.organization_id = ${orgId}
+            AND tr.status IN ('failed', 'timedout')
+            ${p.execution_id ? `AND tr.execution_id = ${p.execution_id}` : ""}
+        `
+        const statsResults = await sql.unsafe(statsQuery) as unknown as Array<{
+          total_failed: string
+          with_v1: string
+          with_v2: string
+          without_v1: string
+          without_v2: string
+        }>
+        const stats = statsResults[0]
+
+        // Dry run - just return preview
+        if (dryRun) {
+          const toProcess = force
+            ? Number(stats.total_failed)
+            : version === "v1"
+              ? Number(stats.without_v1)
+              : Number(stats.without_v2)
+
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "reembed",
+            preview: {
+              totalFailed: Number(stats.total_failed),
+              withV1: Number(stats.with_v1),
+              withV2: Number(stats.with_v2),
+              toProcess: limit ? Math.min(toProcess, limit) : toProcess,
+              version,
+              force,
+            },
+          })
+        }
+
+        // Get tests to process
+        const testsQuery = `
+          SELECT tr.id, tr.error_message, tr.stack_trace
+          FROM test_results tr
+          INNER JOIN test_executions te ON tr.execution_id = te.id
+          WHERE ${where}
+          ORDER BY tr.created_at DESC
+          ${limitClause}
+        `
+        const testsToProcess = await sql.unsafe(testsQuery) as unknown as Array<{
+          id: number
+          error_message: string | null
+          stack_trace: string | null
+        }>
+
+        if (testsToProcess.length === 0) {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "reembed",
+            stats: {
+              total: 0,
+              succeeded: 0,
+              failed: 0,
+              skipped: 0,
+              message: "No tests to process",
+            },
+          })
+        }
+
+        // Process in batches
+        const startTime = Date.now()
+        let succeeded = 0
+        let failed = 0
+        let skipped = 0
+
+        const BATCH_SIZE = 10
+        for (let i = 0; i < testsToProcess.length; i += BATCH_SIZE) {
+          const batch = testsToProcess.slice(i, i + BATCH_SIZE)
+          const results = await generateAndStoreEmbeddingsBatch(batch)
+
+          for (const result of results) {
+            if (result.success) {
+              succeeded++
+            } else if (result.error === "No error content to embed") {
+              skipped++
+            } else {
+              failed++
+            }
+          }
+        }
+
+        const durationMs = Date.now() - startTime
+        const config = getEmbeddingConfig()
+
+        if (input.format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "reembed",
+            stats: {
+              total: testsToProcess.length,
+              succeeded,
+              failed,
+              skipped,
+              durationMs,
+              provider: config.provider,
+              dimensions: config.dimensions,
+            },
+          })
+        }
+
+        // Markdown format
+        let output = `## Re-Embedding Complete\n\n`
+        output += `**Organization:** ${authContext.organizationSlug}\n`
+        output += `**Version:** ${version}\n`
+        output += `**Force:** ${force}\n`
+        output += `**Provider:** ${config.provider}\n`
+        output += `**Dimensions:** ${config.dimensions}\n\n`
+
+        output += `### Results\n`
+        output += `| Metric | Value |\n`
+        output += `|--------|-------|\n`
+        output += `| Total | ${testsToProcess.length} |\n`
+        output += `| Succeeded | ${succeeded} |\n`
+        output += `| Failed | ${failed} |\n`
+        output += `| Skipped | ${skipped} |\n`
+        output += `| Duration | ${(durationMs / 1000).toFixed(2)}s |\n`
 
         return textResponse(output)
       }

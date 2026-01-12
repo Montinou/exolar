@@ -142,23 +142,25 @@ Examples:
   // ============================================
   {
     name: "perform_exolar_action",
-    description: `Execute heavy operations: compare executions, generate reports, classify failures.
+    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed errors.
 
 Actions:
 - compare: Side-by-side execution comparison (by ID or branch)
 - generate_report: Markdown failure report for an execution
 - classify: Determine if failure is FLAKE vs BUG
+- reembed: Force re-embedding of test failures (requires admin)
 
 Examples:
 - perform_exolar_action({ action: "compare", params: { baseline_branch: "main", current_branch: "feature" } })
 - perform_exolar_action({ action: "generate_report", params: { execution_id: 123 } })
-- perform_exolar_action({ action: "classify", params: { execution_id: 123, test_name: "login test" } })`,
+- perform_exolar_action({ action: "classify", params: { execution_id: 123, test_name: "login test" } })
+- perform_exolar_action({ action: "reembed", params: { force: true, version: "v2" } })`,
     inputSchema: {
       type: "object" as const,
       properties: {
         action: {
           type: "string",
-          enum: ["compare", "generate_report", "classify"],
+          enum: ["compare", "generate_report", "classify", "reembed"],
           description: "Action to perform",
         },
         params: {
@@ -184,6 +186,11 @@ Examples:
             test_id: { type: "number" },
             test_name: { type: "string" },
             test_file: { type: "string" },
+            // reembed
+            version: { type: "string", enum: ["v1", "v2", "both"] },
+            force: { type: "boolean" },
+            limit: { type: "number" },
+            dry_run: { type: "boolean" },
           },
         },
         format: {
