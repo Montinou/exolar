@@ -7,7 +7,7 @@
  * 3. What thresholds indicate healthy/warning/critical states
  */
 
-export type MetricCategory = "execution" | "flakiness" | "performance" | "reliability"
+export type MetricCategory = "execution" | "flakiness" | "performance" | "reliability" | "ai_insights"
 export type MetricType = "percentage" | "count" | "duration" | "score" | "rate"
 
 export interface MetricDefinition {
@@ -182,6 +182,68 @@ export const METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
     unit: "%",
     relatedTools: ["get_reliability_score"],
   },
+
+  // AI Insights Metrics (Phase 8: Vector Search)
+  cluster_reduction: {
+    id: "cluster_reduction",
+    name: "Cluster Reduction",
+    category: "ai_insights",
+    type: "percentage",
+    formula: "(1 - (clusters / total_failures)) × 100",
+    description: "Percentage reduction in failures when grouped by AI similarity. Higher = more repetitive failures.",
+    unit: "%",
+    thresholds: {
+      healthy: 50, // 50%+ reduction means many similar failures
+      warning: 25,
+      critical: 0, // No reduction = all failures unique
+    },
+    relatedTools: ["query_exolar_data (clustered_failures)"],
+  },
+  similarity_score: {
+    id: "similarity_score",
+    name: "Similarity Score",
+    category: "ai_insights",
+    type: "score",
+    formula: "cosine_similarity(embedding_a, embedding_b)",
+    description: "Vector similarity score between 0-1. Higher = more similar failures. Based on Jina v3 embeddings (512-dim).",
+    unit: "similarity",
+    thresholds: {
+      healthy: 0.85, // Very similar
+      warning: 0.70, // Somewhat similar
+      critical: 0.50, // Possibly related
+    },
+    relatedTools: ["perform_exolar_action (find_similar)", "query_exolar_data (semantic_search)"],
+  },
+  embedding_coverage: {
+    id: "embedding_coverage",
+    name: "Embedding Coverage",
+    category: "ai_insights",
+    type: "percentage",
+    formula: "(failures_with_embeddings / total_failures) × 100",
+    description: "Percentage of failures that have vector embeddings for AI analysis. 100% = all failures indexed.",
+    unit: "%",
+    thresholds: {
+      healthy: 95,
+      warning: 70,
+      critical: 0,
+    },
+    relatedTools: ["query_exolar_data (semantic_search)"],
+  },
+  search_relevance: {
+    id: "search_relevance",
+    name: "Search Relevance",
+    category: "ai_insights",
+    type: "score",
+    formula: "weighted_average(vector_similarity × 0.7 + rerank_score × 0.3)",
+    description: "Combined relevance score for semantic search results. Uses Jina v3 embeddings + Cohere reranking.",
+    unit: "relevance",
+    thresholds: {
+      healthy: 0.80,
+      warning: 0.60,
+      critical: 0.40,
+    },
+    relatedTools: ["query_exolar_data (semantic_search)"],
+  },
 }
 
 /**
@@ -243,5 +305,6 @@ export function getCategories(): { id: MetricCategory; name: string; description
     { id: "flakiness", name: "Flakiness Metrics", description: "Test stability and retry patterns" },
     { id: "performance", name: "Performance Metrics", description: "Duration and speed analysis" },
     { id: "reliability", name: "Reliability Metrics", description: "Overall suite health scores" },
+    { id: "ai_insights", name: "AI Insights", description: "Vector search, clustering, and semantic analysis" },
   ]
 }

@@ -10,7 +10,7 @@ import type { MCPAuthContext } from "../auth"
 import * as db from "@/lib/db"
 
 const ActionInputSchema = z.object({
-  action: z.enum(["compare", "generate_report", "classify"]),
+  action: z.enum(["compare", "generate_report", "classify", "find_similar"]),
   params: z
     .object({
       // Para compare
@@ -33,6 +33,12 @@ const ActionInputSchema = z.object({
       test_id: z.number().optional(),
       test_name: z.string().optional(),
       test_file: z.string().optional(),
+
+      // Para find_similar (Phase 8: AI Vector Search)
+      test_result_id: z.number().optional(),
+      scope: z.enum(["current", "historical"]).optional(), // current = same execution, historical = across org
+      threshold: z.number().min(0).max(1).optional(), // Similarity threshold (0-1)
+      rerank: z.boolean().optional(), // Enable Cohere reranking
     })
     .optional()
     .default({}),
@@ -325,6 +331,145 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           output += `- Total Runs: ${classification.historicalMetrics.totalRuns}\n`
           output += `- Pass Rate: ${classification.historicalMetrics.passRate?.toFixed(1) || 0}%\n`
           output += `- Flaky Rate: ${classification.historicalMetrics.flakyRate?.toFixed(1) || 0}%\n`
+        }
+
+        return textResponse(output)
+      }
+
+      // ============================================
+      // Find Similar Failures (Phase 8: AI Vector Search)
+      // ============================================
+      case "find_similar": {
+        if (!p.test_result_id) {
+          return errorResponse("find_similar requires params.test_result_id")
+        }
+
+        // Get the best available embedding for this test result
+        const embeddingData = await db.getBestEmbedding(p.test_result_id)
+        if (!embeddingData) {
+          return errorResponse("Test result not found or no embedding available")
+        }
+
+        const { embedding, version } = embeddingData
+        const scope = p.scope || "historical"
+        const threshold = p.threshold ?? 0.15
+
+        // Find similar failures
+        let similarFailures: Array<{
+          id: number
+          test_name: string
+          test_file: string
+          error_message: string | null
+          execution_id: number
+          branch: string
+          suite: string | null
+          similarity: number
+          created_at: string
+        }> = []
+
+        if (scope === "current") {
+          // Get execution_id for this test_result
+          const sql = db.getSql()
+          const testResult = await sql`
+            SELECT execution_id FROM test_results WHERE id = ${p.test_result_id}
+          `.then((rows) => rows[0] as { execution_id: number } | undefined)
+
+          if (!testResult) {
+            return errorResponse("Test result not found")
+          }
+
+          // Find similar in same execution
+          if (version === "v2") {
+            similarFailures = await db.findSimilarFailuresV2(embedding, {
+              organizationId: orgId,
+              executionId: testResult.execution_id,
+              threshold,
+              limit: p.limit ?? 20,
+            })
+          } else {
+            similarFailures = await db.findSimilarFailures(embedding, {
+              organizationId: orgId,
+              executionId: testResult.execution_id,
+              threshold,
+              limit: p.limit ?? 20,
+            })
+          }
+        } else {
+          // Historical search across org
+          similarFailures = await db.findHistoricalClusters(embedding, orgId, {
+            threshold,
+            limit: p.limit ?? 20,
+            daysBack: 30,
+          })
+        }
+
+        // Optional: Apply reranking if requested
+        if (p.rerank && similarFailures.length > 0) {
+          try {
+            const { rerankItems, isRerankingAvailable } = await import("@/lib/ai/reranker")
+            if (isRerankingAvailable()) {
+              // Get original test error for query
+              const sql = db.getSql()
+              const originalTest = await sql`
+                SELECT test_name, test_file, error_message
+                FROM test_results
+                WHERE id = ${p.test_result_id}
+              `.then((rows) => rows[0] as { test_name: string; test_file: string; error_message: string | null } | undefined)
+
+              if (originalTest) {
+                const query = `${originalTest.test_name}\n${originalTest.test_file}\n${originalTest.error_message || ""}`
+                similarFailures = await rerankItems(
+                  query,
+                  similarFailures,
+                  (f) => `${f.test_name}\n${f.test_file}\n${f.error_message || ""}`,
+                  {
+                    topN: p.limit ?? 20,
+                    minScore: 0.1,
+                  }
+                )
+              }
+            }
+          } catch (error) {
+            // Reranking failed, continue with vector results
+            console.error("Reranking failed:", error)
+          }
+        }
+
+        if (input.format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "find_similar",
+            test_result_id: p.test_result_id,
+            scope,
+            threshold,
+            embedding_version: version,
+            reranked: p.rerank ?? false,
+            total_similar: similarFailures.length,
+            data: similarFailures,
+          })
+        }
+
+        // Markdown format
+        let output = `## Similar Failures\n\n`
+        output += `**Test Result ID:** ${p.test_result_id}\n`
+        output += `**Scope:** ${scope}\n`
+        output += `**Threshold:** ${threshold}\n`
+        output += `**Embedding Version:** ${version}\n`
+        output += `**Found:** ${similarFailures.length} similar failures\n\n`
+
+        if (similarFailures.length > 0) {
+          output += "| Test | File | Branch | Similarity | Execution |\n"
+          output += "|------|------|--------|------------|----------|\n"
+          for (const f of similarFailures.slice(0, 15)) {
+            const similarity = `${(f.similarity * 100).toFixed(0)}%`
+            output += `| ${f.test_name.slice(0, 30)} | ${f.test_file.split("/").pop()?.slice(0, 20) || ""} | ${f.branch} | ${similarity} | #${f.execution_id} |\n`
+          }
+
+          if (similarFailures.length > 15) {
+            output += `\n_...and ${similarFailures.length - 15} more similar failures_\n`
+          }
+        } else {
+          output += "_No similar failures found with the current threshold_\n"
         }
 
         return textResponse(output)

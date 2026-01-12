@@ -37,6 +37,9 @@ const QueryInputSchema = z.object({
     "org_suites", // List suites with stats
     "suite_tests", // Tests for a suite
     "inactive_tests", // Tests that haven't run in 30 days
+    // AI Vector Search (Phase 8)
+    "clustered_failures", // AI-grouped failures by similarity
+    "semantic_search", // Natural language search for tests
   ]),
   filters: z
     .object({
@@ -76,6 +79,12 @@ const QueryInputSchema = z.object({
       is_active: z.boolean().optional(),
       is_critical: z.boolean().optional(),
       test_file: z.string().optional(),
+      // AI Vector Search filters (Phase 8)
+      distance_threshold: z.number().min(0).max(1).optional(), // Cosine distance threshold
+      min_cluster_size: z.number().min(1).optional(), // Minimum failures per cluster
+      max_clusters: z.number().optional(), // Maximum number of clusters
+      search_mode: z.enum(["semantic", "keyword", "hybrid"]).optional(), // Search mode
+      rerank: z.boolean().optional(), // Enable Cohere reranking
     })
     .optional()
     .default({}),
@@ -753,6 +762,122 @@ export async function handleQuery(
           const lastSeen = new Date(t.last_seen_at).toLocaleDateString()
           const suite = t.suite_name || "—"
           output += `| ${t.test_name.slice(0, 30)} | ${t.test_file.split("/").pop()?.slice(0, 20) || ""} | ${suite} | ${lastSeen} | ${t.run_count} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      // ============================================
+      // AI Vector Search (Phase 8)
+      // ============================================
+      case "clustered_failures": {
+        if (!f.execution_id) {
+          return errorResponse("clustered_failures requires filters.execution_id")
+        }
+
+        // Get clustered failures (from cache if available)
+        const clusters = await db.getCachedClusters(f.execution_id, {
+          distanceThreshold: f.distance_threshold ?? 0.15,
+          minClusterSize: f.min_cluster_size ?? 2,
+          maxClusters: f.max_clusters,
+        })
+
+        if (!clusters) {
+          return errorResponse("Execution not found or no failures to cluster")
+        }
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "clustered_failures",
+            execution_id: f.execution_id,
+            total_failures: clusters.totalFailures,
+            total_clusters: clusters.clusters.length,
+            reduction_percentage: clusters.totalFailures > 0
+              ? ((1 - clusters.clusters.length / clusters.totalFailures) * 100).toFixed(1)
+              : "0",
+            metadata: clusters.metadata,
+            data: clusters.clusters,
+          })
+        }
+
+        // Markdown format
+        let output = `## AI-Grouped Failures (Execution #${f.execution_id})\n\n`
+        output += `**Total Failures:** ${clusters.totalFailures}\n`
+        output += `**Grouped into:** ${clusters.clusters.length} clusters\n`
+        output += `**Reduction:** ${((1 - clusters.clusters.length / clusters.totalFailures) * 100).toFixed(1)}%\n\n`
+
+        for (const cluster of clusters.clusters) {
+          output += `### Cluster #${cluster.clusterId} (${cluster.members.length} failures)\n`
+          output += `**Representative:** ${cluster.representative.test_name}\n`
+          output += `**Error:** ${(cluster.representative.error_message || "").slice(0, 80)}...\n\n`
+
+          if (cluster.members.length > 1) {
+            output += `**Similar failures:**\n`
+            for (const member of cluster.members.slice(0, 5)) {
+              output += `- ${member.test_name} (${member.similarity?.toFixed(2) || "N/A"} similarity)\n`
+            }
+            if (cluster.members.length > 5) {
+              output += `- ...and ${cluster.members.length - 5} more\n`
+            }
+          }
+          output += "\n"
+        }
+
+        return textResponse(output)
+      }
+
+      case "semantic_search": {
+        if (!f.query) {
+          return errorResponse("semantic_search requires filters.query (natural language search)")
+        }
+
+        // Import semantic search service
+        const { semanticSearch } = await import("@/lib/services/search-service")
+
+        const searchMode = f.search_mode || "hybrid"
+        const results = await semanticSearch({
+          query: f.query,
+          organizationId: orgId,
+          mode: searchMode,
+          limit: f.limit ?? 20,
+          branch: f.branch,
+          suite: f.suite,
+          since: f.from,
+          rerank: f.rerank ?? true,
+        })
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "semantic_search",
+            query: f.query,
+            mode: searchMode,
+            total_results: results.totalResults,
+            embedding_version: results.embeddingVersion,
+            reranked: results.reranked,
+            search_time_ms: results.searchTimeMs,
+            data: results.results,
+          })
+        }
+
+        // Markdown format
+        let output = `## Semantic Search: "${f.query}"\n\n`
+        output += `**Mode:** ${searchMode} | **Results:** ${results.totalResults} | **Time:** ${results.searchTimeMs}ms\n`
+        if (results.reranked) {
+          output += `**Reranked:** Yes (Cohere)\n`
+        }
+        output += "\n"
+
+        output += "| Test | File | Status | Similarity | Branch |\n"
+        output += "|------|------|--------|------------|--------|\n"
+        for (const r of results.results.slice(0, 20)) {
+          const similarity = r.similarity ? `${(r.similarity * 100).toFixed(0)}%` : "N/A"
+          output += `| ${r.testName.slice(0, 30)} | ${r.testFile.split("/").pop()?.slice(0, 20) || ""} | ${r.status} | ${similarity} | ${r.branch} |\n`
+        }
+
+        if (results.results.length > 20) {
+          output += `\n_...and ${results.results.length - 20} more results_\n`
         }
 
         return textResponse(output)
