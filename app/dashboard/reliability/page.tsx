@@ -4,11 +4,6 @@ import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg } from "@/lib/db"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BrandLogo } from "@/components/ui/brand-logo"
-import { UserMenu } from "@/components/dashboard/user-menu"
-import { AdminLink } from "@/components/dashboard/admin-link"
-import { SearchTests } from "@/components/dashboard/search-tests"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { Filters } from "@/components/dashboard/filters"
 import { ReliabilityScoreCard } from "@/components/dashboard/reliability-score"
 import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
@@ -330,49 +325,11 @@ export default async function ReliabilityPage({
   searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="space-y-1 sm:space-y-2">
-              <div className="flex items-center gap-2">
-                <BrandLogo variant="animated-icon" width={32} />
-                <h1
-                  className="text-2xl sm:text-3xl font-bold tracking-tight"
-                  style={{
-                    background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}
-                >
-                  Reliability
-                </h1>
-              </div>
-              <p className="text-sm sm:text-base text-muted-foreground text-pretty">
-                Overall health of your test suite
-              </p>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <SearchTests />
-              <AdminLink />
-              <UserMenu />
-            </div>
-          </div>
-
-          {/* Dashboard Navigation */}
-          <div className="mt-4">
-            <DashboardNav />
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-4 sm:py-8">
-        <Suspense fallback={<ReliabilitySkeleton />}>
-          {/* @ts-expect-error Async Server Component */}
-          <ReliabilityContent searchParams={searchParams} />
-        </Suspense>
-      </div>
+    <div className="container mx-auto px-4 py-4 sm:py-8">
+      <Suspense fallback={<ReliabilitySkeleton />}>
+        {/* @ts-expect-error Async Server Component */}
+        <ReliabilityContent searchParams={searchParams} />
+      </Suspense>
     </div>
   )
 }

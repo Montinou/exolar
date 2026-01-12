@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -26,14 +25,12 @@ import {
   Search,
   Sparkles,
   Zap,
-  ArrowLeft,
   ExternalLink,
   Download,
   CheckCircle2,
   XCircle,
   Clock,
   GitBranch,
-  Filter,
 } from "lucide-react"
 
 type SearchMode = "hybrid" | "semantic" | "keyword"
@@ -63,7 +60,6 @@ interface SearchResponse {
 }
 
 export default function SearchPage() {
-  const router = useRouter()
   const [query, setQuery] = useState("")
   const [mode, setMode] = useState<SearchMode>("hybrid")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -151,71 +147,63 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard")}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-cyan-400" />
-                Semantic Search
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Search failures by intent using AI-powered semantic matching
-              </p>
-            </div>
-          </div>
+    <div className="container mx-auto px-4 py-6 space-y-6">
+      {/* Page Title and Search Bar */}
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-cyan-400" />
+            Semantic Search
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Search failures by intent using AI-powered semantic matching
+          </p>
+        </div>
 
-          {/* Search Bar */}
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search failures... e.g., 'timeout errors', 'login failures', 'API rate limiting'"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="pl-10 h-12 text-lg"
-              />
-            </div>
-            <Select value={mode} onValueChange={(v) => setMode(v as SearchMode)}>
-              <SelectTrigger className="w-[140px] h-12">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hybrid">
-                  <span className="flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    Hybrid
-                  </span>
-                </SelectItem>
-                <SelectItem value="semantic">
-                  <span className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    AI Only
-                  </span>
-                </SelectItem>
-                <SelectItem value="keyword">
-                  <span className="flex items-center gap-2">
-                    <Search className="h-4 w-4" />
-                    Keyword
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={performSearch} disabled={query.length < 2 || isLoading} className="h-12 px-8">
-              {isLoading ? <Clock className="h-4 w-4 animate-spin" /> : "Search"}
-            </Button>
+        {/* Search Bar */}
+        <div className="flex gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search failures... e.g., 'timeout errors', 'login failures', 'API rate limiting'"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="pl-10 h-12 text-lg"
+            />
           </div>
+          <Select value={mode} onValueChange={(v) => setMode(v as SearchMode)}>
+            <SelectTrigger className="w-[140px] h-12">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="hybrid">
+                <span className="flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  Hybrid
+                </span>
+              </SelectItem>
+              <SelectItem value="semantic">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  AI Only
+                </span>
+              </SelectItem>
+              <SelectItem value="keyword">
+                <span className="flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Keyword
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={performSearch} disabled={query.length < 2 || isLoading} className="h-12 px-8">
+            {isLoading ? <Clock className="h-4 w-4 animate-spin" /> : "Search"}
+          </Button>
         </div>
       </div>
 
       {/* Results */}
-      <div className="container mx-auto px-4 py-6">
         {/* Meta Info */}
         {meta && (
           <div className="flex items-center justify-between mb-4">
@@ -361,7 +349,6 @@ export default function SearchPage() {
             </div>
           </div>
         )}
-      </div>
     </div>
   )
 }
