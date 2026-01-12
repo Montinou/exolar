@@ -31,14 +31,14 @@ const consolidatedTools = [
   },
   {
     name: "query_exolar_data",
-    description: "Universal data retrieval router. Retrieves data from any of the 14 available datasets using a unified filter interface.",
+    description: "Universal data retrieval router. Retrieves data from any of the 16 available datasets using a unified filter interface.",
     category: "query" as const,
     parameters: [
       {
         name: "dataset",
         type: "string",
         required: true,
-        description: "Dataset to query: executions | execution_details | failures | flaky_tests | trends | dashboard_stats | error_analysis | test_search | test_history | flakiness_summary | reliability_score | performance_regressions | execution_summary | execution_failures"
+        description: "Dataset to query: executions | execution_details | failures | flaky_tests | trends | dashboard_stats | error_analysis | test_search | test_history | flakiness_summary | reliability_score | performance_regressions | execution_summary | execution_failures | clustered_failures | semantic_search"
       },
       {
         name: "filters",
@@ -74,29 +74,30 @@ const consolidatedTools = [
   },
   {
     name: "perform_exolar_action",
-    description: "Execute heavy operations: compare executions, generate reports, or classify failures as FLAKE vs BUG.",
+    description: "Execute heavy operations: compare executions, generate reports, classify failures, or find similar failures using AI.",
     category: "action" as const,
     parameters: [
       {
         name: "action",
         type: "string",
         required: true,
-        description: "Action to perform: compare | generate_report | classify"
+        description: "Action to perform: compare | generate_report | classify | find_similar"
       },
       {
         name: "params",
         type: "object",
         required: true,
-        description: "Action-specific parameters (e.g., baseline_id, current_id, execution_id, test_name)"
+        description: "Action-specific parameters (e.g., baseline_id, current_id, execution_id, test_name, test_result_id, scope)"
       },
     ],
     responseFields: [
       "compare: Side-by-side execution comparison with diff categories and performance deltas",
       "generate_report: Markdown report with failures, error distribution, and recommendations",
       "classify: FLAKE vs BUG classification with confidence score and reasoning",
+      "find_similar: Similar failures from current execution or historical runs with similarity scores",
     ],
     example: `"Compare main vs feature-auth branch and show regressions"`,
-    replaces: ["compare_executions", "generate_failure_report", "classify_failure"],
+    replaces: ["compare_executions", "generate_failure_report", "classify_failure", "(NEW: find_similar)"],
   },
   {
     name: "get_semantic_definition",
@@ -142,7 +143,7 @@ const consolidatedTools = [
   },
 ]
 
-// 14 Available Datasets via query_exolar_data
+// 16 Available Datasets via query_exolar_data
 const datasets = [
   { name: "executions", description: "List test executions with optional filters (branch, suite, status, dates)" },
   { name: "execution_details", description: "Full execution data with all test results and artifacts (requires execution_id)" },
@@ -158,6 +159,8 @@ const datasets = [
   { name: "performance_regressions", description: "Tests slower than historical baseline" },
   { name: "execution_summary", description: "Aggregated execution overview without full test list" },
   { name: "execution_failures", description: "Only failed tests from an execution with error grouping" },
+  { name: "clustered_failures", description: "AI-grouped failures by similarity (requires execution_id, reduces 50+ failures to root causes)" },
+  { name: "semantic_search", description: "Natural language search for failures using vector embeddings (requires query)" },
 ]
 
 const usageExamples = [
@@ -178,6 +181,12 @@ const usageExamples = [
   "Are there any performance regressions on the main branch?",
   "Show me tests that got slower in the last 24 hours",
   "What's the error distribution for failed tests?",
+
+  // AI Vector Search (NEW)
+  "Cluster the failures from the last run by root cause",
+  "Find tests with timeout errors using semantic search",
+  "Show me similar failures to this test",
+  "Group 50+ failures into meaningful clusters",
 
   // Comparison
   "Compare the last two runs on main branch",
@@ -204,7 +213,7 @@ export default function MCPDocsPage() {
       {/* Hero */}
       <div className="space-y-4">
         <div className="inline-block px-3 py-1 rounded-full glass-panel text-xs sm:text-sm font-medium mb-2">
-          New: Router Pattern • HTTP Streamable • 83% Token Reduction
+          New: 🧠 AI Vector Search • Semantic Clustering • 16 Datasets
         </div>
         <h1
           className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
@@ -223,8 +232,20 @@ export default function MCPDocsPage() {
 
       {/* What's New */}
       <section className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow space-y-3">
-        <h2 className="text-lg sm:text-xl font-semibold">What's New in v2.0</h2>
+        <h2 className="text-lg sm:text-xl font-semibold">What&apos;s New in v2.1</h2>
         <ul className="space-y-2 text-sm sm:text-base text-muted-foreground">
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-cyan-500 shrink-0 mt-0.5" />
+            <span><strong>🧠 AI Vector Search</strong> - Semantic search & failure clustering using Jina v3 embeddings + Cohere reranking</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-cyan-500 shrink-0 mt-0.5" />
+            <span><strong>16 queryable datasets</strong> - Added clustered_failures and semantic_search</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Check className="h-5 w-5 text-cyan-500 shrink-0 mt-0.5" />
+            <span><strong>find_similar action</strong> - Find similar failures across current or historical runs</span>
+          </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
             <span><strong>5 tools instead of 24</strong> - Router pattern with ~83% token reduction</span>
@@ -235,15 +256,7 @@ export default function MCPDocsPage() {
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span><strong>14 queryable datasets</strong> - Unified filter interface via query_exolar_data</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
             <span><strong>Semantic definitions</strong> - Metric formulas prevent AI hallucinations</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            <span><strong>Markdown output</strong> - ~70% fewer tokens than JSON</span>
           </li>
         </ul>
       </section>
@@ -355,7 +368,7 @@ export default function MCPDocsPage() {
 
       {/* Available Tools */}
       <section id="tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Available Tools (5 Total)</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold">Available Tools (5 Total + AI Features)</h2>
         <p className="text-muted-foreground">
           All tools support organization-scoped access with automatic filtering.
         </p>

@@ -32,6 +32,59 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: "ai-vector-search",
+    date: "2026-01-12",
+    version: "v2.3",
+    title: "🧠 AI Vector Search - Smart Failure Clustering & Semantic Search",
+    description:
+      "Transform test failure triage from hours to minutes with AI-powered clustering and semantic search. Using Jina v3 embeddings and Cohere reranking, Exolar now automatically groups 50+ failures into root cause clusters and lets you search failures using natural language.",
+    type: "feature",
+    features: [
+      {
+        icon: "🎯",
+        title: "Smart Failure Clustering",
+        description:
+          "Automatically group 50+ failures into root cause clusters. See '50 failures → 3 issues' instead of scrolling through repetitive errors. Toggle between list and clustered views in the execution details page.",
+        docsUrl: "/docs/mcp#datasets",
+      },
+      {
+        icon: "🔍",
+        title: "Semantic Test Search",
+        description:
+          "Find tests by intent, not just file names. Search 'timeout errors' or 'login failures' using natural language. Three search modes: Hybrid (default), AI (semantic), and Keyword.",
+        docsUrl: "/docs/mcp#examples",
+      },
+      {
+        icon: "🔗",
+        title: "Find Similar Failures",
+        description:
+          "New MCP action 'find_similar' finds related failures using vector similarity. Scope to current execution or search across historical runs to identify recurring issues.",
+        docsUrl: "/docs/mcp#tools",
+      },
+      {
+        icon: "⚡",
+        title: "Jina v3 + Cohere Reranking",
+        description:
+          "512-dim Matryoshka embeddings via Jina v3 with asymmetric query/passage support. Two-stage retrieval with Cohere rerank-english-v3.0 for precision. Automatic fallback to Gemini if Jina unavailable.",
+        docsUrl: "/docs/mcp#architecture",
+      },
+      {
+        icon: "📊",
+        title: "2 New MCP Datasets",
+        description:
+          "Query clustered_failures to get AI-grouped failures by similarity. Use semantic_search for natural language test search. Now 16 total datasets via query_exolar_data.",
+        docsUrl: "/docs/mcp#datasets",
+      },
+      {
+        icon: "🏷️",
+        title: "AI Insights Metrics",
+        description:
+          "New metric category with cluster_reduction (grouping efficiency), similarity_score (vector similarity), embedding_coverage (failures with embeddings), and search_relevance scores.",
+        docsUrl: "/docs/mcp#semantic-definitions",
+      },
+    ],
+  },
+  {
     id: "oauth-authentication",
     date: "2026-01-11",
     version: "v2.2",

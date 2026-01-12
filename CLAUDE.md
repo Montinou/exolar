@@ -473,14 +473,24 @@ The MCP server uses a consolidated router pattern with **5 tools** (reduced from
 12. **performance_regressions** - Tests slower than baseline
 13. **execution_summary** - Execution overview
 14. **execution_failures** - Failures for execution
+15. **clustered_failures** - 🧠 AI-grouped failures by similarity (reduces 50+ failures to root causes)
+16. **semantic_search** - 🧠 Natural language search using vector embeddings
 
 **Router Pattern**: Use `query_exolar_data({ dataset: "executions" })` instead of `get_executions()`. All old tools are mapped to the new 5-tool structure.
+
+### AI Actions (via perform_exolar_action)
+- **find_similar** - Find similar failures using vector embeddings (scope: current | historical)
 
 See `docs/unorganized-docs/MCP_INTEGRATION.md` for full documentation.
 
 ## Key Features
 
 ### Implemented
+- **🧠 AI Vector Search** - Smart failure clustering & semantic test search using Jina v3 embeddings
+  - **Clustered Failures View** - Reduces 50+ failures to root cause clusters (toggle in execution details)
+  - **Semantic Search** - Natural language search ("timeout errors", "login failures")
+  - **Similar Failures** - Find related historical failures using vector similarity
+  - **Cohere Reranking** - Two-stage retrieval for precision
 - **Reliability Score** (`/dashboard/reliability`) - Single 0-100 gauge showing test suite health
 - **Performance Regression Detection** (`/dashboard/performance`) - Automatic alerts when tests slow down
 - **Comparative Run Analysis** (`/dashboard/compare`) - Side-by-side comparison of test executions
@@ -492,7 +502,7 @@ See `docs/unorganized-docs/MCP_INTEGRATION.md` for full documentation.
 - Slowest tests card
 - Suite pass rates
 - Branch accordion view
-- Test search with history modal
+- Test search with history modal (now with semantic search mode)
 - Test result cards with artifacts (video, trace, screenshots)
 - AI context for failures
 - Multi-tenancy with organization filtering

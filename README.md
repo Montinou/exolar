@@ -4,6 +4,9 @@ A comprehensive multi-tenant dashboard for monitoring Playwright test executions
 
 ## Features
 
+- **🧠 AI Vector Search** (NEW): Semantic failure clustering & natural language test search using Jina v3 embeddings
+- **Smart Failure Clustering**: Automatically group 50+ failures into root cause clusters ("50 failures → 3 issues")
+- **Semantic Test Search**: Find tests by intent ("timeout errors") not just file names
 - **Reliability Score**: Single 0-100 gauge showing overall test suite health at a glance
 - **Performance Regression Detection**: Automatic alerts when tests become slower than baseline
 - **Multi-Tenancy**: Organization-level data isolation with RLS
@@ -118,30 +121,38 @@ The dashboard includes a built-in MCP server that allows Claude Code to access y
 4. Replace `<your-token>` with your Neon Auth token
 5. Restart Claude Code
 
-### Available MCP Tools (15)
+### Available MCP Tools (5 Consolidated + 16 Datasets)
+
+The MCP server uses a **router pattern** with 5 consolidated tools:
 
 | Tool | Description |
 |------|-------------|
-| **Core Data** | |
-| `get_executions` | List test executions with filters (status, branch, suite, date range) |
-| `get_execution_details` | Get execution + test results (supports `status` filter: passed/failed/skipped/all) |
-| `search_tests` | Search tests by name or file with aggregated statistics |
-| `get_test_history` | History for a specific test over time |
-| **Aggregation (New)** | |
-| `get_execution_summary` | Lightweight summary without full test list (~1KB vs 110KB) |
-| `get_execution_failures` | Failed tests only with grouping by file/error_type |
-| `generate_failure_report` | Pre-formatted markdown report for an execution |
-| **Analysis** | |
-| `get_failed_tests` | Failed tests with optional AI context and execution_id filter |
-| `get_dashboard_metrics` | Pass rate, failure counts, avg duration |
-| `get_trends` | Time-series pass/fail data over configurable days |
-| `get_error_distribution` | Error type breakdown from failures |
-| **Flakiness** | |
-| `get_flaky_tests` | Flaky tests sorted by flakiness rate |
-| `get_flakiness_summary` | Overall flakiness metrics |
-| **Metadata** | |
-| `list_branches` | Branches with test runs in last 30 days |
-| `list_suites` | Test suites with recent runs |
+| `explore_exolar_index` | Discovery tool - lists datasets, branches, suites, or metrics |
+| `query_exolar_data` | Universal data retrieval with 16 datasets |
+| `perform_exolar_action` | Heavy operations: compare, report, classify, find_similar |
+| `get_semantic_definition` | Metric formulas to prevent AI hallucinations |
+| `get_installation_config` | CI/CD setup guide for Playwright/GitHub Actions |
+
+#### 16 Available Datasets (via query_exolar_data)
+
+| Dataset | Description |
+|---------|-------------|
+| `executions` | List test executions with filters |
+| `execution_details` | Full execution data with test results |
+| `failures` | Failed tests with AI context |
+| `flaky_tests` | Tests with flakiness history |
+| `trends` | Time-series metrics |
+| `dashboard_stats` | Overall metrics summary |
+| `error_analysis` | Error type distribution |
+| `test_search` | Search by name/file |
+| `test_history` | History for a specific test |
+| `flakiness_summary` | Overall flakiness metrics |
+| `reliability_score` | Suite health (0-100) |
+| `performance_regressions` | Tests slower than baseline |
+| `execution_summary` | Lightweight execution overview |
+| `execution_failures` | Failures with error grouping |
+| `clustered_failures` | 🧠 AI-grouped failures by similarity |
+| `semantic_search` | 🧠 Natural language failure search |
 
 ### MCP Environment Variables
 
