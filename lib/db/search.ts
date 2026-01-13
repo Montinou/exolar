@@ -28,7 +28,7 @@ export async function searchTests(organizationId: number, query: string, limit =
       COUNT(*) as run_count,
       MAX(tr.started_at) as last_run,
       (
-        SELECT status FROM test_results tr2
+        SELECT tr2.status FROM test_results tr2
         JOIN test_executions te2 ON tr2.execution_id = te2.id
         WHERE tr2.test_name = tr.test_name
           AND tr2.test_file = tr.test_file
