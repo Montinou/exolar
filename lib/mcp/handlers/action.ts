@@ -483,7 +483,7 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
       }
 
       // ============================================
-      // Reembed Tests (error, test, or suite)
+      // Reembed Tests (error, test, suite, or clear)
       // ============================================
       case "reembed": {
         const embedType = p.type || "error"
@@ -491,6 +491,83 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
         const limitCount = p.limit ?? 500
         const dryRun = p.dry_run ?? false
         const sql = db.getSql()
+
+        // ---- CLEAR OLD EMBEDDINGS ----
+        // Clears all test_embedding except the most recent N tests
+        // Use: perform_exolar_action({ action: "reembed", params: { type: "clear", limit: 100 } })
+        if (embedType === "clear") {
+          const keepRecent = limitCount
+
+          // Count how many will be cleared
+          const countResult = await sql`
+            WITH recent_tests AS (
+              SELECT tr.id
+              FROM test_results tr
+              INNER JOIN test_executions te ON tr.execution_id = te.id
+              WHERE te.organization_id = ${orgId}
+              ORDER BY tr.created_at DESC
+              LIMIT ${keepRecent}
+            )
+            SELECT
+              COUNT(*) FILTER (WHERE tr.test_embedding IS NOT NULL AND tr.id NOT IN (SELECT id FROM recent_tests)) as to_clear,
+              COUNT(*) FILTER (WHERE tr.test_embedding IS NOT NULL AND tr.id IN (SELECT id FROM recent_tests)) as to_keep,
+              COUNT(*) FILTER (WHERE tr.test_embedding IS NOT NULL) as total_with_embedding
+            FROM test_results tr
+            INNER JOIN test_executions te ON tr.execution_id = te.id
+            WHERE te.organization_id = ${orgId}
+          ` as Array<{ to_clear: string; to_keep: string; total_with_embedding: string }>
+
+          const toClear = Number(countResult[0].to_clear)
+          const toKeep = Number(countResult[0].to_keep)
+          const totalWithEmbedding = Number(countResult[0].total_with_embedding)
+
+          if (dryRun) {
+            return jsonResponse({
+              organization: authContext.organizationSlug,
+              action: "reembed",
+              type: "clear",
+              preview: {
+                totalWithEmbedding,
+                toClear,
+                toKeep,
+                keepRecent,
+              },
+            })
+          }
+
+          // Clear old embeddings
+          await sql`
+            WITH recent_tests AS (
+              SELECT tr.id
+              FROM test_results tr
+              INNER JOIN test_executions te ON tr.execution_id = te.id
+              WHERE te.organization_id = ${orgId}
+              ORDER BY tr.created_at DESC
+              LIMIT ${keepRecent}
+            )
+            UPDATE test_results
+            SET test_embedding = NULL,
+                test_embedding_hash = NULL
+            WHERE id NOT IN (SELECT id FROM recent_tests)
+              AND test_embedding IS NOT NULL
+              AND id IN (
+                SELECT tr.id FROM test_results tr
+                INNER JOIN test_executions te ON tr.execution_id = te.id
+                WHERE te.organization_id = ${orgId}
+              )
+          `
+
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "reembed",
+            type: "clear",
+            stats: {
+              cleared: toClear,
+              kept: toKeep,
+              message: `Cleared ${toClear} old embeddings, kept ${toKeep} recent ones`,
+            },
+          })
+        }
 
         // ---- SUITE EMBEDDINGS ----
         if (embedType === "suite") {

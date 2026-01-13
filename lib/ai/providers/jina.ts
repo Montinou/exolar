@@ -94,11 +94,14 @@ export async function generateJinaEmbedding(
   const jinaTask: JinaEmbeddingRequest["task"] =
     task === "retrieval.query" ? "retrieval.query" : "retrieval.passage"
 
+  // Enable late chunking for long texts (>2000 chars) to improve accuracy
+  // Source: docs/prompts/research/jina-v3-best-practices.md
   const body: JinaEmbeddingRequest = {
     model: JINA_MODEL,
     input: truncatedText,
     task: jinaTask,
     dimensions: JINA_DIMENSIONS,
+    ...(text.length > 2000 && { late_chunking: true }),
   }
 
   try {
@@ -157,7 +160,9 @@ export async function generateJinaEmbeddingsBatch(
   const apiKey = getApiKey()
 
   // Jina supports batch embedding in single request
-  const BATCH_SIZE = 100 // Jina's recommended batch size
+  // Research shows optimal batch size is 256 for 50% cost reduction
+  // Source: docs/prompts/research/jina-v3-best-practices.md
+  const BATCH_SIZE = 256
   const results: number[][] = new Array(texts.length).fill([])
 
   const jinaTask: JinaEmbeddingRequest["task"] =
@@ -166,11 +171,15 @@ export async function generateJinaEmbeddingsBatch(
   for (let i = 0; i < validTexts.length; i += BATCH_SIZE) {
     const batch = validTexts.slice(i, i + BATCH_SIZE)
 
+    // Enable late chunking if any text in batch is >2000 chars
+    const hasLongText = batch.some((b) => b.text.length > 2000)
+
     const body: JinaEmbeddingRequest = {
       model: JINA_MODEL,
       input: batch.map((b) => b.text),
       task: jinaTask,
       dimensions: JINA_DIMENSIONS,
+      ...(hasLongText && { late_chunking: true }),
     }
 
     try {

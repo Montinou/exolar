@@ -131,6 +131,9 @@ export async function storeEmbeddingsBatch(
 /**
  * Store v2 embeddings for multiple test results (512-dim)
  *
+ * Optimized batch UPDATE using temp table pattern for 8-32x speedup.
+ * Source: docs/prompts/research/batch-operations-optimization.md
+ *
  * @param embeddings - Array of {testResultId, embedding, chunkHash?} entries
  */
 export async function storeEmbeddingsBatchV2(
@@ -145,15 +148,62 @@ export async function storeEmbeddingsBatchV2(
 
   if (valid.length === 0) return
 
-  // Update each one individually
-  for (const { testResultId, embedding, chunkHash } of valid) {
+  // For small batches (<1000), use CTE approach
+  if (valid.length < 1000) {
+    const values = valid.map(
+      ({ testResultId, embedding, chunkHash }) =>
+        sql`(${testResultId}, ${toVectorString(embedding)}::vector, ${chunkHash ?? null})`
+    )
+
     await sql`
-      UPDATE test_results
-      SET error_embedding_v2 = ${toVectorString(embedding)}::vector,
-          embedding_chunk_hash = ${chunkHash ?? null}
-      WHERE id = ${testResultId}
+      WITH update_data (test_result_id, embedding, chunk_hash) AS (
+        VALUES ${sql.join(values, sql`, `)}
+      )
+      UPDATE test_results t
+      SET error_embedding_v2 = u.embedding,
+          embedding_chunk_hash = u.chunk_hash
+      FROM update_data u
+      WHERE t.id = u.test_result_id
+    `
+    return
+  }
+
+  // For large batches (>=1000), use temp table approach
+  // Create temp table (session-scoped, auto-dropped)
+  await sql`
+    CREATE TEMP TABLE IF NOT EXISTS embedding_updates_v2 (
+      test_result_id INTEGER NOT NULL,
+      embedding vector(512) NOT NULL,
+      chunk_hash TEXT
+    ) ON COMMIT DROP
+  `
+
+  // Clear any existing data
+  await sql`TRUNCATE embedding_updates_v2`
+
+  // Batch insert into temp table (chunk if >10k rows)
+  const chunkSize = 10000
+  for (let i = 0; i < valid.length; i += chunkSize) {
+    const chunk = valid.slice(i, i + chunkSize)
+    const values = chunk.map(
+      ({ testResultId, embedding, chunkHash }) =>
+        sql`(${testResultId}, ${toVectorString(embedding)}::vector, ${chunkHash ?? null})`
+    )
+
+    await sql`
+      INSERT INTO embedding_updates_v2 (test_result_id, embedding, chunk_hash)
+      VALUES ${sql.join(values, sql`, `)}
     `
   }
+
+  // Batch UPDATE via JOIN
+  await sql`
+    UPDATE test_results t
+    SET error_embedding_v2 = u.embedding,
+        embedding_chunk_hash = u.chunk_hash
+    FROM embedding_updates_v2 u
+    WHERE t.id = u.test_result_id
+  `
 }
 
 /**
@@ -564,6 +614,9 @@ export async function storeTestEmbedding(
 /**
  * Store test embeddings for multiple test results (batch)
  *
+ * Optimized batch UPDATE using temp table pattern for 8-32x speedup.
+ * Source: docs/prompts/research/batch-operations-optimization.md
+ *
  * @param embeddings - Array of {testResultId, embedding, hash} entries
  */
 export async function storeTestEmbeddingsBatch(
@@ -578,15 +631,58 @@ export async function storeTestEmbeddingsBatch(
 
   if (valid.length === 0) return
 
-  // Update each one individually
-  for (const { testResultId, embedding, hash } of valid) {
+  // For small batches (<1000), use CTE approach
+  if (valid.length < 1000) {
+    const values = valid.map(
+      ({ testResultId, embedding, hash }) =>
+        sql`(${testResultId}, ${toVectorString(embedding)}::vector, ${hash})`
+    )
+
     await sql`
-      UPDATE test_results
-      SET test_embedding = ${toVectorString(embedding)}::vector,
-          test_embedding_hash = ${hash}
-      WHERE id = ${testResultId}
+      WITH update_data (test_result_id, embedding, hash) AS (
+        VALUES ${sql.join(values, sql`, `)}
+      )
+      UPDATE test_results t
+      SET test_embedding = u.embedding,
+          test_embedding_hash = u.hash
+      FROM update_data u
+      WHERE t.id = u.test_result_id
+    `
+    return
+  }
+
+  // For large batches (>=1000), use temp table approach
+  await sql`
+    CREATE TEMP TABLE IF NOT EXISTS test_embedding_updates (
+      test_result_id INTEGER NOT NULL,
+      embedding vector(512) NOT NULL,
+      hash TEXT NOT NULL
+    ) ON COMMIT DROP
+  `
+
+  await sql`TRUNCATE test_embedding_updates`
+
+  const chunkSize = 10000
+  for (let i = 0; i < valid.length; i += chunkSize) {
+    const chunk = valid.slice(i, i + chunkSize)
+    const values = chunk.map(
+      ({ testResultId, embedding, hash }) =>
+        sql`(${testResultId}, ${toVectorString(embedding)}::vector, ${hash})`
+    )
+
+    await sql`
+      INSERT INTO test_embedding_updates (test_result_id, embedding, hash)
+      VALUES ${sql.join(values, sql`, `)}
     `
   }
+
+  await sql`
+    UPDATE test_results t
+    SET test_embedding = u.embedding,
+        test_embedding_hash = u.hash
+    FROM test_embedding_updates u
+    WHERE t.id = u.test_result_id
+  `
 }
 
 /**
@@ -728,6 +824,9 @@ export async function storeSuiteEmbedding(
 /**
  * Store suite embeddings for multiple executions (batch)
  *
+ * Optimized batch UPDATE using temp table pattern for 8-32x speedup.
+ * Source: docs/prompts/research/batch-operations-optimization.md
+ *
  * @param embeddings - Array of {executionId, embedding, hash} entries
  */
 export async function storeSuiteEmbeddingsBatch(
@@ -741,14 +840,58 @@ export async function storeSuiteEmbeddingsBatch(
 
   if (valid.length === 0) return
 
-  for (const { executionId, embedding, hash } of valid) {
+  // For small batches (<1000), use CTE approach
+  if (valid.length < 1000) {
+    const values = valid.map(
+      ({ executionId, embedding, hash }) =>
+        sql`(${executionId}, ${toVectorString(embedding)}::vector, ${hash})`
+    )
+
     await sql`
-      UPDATE test_executions
-      SET suite_embedding = ${toVectorString(embedding)}::vector,
-          suite_embedding_hash = ${hash}
-      WHERE id = ${executionId}
+      WITH update_data (execution_id, embedding, hash) AS (
+        VALUES ${sql.join(values, sql`, `)}
+      )
+      UPDATE test_executions t
+      SET suite_embedding = u.embedding,
+          suite_embedding_hash = u.hash
+      FROM update_data u
+      WHERE t.id = u.execution_id
+    `
+    return
+  }
+
+  // For large batches (>=1000), use temp table approach
+  await sql`
+    CREATE TEMP TABLE IF NOT EXISTS suite_embedding_updates (
+      execution_id INTEGER NOT NULL,
+      embedding vector(512) NOT NULL,
+      hash TEXT NOT NULL
+    ) ON COMMIT DROP
+  `
+
+  await sql`TRUNCATE suite_embedding_updates`
+
+  const chunkSize = 10000
+  for (let i = 0; i < valid.length; i += chunkSize) {
+    const chunk = valid.slice(i, i + chunkSize)
+    const values = chunk.map(
+      ({ executionId, embedding, hash }) =>
+        sql`(${executionId}, ${toVectorString(embedding)}::vector, ${hash})`
+    )
+
+    await sql`
+      INSERT INTO suite_embedding_updates (execution_id, embedding, hash)
+      VALUES ${sql.join(values, sql`, `)}
     `
   }
+
+  await sql`
+    UPDATE test_executions t
+    SET suite_embedding = u.embedding,
+        suite_embedding_hash = u.hash
+    FROM suite_embedding_updates u
+    WHERE t.id = u.execution_id
+  `
 }
 
 /**

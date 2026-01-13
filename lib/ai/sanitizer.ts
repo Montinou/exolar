@@ -29,6 +29,14 @@ export function sanitizeErrorMessage(errorMessage: string | null): string {
 
   let sanitized = errorMessage
 
+  // Remove ANSI escape codes (terminal colors/formatting)
+  // Matches: \x1b[...m, \033[...m, \u001b[...m
+  // Source: docs/prompts/research/jina-v3-best-practices.md
+  sanitized = sanitized.replace(
+    /[\u001b\u009b]\[[0-9;]*[a-zA-Z]/g,
+    ""
+  )
+
   // Remove UUIDs (various formats)
   // Standard UUID: 8-4-4-4-12
   sanitized = sanitized.replace(
@@ -122,38 +130,88 @@ export function sanitizeStackTrace(stackTrace: string | null): string {
 }
 
 /**
+ * Extended context for error embeddings with historical and execution data
+ *
+ * Source: docs/prompts/research/advanced-accuracy-improvements.md
+ * Expected impact: 10-20% relevance improvement
+ */
+export interface ErrorEmbeddingContext {
+  testName?: string
+  testFile?: string
+
+  // Execution context
+  branch?: string | null
+  suite?: string | null
+  commitMessage?: string | null
+
+  // Historical context
+  isFlaky?: boolean
+  failureCount?: number
+  firstSeen?: Date | null
+  lastSeen?: Date | null
+
+  // Temporal signals
+  timeSinceLastFailure?: number | null // milliseconds
+  isFirstFailure?: boolean
+
+  // Co-failure context
+  relatedFailures?: string[] // Test names that often fail together
+}
+
+/**
  * Prepare error content for embedding (error_embedding_v2)
  *
  * Creates a rich semantic representation of a test failure for vector search.
- * Includes error categorization, code patterns, and semantic synonyms.
+ * Includes error categorization, code patterns, semantic synonyms, and
+ * contextual enrichment (historical, temporal, execution context).
  *
  * Best practices applied:
  * - Full error context (message + relevant stack)
  * - Error type classification with semantic descriptions
  * - Code pattern extraction (API routes, components, actions)
  * - Synonyms for better semantic matching
+ * - Contextual enrichment (10-20% accuracy improvement)
  *
  * @param errorMessage - Error message
  * @param stackTrace - Stack trace (optional)
- * @param testContext - Optional test context (name, file)
+ * @param context - Extended context (historical, temporal, execution)
  * @returns Combined, enriched string ready for embedding
  */
 export function prepareErrorForEmbedding(
   errorMessage: string | null,
   stackTrace: string | null,
-  testContext?: { testName?: string; testFile?: string }
+  context?: ErrorEmbeddingContext
 ): string {
   const parts: string[] = []
 
   // Add test context if provided (helps with semantic matching)
-  if (testContext?.testName) {
-    parts.push(`Test: ${testContext.testName}`)
+  if (context?.testName) {
+    parts.push(`Test: ${context.testName}`)
   }
-  if (testContext?.testFile) {
-    const normalizedFile = testContext.testFile
+  if (context?.testFile) {
+    const normalizedFile = context.testFile
       .replace(/^.*?(?:tests?\/|specs?\/|e2e\/|playwright\/)/i, "")
       .replace(/\\/g, "/")
     parts.push(`File: ${normalizedFile}`)
+  }
+
+  // Add execution context
+  if (context?.branch) {
+    parts.push(`Branch: ${context.branch}`)
+  }
+  if (context?.suite) {
+    parts.push(`Suite: ${context.suite}`)
+  }
+  if (context?.commitMessage) {
+    // Remove ticket numbers, keep semantic content
+    const sanitizedCommit = context.commitMessage
+      .replace(/\[?[A-Z]+-\d+\]?\s*/g, "") // Remove JIRA-style tickets
+      .replace(/#\d+/g, "") // Remove PR/issue numbers
+      .slice(0, 200)
+      .trim()
+    if (sanitizedCommit) {
+      parts.push(`Recent Change: ${sanitizedCommit}`)
+    }
   }
 
   // Add sanitized error message
@@ -174,6 +232,38 @@ export function prepareErrorForEmbedding(
   // Add synonyms for better semantic search
   if (categoryInfo.synonyms.length > 0) {
     parts.push(`Related Terms: ${categoryInfo.synonyms.join(", ")}`)
+  }
+
+  // Add historical/temporal context
+  if (context?.isFlaky) {
+    parts.push(`Flaky Test: Intermittent failures detected`)
+  }
+  if (context?.failureCount != null && context.failureCount > 1) {
+    if (context.failureCount > 10) {
+      parts.push(`Recurring Issue: ${context.failureCount} failures (chronic problem)`)
+    } else if (context.failureCount > 5) {
+      parts.push(`Recurring Issue: ${context.failureCount} failures`)
+    } else {
+      parts.push(`Multiple Failures: ${context.failureCount} occurrences`)
+    }
+  } else if (context?.isFirstFailure) {
+    parts.push(`First Failure: New issue`)
+  }
+
+  // Temporal signals
+  if (context?.timeSinceLastFailure != null && context.timeSinceLastFailure > 0) {
+    const days = Math.floor(context.timeSinceLastFailure / (24 * 60 * 60 * 1000))
+    if (days > 30) {
+      parts.push(`Temporal: First failure in ${days} days (regression)`)
+    } else if (days > 7) {
+      parts.push(`Temporal: Recent regression (${days} days since last failure)`)
+    }
+  }
+
+  // Co-failure context
+  if (context?.relatedFailures && context.relatedFailures.length > 0) {
+    const related = context.relatedFailures.slice(0, 3).join(", ")
+    parts.push(`Related Failures: ${related}`)
   }
 
   // Extract code patterns from error and stack trace
