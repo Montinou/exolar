@@ -148,23 +148,16 @@ export async function storeEmbeddingsBatchV2(
 
   if (valid.length === 0) return
 
-  // For small batches (<1000), use CTE approach
-  if (valid.length < 1000) {
-    const values = valid.map(
-      ({ testResultId, embedding, chunkHash }) =>
-        sql`(${testResultId}, ${toVectorString(embedding)}::vector, ${chunkHash ?? null})`
-    )
-
-    await sql`
-      WITH update_data (test_result_id, embedding, chunk_hash) AS (
-        VALUES ${sql.join(values, sql`, `)}
-      )
-      UPDATE test_results t
-      SET error_embedding_v2 = u.embedding,
-          embedding_chunk_hash = u.chunk_hash
-      FROM update_data u
-      WHERE t.id = u.test_result_id
-    `
+  // For small batches (<100), use individual UPDATE statements
+  if (valid.length < 100) {
+    for (const { testResultId, embedding, chunkHash } of valid) {
+      await sql`
+        UPDATE test_results
+        SET error_embedding_v2 = ${toVectorString(embedding)}::vector,
+            embedding_chunk_hash = ${chunkHash ?? null}
+        WHERE id = ${testResultId}
+      `
+    }
     return
   }
 
