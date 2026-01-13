@@ -219,7 +219,8 @@ export async function searchAllTestsSemantic(
 
   const whereClause = conditions.join(" AND ")
 
-  const query = `
+  // Use tagged template with sql.unsafe for dynamic parts (vector strings must be raw)
+  const results = await sql`
     SELECT
       tr.id as test_result_id,
       tr.execution_id,
@@ -231,20 +232,15 @@ export async function searchAllTestsSemantic(
       te.branch,
       te.suite,
       tr.created_at,
-      1 - (tr.test_embedding <=> '${vectorStr}'::vector) as similarity
+      1 - (tr.test_embedding <=> ${sql.unsafe(`'${vectorStr}'::vector`)}) as similarity
     FROM test_results tr
     INNER JOIN test_executions te ON tr.execution_id = te.id
-    WHERE ${whereClause}
-    ORDER BY tr.test_embedding <=> '${vectorStr}'::vector
+    WHERE ${sql.unsafe(whereClause)}
+    ORDER BY tr.test_embedding <=> ${sql.unsafe(`'${vectorStr}'::vector`)}
     LIMIT ${limit}
   `
 
-  const results = await sql.unsafe(query)
-
-  // Ensure results is an array (Neon serverless may return different types)
-  const rows = Array.isArray(results) ? results : []
-
-  return rows.map((r: Record<string, unknown>) => ({
+  return results.map((r: Record<string, unknown>) => ({
     testResultId: r.test_result_id as number,
     executionId: r.execution_id as number,
     testName: r.test_name as string,
