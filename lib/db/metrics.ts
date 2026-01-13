@@ -478,19 +478,63 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
   const sql = getSql()
 
   const result = await sql`
+    WITH suite_stats AS (
+      SELECT
+        suite,
+        COUNT(*) as total_runs,
+        ROUND(COUNT(*) FILTER (WHERE status = 'success')::decimal / COUNT(*) * 100, 1) as pass_rate
+      FROM test_executions
+      WHERE organization_id = ${organizationId}
+        AND suite IS NOT NULL
+        AND started_at > NOW() - INTERVAL '7 days'
+      GROUP BY suite
+    ),
+    failed_tests AS (
+      SELECT
+        te.suite,
+        tr.test_name,
+        COUNT(*) as failure_count
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND te.suite IS NOT NULL
+        AND te.started_at > NOW() - INTERVAL '7 days'
+        AND tr.status = 'failed'
+      GROUP BY te.suite, tr.test_name
+    ),
+    ranked_failures AS (
+      SELECT
+        suite,
+        test_name,
+        ROW_NUMBER() OVER (PARTITION BY suite ORDER BY failure_count DESC) as rn
+      FROM failed_tests
+    ),
+    aggregated_failures AS (
+      SELECT
+        suite,
+        array_agg(test_name ORDER BY rn) FILTER (WHERE rn <= 5) as failed_tests,
+        COUNT(*) as failed_count
+      FROM ranked_failures
+      GROUP BY suite
+    )
     SELECT
-      suite,
-      COUNT(*) as total_runs,
-      ROUND(COUNT(*) FILTER (WHERE status = 'success')::decimal / COUNT(*) * 100, 1) as pass_rate
-    FROM test_executions
-    WHERE organization_id = ${organizationId}
-      AND suite IS NOT NULL
-      AND started_at > NOW() - INTERVAL '7 days'
-    GROUP BY suite
-    ORDER BY pass_rate ASC
+      ss.suite,
+      ss.total_runs,
+      ss.pass_rate,
+      COALESCE(af.failed_tests, '{}') as failed_tests,
+      COALESCE(af.failed_count, 0) as failed_count
+    FROM suite_stats ss
+    LEFT JOIN aggregated_failures af ON ss.suite = af.suite
+    ORDER BY ss.pass_rate ASC
   `
 
-  return result as SuitePassRate[]
+  return result.map((r) => ({
+    suite: r.suite as string,
+    total_runs: Number(r.total_runs),
+    pass_rate: Number(r.pass_rate),
+    failed_tests: (r.failed_tests as string[]) || [],
+    failed_count: Number(r.failed_count) || 0,
+  }))
 }
 
 // ============================================

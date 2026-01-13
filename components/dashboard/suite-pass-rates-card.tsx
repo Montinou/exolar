@@ -17,6 +17,8 @@ interface SuitePassRate {
   suite: string
   total_runs: number
   pass_rate: number
+  failed_tests: string[]
+  failed_count: number
 }
 
 function getBarColor(passRate: number): string {
@@ -143,7 +145,7 @@ export function SuitePassRatesCard() {
                 if (active && payload && payload.length) {
                   const tooltipData = payload[0].payload
                   return (
-                    <div className="glass-card p-3">
+                    <div className="glass-card p-3 max-w-[280px]">
                       <p className="font-medium text-sm text-foreground">{tooltipData.suite}</p>
                       <p className={`font-semibold ${getValueClass(tooltipData.pass_rate)}`}>
                         {Number(tooltipData.pass_rate).toFixed(1)}% pass rate
@@ -151,6 +153,21 @@ export function SuitePassRatesCard() {
                       <p className="text-xs text-muted-foreground mt-1">
                         {tooltipData.total_runs} total runs
                       </p>
+                      {tooltipData.failed_tests?.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-white/10">
+                          <p className="text-xs text-muted-foreground mb-1">Failing tests:</p>
+                          <ul className="text-xs text-[var(--status-error)] space-y-0.5">
+                            {tooltipData.failed_tests.map((test: string, i: number) => (
+                              <li key={i} className="truncate" title={test}>• {test}</li>
+                            ))}
+                          </ul>
+                          {tooltipData.failed_count > 5 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              +{tooltipData.failed_count - 5} more
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 }

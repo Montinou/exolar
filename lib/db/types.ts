@@ -150,6 +150,8 @@ export interface SuitePassRate {
   suite: string
   total_runs: number
   pass_rate: number
+  failed_tests: string[]
+  failed_count: number
 }
 
 export interface OrgApiKey {
