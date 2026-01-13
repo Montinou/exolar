@@ -1,9 +1,17 @@
 /**
- * Error Message Sanitizer
+ * Error Message Sanitizer & Embedding Preparation
  *
- * Removes dynamic tokens (UUIDs, timestamps, session IDs) from error messages
- * to improve embedding consistency. Two identical errors with different
- * timestamps should produce similar embeddings.
+ * This module prepares text for vector embeddings following best practices:
+ * 1. Sanitization: Removes dynamic tokens (UUIDs, timestamps) for consistent grouping
+ * 2. Semantic Enrichment: Adds keywords, synonyms, and categories for better search
+ * 3. Context Preservation: Keeps meaningful structure while normalizing noise
+ *
+ * Best practices applied (from Jina v3, Stack Overflow, Highlight.io research):
+ * - Use asymmetric embeddings (retrieval.passage for indexing, retrieval.query for search)
+ * - Include full error context, not just surface-level text
+ * - Add semantic synonyms and related concepts for better matching
+ * - Extract code patterns and error categories for technical search
+ * - Quality signals (frequency, severity) improve ranking
  */
 
 /**
@@ -114,20 +122,39 @@ export function sanitizeStackTrace(stackTrace: string | null): string {
 }
 
 /**
- * Prepare error content for embedding
+ * Prepare error content for embedding (error_embedding_v2)
  *
- * Combines error message and stack trace into a single string
- * optimized for embedding generation.
+ * Creates a rich semantic representation of a test failure for vector search.
+ * Includes error categorization, code patterns, and semantic synonyms.
+ *
+ * Best practices applied:
+ * - Full error context (message + relevant stack)
+ * - Error type classification with semantic descriptions
+ * - Code pattern extraction (API routes, components, actions)
+ * - Synonyms for better semantic matching
  *
  * @param errorMessage - Error message
  * @param stackTrace - Stack trace (optional)
- * @returns Combined, sanitized string ready for embedding
+ * @param testContext - Optional test context (name, file)
+ * @returns Combined, enriched string ready for embedding
  */
 export function prepareErrorForEmbedding(
   errorMessage: string | null,
-  stackTrace: string | null
+  stackTrace: string | null,
+  testContext?: { testName?: string; testFile?: string }
 ): string {
   const parts: string[] = []
+
+  // Add test context if provided (helps with semantic matching)
+  if (testContext?.testName) {
+    parts.push(`Test: ${testContext.testName}`)
+  }
+  if (testContext?.testFile) {
+    const normalizedFile = testContext.testFile
+      .replace(/^.*?(?:tests?\/|specs?\/|e2e\/|playwright\/)/i, "")
+      .replace(/\\/g, "/")
+    parts.push(`File: ${normalizedFile}`)
+  }
 
   // Add sanitized error message
   const sanitizedMessage = sanitizeErrorMessage(errorMessage)
@@ -135,11 +162,31 @@ export function prepareErrorForEmbedding(
     parts.push(`Error: ${sanitizedMessage}`)
   }
 
+  // Extract and add error classification
+  const errorType = extractErrorType(errorMessage)
+  parts.push(`Error Type: ${errorType}`)
+
+  // Add error category with semantic description
+  const categoryInfo = getErrorCategoryInfo(errorType)
+  parts.push(`Category: ${categoryInfo.category}`)
+  parts.push(`Description: ${categoryInfo.description}`)
+
+  // Add synonyms for better semantic search
+  if (categoryInfo.synonyms.length > 0) {
+    parts.push(`Related Terms: ${categoryInfo.synonyms.join(", ")}`)
+  }
+
+  // Extract code patterns from error and stack trace
+  const codePatterns = extractCodePatterns(stackTrace, errorMessage)
+  if (codePatterns.length > 0) {
+    parts.push(`Code Patterns: ${codePatterns.join(", ")}`)
+  }
+
   // Add sanitized stack trace (first few frames are most important)
   const sanitizedStack = sanitizeStackTrace(stackTrace)
   if (sanitizedStack) {
-    // Keep first 10 stack frames (usually most relevant)
-    const stackLines = sanitizedStack.split("\n").slice(0, 10)
+    // Keep first 8 stack frames (balance context vs noise)
+    const stackLines = sanitizedStack.split("\n").slice(0, 8)
     parts.push(`Stack:\n${stackLines.join("\n")}`)
   }
 
@@ -180,6 +227,201 @@ export function extractErrorType(errorMessage: string | null): string {
   }
 
   return "UnknownError"
+}
+
+// ============================================
+// Error Category & Pattern Analysis
+// ============================================
+
+/**
+ * Error categories with semantic descriptions for embedding
+ */
+const ERROR_CATEGORIES: Record<
+  string,
+  { category: string; description: string; synonyms: string[] }
+> = {
+  TimeoutError: {
+    category: "timing",
+    description: "Operation exceeded time limit",
+    synonyms: ["slow", "delay", "hang", "freeze", "unresponsive", "performance"],
+  },
+  AssertionError: {
+    category: "assertion",
+    description: "Test expectation not met",
+    synonyms: ["expect", "should", "must", "verify", "check", "validate", "mismatch"],
+  },
+  ElementNotFoundError: {
+    category: "selector",
+    description: "UI element could not be located",
+    synonyms: ["missing", "not found", "locator", "selector", "DOM", "element", "component"],
+  },
+  ElementNotVisibleError: {
+    category: "visibility",
+    description: "Element exists but not visible",
+    synonyms: ["hidden", "invisible", "display", "render", "visible", "shown"],
+  },
+  ConnectionError: {
+    category: "network",
+    description: "Network connection failed",
+    synonyms: ["network", "connection", "refused", "unreachable", "offline", "API", "request"],
+  },
+  DNSError: {
+    category: "network",
+    description: "Domain name resolution failed",
+    synonyms: ["DNS", "hostname", "domain", "resolve", "network"],
+  },
+  TypeError: {
+    category: "code",
+    description: "Type mismatch in code",
+    synonyms: ["type", "undefined", "null", "property", "method", "function"],
+  },
+  ReferenceError: {
+    category: "code",
+    description: "Undefined variable or reference",
+    synonyms: ["undefined", "reference", "variable", "not defined", "scope"],
+  },
+  SyntaxError: {
+    category: "code",
+    description: "Invalid code syntax",
+    synonyms: ["syntax", "parse", "invalid", "unexpected", "token"],
+  },
+  AuthenticationError: {
+    category: "auth",
+    description: "Authentication or authorization failed",
+    synonyms: ["auth", "login", "token", "session", "unauthorized", "forbidden", "401", "403"],
+  },
+  DatabaseError: {
+    category: "data",
+    description: "Database operation failed",
+    synonyms: ["database", "query", "SQL", "postgres", "connection", "transaction"],
+  },
+  ValidationError: {
+    category: "validation",
+    description: "Input validation failed",
+    synonyms: ["validation", "invalid", "required", "format", "constraint", "schema"],
+  },
+  UnknownError: {
+    category: "unknown",
+    description: "Unclassified error",
+    synonyms: ["error", "failure", "exception", "crash"],
+  },
+}
+
+/**
+ * Get error category info for semantic enrichment
+ */
+export function getErrorCategoryInfo(errorType: string): {
+  category: string
+  description: string
+  synonyms: string[]
+} {
+  return (
+    ERROR_CATEGORIES[errorType] ||
+    ERROR_CATEGORIES.UnknownError
+  )
+}
+
+/**
+ * Extract code patterns from stack trace for semantic matching
+ *
+ * Identifies key code patterns like:
+ * - API endpoints (POST /api/users)
+ * - Component names (UserProfile, LoginForm)
+ * - Action types (click, navigate, fill)
+ * - File types (page, component, util)
+ */
+export function extractCodePatterns(
+  stackTrace: string | null,
+  errorMessage: string | null
+): string[] {
+  const patterns: Set<string> = new Set()
+  const text = `${errorMessage || ""} ${stackTrace || ""}`.toLowerCase()
+
+  // HTTP methods and endpoints
+  const httpMatch = text.match(/\b(get|post|put|patch|delete)\s+[\w/.-]+/gi)
+  if (httpMatch) {
+    httpMatch.forEach((m) => patterns.add(m.toLowerCase()))
+  }
+
+  // API route patterns
+  const apiMatch = text.match(/\/api\/[\w/-]+/gi)
+  if (apiMatch) {
+    apiMatch.forEach((m) => patterns.add(`API route: ${m}`))
+  }
+
+  // Component-like names (PascalCase)
+  const componentMatch = text.match(/\b[A-Z][a-z]+(?:[A-Z][a-z]+)+\b/g)
+  if (componentMatch) {
+    // Take unique, deduplicated list
+    const seen = new Set<string>()
+    componentMatch.forEach((m) => {
+      const lower = m.toLowerCase()
+      if (!seen.has(lower)) {
+        seen.add(lower)
+        patterns.add(`Component: ${m}`)
+      }
+    })
+  }
+
+  // Playwright actions
+  const playwrightActions = [
+    "click",
+    "fill",
+    "type",
+    "navigate",
+    "goto",
+    "waitFor",
+    "expect",
+    "locator",
+    "getByRole",
+    "getByText",
+    "getByTestId",
+    "getByLabel",
+    "hover",
+    "press",
+    "check",
+    "uncheck",
+    "selectOption",
+    "upload",
+    "screenshot",
+  ]
+
+  for (const action of playwrightActions) {
+    if (text.includes(action.toLowerCase())) {
+      patterns.add(`Action: ${action}`)
+    }
+  }
+
+  // File structure patterns
+  if (text.includes("page")) patterns.add("File type: page")
+  if (text.includes("component")) patterns.add("File type: component")
+  if (text.includes("util")) patterns.add("File type: utility")
+  if (text.includes("service")) patterns.add("File type: service")
+  if (text.includes("hook")) patterns.add("File type: hook")
+
+  return Array.from(patterns).slice(0, 10) // Limit to prevent noise
+}
+
+/**
+ * Extract the describe block hierarchy from a test name
+ *
+ * @example
+ * extractDescribeHierarchy("Auth > Login > should login with valid credentials")
+ * // Returns: ["Auth", "Login"]
+ */
+export function extractDescribeHierarchy(testName: string): string[] {
+  // Common separators for describe blocks
+  const separators = [" > ", " › ", " / ", " | ", " :: "]
+
+  for (const sep of separators) {
+    if (testName.includes(sep)) {
+      const parts = testName.split(sep)
+      // Return all but last (which is the test itself)
+      return parts.slice(0, -1).map((p) => p.trim())
+    }
+  }
+
+  return []
 }
 
 // ============================================
@@ -325,21 +567,24 @@ function getSemanticSynonyms(keywords: string[]): string[] {
  * and context without dynamic tokens. Enhanced with keywords and synonyms
  * for better semantic matching.
  *
+ * Best practices applied:
+ * - Describe hierarchy for test context ("Auth > Login > should login")
+ * - Feature area extraction from file path
+ * - Semantic synonyms for better matching
+ * - Error category and code patterns for failed tests
+ * - Quality signals (retries indicate flakiness)
+ *
  * @param test - Test result data
  * @returns Text ready for embedding
- *
- * @example
- * prepareTestForEmbedding({
- *   test_name: "should login successfully",
- *   test_file: "tests/auth/login.spec.ts",
- *   status: "passed",
- *   duration_ms: 1500,
- *   browser: "chromium"
- * })
- * // Returns enhanced text with keywords and synonyms
  */
 export function prepareTestForEmbedding(test: TestResultForEmbedding): string {
   const parts: string[] = []
+
+  // Extract describe hierarchy for context
+  const hierarchy = extractDescribeHierarchy(test.test_name)
+  if (hierarchy.length > 0) {
+    parts.push(`Context: ${hierarchy.join(" > ")}`)
+  }
 
   // Test identity (full name for exact matching)
   parts.push(`Test: ${test.test_name}`)
@@ -370,7 +615,7 @@ export function prepareTestForEmbedding(test: TestResultForEmbedding): string {
   const synonyms = getSemanticSynonyms(keywords)
   if (synonyms.length > 0) {
     // Limit synonyms to avoid noise
-    parts.push(`Related: ${synonyms.slice(0, 5).join(", ")}`)
+    parts.push(`Related: ${synonyms.slice(0, 8).join(", ")}`)
   }
 
   // Status with context
@@ -390,14 +635,27 @@ export function prepareTestForEmbedding(test: TestResultForEmbedding): string {
   // Retry information (useful for flakiness context)
   if (test.retry_count != null && test.retry_count > 0) {
     parts.push(`Retries: ${test.retry_count}`)
+    parts.push(`Flaky: yes`) // Quality signal for flaky tests
   }
 
-  // For failed tests, include sanitized error (brief)
+  // For failed tests, include rich error context
   if (test.status === "failed" && test.error_message) {
     const sanitizedError = sanitizeErrorMessage(test.error_message)
     // Truncate to first line or 200 chars for embedding focus
     const briefError = sanitizedError.split("\n")[0].slice(0, 200)
     parts.push(`Error: ${briefError}`)
+
+    // Add error category and synonyms for semantic matching
+    const errorType = extractErrorType(test.error_message)
+    const categoryInfo = getErrorCategoryInfo(errorType)
+    parts.push(`Error Type: ${errorType}`)
+    parts.push(`Error Category: ${categoryInfo.category}`)
+    parts.push(`Error Description: ${categoryInfo.description}`)
+
+    // Add error-specific synonyms for better search
+    if (categoryInfo.synonyms.length > 0) {
+      parts.push(`Error Related: ${categoryInfo.synonyms.slice(0, 5).join(", ")}`)
+    }
   }
 
   return parts.join("\n")
