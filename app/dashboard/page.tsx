@@ -8,7 +8,7 @@ import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
 import { ErrorDistributionChart } from "@/components/dashboard/error-distribution-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { FlakinessBySuiteChart } from "@/components/dashboard/flakiness-by-suite-chart"
-import { ClusterDistributionChart } from "@/components/dashboard/charts/cluster-distribution-chart"
+import { CategoryDistributionChart } from "@/components/dashboard/charts/category-distribution-chart"
 import { ExecutionsView } from "@/components/dashboard/executions-view"
 import { Filters } from "@/components/dashboard/filters"
 import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
@@ -107,7 +107,7 @@ async function DashboardContent({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <SuitePassRatesCard />
           <FlakinessBySuiteChart data={[]} />
-          <ClusterDistributionChart />
+          <CategoryDistributionChart />
         </div>
 
         {/* Executions */}
