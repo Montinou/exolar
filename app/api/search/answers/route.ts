@@ -88,9 +88,18 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode("data: [DONE]\n\n"))
             controller.close()
           } catch (error) {
-            const errorMsg =
-              error instanceof Error ? error.message : "Unknown error"
             console.error("Streaming error:", error)
+
+            // Detect quota/rate limit errors
+            let errorMsg = "Failed to generate answer"
+            if (error instanceof Error) {
+              if (error.message.includes("429") || error.message.includes("quota") || error.message.includes("Too Many Requests")) {
+                errorMsg = "AI quota exceeded. Please try again later or upgrade your Gemini API plan."
+              } else {
+                errorMsg = error.message
+              }
+            }
+
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ error: errorMsg })}\n\n`)
             )
