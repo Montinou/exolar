@@ -31,7 +31,7 @@ export async function getCachedClusters(
   const cached = await sql`
     SELECT
       fc.id,
-      fc.cluster_index,
+      fc.cluster_id,
       fc.representative_error,
       fc.test_count,
       fc.centroid_embedding::text as centroid_v1,
@@ -39,7 +39,7 @@ export async function getCachedClusters(
       fc.created_at
     FROM failure_clusters fc
     WHERE fc.execution_id = ${executionId}
-    ORDER BY fc.cluster_index ASC
+    ORDER BY fc.cluster_id ASC
   `
 
   if (cached.length > 0) {
@@ -65,7 +65,7 @@ export async function getCachedClusters(
       const centroidStr = (row.centroid_v2 || row.centroid_v1) as string | null
 
       clusters.push({
-        clusterId: row.cluster_index as number,
+        clusterId: row.cluster_id as number,
         representativeError: row.representative_error as string,
         testCount: row.test_count as number,
         centroidEmbedding: centroidStr ? parseVectorFromDb(centroidStr) : undefined,
@@ -128,7 +128,7 @@ async function cacheClusterResults(
       ? await sql`
           INSERT INTO failure_clusters (
             execution_id,
-            cluster_index,
+            cluster_id,
             representative_error,
             test_count,
             centroid_embedding_v2
@@ -144,7 +144,7 @@ async function cacheClusterResults(
       : await sql`
           INSERT INTO failure_clusters (
             execution_id,
-            cluster_index,
+            cluster_id,
             representative_error,
             test_count,
             centroid_embedding

@@ -390,10 +390,10 @@ export async function handleQuery(
         let output = "## Dashboard Metrics\n\n"
         output += `| Metric | Value |\n`
         output += `|--------|-------|\n`
-        output += `| Total Executions | ${metrics.totalExecutions} |\n`
-        output += `| Pass Rate | ${metrics.passRate?.toFixed(1) || 0}% |\n`
-        output += `| Failure Rate | ${metrics.failureRate?.toFixed(1) || 0}% |\n`
-        output += `| Avg Duration | ${formatMetricValue(metrics.avgDuration, "duration", "markdown")} |\n`
+        output += `| Total Executions | ${metrics.total_executions} |\n`
+        output += `| Pass Rate | ${metrics.pass_rate?.toFixed(1) || 0}% |\n`
+        output += `| Failure Rate | ${metrics.failure_rate?.toFixed(1) || 0}% |\n`
+        output += `| Avg Duration | ${formatMetricValue(metrics.avg_duration_ms, "duration", "markdown")} |\n`
 
         return textResponse(output)
       }
