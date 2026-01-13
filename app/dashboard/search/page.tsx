@@ -35,8 +35,11 @@ import {
   Filter,
   CircleDot,
   SkipForward,
+  Layers,
 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AIAnswerCard, type SearchResultForAI } from "@/components/dashboard/ai-answer-card"
+import { ClustersTabContent } from "@/components/dashboard/clusters-tab-content"
 
 type SearchMode = "hybrid" | "semantic" | "keyword"
 type StatusFilter = "all" | "passed" | "failed" | "skipped"
@@ -273,9 +276,22 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* Results */}
-        {/* Meta Info */}
-        {meta && (
+      {/* Tabs: Search Results & Clusters */}
+      <Tabs defaultValue="search" className="w-full">
+        <TabsList className="glass-card mb-4">
+          <TabsTrigger value="search" className="gap-2">
+            <Search className="h-4 w-4" />
+            Search Results
+          </TabsTrigger>
+          <TabsTrigger value="clusters" className="gap-2">
+            <Layers className="h-4 w-4" />
+            Clusters
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="search" className="space-y-4">
+          {/* Meta Info */}
+          {meta && (
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span>{meta.totalResults} results</span>
@@ -421,31 +437,37 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Initial State */}
-        {!searched && (
-          <div className="glass-card glass-card-glow p-12 text-center">
-            <Sparkles className="h-12 w-12 mx-auto mb-4 text-cyan-400" />
-            <p className="text-lg font-medium">AI-Powered Test Search</p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Search tests by behavior, error patterns, or description — not just keywords
-            </p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {["timeout errors", "login failures", "API rate limiting", "flaky tests", "network issues"].map((example) => (
-                <Badge
-                  key={example}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-muted"
-                  onClick={() => {
-                    setQuery(example)
-                    setTimeout(performSearch, 100)
-                  }}
-                >
-                  {example}
-                </Badge>
-              ))}
+          {/* Initial State */}
+          {!searched && (
+            <div className="glass-card glass-card-glow p-12 text-center">
+              <Sparkles className="h-12 w-12 mx-auto mb-4 text-cyan-400" />
+              <p className="text-lg font-medium">AI-Powered Test Search</p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Search tests by behavior, error patterns, or description — not just keywords
+              </p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {["timeout errors", "login failures", "API rate limiting", "flaky tests", "network issues"].map((example) => (
+                  <Badge
+                    key={example}
+                    variant="outline"
+                    className="cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      setQuery(example)
+                      setTimeout(performSearch, 100)
+                    }}
+                  >
+                    {example}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </TabsContent>
+
+        <TabsContent value="clusters">
+          <ClustersTabContent />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

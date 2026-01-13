@@ -8,6 +8,7 @@ import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
 import { ErrorDistributionChart } from "@/components/dashboard/error-distribution-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { FlakinessBySuiteChart } from "@/components/dashboard/flakiness-by-suite-chart"
+import { ClusterDistributionChart } from "@/components/dashboard/charts/cluster-distribution-chart"
 import { ExecutionsView } from "@/components/dashboard/executions-view"
 import { Filters } from "@/components/dashboard/filters"
 import { FlakiestTestsCard } from "@/components/dashboard/flakiest-tests-card"
@@ -103,9 +104,10 @@ async function DashboardContent({
         </div>
 
         {/* Suite Analysis Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <SuitePassRatesCard />
           <FlakinessBySuiteChart data={[]} />
+          <ClusterDistributionChart />
         </div>
 
         {/* Executions */}
@@ -151,8 +153,8 @@ function DashboardSkeleton() {
       </div>
 
       {/* Suite Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[...Array(2)].map((_, i) => (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="glass-card glass-card-glow p-6">
             <Skeleton className="h-[200px] w-full bg-muted/30" />
           </div>

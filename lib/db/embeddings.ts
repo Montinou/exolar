@@ -148,56 +148,17 @@ export async function storeEmbeddingsBatchV2(
 
   if (valid.length === 0) return
 
-  // For small batches (<100), use individual UPDATE statements
-  if (valid.length < 100) {
-    for (const { testResultId, embedding, chunkHash } of valid) {
-      await sql`
-        UPDATE test_results
-        SET error_embedding_v2 = ${toVectorString(embedding)}::vector,
-            embedding_chunk_hash = ${chunkHash ?? null}
-        WHERE id = ${testResultId}
-      `
-    }
-    return
-  }
-
-  // For large batches (>=100), use temp table approach
-  // Note: Serverless auto-commits each statement, so we use a regular temp table
-  // and DELETE instead of TRUNCATE (temp tables persist per session)
-  await sql`
-    CREATE TEMP TABLE IF NOT EXISTS embedding_updates_v2 (
-      test_result_id INTEGER NOT NULL,
-      embedding vector(512) NOT NULL,
-      chunk_hash TEXT
-    )
-  `
-
-  // Clear any existing data
-  await sql`DELETE FROM embedding_updates_v2`
-
-  // Batch insert into temp table (chunk if >10k rows)
-  const chunkSize = 10000
-  for (let i = 0; i < valid.length; i += chunkSize) {
-    const chunk = valid.slice(i, i + chunkSize)
-    const values = chunk.map(
-      ({ testResultId, embedding, chunkHash }) =>
-        sql`(${testResultId}, ${toVectorString(embedding)}::vector, ${chunkHash ?? null})`
-    )
-
+  // Use individual UPDATE statements
+  // Note: Temp table approach doesn't work with Neon serverless connection pooling
+  // as each statement may use a different connection from the pool
+  for (const { testResultId, embedding, chunkHash } of valid) {
     await sql`
-      INSERT INTO embedding_updates_v2 (test_result_id, embedding, chunk_hash)
-      VALUES ${sql.join(values, sql`, `)}
+      UPDATE test_results
+      SET error_embedding_v2 = ${toVectorString(embedding)}::vector,
+          embedding_chunk_hash = ${chunkHash ?? null}
+      WHERE id = ${testResultId}
     `
   }
-
-  // Batch UPDATE via JOIN
-  await sql`
-    UPDATE test_results t
-    SET error_embedding_v2 = u.embedding,
-        embedding_chunk_hash = u.chunk_hash
-    FROM embedding_updates_v2 u
-    WHERE t.id = u.test_result_id
-  `
 }
 
 /**
