@@ -174,6 +174,13 @@ export async function getFailuresWithAIContext(
   `
 
   const result = await sql.unsafe(query)
+
+  // Defensive check: ensure result is an array before returning
+  if (!Array.isArray(result)) {
+    console.error("[getFailuresWithAIContext] Unexpected result type:", typeof result, result)
+    return []
+  }
+
   return result as unknown as TestResult[]
 }
 
@@ -283,5 +290,12 @@ export async function getErrorTypeDistribution(
   `
 
   const result = await sql.unsafe(query)
+
+  // Defensive check: ensure result is an array before returning
+  if (!Array.isArray(result)) {
+    console.error("[getErrorTypeDistribution] Unexpected result type:", typeof result, result)
+    return []
+  }
+
   return result as unknown as ErrorDistributionItem[]
 }
