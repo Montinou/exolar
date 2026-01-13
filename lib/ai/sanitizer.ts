@@ -32,10 +32,31 @@ export function sanitizeErrorMessage(errorMessage: string | null): string {
   // Remove ANSI escape codes (terminal colors/formatting)
   // Matches: \x1b[...m, \033[...m, \u001b[...m
   // Source: docs/prompts/research/jina-v3-best-practices.md
+  // Source: docs/prompts/research/error-embedding-optimization.md
   sanitized = sanitized.replace(
     /[\u001b\u009b]\[[0-9;]*[a-zA-Z]/g,
     ""
   )
+
+  // Remove GitHub Actions runner paths to relative
+  // Source: docs/prompts/research/error-embedding-optimization.md
+  // Before: /home/runner/work/attorney_share_mvp_web/attorney_share_mvp_web/automation/playwright/tests/negotiation/file.ts
+  // After: negotiation/file.ts
+  sanitized = sanitized.replace(
+    /\/home\/runner\/work\/[^/]+\/[^/]+\/automation\/playwright\/(?:tests\/)?/g,
+    ""
+  )
+
+  // Remove CSS class names from element descriptions
+  // Source: docs/prompts/research/error-embedding-optimization.md
+  // Removes: class="MuiDialog-root MuiModal-root css-7xusza"
+  sanitized = sanitized.replace(/\s+class="[^"]*"/g, "")
+
+  // Remove Playwright repetition counts
+  // Source: docs/prompts/research/error-embedding-optimization.md
+  // Before: "35 × locator resolved to visible"
+  // After: "locator resolved to visible"
+  sanitized = sanitized.replace(/\b\d+\s*×\s*/g, "")
 
   // Remove UUIDs (various formats)
   // Standard UUID: 8-4-4-4-12
