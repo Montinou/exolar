@@ -23,8 +23,6 @@
  * @see https://github.com/xenova/transformers.js
  */
 
-import { pipeline, type Pipeline } from "@xenova/transformers"
-
 // ============================================
 // Configuration
 // ============================================
@@ -37,6 +35,9 @@ const CROSS_ENCODER_MODEL =
 // ============================================
 // Types
 // ============================================
+
+// Dynamic import type (will be resolved at runtime)
+type Pipeline = any
 
 export interface CrossEncoderDocument {
   /** Unique identifier for tracking */
@@ -68,6 +69,8 @@ let modelLoadingPromise: Promise<Pipeline> | null = null
  *
  * Uses lazy loading and caching to avoid reloading the model on every request.
  * The model is loaded once and kept in memory for subsequent requests.
+ *
+ * Uses dynamic import to avoid loading transformers.js during build time.
  */
 async function loadModel(): Promise<Pipeline> {
   // Return cached model if already loaded
@@ -84,10 +87,17 @@ async function loadModel(): Promise<Pipeline> {
   console.log(`[CrossEncoder] Loading model: ${CROSS_ENCODER_MODEL}`)
   const startTime = Date.now()
 
-  modelLoadingPromise = pipeline(
-    "text-classification",
-    CROSS_ENCODER_MODEL
-  ) as Promise<Pipeline>
+  modelLoadingPromise = (async () => {
+    try {
+      // Dynamic import to avoid loading during build
+      const { pipeline } = await import("@xenova/transformers")
+      const model = await pipeline("text-classification", CROSS_ENCODER_MODEL)
+      return model as Pipeline
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(`Failed to load transformers.js: ${message}`)
+    }
+  })()
 
   try {
     modelCache = await modelLoadingPromise
