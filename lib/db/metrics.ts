@@ -278,9 +278,15 @@ export async function getTrendData(
     ORDER BY period ASC
   `
 
-  const result = await sql.unsafe(query) as unknown as Record<string, unknown>[]
+  const result = await sql.unsafe(query)
 
-  return result.map((r) => ({
+  // Defensive check: ensure result is an array before mapping
+  if (!Array.isArray(result)) {
+    console.error("[getTrendData] Unexpected result type:", typeof result, result)
+    return []
+  }
+
+  return result.map((r: Record<string, unknown>) => ({
     period: r.period instanceof Date ? r.period.toISOString() : String(r.period),
     executions: Number(r.executions),
     passed: Number(r.passed),
