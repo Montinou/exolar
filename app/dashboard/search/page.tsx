@@ -32,10 +32,14 @@ import {
   Clock,
   GitBranch,
   Brain,
+  Filter,
+  CircleDot,
+  SkipForward,
 } from "lucide-react"
 import { AIAnswerCard, type SearchResultForAI } from "@/components/dashboard/ai-answer-card"
 
 type SearchMode = "hybrid" | "semantic" | "keyword"
+type StatusFilter = "all" | "passed" | "failed" | "skipped"
 
 interface SearchResult {
   testResultId: number
@@ -64,6 +68,7 @@ interface SearchResponse {
 export default function SearchPage() {
   const [query, setQuery] = useState("")
   const [mode, setMode] = useState<SearchMode>("hybrid")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searched, setSearched] = useState(false)
@@ -90,6 +95,7 @@ export default function SearchPage() {
           mode,
           limit: 50,
           rerank: true,
+          statusFilter,
         }),
       })
       if (response.ok) {
@@ -107,7 +113,7 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [query, mode])
+  }, [query, mode, statusFilter])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
@@ -160,7 +166,7 @@ export default function SearchPage() {
             Semantic Search
           </h1>
           <p className="text-sm text-muted-foreground">
-            Search failures by intent using AI-powered semantic matching
+            Search tests by intent using AI-powered semantic matching
           </p>
         </div>
 
@@ -169,15 +175,46 @@ export default function SearchPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search failures... e.g., 'timeout errors', 'login failures', 'API rate limiting'"
+              placeholder="Search tests... e.g., 'login flow', 'timeout errors', 'checkout process'"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               className="pl-10 h-12 text-lg"
             />
           </div>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className="w-[130px] h-12">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                <span className="flex items-center gap-2">
+                  <Filter className="h-4 w-4" />
+                  All Status
+                </span>
+              </SelectItem>
+              <SelectItem value="passed">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  Passed
+                </span>
+              </SelectItem>
+              <SelectItem value="failed">
+                <span className="flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  Failed
+                </span>
+              </SelectItem>
+              <SelectItem value="skipped">
+                <span className="flex items-center gap-2">
+                  <SkipForward className="h-4 w-4 text-yellow-500" />
+                  Skipped
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={mode} onValueChange={(v) => setMode(v as SearchMode)}>
-            <SelectTrigger className="w-[140px] h-12">
+            <SelectTrigger className="w-[130px] h-12">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -359,9 +396,9 @@ export default function SearchPage() {
         {!searched && (
           <div className="glass-card glass-card-glow p-12 text-center">
             <Sparkles className="h-12 w-12 mx-auto mb-4 text-cyan-400" />
-            <p className="text-lg font-medium">AI-Powered Failure Search</p>
+            <p className="text-lg font-medium">AI-Powered Test Search</p>
             <p className="text-sm text-muted-foreground mb-6">
-              Search by error type, behavior, or description — not just keywords
+              Search tests by behavior, error patterns, or description — not just keywords
             </p>
             <div className="flex flex-wrap gap-2 justify-center">
               {["timeout errors", "login failures", "API rate limiting", "flaky tests", "network issues"].map((example) => (

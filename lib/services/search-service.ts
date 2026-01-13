@@ -45,6 +45,8 @@ export interface SearchRequest {
   rerank?: boolean
   /** Number of candidates for reranking (fetch more, rerank to limit) */
   rerankCandidates?: number
+  /** Filter by test status (all, passed, failed, skipped) */
+  statusFilter?: "all" | "passed" | "failed" | "skipped"
 }
 
 export interface SearchResponse {
@@ -79,6 +81,7 @@ export async function semanticSearch(request: SearchRequest): Promise<SearchResp
     since,
     rerank = true,
     rerankCandidates = 50,
+    statusFilter = "all",
   } = request
 
   // Validate query
@@ -101,6 +104,7 @@ export async function semanticSearch(request: SearchRequest): Promise<SearchResp
     suite,
     since,
     mode,
+    statusFilter,
   }
 
   let queryEmbedding: number[] | null = null

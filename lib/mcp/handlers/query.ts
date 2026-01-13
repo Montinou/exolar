@@ -85,6 +85,7 @@ const QueryInputSchema = z.object({
       max_clusters: z.number().optional(), // Maximum number of clusters
       search_mode: z.enum(["semantic", "keyword", "hybrid"]).optional(), // Search mode
       rerank: z.boolean().optional(), // Enable Cohere reranking
+      status_filter: z.enum(["all", "passed", "failed", "skipped"]).optional(), // Filter by test status
     })
     .optional()
     .default({}),
@@ -836,6 +837,7 @@ export async function handleQuery(
         const { semanticSearch } = await import("@/lib/services/search-service")
 
         const searchMode = f.search_mode || "hybrid"
+        const statusFilter = f.status_filter || "all"
         const results = await semanticSearch({
           query: f.query,
           organizationId: orgId,
@@ -845,6 +847,7 @@ export async function handleQuery(
           suite: f.suite,
           since: f.from,
           rerank: f.rerank ?? true,
+          statusFilter,
         })
 
         if (format === "json") {
@@ -853,6 +856,7 @@ export async function handleQuery(
             dataset: "semantic_search",
             query: f.query,
             mode: searchMode,
+            status_filter: statusFilter,
             total_results: results.totalResults,
             embedding_version: results.embeddingVersion,
             reranked: results.reranked,
@@ -863,7 +867,7 @@ export async function handleQuery(
 
         // Markdown format
         let output = `## Semantic Search: "${f.query}"\n\n`
-        output += `**Mode:** ${searchMode} | **Results:** ${results.totalResults} | **Time:** ${results.searchTimeMs}ms\n`
+        output += `**Mode:** ${searchMode} | **Status:** ${statusFilter} | **Results:** ${results.totalResults} | **Time:** ${results.searchTimeMs}ms\n`
         if (results.reranked) {
           output += `**Reranked:** Yes (Cohere)\n`
         }

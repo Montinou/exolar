@@ -24,6 +24,7 @@ interface SearchRequestBody {
   suite?: string
   since?: string
   rerank?: boolean
+  statusFilter?: "all" | "passed" | "failed" | "skipped"
 }
 
 /**
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = (await request.json()) as SearchRequestBody
-    const { query, mode = "hybrid", limit = 20, branch, suite, since, rerank = true } = body
+    const { query, mode = "hybrid", limit = 20, branch, suite, since, rerank = true, statusFilter = "all" } = body
 
     if (!query || query.trim().length < 2) {
       return NextResponse.json(
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
       suite,
       since,
       rerank,
+      statusFilter,
     })
 
     return NextResponse.json(response)
@@ -85,6 +87,7 @@ export async function GET(request: NextRequest) {
       // Quick search via GET
       const mode = (searchParams.get("mode") as "semantic" | "keyword" | "hybrid") || "hybrid"
       const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100)
+      const statusFilter = (searchParams.get("status") as "all" | "passed" | "failed" | "skipped") || "all"
 
       const response = await semanticSearch({
         query: query.trim(),
@@ -92,6 +95,7 @@ export async function GET(request: NextRequest) {
         mode,
         limit,
         rerank: searchParams.get("rerank") !== "false",
+        statusFilter,
       })
 
       return NextResponse.json(response)

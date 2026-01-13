@@ -33,8 +33,10 @@ export interface SemanticSearchOptions {
   since?: string
   /** Search mode */
   mode?: "semantic" | "keyword" | "hybrid"
-  /** Include only failed tests */
+  /** Include only failed tests (legacy, use statusFilter instead) */
   failedOnly?: boolean
+  /** Filter by test status */
+  statusFilter?: "all" | "passed" | "failed" | "skipped"
 }
 
 export interface SemanticSearchResult {
@@ -141,6 +143,100 @@ export async function searchFailuresSemantic(
     INNER JOIN test_executions te ON tr.execution_id = te.id
     WHERE ${whereClause}
     ORDER BY tr.${embeddingColumn} <=> '${vectorStr}'::vector
+    LIMIT ${limit}
+  `
+
+  const results = await sql.unsafe(query)
+
+  return results.map((r: Record<string, unknown>) => ({
+    testResultId: r.test_result_id as number,
+    executionId: r.execution_id as number,
+    testName: r.test_name as string,
+    testFile: r.test_file as string,
+    testSignature: r.test_signature as string | null,
+    status: r.status as string,
+    errorMessage: r.error_message as string | null,
+    similarity: r.similarity as number,
+    branch: r.branch as string,
+    suite: r.suite as string | null,
+    createdAt: (r.created_at as Date).toISOString(),
+  }))
+}
+
+/**
+ * Search ALL tests using vector similarity (test_embedding)
+ *
+ * Uses test_embedding column which includes all tests (passed, failed, skipped).
+ * Embedding should be generated with task="retrieval.query" for best results.
+ *
+ * @param queryEmbedding - Query embedding (512 dimensions)
+ * @param options - Search options
+ */
+export async function searchAllTestsSemantic(
+  queryEmbedding: number[],
+  options: SemanticSearchOptions
+): Promise<SemanticSearchResult[]> {
+  const sql = getSql()
+  const {
+    organizationId,
+    limit = 50,
+    threshold = 0.5,
+    branch,
+    suite,
+    since,
+    statusFilter = "all",
+  } = options
+
+  const vectorStr = toVectorString(queryEmbedding)
+
+  // Build dynamic conditions
+  const conditions: string[] = [
+    `te.organization_id = ${organizationId}`,
+    "tr.test_embedding IS NOT NULL",
+    `tr.test_embedding <=> '${vectorStr}'::vector < ${threshold}`,
+  ]
+
+  // Status filter
+  if (statusFilter === "failed") {
+    conditions.push("tr.status IN ('failed', 'timedout')")
+  } else if (statusFilter === "passed") {
+    conditions.push("tr.status = 'passed'")
+  } else if (statusFilter === "skipped") {
+    conditions.push("tr.status = 'skipped'")
+  }
+  // "all" means no status filter
+
+  if (branch) {
+    conditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+  }
+
+  if (suite) {
+    conditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+  }
+
+  if (since) {
+    conditions.push(`tr.created_at >= '${since}'`)
+  }
+
+  const whereClause = conditions.join(" AND ")
+
+  const query = `
+    SELECT
+      tr.id as test_result_id,
+      tr.execution_id,
+      tr.test_name,
+      tr.test_file,
+      tr.test_signature,
+      tr.status,
+      tr.error_message,
+      te.branch,
+      te.suite,
+      tr.created_at,
+      1 - (tr.test_embedding <=> '${vectorStr}'::vector) as similarity
+    FROM test_results tr
+    INNER JOIN test_executions te ON tr.execution_id = te.id
+    WHERE ${whereClause}
+    ORDER BY tr.test_embedding <=> '${vectorStr}'::vector
     LIMIT ${limit}
   `
 
@@ -276,7 +372,7 @@ export async function searchHybrid(
   queryText: string,
   options: SemanticSearchOptions
 ): Promise<SemanticSearchResult[]> {
-  const { mode = "hybrid" } = options
+  const { mode = "hybrid", statusFilter = "all" } = options
 
   // Keyword-only mode
   if (mode === "keyword" || !queryEmbedding) {
@@ -297,21 +393,26 @@ export async function searchHybrid(
     }))
   }
 
+  // Determine which semantic search to use based on status filter
+  // Use searchAllTestsSemantic (test_embedding) for all statuses
+  // This searches ALL tests, not just failures
+  const semanticSearchFn = searchAllTestsSemantic
+
   // Semantic-only mode
   if (mode === "semantic") {
-    return searchFailuresSemantic(queryEmbedding, options)
+    return semanticSearchFn(queryEmbedding, options)
   }
 
   // Hybrid mode: combine both
   const [semanticResults, keywordResults] = await Promise.all([
-    searchFailuresSemantic(queryEmbedding, {
+    semanticSearchFn(queryEmbedding, {
       ...options,
       limit: Math.ceil((options.limit || 50) * 0.7), // 70% semantic
     }),
     searchTestsKeyword(queryText, {
       ...options,
       limit: Math.ceil((options.limit || 50) * 0.3), // 30% keyword
-      failedOnly: true,
+      failedOnly: statusFilter === "failed",
     }),
   ])
 
