@@ -181,3 +181,202 @@ export function extractErrorType(errorMessage: string | null): string {
 
   return "UnknownError"
 }
+
+// ============================================
+// Universal Test Embedding Functions
+// ============================================
+
+/**
+ * Test result data for embedding preparation
+ */
+export interface TestResultForEmbedding {
+  test_name: string
+  test_file: string | null
+  status: string
+  duration_ms?: number | null
+  browser?: string | null
+  retry_count?: number | null
+  error_message?: string | null
+}
+
+/**
+ * Prepare any test result (passed, failed, skipped) for embedding
+ *
+ * Creates a semantic text representation that captures the test's identity
+ * and context without dynamic tokens.
+ *
+ * @param test - Test result data
+ * @returns Text ready for embedding
+ *
+ * @example
+ * prepareTestForEmbedding({
+ *   test_name: "should login successfully",
+ *   test_file: "tests/auth/login.spec.ts",
+ *   status: "passed",
+ *   duration_ms: 1500,
+ *   browser: "chromium"
+ * })
+ * // Returns: "Test: should login successfully\nFile: tests/auth/login.spec.ts\nStatus: passed\nDuration: 1.5s\nBrowser: chromium"
+ */
+export function prepareTestForEmbedding(test: TestResultForEmbedding): string {
+  const parts: string[] = []
+
+  // Test identity
+  parts.push(`Test: ${test.test_name}`)
+
+  // File path (normalized)
+  if (test.test_file) {
+    // Remove absolute path prefixes, keep relative structure
+    const normalizedFile = test.test_file
+      .replace(/^.*?(?:tests?\/|specs?\/|e2e\/|playwright\/)/i, "")
+      .replace(/\\/g, "/")
+    parts.push(`File: ${normalizedFile || test.test_file}`)
+  }
+
+  // Status with context
+  parts.push(`Status: ${test.status}`)
+
+  // Duration (human-readable)
+  if (test.duration_ms != null && test.duration_ms > 0) {
+    const seconds = (test.duration_ms / 1000).toFixed(1)
+    parts.push(`Duration: ${seconds}s`)
+  }
+
+  // Browser context
+  if (test.browser) {
+    parts.push(`Browser: ${test.browser}`)
+  }
+
+  // Retry information (useful for flakiness context)
+  if (test.retry_count != null && test.retry_count > 0) {
+    parts.push(`Retries: ${test.retry_count}`)
+  }
+
+  // For failed tests, include sanitized error (brief)
+  if (test.status === "failed" && test.error_message) {
+    const sanitizedError = sanitizeErrorMessage(test.error_message)
+    // Truncate to first line or 200 chars for embedding focus
+    const briefError = sanitizedError.split("\n")[0].slice(0, 200)
+    parts.push(`Error: ${briefError}`)
+  }
+
+  return parts.join("\n")
+}
+
+/**
+ * Execution data for suite embedding preparation
+ */
+export interface ExecutionForEmbedding {
+  branch: string | null
+  suite: string | null
+  commit_message?: string | null
+  total_tests?: number | null
+  passed_count?: number | null
+  failed_count?: number | null
+  skipped_count?: number | null
+  duration_ms?: number | null
+  status?: string | null
+}
+
+/**
+ * Prepare execution/suite data for embedding
+ *
+ * Creates a semantic text representation of a test execution
+ * for suite-level semantic search.
+ *
+ * @param execution - Execution data
+ * @returns Text ready for embedding
+ *
+ * @example
+ * prepareSuiteForEmbedding({
+ *   branch: "main",
+ *   suite: "e2e",
+ *   commit_message: "feat: add user authentication",
+ *   total_tests: 50,
+ *   passed_count: 48,
+ *   failed_count: 2
+ * })
+ * // Returns: "Branch: main\nSuite: e2e\nCommit: feat: add user authentication\nTests: 50 total, 48 passed, 2 failed"
+ */
+export function prepareSuiteForEmbedding(
+  execution: ExecutionForEmbedding
+): string {
+  const parts: string[] = []
+
+  // Branch context
+  if (execution.branch) {
+    parts.push(`Branch: ${execution.branch}`)
+  }
+
+  // Suite name
+  if (execution.suite) {
+    parts.push(`Suite: ${execution.suite}`)
+  }
+
+  // Commit message (sanitized for dynamic content)
+  if (execution.commit_message) {
+    // Remove ticket numbers, keep semantic content
+    const sanitizedCommit = execution.commit_message
+      .replace(/\[?[A-Z]+-\d+\]?\s*/g, "") // Remove JIRA-style tickets
+      .replace(/#\d+/g, "") // Remove PR/issue numbers
+      .slice(0, 200) // Reasonable length
+      .trim()
+    if (sanitizedCommit) {
+      parts.push(`Commit: ${sanitizedCommit}`)
+    }
+  }
+
+  // Test summary
+  const summaryParts: string[] = []
+  if (execution.total_tests != null) {
+    summaryParts.push(`${execution.total_tests} total`)
+  }
+  if (execution.passed_count != null) {
+    summaryParts.push(`${execution.passed_count} passed`)
+  }
+  if (execution.failed_count != null && execution.failed_count > 0) {
+    summaryParts.push(`${execution.failed_count} failed`)
+  }
+  if (execution.skipped_count != null && execution.skipped_count > 0) {
+    summaryParts.push(`${execution.skipped_count} skipped`)
+  }
+  if (summaryParts.length > 0) {
+    parts.push(`Tests: ${summaryParts.join(", ")}`)
+  }
+
+  // Duration
+  if (execution.duration_ms != null && execution.duration_ms > 0) {
+    const minutes = Math.floor(execution.duration_ms / 60000)
+    const seconds = Math.floor((execution.duration_ms % 60000) / 1000)
+    const durationStr =
+      minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
+    parts.push(`Duration: ${durationStr}`)
+  }
+
+  // Execution status
+  if (execution.status) {
+    parts.push(`Status: ${execution.status}`)
+  }
+
+  return parts.join("\n")
+}
+
+/**
+ * Generate a hash for embedding text to track changes
+ *
+ * Used for incremental re-indexing - only regenerate embedding
+ * when the source text has changed.
+ *
+ * @param text - Text that will be embedded
+ * @returns Hash string
+ */
+export function generateEmbeddingHash(text: string): string {
+  // Simple hash using string manipulation (no crypto needed for this use case)
+  let hash = 0
+  for (let i = 0; i < text.length; i++) {
+    const char = text.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36)
+}

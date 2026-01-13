@@ -528,3 +528,443 @@ export async function findSimilarFailuresV2(
 
   throw new Error("Either executionId or organizationId must be provided")
 }
+
+// ============================================
+// Universal Test Embeddings (ALL tests)
+// ============================================
+
+/**
+ * Store a test embedding for any test result (passed, failed, skipped)
+ *
+ * @param testResultId - ID of the test result
+ * @param embedding - 512-dimensional embedding vector
+ * @param hash - Hash of the source text for incremental updates
+ */
+export async function storeTestEmbedding(
+  testResultId: number,
+  embedding: number[],
+  hash: string
+): Promise<void> {
+  const sql = getSql()
+
+  if (embedding.length !== 512) {
+    throw new Error(
+      `Invalid test embedding dimensions: expected 512, got ${embedding.length}`
+    )
+  }
+
+  await sql`
+    UPDATE test_results
+    SET test_embedding = ${toVectorString(embedding)}::vector,
+        test_embedding_hash = ${hash}
+    WHERE id = ${testResultId}
+  `
+}
+
+/**
+ * Store test embeddings for multiple test results (batch)
+ *
+ * @param embeddings - Array of {testResultId, embedding, hash} entries
+ */
+export async function storeTestEmbeddingsBatch(
+  embeddings: Array<{ testResultId: number; embedding: number[]; hash: string }>
+): Promise<void> {
+  const sql = getSql()
+
+  if (embeddings.length === 0) return
+
+  // Filter valid embeddings
+  const valid = embeddings.filter((e) => e.embedding.length === 512)
+
+  if (valid.length === 0) return
+
+  // Update each one individually
+  for (const { testResultId, embedding, hash } of valid) {
+    await sql`
+      UPDATE test_results
+      SET test_embedding = ${toVectorString(embedding)}::vector,
+          test_embedding_hash = ${hash}
+      WHERE id = ${testResultId}
+    `
+  }
+}
+
+/**
+ * Get test results that need test embeddings (all statuses)
+ *
+ * Returns tests without test_embedding, ordered by most recent first.
+ *
+ * @param organizationId - Filter by organization
+ * @param limit - Max results to return
+ * @param status - Optional status filter ('passed', 'failed', 'skipped', or null for all)
+ */
+export async function getTestsNeedingTestEmbeddings(
+  organizationId: number,
+  limit: number = 100,
+  status?: string | null
+): Promise<
+  Array<{
+    id: number
+    test_name: string
+    test_file: string | null
+    status: string
+    duration_ms: number | null
+    browser: string | null
+    retry_count: number | null
+    error_message: string | null
+    current_hash: string | null
+  }>
+> {
+  const sql = getSql()
+
+  if (status) {
+    const results = await sql`
+      SELECT
+        tr.id, tr.test_name, tr.test_file, tr.status,
+        tr.duration_ms, tr.browser, tr.retry_count,
+        tr.error_message, tr.test_embedding_hash as current_hash
+      FROM test_results tr
+      INNER JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND tr.test_embedding IS NULL
+        AND tr.status = ${status}
+      ORDER BY tr.created_at DESC
+      LIMIT ${limit}
+    `
+    return results as Array<{
+      id: number
+      test_name: string
+      test_file: string | null
+      status: string
+      duration_ms: number | null
+      browser: string | null
+      retry_count: number | null
+      error_message: string | null
+      current_hash: string | null
+    }>
+  }
+
+  const results = await sql`
+    SELECT
+      tr.id, tr.test_name, tr.test_file, tr.status,
+      tr.duration_ms, tr.browser, tr.retry_count,
+      tr.error_message, tr.test_embedding_hash as current_hash
+    FROM test_results tr
+    INNER JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND tr.test_embedding IS NULL
+    ORDER BY tr.created_at DESC
+    LIMIT ${limit}
+  `
+
+  return results as Array<{
+    id: number
+    test_name: string
+    test_file: string | null
+    status: string
+    duration_ms: number | null
+    browser: string | null
+    retry_count: number | null
+    error_message: string | null
+    current_hash: string | null
+  }>
+}
+
+/**
+ * Count tests with test embeddings for an organization
+ */
+export async function countTestsWithTestEmbeddings(
+  organizationId: number
+): Promise<{ withTestEmbedding: number; total: number }> {
+  const sql = getSql()
+
+  const [result] = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE tr.test_embedding IS NOT NULL) as with_test_embedding,
+      COUNT(*) as total
+    FROM test_results tr
+    INNER JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+  `
+
+  return {
+    withTestEmbedding: Number(result.with_test_embedding),
+    total: Number(result.total),
+  }
+}
+
+// ============================================
+// Suite Embeddings
+// ============================================
+
+/**
+ * Store a suite embedding for a test execution
+ *
+ * @param executionId - ID of the test execution
+ * @param embedding - 512-dimensional embedding vector
+ * @param hash - Hash of the source text for incremental updates
+ */
+export async function storeSuiteEmbedding(
+  executionId: number,
+  embedding: number[],
+  hash: string
+): Promise<void> {
+  const sql = getSql()
+
+  if (embedding.length !== 512) {
+    throw new Error(
+      `Invalid suite embedding dimensions: expected 512, got ${embedding.length}`
+    )
+  }
+
+  await sql`
+    UPDATE test_executions
+    SET suite_embedding = ${toVectorString(embedding)}::vector,
+        suite_embedding_hash = ${hash}
+    WHERE id = ${executionId}
+  `
+}
+
+/**
+ * Store suite embeddings for multiple executions (batch)
+ *
+ * @param embeddings - Array of {executionId, embedding, hash} entries
+ */
+export async function storeSuiteEmbeddingsBatch(
+  embeddings: Array<{ executionId: number; embedding: number[]; hash: string }>
+): Promise<void> {
+  const sql = getSql()
+
+  if (embeddings.length === 0) return
+
+  const valid = embeddings.filter((e) => e.embedding.length === 512)
+
+  if (valid.length === 0) return
+
+  for (const { executionId, embedding, hash } of valid) {
+    await sql`
+      UPDATE test_executions
+      SET suite_embedding = ${toVectorString(embedding)}::vector,
+          suite_embedding_hash = ${hash}
+      WHERE id = ${executionId}
+    `
+  }
+}
+
+/**
+ * Get executions that need suite embeddings
+ *
+ * @param organizationId - Filter by organization
+ * @param limit - Max results to return
+ */
+export async function getExecutionsNeedingSuiteEmbeddings(
+  organizationId: number,
+  limit: number = 100
+): Promise<
+  Array<{
+    id: number
+    branch: string | null
+    suite: string | null
+    commit_message: string | null
+    total_tests: number | null
+    passed_count: number | null
+    failed_count: number | null
+    skipped_count: number | null
+    duration_ms: number | null
+    status: string | null
+    current_hash: string | null
+  }>
+> {
+  const sql = getSql()
+
+  const results = await sql`
+    SELECT
+      id, branch, suite, commit_message,
+      total_tests, passed_count, failed_count, skipped_count,
+      duration_ms, status, suite_embedding_hash as current_hash
+    FROM test_executions
+    WHERE organization_id = ${organizationId}
+      AND suite_embedding IS NULL
+    ORDER BY started_at DESC
+    LIMIT ${limit}
+  `
+
+  return results as Array<{
+    id: number
+    branch: string | null
+    suite: string | null
+    commit_message: string | null
+    total_tests: number | null
+    passed_count: number | null
+    failed_count: number | null
+    skipped_count: number | null
+    duration_ms: number | null
+    status: string | null
+    current_hash: string | null
+  }>
+}
+
+/**
+ * Count executions with suite embeddings for an organization
+ */
+export async function countExecutionsWithSuiteEmbeddings(
+  organizationId: number
+): Promise<{ withSuiteEmbedding: number; total: number }> {
+  const sql = getSql()
+
+  const [result] = await sql`
+    SELECT
+      COUNT(*) FILTER (WHERE suite_embedding IS NOT NULL) as with_suite_embedding,
+      COUNT(*) as total
+    FROM test_executions
+    WHERE organization_id = ${organizationId}
+  `
+
+  return {
+    withSuiteEmbedding: Number(result.with_suite_embedding),
+    total: Number(result.total),
+  }
+}
+
+/**
+ * Search all tests by semantic similarity (any status)
+ *
+ * @param embedding - Query embedding (512-dim)
+ * @param organizationId - Organization for filtering
+ * @param options - Search options
+ */
+export async function searchTestsSemantic(
+  embedding: number[],
+  organizationId: number,
+  options: {
+    threshold?: number
+    limit?: number
+    status?: string | null
+  } = {}
+): Promise<
+  Array<{
+    id: number
+    test_name: string
+    test_file: string | null
+    status: string
+    similarity: number
+    execution_id: number
+  }>
+> {
+  const sql = getSql()
+  const { threshold = 0.3, limit = 20, status } = options
+
+  if (embedding.length !== 512) {
+    throw new Error(`Expected 512-dim embedding, got ${embedding.length}`)
+  }
+
+  const vectorStr = toVectorString(embedding)
+
+  if (status) {
+    return (await sql`
+      SELECT
+        tr.id,
+        tr.test_name,
+        tr.test_file,
+        tr.status,
+        tr.execution_id,
+        1 - (tr.test_embedding <=> ${vectorStr}::vector) as similarity
+      FROM test_results tr
+      INNER JOIN test_executions te ON tr.execution_id = te.id
+      WHERE te.organization_id = ${organizationId}
+        AND tr.test_embedding IS NOT NULL
+        AND tr.status = ${status}
+        AND tr.test_embedding <=> ${vectorStr}::vector < ${threshold}
+      ORDER BY tr.test_embedding <=> ${vectorStr}::vector
+      LIMIT ${limit}
+    `) as Array<{
+      id: number
+      test_name: string
+      test_file: string | null
+      status: string
+      similarity: number
+      execution_id: number
+    }>
+  }
+
+  return (await sql`
+    SELECT
+      tr.id,
+      tr.test_name,
+      tr.test_file,
+      tr.status,
+      tr.execution_id,
+      1 - (tr.test_embedding <=> ${vectorStr}::vector) as similarity
+    FROM test_results tr
+    INNER JOIN test_executions te ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND tr.test_embedding IS NOT NULL
+      AND tr.test_embedding <=> ${vectorStr}::vector < ${threshold}
+    ORDER BY tr.test_embedding <=> ${vectorStr}::vector
+    LIMIT ${limit}
+  `) as Array<{
+    id: number
+    test_name: string
+    test_file: string | null
+    status: string
+    similarity: number
+    execution_id: number
+  }>
+}
+
+/**
+ * Search suites by semantic similarity
+ *
+ * @param embedding - Query embedding (512-dim)
+ * @param organizationId - Organization for filtering
+ * @param options - Search options
+ */
+export async function searchSuitesSemantic(
+  embedding: number[],
+  organizationId: number,
+  options: {
+    threshold?: number
+    limit?: number
+  } = {}
+): Promise<
+  Array<{
+    id: number
+    branch: string | null
+    suite: string | null
+    commit_message: string | null
+    similarity: number
+    started_at: Date | null
+  }>
+> {
+  const sql = getSql()
+  const { threshold = 0.3, limit = 10 } = options
+
+  if (embedding.length !== 512) {
+    throw new Error(`Expected 512-dim embedding, got ${embedding.length}`)
+  }
+
+  const vectorStr = toVectorString(embedding)
+
+  return (await sql`
+    SELECT
+      id,
+      branch,
+      suite,
+      commit_message,
+      started_at,
+      1 - (suite_embedding <=> ${vectorStr}::vector) as similarity
+    FROM test_executions
+    WHERE organization_id = ${organizationId}
+      AND suite_embedding IS NOT NULL
+      AND suite_embedding <=> ${vectorStr}::vector < ${threshold}
+    ORDER BY suite_embedding <=> ${vectorStr}::vector
+    LIMIT ${limit}
+  `) as Array<{
+    id: number
+    branch: string | null
+    suite: string | null
+    commit_message: string | null
+    similarity: number
+    started_at: Date | null
+  }>
+}

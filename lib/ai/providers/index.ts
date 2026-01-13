@@ -153,3 +153,12 @@ export { generateJinaEmbedding, generateJinaEmbeddingsBatch, getJinaDimensions }
 export { generateGeminiEmbedding, generateGeminiBatch }
 export { cohereRerank, isCohereAvailable, getCohereModelInfo } from "./cohere"
 export type { RerankDocument, RerankResult } from "./cohere"
+
+// Gemini Flash for Q&A
+export {
+  generateAnswer,
+  buildContextFromResults,
+  isGeminiFlashAvailable,
+  getGeminiFlashInfo,
+} from "./gemini-flash"
+export type { GenerateAnswerOptions, SearchResult } from "./gemini-flash"

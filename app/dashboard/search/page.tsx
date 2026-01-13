@@ -31,7 +31,9 @@ import {
   XCircle,
   Clock,
   GitBranch,
+  Brain,
 } from "lucide-react"
+import { AIAnswerCard, type SearchResultForAI } from "@/components/dashboard/ai-answer-card"
 
 type SearchMode = "hybrid" | "semantic" | "keyword"
 
@@ -65,6 +67,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [showAIAnswer, setShowAIAnswer] = useState(false)
   const [meta, setMeta] = useState<{
     totalResults: number
     reranked: boolean
@@ -77,6 +80,7 @@ export default function SearchPage() {
 
     setIsLoading(true)
     setSearched(true)
+    setShowAIAnswer(false) // Reset AI answer on new search
     try {
       const response = await fetch("/api/search/semantic", {
         method: "POST",
@@ -228,12 +232,39 @@ export default function SearchPage() {
               )}
             </div>
             {results.length > 0 && (
-              <Button variant="outline" size="sm" onClick={exportResults}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAIAnswer(true)}
+                  disabled={showAIAnswer}
+                  className="gap-1.5 border-cyan-500/30 hover:border-cyan-500/50 hover:bg-cyan-500/10"
+                >
+                  <Brain className="h-4 w-4 text-cyan-400" />
+                  Ask AI
+                </Button>
+                <Button variant="outline" size="sm" onClick={exportResults}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+              </div>
             )}
           </div>
+        )}
+
+        {/* AI Answer Card */}
+        {showAIAnswer && results.length > 0 && (
+          <AIAnswerCard
+            query={query}
+            searchResults={results.map((r): SearchResultForAI => ({
+              testName: r.testName,
+              testFile: r.testFile,
+              status: r.status,
+              errorMessage: r.errorMessage,
+              similarity: r.similarity,
+            }))}
+            onClose={() => setShowAIAnswer(false)}
+          />
         )}
 
         {/* Loading */}
