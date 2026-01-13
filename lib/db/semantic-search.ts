@@ -85,7 +85,6 @@ export async function searchFailuresSemantic(
   const {
     organizationId,
     limit = 50,
-    threshold = 0.5, // More lenient for search
     branch,
     suite,
     since,
@@ -114,19 +113,18 @@ export async function searchFailuresSemantic(
     conditions.push(`tr.created_at >= '${since}'`)
   }
 
-  // Use appropriate embedding column
+  // Use appropriate embedding column - no hard threshold, let reranking handle relevance
   if (isV2) {
     conditions.push("tr.error_embedding_v2 IS NOT NULL")
-    conditions.push(`tr.error_embedding_v2 <=> '${vectorStr}'::vector < ${threshold}`)
   } else {
     conditions.push("tr.error_embedding IS NOT NULL")
-    conditions.push(`tr.error_embedding <=> '${vectorStr}'::vector < ${threshold}`)
   }
 
   const whereClause = conditions.join(" AND ")
   const embeddingColumn = isV2 ? "error_embedding_v2" : "error_embedding"
 
-  const query = `
+  // Use tagged template with sql.unsafe for dynamic parts (vector strings must be raw)
+  const results = await sql`
     SELECT
       tr.id as test_result_id,
       tr.execution_id,
@@ -138,15 +136,13 @@ export async function searchFailuresSemantic(
       te.branch,
       te.suite,
       tr.created_at,
-      1 - (tr.${embeddingColumn} <=> '${vectorStr}'::vector) as similarity
+      1 - (${sql.unsafe(`tr.${embeddingColumn}`)} <=> ${sql.unsafe(`'${vectorStr}'::vector`)}) as similarity
     FROM test_results tr
     INNER JOIN test_executions te ON tr.execution_id = te.id
-    WHERE ${whereClause}
-    ORDER BY tr.${embeddingColumn} <=> '${vectorStr}'::vector
+    WHERE ${sql.unsafe(whereClause)}
+    ORDER BY ${sql.unsafe(`tr.${embeddingColumn}`)} <=> ${sql.unsafe(`'${vectorStr}'::vector`)}
     LIMIT ${limit}
   `
-
-  const results = await sql.unsafe(query)
 
   return results.map((r: Record<string, unknown>) => ({
     testResultId: r.test_result_id as number,
