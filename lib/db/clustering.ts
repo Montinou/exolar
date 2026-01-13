@@ -42,9 +42,9 @@ export async function clusterFailures(
   options: ClusteringOptionsV2 = {}
 ): Promise<FailureCluster[] & { embeddingVersion?: EmbeddingVersion }> {
   const {
-    distanceThreshold = 0.15,
+    distanceThreshold = 0.40, // 60% similarity required (was 0.15 = 85% - too strict)
     minClusterSize = 1,
-    maxClusters = 20,
+    maxClusters = 10,
     embeddingVersion = "auto",
   } = options
 
