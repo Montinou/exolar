@@ -42,6 +42,7 @@ const ActionInputSchema = z.object({
       limit: z.number().optional(), // Limit for find_similar
 
       // Para reembed
+      type: z.enum(["error", "test", "suite"]).optional(), // error=failures only, test=all tests, suite=executions
       version: z.enum(["v1", "v2", "both"]).optional(),
       force: z.boolean().optional(),
       dry_run: z.boolean().optional(),
@@ -482,28 +483,225 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
       }
 
       // ============================================
-      // Reembed Test Failures
+      // Reembed Tests (error, test, or suite)
       // ============================================
       case "reembed": {
-        // Import embedding service
+        const embedType = p.type || "error"
+        const force = p.force ?? false
+        const limitCount = p.limit ?? 500
+        const dryRun = p.dry_run ?? false
+        const sql = db.getSql()
+
+        // ---- SUITE EMBEDDINGS ----
+        if (embedType === "suite") {
+          const { generateSuiteEmbeddingsBatch, getSuiteEmbeddingConfig } = await import(
+            "@/lib/services/suite-embedding-service"
+          )
+
+          // Get stats
+          const statsResults = await sql`
+            SELECT
+              COUNT(*) as total,
+              COUNT(suite_embedding) as with_embedding
+            FROM test_executions
+            WHERE organization_id = ${orgId}
+          ` as Array<{ total: string; with_embedding: string }>
+          const stats = statsResults[0]
+          const toProcess = force ? Number(stats.total) : Number(stats.total) - Number(stats.with_embedding)
+
+          if (dryRun) {
+            return jsonResponse({
+              organization: authContext.organizationSlug,
+              action: "reembed",
+              type: "suite",
+              preview: {
+                total: Number(stats.total),
+                withEmbedding: Number(stats.with_embedding),
+                toProcess: Math.min(toProcess, limitCount),
+              },
+            })
+          }
+
+          // Get executions to process
+          const whereClause = force ? "" : "AND suite_embedding IS NULL"
+          const executions = await sql`
+            SELECT id, branch, suite, commit_message, total_tests, passed, failed, skipped, duration_ms, status
+            FROM test_executions
+            WHERE organization_id = ${orgId} ${sql.unsafe(whereClause)}
+            ORDER BY started_at DESC
+            LIMIT ${limitCount}
+          ` as Array<{
+            id: number
+            branch: string | null
+            suite: string | null
+            commit_message: string | null
+            total_tests: number | null
+            passed: number | null
+            failed: number | null
+            skipped: number | null
+            duration_ms: number | null
+            status: string | null
+          }>
+
+          if (executions.length === 0) {
+            return jsonResponse({
+              organization: authContext.organizationSlug,
+              action: "reembed",
+              type: "suite",
+              stats: { total: 0, succeeded: 0, failed: 0, message: "No executions to process" },
+            })
+          }
+
+          const startTime = Date.now()
+          const results = await generateSuiteEmbeddingsBatch(executions)
+          const succeeded = results.filter((r) => r.success).length
+          const failed = results.filter((r) => !r.success).length
+          const config = getSuiteEmbeddingConfig()
+
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "reembed",
+            type: "suite",
+            stats: {
+              total: executions.length,
+              succeeded,
+              failed,
+              durationMs: Date.now() - startTime,
+              provider: config.provider,
+              dimensions: config.dimensions,
+            },
+          })
+        }
+
+        // ---- TEST EMBEDDINGS (all tests) ----
+        if (embedType === "test") {
+          const {
+            generateEmbeddingsBatchWithProvider,
+            getDefaultProvider,
+            getDimensionsForProvider,
+          } = await import("@/lib/ai")
+          const { prepareTestForEmbedding, generateEmbeddingHash } = await import("@/lib/ai/sanitizer")
+
+          // Get stats
+          const statsResults = await sql`
+            SELECT
+              COUNT(*) as total,
+              COUNT(test_embedding) as with_embedding
+            FROM test_results tr
+            INNER JOIN test_executions te ON tr.execution_id = te.id
+            WHERE te.organization_id = ${orgId}
+          ` as Array<{ total: string; with_embedding: string }>
+          const stats = statsResults[0]
+          const toProcess = force ? Number(stats.total) : Number(stats.total) - Number(stats.with_embedding)
+
+          if (dryRun) {
+            return jsonResponse({
+              organization: authContext.organizationSlug,
+              action: "reembed",
+              type: "test",
+              preview: {
+                total: Number(stats.total),
+                withEmbedding: Number(stats.with_embedding),
+                toProcess: Math.min(toProcess, limitCount),
+              },
+            })
+          }
+
+          // Get tests to process
+          const whereClause = force ? "" : "AND tr.test_embedding IS NULL"
+          const tests = await sql`
+            SELECT tr.id, tr.test_name, tr.test_file, tr.status, tr.duration_ms, tr.browser, tr.error_message
+            FROM test_results tr
+            INNER JOIN test_executions te ON tr.execution_id = te.id
+            WHERE te.organization_id = ${orgId} ${sql.unsafe(whereClause)}
+            ORDER BY tr.created_at DESC
+            LIMIT ${limitCount}
+          ` as Array<{
+            id: number
+            test_name: string
+            test_file: string
+            status: string
+            duration_ms: number | null
+            browser: string | null
+            error_message: string | null
+          }>
+
+          if (tests.length === 0) {
+            return jsonResponse({
+              organization: authContext.organizationSlug,
+              action: "reembed",
+              type: "test",
+              stats: { total: 0, succeeded: 0, failed: 0, message: "No tests to process" },
+            })
+          }
+
+          const startTime = Date.now()
+          const provider = getDefaultProvider()
+          const expectedDimensions = getDimensionsForProvider(provider)
+          let succeeded = 0
+          let failed = 0
+
+          const BATCH_SIZE = 10
+          for (let i = 0; i < tests.length; i += BATCH_SIZE) {
+            const batch = tests.slice(i, i + BATCH_SIZE)
+            const texts = batch.map((t) =>
+              prepareTestForEmbedding({ ...t, browser_name: t.browser })
+            )
+
+            try {
+              const embeddings = await generateEmbeddingsBatchWithProvider(texts, {
+                provider,
+                task: "retrieval.passage",
+              })
+
+              for (let j = 0; j < batch.length; j++) {
+                if (embeddings[j]?.length === expectedDimensions) {
+                  const hash = generateEmbeddingHash(texts[j])
+                  await sql`
+                    UPDATE test_results
+                    SET test_embedding = ${JSON.stringify(embeddings[j])}::vector,
+                        test_embedding_hash = ${hash}
+                    WHERE id = ${batch[j].id}
+                  `
+                  succeeded++
+                } else {
+                  failed++
+                }
+              }
+            } catch {
+              failed += batch.length
+            }
+          }
+
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            action: "reembed",
+            type: "test",
+            stats: {
+              total: tests.length,
+              succeeded,
+              failed,
+              durationMs: Date.now() - startTime,
+              provider,
+              dimensions: expectedDimensions,
+            },
+          })
+        }
+
+        // ---- ERROR EMBEDDINGS (failures only, default) ----
         const {
           generateAndStoreEmbeddingsBatch,
           getEmbeddingConfig,
         } = await import("@/lib/services/embedding-service")
 
         const version = p.version || "v2"
-        const force = p.force ?? false
-        const limitCount = p.limit
-        const dryRun = p.dry_run ?? false
-
-        const sql = db.getSql()
 
         // Build WHERE clause for stats (base filter)
         const statsWhereClause = p.execution_id
           ? `te.organization_id = ${orgId} AND tr.status IN ('failed', 'timedout') AND tr.execution_id = ${p.execution_id}`
           : `te.organization_id = ${orgId} AND tr.status IN ('failed', 'timedout')`
 
-        // Get stats first using tagged template with sql.unsafe for interpolation
+        // Get stats first
         const statsResults = await sql`
           SELECT
             COUNT(*) as total_failed,
@@ -534,11 +732,12 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           return jsonResponse({
             organization: authContext.organizationSlug,
             action: "reembed",
+            type: "error",
             preview: {
               totalFailed: Number(stats.total_failed),
               withV1: Number(stats.with_v1),
               withV2: Number(stats.with_v2),
-              toProcess: limitCount ? Math.min(toProcess, limitCount) : toProcess,
+              toProcess: Math.min(toProcess, limitCount),
               version,
               force,
             },
@@ -566,10 +765,9 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
         }
 
         const whereClause = whereClauses.join(" AND ")
-        const limitClause = limitCount ? `LIMIT ${limitCount}` : ""
-        const fullWhereAndLimit = `${whereClause} ORDER BY tr.created_at DESC ${limitClause}`
+        const fullWhereAndLimit = `${whereClause} ORDER BY tr.created_at DESC LIMIT ${limitCount}`
 
-        // Get tests to process using tagged template
+        // Get tests to process
         const testsToProcess = await sql`
           SELECT tr.id, tr.error_message, tr.stack_trace
           FROM test_results tr
@@ -585,6 +783,7 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           return jsonResponse({
             organization: authContext.organizationSlug,
             action: "reembed",
+            type: "error",
             stats: {
               total: 0,
               succeeded: 0,
@@ -620,40 +819,20 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
         const durationMs = Date.now() - startTime
         const config = getEmbeddingConfig()
 
-        if (input.format === "json") {
-          return jsonResponse({
-            organization: authContext.organizationSlug,
-            action: "reembed",
-            stats: {
-              total: testsToProcess.length,
-              succeeded,
-              failed,
-              skipped,
-              durationMs,
-              provider: config.provider,
-              dimensions: config.dimensions,
-            },
-          })
-        }
-
-        // Markdown format
-        let output = `## Re-Embedding Complete\n\n`
-        output += `**Organization:** ${authContext.organizationSlug}\n`
-        output += `**Version:** ${version}\n`
-        output += `**Force:** ${force}\n`
-        output += `**Provider:** ${config.provider}\n`
-        output += `**Dimensions:** ${config.dimensions}\n\n`
-
-        output += `### Results\n`
-        output += `| Metric | Value |\n`
-        output += `|--------|-------|\n`
-        output += `| Total | ${testsToProcess.length} |\n`
-        output += `| Succeeded | ${succeeded} |\n`
-        output += `| Failed | ${failed} |\n`
-        output += `| Skipped | ${skipped} |\n`
-        output += `| Duration | ${(durationMs / 1000).toFixed(2)}s |\n`
-
-        return textResponse(output)
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "reembed",
+          type: "error",
+          stats: {
+            total: testsToProcess.length,
+            succeeded,
+            failed,
+            skipped,
+            durationMs,
+            provider: config.provider,
+            dimensions: config.dimensions,
+          },
+        })
       }
 
       default:

@@ -142,19 +142,21 @@ Examples:
   // ============================================
   {
     name: "perform_exolar_action",
-    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed errors.
+    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed tests.
 
 Actions:
 - compare: Side-by-side execution comparison (by ID or branch)
 - generate_report: Markdown failure report for an execution
 - classify: Determine if failure is FLAKE vs BUG
-- reembed: Force re-embedding of test failures (requires admin)
+- reembed: Generate embeddings for tests (type: error|test|suite)
 
 Examples:
 - perform_exolar_action({ action: "compare", params: { baseline_branch: "main", current_branch: "feature" } })
 - perform_exolar_action({ action: "generate_report", params: { execution_id: 123 } })
 - perform_exolar_action({ action: "classify", params: { execution_id: 123, test_name: "login test" } })
-- perform_exolar_action({ action: "reembed", params: { force: true, version: "v2" } })`,
+- perform_exolar_action({ action: "reembed", params: { type: "test", limit: 500 } })
+- perform_exolar_action({ action: "reembed", params: { type: "suite" } })
+- perform_exolar_action({ action: "reembed", params: { type: "error", force: true } })`,
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -187,6 +189,7 @@ Examples:
             test_name: { type: "string" },
             test_file: { type: "string" },
             // reembed
+            type: { type: "string", enum: ["error", "test", "suite"], description: "error=failures, test=all tests, suite=executions" },
             version: { type: "string", enum: ["v1", "v2", "both"] },
             force: { type: "boolean" },
             limit: { type: "number" },
