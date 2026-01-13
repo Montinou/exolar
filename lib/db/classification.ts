@@ -309,8 +309,10 @@ export async function getFailureClassification(
     `
   }
 
-  const failureResult = (await sql.unsafe(failureQuery)) as unknown as Record<string, unknown>[]
-  if (!failureResult || failureResult.length === 0) {
+  const failureResult = await sql.unsafe(failureQuery)
+
+  // Defensive check: ensure result is an array before accessing
+  if (!Array.isArray(failureResult) || failureResult.length === 0) {
     return null
   }
 
