@@ -425,7 +425,7 @@ export async function handleQuery(
         for (const t of tests) {
           const name = (t.test_name || "").slice(0, 35)
           const file = (t.test_file || "").split("/").pop()?.slice(0, 20) || ""
-          output += `| ${name} | ${file} | ${t.run_count} | ${t.pass_rate?.toFixed(1) || 0}% |\n`
+          output += `| ${name} | ${file} | ${t.run_count} | ${Number(t.pass_rate || 0).toFixed(1)}% |\n`
         }
 
         return textResponse(output)
@@ -692,7 +692,7 @@ export async function handleQuery(
           const lastRun = suite.last_execution_at
             ? new Date(suite.last_execution_at).toLocaleDateString()
             : "Never"
-          output += `| ${suite.name} | ${suite.tech_stack} | ${suite.active_test_count} | ${suite.pass_rate?.toFixed(1) || 0}% | ${lastRun} |\n`
+          output += `| ${suite.name} | ${suite.tech_stack} | ${suite.active_test_count} | ${Number(suite.pass_rate || 0).toFixed(1)}% | ${lastRun} |\n`
         }
 
         return textResponse(output)

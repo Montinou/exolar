@@ -200,10 +200,130 @@ export interface TestResultForEmbedding {
 }
 
 /**
+ * Extract semantic keywords from test name
+ *
+ * Tokenizes camelCase, snake_case, kebab-case and extracts meaningful words
+ */
+function extractKeywords(text: string): string[] {
+  // Split on common separators and case boundaries
+  const words = text
+    // Split camelCase: "shouldLoginSuccessfully" -> "should Login Successfully"
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    // Split snake_case and kebab-case
+    .replace(/[_-]/g, " ")
+    // Remove common test prefixes
+    .replace(/^(should|it|test|spec|describe)\s+/gi, "")
+    // Split on spaces and filter
+    .split(/\s+/)
+    .map((w) => w.toLowerCase())
+    .filter((w) => w.length > 2) // Skip tiny words
+
+  // Remove common stop words
+  const stopWords = new Set([
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "are",
+    "was",
+    "were",
+    "been",
+    "have",
+    "has",
+    "had",
+    "can",
+    "will",
+    "when",
+    "then",
+    "than",
+    "into",
+  ])
+
+  return words.filter((w) => !stopWords.has(w))
+}
+
+/**
+ * Extract feature area from file path
+ *
+ * Identifies the domain/feature from test file structure
+ */
+function extractFeatureArea(filePath: string): string | null {
+  if (!filePath) return null
+
+  // Normalize path
+  const normalized = filePath.replace(/\\/g, "/").toLowerCase()
+
+  // Common patterns to extract feature area
+  // e.g., "tests/auth/login.spec.ts" -> "auth"
+  // e.g., "e2e/cases/marketplace/filters.spec.ts" -> "marketplace"
+
+  const patterns = [
+    /(?:tests?|specs?|e2e|playwright)\/(?:cases\/)?([^/]+)/,
+    /\/([^/]+)\/[^/]+\.(?:spec|test)\.[tj]sx?$/,
+  ]
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern)
+    if (match && match[1]) {
+      // Clean up the feature name
+      return match[1].replace(/[_-]/g, " ").trim()
+    }
+  }
+
+  return null
+}
+
+/**
+ * Get semantic synonyms for common test concepts
+ */
+function getSemanticSynonyms(keywords: string[]): string[] {
+  const synonymMap: Record<string, string[]> = {
+    login: ["authentication", "signin", "sign-in", "auth"],
+    logout: ["signout", "sign-out", "deauthentication"],
+    auth: ["authentication", "authorization", "login"],
+    signup: ["registration", "register", "sign-up", "create account"],
+    filter: ["search", "query", "find", "select"],
+    search: ["filter", "find", "query", "lookup"],
+    create: ["add", "new", "insert"],
+    delete: ["remove", "destroy", "erase"],
+    update: ["edit", "modify", "change"],
+    list: ["view", "display", "show", "table"],
+    modal: ["dialog", "popup", "overlay"],
+    button: ["click", "action", "submit"],
+    form: ["input", "submit", "validation"],
+    error: ["failure", "exception", "bug"],
+    timeout: ["slow", "delay", "wait"],
+    user: ["account", "profile", "member"],
+    admin: ["administrator", "superuser", "management"],
+    notification: ["alert", "message", "toast"],
+    dashboard: ["home", "overview", "main"],
+    settings: ["preferences", "configuration", "options"],
+    payment: ["checkout", "billing", "purchase"],
+    cart: ["basket", "shopping"],
+    order: ["purchase", "transaction"],
+    navigation: ["menu", "routing", "navigate"],
+  }
+
+  const synonyms: Set<string> = new Set()
+  for (const keyword of keywords) {
+    const relatedWords = synonymMap[keyword]
+    if (relatedWords) {
+      relatedWords.forEach((s) => synonyms.add(s))
+    }
+  }
+
+  return Array.from(synonyms)
+}
+
+/**
  * Prepare any test result (passed, failed, skipped) for embedding
  *
  * Creates a semantic text representation that captures the test's identity
- * and context without dynamic tokens.
+ * and context without dynamic tokens. Enhanced with keywords and synonyms
+ * for better semantic matching.
  *
  * @param test - Test result data
  * @returns Text ready for embedding
@@ -216,21 +336,41 @@ export interface TestResultForEmbedding {
  *   duration_ms: 1500,
  *   browser: "chromium"
  * })
- * // Returns: "Test: should login successfully\nFile: tests/auth/login.spec.ts\nStatus: passed\nDuration: 1.5s\nBrowser: chromium"
+ * // Returns enhanced text with keywords and synonyms
  */
 export function prepareTestForEmbedding(test: TestResultForEmbedding): string {
   const parts: string[] = []
 
-  // Test identity
+  // Test identity (full name for exact matching)
   parts.push(`Test: ${test.test_name}`)
 
   // File path (normalized)
+  let featureArea: string | null = null
   if (test.test_file) {
     // Remove absolute path prefixes, keep relative structure
     const normalizedFile = test.test_file
       .replace(/^.*?(?:tests?\/|specs?\/|e2e\/|playwright\/)/i, "")
       .replace(/\\/g, "/")
     parts.push(`File: ${normalizedFile || test.test_file}`)
+
+    // Extract feature area
+    featureArea = extractFeatureArea(test.test_file)
+    if (featureArea) {
+      parts.push(`Feature: ${featureArea}`)
+    }
+  }
+
+  // Extract keywords from test name for semantic matching
+  const keywords = extractKeywords(test.test_name)
+  if (keywords.length > 0) {
+    parts.push(`Keywords: ${keywords.join(", ")}`)
+  }
+
+  // Add semantic synonyms for better matching
+  const synonyms = getSemanticSynonyms(keywords)
+  if (synonyms.length > 0) {
+    // Limit synonyms to avoid noise
+    parts.push(`Related: ${synonyms.slice(0, 5).join(", ")}`)
   }
 
   // Status with context

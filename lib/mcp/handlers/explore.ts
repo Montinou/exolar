@@ -150,7 +150,7 @@ export async function handleExplore(
         pass_rate: number
         last_status: string
       }>) {
-        output += `| ${s.suite} | ${s.execution_count} | ${s.pass_rate.toFixed(1)}% | ${s.last_status} |\n`
+        output += `| ${s.suite} | ${s.execution_count} | ${Number(s.pass_rate).toFixed(1)}% | ${s.last_status} |\n`
       }
 
       return textResponse(`## Suites (last 30 days)\n\n${output}`)
