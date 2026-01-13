@@ -80,12 +80,34 @@ export default function SearchPage() {
     embeddingVersion?: string
   } | null>(null)
 
+  // Detect query intent for smart filtering
+  const detectQueryIntent = useCallback((q: string): { isQuestion: boolean; suggestedFilter: StatusFilter } => {
+    const lowerQ = q.toLowerCase()
+    const errorKeywords = ["error", "fail", "failure", "failed", "broken", "bug", "crash", "timeout", "exception"]
+    const questionKeywords = ["can you", "what", "which", "why", "how", "tell me", "show me", "find", "most", "frequent"]
+
+    const isAboutErrors = errorKeywords.some(k => lowerQ.includes(k))
+    const isQuestion = questionKeywords.some(k => lowerQ.includes(k)) || q.includes("?")
+
+    return {
+      isQuestion,
+      suggestedFilter: isAboutErrors ? "failed" : "all"
+    }
+  }, [])
+
   const performSearch = useCallback(async () => {
     if (query.trim().length < 2) return
 
     setIsLoading(true)
     setSearched(true)
-    setShowAIAnswer(false) // Reset AI answer on new search
+    setShowAIAnswer(false)
+
+    // Smart intent detection
+    const intent = detectQueryIntent(query)
+    const effectiveStatusFilter = statusFilter === "all" && intent.suggestedFilter !== "all"
+      ? intent.suggestedFilter
+      : statusFilter
+
     try {
       const response = await fetch("/api/search/semantic", {
         method: "POST",
@@ -95,7 +117,7 @@ export default function SearchPage() {
           mode,
           limit: 50,
           rerank: true,
-          statusFilter,
+          statusFilter: effectiveStatusFilter,
         }),
       })
       if (response.ok) {
@@ -107,13 +129,18 @@ export default function SearchPage() {
           searchTimeMs: data.searchTimeMs,
           embeddingVersion: data.embeddingVersion,
         })
+
+        // Auto-show AI answer for natural language questions with results
+        if (intent.isQuestion && data.results.length > 0) {
+          setShowAIAnswer(true)
+        }
       }
     } catch (error) {
       console.error("Search failed:", error)
     } finally {
       setIsLoading(false)
     }
-  }, [query, mode, statusFilter])
+  }, [query, mode, statusFilter, detectQueryIntent])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
