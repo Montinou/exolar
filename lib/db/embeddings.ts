@@ -161,18 +161,19 @@ export async function storeEmbeddingsBatchV2(
     return
   }
 
-  // For large batches (>=1000), use temp table approach
-  // Create temp table (session-scoped, auto-dropped)
+  // For large batches (>=100), use temp table approach
+  // Note: Serverless auto-commits each statement, so we use a regular temp table
+  // and DELETE instead of TRUNCATE (temp tables persist per session)
   await sql`
     CREATE TEMP TABLE IF NOT EXISTS embedding_updates_v2 (
       test_result_id INTEGER NOT NULL,
       embedding vector(512) NOT NULL,
       chunk_hash TEXT
-    ) ON COMMIT DROP
+    )
   `
 
   // Clear any existing data
-  await sql`TRUNCATE embedding_updates_v2`
+  await sql`DELETE FROM embedding_updates_v2`
 
   // Batch insert into temp table (chunk if >10k rows)
   const chunkSize = 10000

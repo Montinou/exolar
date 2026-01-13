@@ -811,6 +811,11 @@ export async function handleQuery(
         output += `**Reduction:** ${((1 - clusterArray.length / totalFailures) * 100).toFixed(1)}%\n\n`
 
         for (const cluster of clusterArray) {
+          // Skip clusters with no tests (shouldn't happen, but safety check)
+          if (!cluster.tests || cluster.tests.length === 0) {
+            continue
+          }
+
           const representative = cluster.tests.find(t => t.isRepresentative) || cluster.tests[0]
           output += `### Cluster #${cluster.clusterId} (${cluster.tests.length} failures)\n`
           output += `**Representative:** ${representative.testName}\n`
