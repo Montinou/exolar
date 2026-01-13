@@ -112,9 +112,9 @@ export async function generateSuiteEmbeddingsBatch(
     suite: string | null
     commit_message: string | null
     total_tests: number | null
-    passed_count: number | null
-    failed_count: number | null
-    skipped_count: number | null
+    passed: number | null
+    failed: number | null
+    skipped: number | null
     duration_ms: number | null
     status: string | null
   }>
@@ -133,9 +133,9 @@ export async function generateSuiteEmbeddingsBatch(
       suite: exec.suite,
       commit_message: exec.commit_message,
       total_tests: exec.total_tests,
-      passed_count: exec.passed_count,
-      failed_count: exec.failed_count,
-      skipped_count: exec.skipped_count,
+      passed_count: exec.passed,
+      failed_count: exec.failed,
+      skipped_count: exec.skipped,
       duration_ms: exec.duration_ms,
       status: exec.status,
     }
@@ -214,9 +214,9 @@ export async function generateSuiteEmbeddingsWithProgress(
     suite: string | null
     commit_message: string | null
     total_tests: number | null
-    passed_count: number | null
-    failed_count: number | null
-    skipped_count: number | null
+    passed: number | null
+    failed: number | null
+    skipped: number | null
     duration_ms: number | null
     status: string | null
   }>,

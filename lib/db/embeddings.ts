@@ -767,9 +767,9 @@ export async function getExecutionsNeedingSuiteEmbeddings(
     suite: string | null
     commit_message: string | null
     total_tests: number | null
-    passed_count: number | null
-    failed_count: number | null
-    skipped_count: number | null
+    passed: number | null
+    failed: number | null
+    skipped: number | null
     duration_ms: number | null
     status: string | null
     current_hash: string | null
@@ -780,7 +780,7 @@ export async function getExecutionsNeedingSuiteEmbeddings(
   const results = await sql`
     SELECT
       id, branch, suite, commit_message,
-      total_tests, passed_count, failed_count, skipped_count,
+      total_tests, passed, failed, skipped,
       duration_ms, status, suite_embedding_hash as current_hash
     FROM test_executions
     WHERE organization_id = ${organizationId}
@@ -795,9 +795,9 @@ export async function getExecutionsNeedingSuiteEmbeddings(
     suite: string | null
     commit_message: string | null
     total_tests: number | null
-    passed_count: number | null
-    failed_count: number | null
-    skipped_count: number | null
+    passed: number | null
+    failed: number | null
+    skipped: number | null
     duration_ms: number | null
     status: string | null
     current_hash: string | null
