@@ -53,6 +53,7 @@ export interface FailingTest {
 
 /**
  * Get top recurring error patterns
+ * Filters by occurrences within the date range to match CategoryDistribution
  */
 export async function getTopPatterns(
   organizationId: number,
@@ -63,20 +64,24 @@ export async function getTopPatterns(
   const dateThreshold = new Date()
   dateThreshold.setDate(dateThreshold.getDate() - days)
 
+  // Count occurrences within the date range, not all-time totals
   const results = await sql`
     SELECT
       ep.id,
       ep.canonical_error,
       ep.category,
-      ep.total_occurrences,
-      ep.affected_executions,
-      ep.affected_tests,
-      ep.first_seen,
-      ep.last_seen
+      COUNT(epo.id) as occurrences_in_range,
+      COUNT(DISTINCT epo.execution_id) as executions_in_range,
+      COUNT(DISTINCT tr.test_file || ':' || tr.test_name) as tests_in_range,
+      MIN(epo.created_at) as first_seen_in_range,
+      MAX(epo.created_at) as last_seen_in_range
     FROM error_patterns ep
+    JOIN error_pattern_occurrences epo ON ep.id = epo.pattern_id
+    JOIN test_results tr ON epo.test_result_id = tr.id
     WHERE ep.organization_id = ${organizationId}
-      AND ep.last_seen >= ${dateThreshold.toISOString()}
-    ORDER BY ep.total_occurrences DESC
+      AND epo.created_at >= ${dateThreshold.toISOString()}
+    GROUP BY ep.id, ep.canonical_error, ep.category
+    ORDER BY occurrences_in_range DESC
     LIMIT ${limit}
   `
 
@@ -84,11 +89,11 @@ export async function getTopPatterns(
     id: row.id as number,
     canonicalError: row.canonical_error as string,
     category: row.category as ErrorCategory,
-    totalOccurrences: Number(row.total_occurrences),
-    affectedExecutions: Number(row.affected_executions),
-    affectedTests: Number(row.affected_tests),
-    firstSeen: new Date(row.first_seen as string),
-    lastSeen: new Date(row.last_seen as string),
+    totalOccurrences: Number(row.occurrences_in_range),
+    affectedExecutions: Number(row.executions_in_range),
+    affectedTests: Number(row.tests_in_range),
+    firstSeen: new Date(row.first_seen_in_range as string),
+    lastSeen: new Date(row.last_seen_in_range as string),
   }))
 }
 
