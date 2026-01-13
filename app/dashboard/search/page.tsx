@@ -69,6 +69,8 @@ export default function SearchPage() {
   const [query, setQuery] = useState("")
   const [mode, setMode] = useState<SearchMode>("hybrid")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [branchFilter, setBranchFilter] = useState("")
+  const [suiteFilter, setSuiteFilter] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [searched, setSearched] = useState(false)
