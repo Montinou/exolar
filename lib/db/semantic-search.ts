@@ -391,10 +391,11 @@ export async function searchHybrid(
     }))
   }
 
-  // Determine which semantic search to use based on status filter
-  // Use searchAllTestsSemantic (test_embedding) for all statuses
-  // This searches ALL tests, not just failures
-  const semanticSearchFn = searchAllTestsSemantic
+  // Determine which semantic search function to use:
+  // - For "failed" status filter: use searchFailuresSemantic (error_embedding_v2) which has actual error messages
+  // - For other statuses: use searchAllTestsSemantic (test_embedding) which has test metadata
+  const useErrorEmbeddings = statusFilter === "failed"
+  const semanticSearchFn = useErrorEmbeddings ? searchFailuresSemantic : searchAllTestsSemantic
 
   // Semantic-only mode
   if (mode === "semantic") {
