@@ -777,49 +777,52 @@ export async function handleQuery(
         }
 
         // Get clustered failures (from cache if available)
-        const clusters = await db.getCachedClusters(f.execution_id, {
+        const clusterArray = await db.getCachedClusters(f.execution_id, {
           distanceThreshold: f.distance_threshold ?? 0.15,
           minClusterSize: f.min_cluster_size ?? 2,
           maxClusters: f.max_clusters,
         })
 
-        if (!clusters) {
+        if (!clusterArray || clusterArray.length === 0) {
           return errorResponse("Execution not found or no failures to cluster")
         }
+
+        // Calculate total failures across all clusters
+        const totalFailures = clusterArray.reduce((sum, c) => sum + c.testCount, 0)
 
         if (format === "json") {
           return jsonResponse({
             organization: authContext.organizationSlug,
             dataset: "clustered_failures",
             execution_id: f.execution_id,
-            total_failures: clusters.totalFailures,
-            total_clusters: clusters.clusters.length,
-            reduction_percentage: clusters.totalFailures > 0
-              ? ((1 - clusters.clusters.length / clusters.totalFailures) * 100).toFixed(1)
+            total_failures: totalFailures,
+            total_clusters: clusterArray.length,
+            reduction_percentage: totalFailures > 0
+              ? ((1 - clusterArray.length / totalFailures) * 100).toFixed(1)
               : "0",
-            metadata: clusters.metadata,
-            data: clusters.clusters,
+            data: clusterArray,
           })
         }
 
         // Markdown format
         let output = `## AI-Grouped Failures (Execution #${f.execution_id})\n\n`
-        output += `**Total Failures:** ${clusters.totalFailures}\n`
-        output += `**Grouped into:** ${clusters.clusters.length} clusters\n`
-        output += `**Reduction:** ${((1 - clusters.clusters.length / clusters.totalFailures) * 100).toFixed(1)}%\n\n`
+        output += `**Total Failures:** ${totalFailures}\n`
+        output += `**Grouped into:** ${clusterArray.length} clusters\n`
+        output += `**Reduction:** ${((1 - clusterArray.length / totalFailures) * 100).toFixed(1)}%\n\n`
 
-        for (const cluster of clusters.clusters) {
-          output += `### Cluster #${cluster.clusterId} (${cluster.members.length} failures)\n`
-          output += `**Representative:** ${cluster.representative.test_name}\n`
-          output += `**Error:** ${(cluster.representative.error_message || "").slice(0, 80)}...\n\n`
+        for (const cluster of clusterArray) {
+          const representative = cluster.tests.find(t => t.isRepresentative) || cluster.tests[0]
+          output += `### Cluster #${cluster.clusterId} (${cluster.tests.length} failures)\n`
+          output += `**Representative:** ${representative.testName}\n`
+          output += `**Error:** ${(representative.errorMessage || "").slice(0, 80)}...\n\n`
 
-          if (cluster.members.length > 1) {
+          if (cluster.tests.length > 1) {
             output += `**Similar failures:**\n`
-            for (const member of cluster.members.slice(0, 5)) {
-              output += `- ${member.test_name} (${member.similarity?.toFixed(2) || "N/A"} similarity)\n`
+            for (const test of cluster.tests.slice(0, 5)) {
+              output += `- ${test.testName} (${test.distanceToCentroid?.toFixed(2) || "N/A"} distance)\n`
             }
-            if (cluster.members.length > 5) {
-              output += `- ...and ${cluster.members.length - 5} more\n`
+            if (cluster.tests.length > 5) {
+              output += `- ...and ${cluster.tests.length - 5} more\n`
             }
           }
           output += "\n"
