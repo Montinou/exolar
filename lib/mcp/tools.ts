@@ -63,7 +63,7 @@ Examples:
     name: "query_exolar_data",
     description: `Retrieve data from any dataset. Use explore_exolar_index(category="datasets") to see available datasets.
 
-Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures
+Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures, clustered_failures, semantic_search
 
 Examples:
 - query_exolar_data({ dataset: "executions", filters: { branch: "main", limit: 10 } })
@@ -89,6 +89,8 @@ Examples:
             "performance_regressions",
             "execution_summary",
             "execution_failures",
+            "clustered_failures",
+            "semantic_search",
           ],
           description: "Dataset to query",
         },
@@ -120,6 +122,10 @@ Examples:
             include_retries: { type: "boolean" },
             include_stack_traces: { type: "boolean" },
             lastRunOnly: { type: "boolean" },
+            // Semantic search filters
+            status_filter: { type: "string", enum: ["all", "passed", "failed", "skipped"], description: "Filter by test status (semantic_search)" },
+            search_mode: { type: "string", enum: ["semantic", "keyword", "hybrid"], description: "Search mode (semantic_search)" },
+            rerank: { type: "boolean", description: "Enable Cohere reranking (semantic_search)" },
           },
         },
         view_mode: {
