@@ -264,12 +264,26 @@ export async function getTestsNeedingEmbeddingsV2(
     error_message: string | null
     stack_trace: string | null
     current_hash: string | null
+    test_name: string
+    test_file: string | null
+    branch: string
+    suite: string | null
+    status: string
   }>
 > {
   const sql = getSql()
 
   const results = await sql`
-    SELECT tr.id, tr.error_message, tr.stack_trace, tr.embedding_chunk_hash as current_hash
+    SELECT
+      tr.id,
+      tr.error_message,
+      tr.stack_trace,
+      tr.embedding_chunk_hash as current_hash,
+      tr.test_name,
+      tr.test_file,
+      te.branch,
+      te.suite,
+      tr.status
     FROM test_results tr
     INNER JOIN test_executions te ON tr.execution_id = te.id
     WHERE te.organization_id = ${organizationId}
@@ -285,6 +299,11 @@ export async function getTestsNeedingEmbeddingsV2(
     error_message: string | null
     stack_trace: string | null
     current_hash: string | null
+    test_name: string
+    test_file: string | null
+    branch: string
+    suite: string | null
+    status: string
   }>
 }
 
