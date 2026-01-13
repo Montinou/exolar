@@ -180,7 +180,7 @@ export async function searchAllTestsSemantic(
   const {
     organizationId,
     limit = 50,
-    threshold = 0.5,
+    threshold = 0.85, // Higher threshold = more permissive (cosine distance)
     branch,
     suite,
     since,
@@ -189,11 +189,10 @@ export async function searchAllTestsSemantic(
 
   const vectorStr = toVectorString(queryEmbedding)
 
-  // Build dynamic conditions
+  // Build dynamic conditions - no hard threshold, let reranking handle relevance
   const conditions: string[] = [
     `te.organization_id = ${organizationId}`,
     "tr.test_embedding IS NOT NULL",
-    `tr.test_embedding <=> '${vectorStr}'::vector < ${threshold}`,
   ]
 
   // Status filter
