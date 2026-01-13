@@ -242,7 +242,10 @@ export async function searchAllTestsSemantic(
 
   const results = await sql.unsafe(query)
 
-  return results.map((r: Record<string, unknown>) => ({
+  // Ensure results is an array (Neon serverless may return different types)
+  const rows = Array.isArray(results) ? results : []
+
+  return rows.map((r: Record<string, unknown>) => ({
     testResultId: r.test_result_id as number,
     executionId: r.execution_id as number,
     testName: r.test_name as string,
