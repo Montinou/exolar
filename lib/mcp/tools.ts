@@ -63,7 +63,7 @@ Examples:
     name: "query_exolar_data",
     description: `Retrieve data from any dataset. Use explore_exolar_index(category="datasets") to see available datasets.
 
-Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures, clustered_failures, semantic_search
+Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures, setup_guide, org_suites, suite_tests, inactive_tests, clustered_failures, semantic_search
 
 Examples:
 - query_exolar_data({ dataset: "executions", filters: { branch: "main", limit: 10 } })
@@ -89,6 +89,10 @@ Examples:
             "performance_regressions",
             "execution_summary",
             "execution_failures",
+            "setup_guide",
+            "org_suites",
+            "suite_tests",
+            "inactive_tests",
             "clustered_failures",
             "semantic_search",
           ],

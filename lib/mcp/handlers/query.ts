@@ -206,6 +206,11 @@ export async function handleQuery(
           requireAIContext: !!f.error_type,
         })
 
+        // Defensive check: ensure failures is an array
+        if (!Array.isArray(failures)) {
+          return errorResponse("Unexpected response from failures query - expected array")
+        }
+
         if (format === "json") {
           return jsonResponse({
             organization: authContext.organizationSlug,
@@ -239,6 +244,11 @@ export async function handleQuery(
           limit: f.limit ?? 10,
           groupBy: (f.group_by as "error_type" | "file" | "branch") || "error_type",
         })
+
+        // Defensive check: ensure distribution is an array
+        if (!Array.isArray(distribution)) {
+          return errorResponse("Unexpected response from error analysis query - expected array")
+        }
 
         if (format === "json") {
           return jsonResponse({
@@ -344,6 +354,11 @@ export async function handleQuery(
           from: f.from,
           to: f.to,
         })
+
+        // Defensive check: ensure trends is an array
+        if (!Array.isArray(trends)) {
+          return errorResponse("Unexpected response from trends query - expected array")
+        }
 
         if (format === "json") {
           return jsonResponse({
@@ -776,6 +791,12 @@ export async function handleQuery(
           return errorResponse("clustered_failures requires filters.execution_id")
         }
 
+        // First verify execution exists
+        const execution = await db.getExecutionById(orgId, f.execution_id)
+        if (!execution) {
+          return errorResponse(`Execution ${f.execution_id} not found`)
+        }
+
         // Get clustered failures (from cache if available)
         const clusterArray = await db.getCachedClusters(f.execution_id, {
           distanceThreshold: f.distance_threshold ?? 0.15,
@@ -784,7 +805,7 @@ export async function handleQuery(
         })
 
         if (!clusterArray || clusterArray.length === 0) {
-          return errorResponse("Execution not found or no failures to cluster")
+          return errorResponse(`No failures to cluster in execution ${f.execution_id} (${execution.failed || 0} failed tests)`)
         }
 
         // Calculate total failures across all clusters

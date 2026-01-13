@@ -47,6 +47,11 @@ const AVAILABLE_DATASETS = [
   { id: "org_suites", description: "Registered suites with tech stack and stats", filters: "tech_stack, is_active" },
   { id: "suite_tests", description: "Individual tests in a suite", filters: "suite_id or suite (required), is_active, is_critical" },
   { id: "inactive_tests", description: "Tests that haven't run in 30+ days", filters: "limit" },
+  // CI/CD Integration
+  { id: "setup_guide", description: "CI/CD integration configuration guide", filters: "section, ci_provider" },
+  // AI Vector Search (Phase 8)
+  { id: "clustered_failures", description: "AI-grouped failures by similarity", filters: "execution_id (required), distance_threshold" },
+  { id: "semantic_search", description: "Natural language search for tests", filters: "query (required), search_mode, rerank" },
 ]
 
 export async function handleExplore(

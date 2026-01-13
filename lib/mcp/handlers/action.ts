@@ -42,7 +42,7 @@ const ActionInputSchema = z.object({
       limit: z.number().optional(), // Limit for find_similar
 
       // Para reembed
-      type: z.enum(["error", "test", "suite"]).optional(), // error=failures only, test=all tests, suite=executions
+      type: z.enum(["error", "test", "suite", "clear"]).optional(), // error=failures only, test=all tests, suite=executions, clear=remove old embeddings
       version: z.enum(["v1", "v2", "both"]).optional(),
       force: z.boolean().optional(),
       dry_run: z.boolean().optional(),
@@ -81,8 +81,13 @@ export async function handleAction(
         if (p.baseline_branch && !baselineId) {
           const baselineExec = await db.getLatestExecutionByBranch(orgId, p.baseline_branch, p.suite)
           if (!baselineExec) {
+            // Get available branches for suggestion
+            const branches = await db.getBranches(orgId, 30)
+            const branchList = branches.slice(0, 5).map(b => b.branch).join(", ")
+            const suffix = branches.length > 5 ? `, ... (${branches.length} total)` : ""
             return errorResponse(
-              `No execution found for branch "${p.baseline_branch}"${p.suite ? ` with suite "${p.suite}"` : ""}`
+              `No execution found for branch "${p.baseline_branch}"${p.suite ? ` with suite "${p.suite}"` : ""}. ` +
+              `Available branches: ${branchList || "none"}${suffix}`
             )
           }
           baselineId = baselineExec.id
@@ -91,8 +96,13 @@ export async function handleAction(
         if (p.current_branch && !currentId) {
           const currentExec = await db.getLatestExecutionByBranch(orgId, p.current_branch, p.suite)
           if (!currentExec) {
+            // Get available branches for suggestion
+            const branches = await db.getBranches(orgId, 30)
+            const branchList = branches.slice(0, 5).map(b => b.branch).join(", ")
+            const suffix = branches.length > 5 ? `, ... (${branches.length} total)` : ""
             return errorResponse(
-              `No execution found for branch "${p.current_branch}"${p.suite ? ` with suite "${p.suite}"` : ""}`
+              `No execution found for branch "${p.current_branch}"${p.suite ? ` with suite "${p.suite}"` : ""}. ` +
+              `Available branches: ${branchList || "none"}${suffix}`
             )
           }
           currentId = currentExec.id
@@ -326,18 +336,20 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
 
         // Markdown format
         let output = `## Failure Classification\n\n`
-        output += `**Test:** ${classification.testName}\n`
-        output += `**Classification:** ${classification.suggestedClassification}\n`
+        output += `**Test:** ${classification.test_id}\n`
+        output += `**Classification:** ${classification.suggested_classification}\n`
         output += `**Confidence:** ${(classification.confidence * 100).toFixed(0)}%\n\n`
 
         output += `### Reasoning\n`
         output += `${classification.reasoning}\n\n`
 
-        if (classification.historicalMetrics) {
+        if (classification.historical_metrics) {
+          const hm = classification.historical_metrics
+          const passRate = hm.total_runs > 0 ? ((hm.passed_runs / hm.total_runs) * 100).toFixed(1) : "0"
           output += `### Historical Metrics\n`
-          output += `- Total Runs: ${classification.historicalMetrics.totalRuns}\n`
-          output += `- Pass Rate: ${classification.historicalMetrics.passRate?.toFixed(1) || 0}%\n`
-          output += `- Flaky Rate: ${classification.historicalMetrics.flakyRate?.toFixed(1) || 0}%\n`
+          output += `- Total Runs: ${hm.total_runs}\n`
+          output += `- Pass Rate: ${passRate}%\n`
+          output += `- Flaky Rate: ${hm.flakiness_rate?.toFixed(1) || 0}%\n`
         }
 
         return textResponse(output)
