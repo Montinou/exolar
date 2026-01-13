@@ -7,3 +7,6 @@ node_modules
 USER_CREDENTIALS.md
 .env.production
 docs/unorganized-docs
+# macOS
+.DS_Store
+**/.DS_Store
