@@ -300,7 +300,8 @@ export async function searchTestsKeyword(
 
   const whereClause = conditions.join(" AND ")
 
-  const sqlQuery = `
+  // Use tagged template with sql.unsafe for dynamic parts
+  const results = await sql`
     SELECT
       COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) as test_signature,
       tr.test_name,
@@ -308,7 +309,7 @@ export async function searchTestsKeyword(
       COUNT(*) as run_count,
       MAX(tr.started_at) as last_run,
       (
-        SELECT status FROM test_results tr2
+        SELECT tr2.status FROM test_results tr2
         JOIN test_executions te2 ON tr2.execution_id = te2.id
         WHERE tr2.test_name = tr.test_name
           AND tr2.test_file = tr.test_file
@@ -321,22 +322,20 @@ export async function searchTestsKeyword(
       ) as pass_rate,
       -- Simple relevance score based on match position
       CASE
-        WHEN tr.test_name ILIKE '${query}%' THEN 1.0
-        WHEN tr.test_name ILIKE '%${query}%' THEN 0.8
-        WHEN tr.test_file ILIKE '${query}%' THEN 0.7
+        WHEN tr.test_name ILIKE ${sql.unsafe(`'${query.replace(/'/g, "''")}%'`)} THEN 1.0
+        WHEN tr.test_name ILIKE ${sql.unsafe(`'%${query.replace(/'/g, "''")}%'`)} THEN 0.8
+        WHEN tr.test_file ILIKE ${sql.unsafe(`'${query.replace(/'/g, "''")}%'`)} THEN 0.7
         ELSE 0.5
       END as similarity
     FROM test_results tr
     JOIN test_executions te ON tr.execution_id = te.id
-    WHERE (tr.test_name ILIKE '${searchPattern.replace(/'/g, "''")}'
-       OR tr.test_file ILIKE '${searchPattern.replace(/'/g, "''")}')
-      AND ${whereClause}
+    WHERE (tr.test_name ILIKE ${sql.unsafe(`'${searchPattern.replace(/'/g, "''")}'`)}
+       OR tr.test_file ILIKE ${sql.unsafe(`'${searchPattern.replace(/'/g, "''")}'`)})
+      AND ${sql.unsafe(whereClause)}
     GROUP BY tr.test_name, tr.test_file, tr.test_signature
     ORDER BY similarity DESC, run_count DESC
     LIMIT ${limit}
   `
-
-  const results = await sql.unsafe(sqlQuery)
 
   return results.map((r: Record<string, unknown>) => ({
     testSignature: r.test_signature as string,
