@@ -145,9 +145,15 @@ export async function semanticSearch(request: SearchRequest): Promise<SearchResp
   let reranked = false
   if (rerank && results.length > 0 && isRerankingAvailable()) {
     try {
+      // Map results to include 'id' field required by rerankItems
+      const resultsWithId = results.map((r) => ({
+        ...r,
+        id: r.testResultId || `${r.testName}:${r.testFile}`, // Use testResultId or generate key
+      }))
+
       const rerankedResults = await rerankItems(
         query,
-        results,
+        resultsWithId,
         (r) => `${r.testName}\n${r.testFile}\n${r.errorMessage || ""}`,
         {
           topN: limit,
@@ -156,7 +162,8 @@ export async function semanticSearch(request: SearchRequest): Promise<SearchResp
       )
 
       if (rerankedResults.length > 0) {
-        results = rerankedResults
+        // Remove the temporary 'id' field we added
+        results = rerankedResults.map(({ id, rerankScore, ...rest }) => rest as SemanticSearchResult)
         reranked = true
       }
     } catch (error) {
