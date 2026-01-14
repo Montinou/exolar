@@ -13,6 +13,7 @@ import {
   LogOut,
   ChevronUp,
   Shield,
+  Webhook,
 } from "lucide-react"
 import { authClient } from "@/lib/auth/client"
 import { useAccess } from "@/components/auth/access-context"
@@ -64,6 +65,11 @@ const navItems = [
     label: "AI Search",
     href: "/dashboard/search",
     icon: Sparkles,
+  },
+  {
+    label: "Mock APIs",
+    href: "/dashboard/mocks",
+    icon: Webhook,
   },
   {
     label: "Documentation",

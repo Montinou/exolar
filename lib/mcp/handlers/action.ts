@@ -10,7 +10,17 @@ import type { MCPAuthContext } from "../auth"
 import * as db from "@/lib/db"
 
 const ActionInputSchema = z.object({
-  action: z.enum(["compare", "generate_report", "classify", "find_similar", "reembed"]),
+  action: z.enum([
+    "compare",
+    "generate_report",
+    "classify",
+    "find_similar",
+    "reembed",
+    "create_mock_interface",
+    "create_mock_route",
+    "create_mock_rule",
+    "delete_mock_interface",
+  ]),
   params: z
     .object({
       // Para compare
@@ -46,6 +56,29 @@ const ActionInputSchema = z.object({
       version: z.enum(["v1", "v2", "both"]).optional(),
       force: z.boolean().optional(),
       dry_run: z.boolean().optional(),
+
+      // Para mock_interface
+      name: z.string().optional(),
+      slug: z.string().optional(),
+      description: z.string().optional(),
+      rate_limit_rpm: z.number().optional(),
+      interface_id: z.number().optional(),
+
+      // Para mock_route
+      path_pattern: z.string().optional(),
+      method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH", "*"]).optional(),
+      route_id: z.number().optional(),
+      priority: z.number().optional(),
+
+      // Para mock_rule
+      match_headers: z.record(z.string()).optional(),
+      match_query: z.record(z.string()).optional(),
+      match_body: z.record(z.unknown()).optional(),
+      match_body_contains: z.string().optional(),
+      response_status: z.number().optional(),
+      response_headers: z.record(z.string()).optional(),
+      response_body: z.string().optional(),
+      response_delay_ms: z.number().optional(),
     })
     .optional()
     .default({}),
@@ -921,6 +954,118 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
             provider: config.provider,
             dimensions: config.dimensions,
           },
+        })
+      }
+
+      // ============================================
+      // Mock API Actions
+      // ============================================
+      case "create_mock_interface": {
+        if (!p.name) {
+          return errorResponse("create_mock_interface requires params.name")
+        }
+
+        const slug = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50)
+
+        const mockInterface = await db.createMockInterface(orgId, {
+          name: p.name,
+          slug,
+          description: p.description,
+          rate_limit_rpm: p.rate_limit_rpm,
+        })
+
+        // Get org slug for public URL
+        const orgSlug = authContext.organizationSlug
+        const baseUrl = process.env.NEXT_PUBLIC_DASHBOARD_URL ||
+          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar.vercel.app")
+        const publicUrl = `${baseUrl}/api/mock/${orgSlug}/${mockInterface.slug}`
+
+        return jsonResponse({
+          organization: orgSlug,
+          action: "create_mock_interface",
+          data: mockInterface,
+          public_url: publicUrl,
+          next_steps: [
+            `Add routes: perform_exolar_action({ action: "create_mock_route", params: { interface_id: ${mockInterface.id}, path_pattern: "/users/:id", method: "GET" } })`,
+          ],
+        })
+      }
+
+      case "create_mock_route": {
+        if (!p.interface_id) {
+          return errorResponse("create_mock_route requires params.interface_id")
+        }
+        if (!p.path_pattern) {
+          return errorResponse("create_mock_route requires params.path_pattern")
+        }
+
+        const route = await db.createMockRoute(p.interface_id, {
+          path_pattern: p.path_pattern,
+          method: p.method || "GET",
+          description: p.description,
+          priority: p.priority,
+        })
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "create_mock_route",
+          data: route,
+          next_steps: [
+            `Add rules: perform_exolar_action({ action: "create_mock_rule", params: { route_id: ${route.id}, name: "Success", response_status: 200, response_body: '{"message": "ok"}' } })`,
+          ],
+        })
+      }
+
+      case "create_mock_rule": {
+        if (!p.route_id) {
+          return errorResponse("create_mock_rule requires params.route_id")
+        }
+        if (!p.name) {
+          return errorResponse("create_mock_rule requires params.name")
+        }
+
+        const rule = await db.createMockResponseRule(p.route_id, {
+          name: p.name,
+          match_headers: p.match_headers,
+          match_query: p.match_query,
+          match_body: p.match_body,
+          match_body_contains: p.match_body_contains,
+          response_status: p.response_status ?? 200,
+          response_headers: p.response_headers,
+          response_body: p.response_body || "",
+          response_delay_ms: p.response_delay_ms,
+          priority: p.priority,
+        })
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "create_mock_rule",
+          data: rule,
+          templating_help: {
+            available_variables: [
+              "{{request.body.fieldName}} - Access JSON body fields",
+              "{{request.query.paramName}} - Access query parameters",
+              "{{request.headers.headerName}} - Access headers",
+              "{{request.params.paramName}} - Access path parameters",
+              "{{uuid}} - Generate random UUID",
+              "{{timestamp}} - Current ISO timestamp",
+            ],
+          },
+        })
+      }
+
+      case "delete_mock_interface": {
+        if (!p.interface_id) {
+          return errorResponse("delete_mock_interface requires params.interface_id")
+        }
+
+        await db.deleteMockInterface(orgId, p.interface_id)
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "delete_mock_interface",
+          deleted_interface_id: p.interface_id,
+          message: "Mock interface and all associated routes, rules, and logs have been deleted",
         })
       }
 

@@ -759,3 +759,200 @@ export interface UpdateSuiteRequest {
   tech_stack?: TechStack
   is_active?: boolean
 }
+
+// ============================================
+// Mock API Endpoint Types
+// ============================================
+
+/**
+ * Mock interface container - groups related mock routes
+ * Public URL: /api/mock/{org-slug}/{interface-slug}/
+ */
+export interface MockInterface {
+  id: number
+  organization_id: number
+  name: string
+  slug: string
+  description: string | null
+  is_active: boolean
+  rate_limit_rpm: number
+  created_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Mock interface with aggregated statistics
+ */
+export interface MockInterfaceWithStats extends MockInterface {
+  total_routes: number
+  total_rules: number
+  total_requests: number
+  requests_last_24h: number
+  last_request_at: string | null
+}
+
+/**
+ * Mock route - path + method definition within an interface
+ * Supports: exact (/users), params (/users/:id), wildcards (/api/*)
+ */
+export interface MockRoute {
+  id: number
+  interface_id: number
+  path_pattern: string
+  method: string
+  description: string | null
+  is_active: boolean
+  priority: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Mock route with rule count for display
+ */
+export interface MockRouteWithRuleCount extends MockRoute {
+  rule_count: number
+  hit_count: number
+}
+
+/**
+ * Mock response rule - matching conditions + response configuration
+ * Supports templating: {{request.body.name}}, {{uuid}}, {{timestamp}}
+ */
+export interface MockResponseRule {
+  id: number
+  route_id: number
+  name: string
+  // Matching conditions (null = match any)
+  match_headers: Record<string, string> | null
+  match_query: Record<string, string> | null
+  match_body: Record<string, unknown> | null
+  match_body_contains: string | null
+  // Response configuration
+  response_status: number
+  response_headers: Record<string, string>
+  response_body: string | null
+  response_delay_ms: number
+  // Metadata
+  priority: number
+  is_active: boolean
+  hit_count: number
+  last_hit_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Mock request log - for debugging and analytics
+ */
+export interface MockRequestLog {
+  id: number
+  interface_id: number
+  route_id: number | null
+  rule_id: number | null
+  method: string
+  path: string
+  headers: Record<string, string> | null
+  query_params: Record<string, string> | null
+  body: string | null
+  response_status: number | null
+  response_body: string | null
+  matched: boolean
+  request_at: string
+  response_time_ms: number | null
+}
+
+/**
+ * Request to create a mock interface
+ */
+export interface CreateMockInterfaceRequest {
+  name: string
+  slug: string
+  description?: string
+  rate_limit_rpm?: number
+}
+
+/**
+ * Request to update a mock interface
+ */
+export interface UpdateMockInterfaceRequest {
+  name?: string
+  slug?: string
+  description?: string
+  is_active?: boolean
+  rate_limit_rpm?: number
+}
+
+/**
+ * Request to create a mock route
+ */
+export interface CreateMockRouteRequest {
+  path_pattern: string
+  method: string
+  description?: string
+  priority?: number
+}
+
+/**
+ * Request to update a mock route
+ */
+export interface UpdateMockRouteRequest {
+  path_pattern?: string
+  method?: string
+  description?: string
+  is_active?: boolean
+  priority?: number
+}
+
+/**
+ * Request to create a mock response rule
+ */
+export interface CreateMockResponseRuleRequest {
+  name: string
+  match_headers?: Record<string, string>
+  match_query?: Record<string, string>
+  match_body?: Record<string, unknown>
+  match_body_contains?: string
+  response_status: number
+  response_headers?: Record<string, string>
+  response_body?: string
+  response_delay_ms?: number
+  priority?: number
+}
+
+/**
+ * Request to update a mock response rule
+ */
+export interface UpdateMockResponseRuleRequest {
+  name?: string
+  match_headers?: Record<string, string> | null
+  match_query?: Record<string, string> | null
+  match_body?: Record<string, unknown> | null
+  match_body_contains?: string | null
+  response_status?: number
+  response_headers?: Record<string, string>
+  response_body?: string | null
+  response_delay_ms?: number
+  is_active?: boolean
+  priority?: number
+}
+
+/**
+ * Context for matching mock requests
+ */
+export interface MockRequestContext {
+  headers: Record<string, string>
+  query: Record<string, string>
+  body: unknown
+  params: Record<string, string>
+}
+
+/**
+ * Result of finding a matching route
+ */
+export interface MockRouteMatch {
+  interface: MockInterface
+  route: MockRoute
+  params: Record<string, string>
+}

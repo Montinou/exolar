@@ -52,6 +52,11 @@ const AVAILABLE_DATASETS = [
   // AI Vector Search (Phase 8)
   { id: "clustered_failures", description: "AI-grouped failures by similarity", filters: "execution_id (required), distance_threshold" },
   { id: "semantic_search", description: "Natural language search for tests", filters: "query (required), search_mode, rerank" },
+  // Mock API Endpoints
+  { id: "mock_interfaces", description: "List mock API interfaces for testing", filters: "none" },
+  { id: "mock_routes", description: "Routes configured for a mock interface", filters: "interface_id (required)" },
+  { id: "mock_rules", description: "Response rules for a mock route", filters: "route_id (required)" },
+  { id: "mock_logs", description: "Request logs for a mock interface", filters: "interface_id (required), limit" },
 ]
 
 export async function handleExplore(

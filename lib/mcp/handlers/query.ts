@@ -40,6 +40,11 @@ const QueryInputSchema = z.object({
     // AI Vector Search (Phase 8)
     "clustered_failures", // AI-grouped failures by similarity
     "semantic_search", // Natural language search for tests
+    // Mock API endpoints
+    "mock_interfaces", // List mock interfaces
+    "mock_routes", // List routes for an interface
+    "mock_rules", // List rules for a route
+    "mock_logs", // Request logs for an interface
   ]),
   filters: z
     .object({
@@ -86,6 +91,9 @@ const QueryInputSchema = z.object({
       search_mode: z.enum(["semantic", "keyword", "hybrid"]).optional(), // Search mode
       rerank: z.boolean().optional(), // Enable Cohere reranking
       status_filter: z.enum(["all", "passed", "failed", "skipped"]).optional(), // Filter by test status
+      // Mock API filters
+      interface_id: z.number().optional(), // Mock interface ID
+      route_id: z.number().optional(), // Mock route ID
     })
     .optional()
     .default({}),
@@ -911,6 +919,113 @@ export async function handleQuery(
 
         if (results.results.length > 20) {
           output += `\n_...and ${results.results.length - 20} more results_\n`
+        }
+
+        return textResponse(output)
+      }
+
+      // ============================================
+      // Mock API Endpoints
+      // ============================================
+      case "mock_interfaces": {
+        const interfaces = await db.getMockInterfaces(orgId)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "mock_interfaces",
+            count: interfaces.length,
+            data: interfaces,
+          })
+        }
+
+        let output = `## Mock Interfaces (${interfaces.length})\n\n`
+        output += "| ID | Name | Slug | Routes | Requests (24h) | Active |\n"
+        output += "|----|------|------|--------|----------------|--------|\n"
+        for (const iface of interfaces) {
+          output += `| ${iface.id} | ${iface.name} | ${iface.slug} | ${iface.total_routes} | ${iface.requests_last_24h} | ${iface.is_active ? "Yes" : "No"} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "mock_routes": {
+        if (!f.interface_id) {
+          return errorResponse("mock_routes requires filters.interface_id")
+        }
+
+        const routes = await db.getMockRoutes(f.interface_id)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "mock_routes",
+            interface_id: f.interface_id,
+            count: routes.length,
+            data: routes,
+          })
+        }
+
+        let output = `## Mock Routes (${routes.length})\n\n`
+        output += "| ID | Method | Path | Rules | Priority | Active |\n"
+        output += "|----|--------|------|-------|----------|--------|\n"
+        for (const route of routes) {
+          output += `| ${route.id} | ${route.method} | ${route.path_pattern} | ${route.rule_count} | ${route.priority} | ${route.is_active ? "Yes" : "No"} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "mock_rules": {
+        if (!f.route_id) {
+          return errorResponse("mock_rules requires filters.route_id")
+        }
+
+        const rules = await db.getMockResponseRules(f.route_id)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "mock_rules",
+            route_id: f.route_id,
+            count: rules.length,
+            data: rules,
+          })
+        }
+
+        let output = `## Mock Rules (${rules.length})\n\n`
+        output += "| ID | Name | Status | Delay | Hits | Priority | Active |\n"
+        output += "|----|------|--------|-------|------|----------|--------|\n"
+        for (const rule of rules) {
+          output += `| ${rule.id} | ${rule.name} | ${rule.response_status} | ${rule.response_delay_ms}ms | ${rule.hit_count} | ${rule.priority} | ${rule.is_active ? "Yes" : "No"} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "mock_logs": {
+        if (!f.interface_id) {
+          return errorResponse("mock_logs requires filters.interface_id")
+        }
+
+        const logs = await db.getMockRequestLogs(f.interface_id, f.limit ?? 50)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "mock_logs",
+            interface_id: f.interface_id,
+            count: logs.length,
+            data: logs,
+          })
+        }
+
+        let output = `## Mock Request Logs (${logs.length})\n\n`
+        output += "| Time | Method | Path | Status | Matched | Response Time |\n"
+        output += "|------|--------|------|--------|---------|---------------|\n"
+        for (const log of logs) {
+          const time = new Date(log.request_at).toLocaleString()
+          output += `| ${time} | ${log.method} | ${log.path.slice(0, 30)} | ${log.response_status} | ${log.matched ? "Yes" : "No"} | ${log.response_time_ms}ms |\n`
         }
 
         return textResponse(output)

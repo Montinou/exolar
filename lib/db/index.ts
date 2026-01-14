@@ -227,6 +227,39 @@ export {
   getSuiteCountsSummary,
 } from "./suites"
 
+// Mock API endpoints
+export {
+  // Interface CRUD
+  createMockInterface,
+  getMockInterfaces,
+  getMockInterfaceById,
+  getMockInterfaceBySlug,
+  updateMockInterface,
+  deleteMockInterface,
+  // Route CRUD
+  createMockRoute,
+  getMockRoutes,
+  getMockRouteById,
+  updateMockRoute,
+  deleteMockRoute,
+  // Response rule CRUD
+  createMockResponseRule,
+  getMockResponseRules,
+  getMockResponseRuleById,
+  updateMockResponseRule,
+  deleteMockResponseRule,
+  incrementRuleHitCount,
+  // Public matching
+  getActiveRoutesForInterface,
+  getActiveRulesForRoute,
+  // Request logging
+  logMockRequest,
+  getMockRequestLogs,
+  // Rate limiting
+  checkRateLimit,
+  cleanupRateLimitHits,
+} from "./mocks"
+
 // ============================================
 // Org-Bound Query Helper
 // ============================================
@@ -240,6 +273,12 @@ import type {
   GetSuitesOptions,
   GetSuiteTestsOptions,
   UpdateSuiteRequest,
+  CreateMockInterfaceRequest,
+  UpdateMockInterfaceRequest,
+  CreateMockRouteRequest,
+  UpdateMockRouteRequest,
+  CreateMockResponseRuleRequest,
+  UpdateMockResponseRuleRequest,
 } from "../types"
 import type {
   DateRangeFilter,
@@ -339,6 +378,22 @@ import {
   invalidateClusterCache,
   isClustered,
 } from "./cluster-cache"
+import {
+  createMockInterface,
+  getMockInterfaces,
+  getMockInterfaceById,
+  updateMockInterface,
+  deleteMockInterface,
+  createMockRoute,
+  getMockRoutes,
+  updateMockRoute,
+  deleteMockRoute,
+  createMockResponseRule,
+  getMockResponseRules,
+  updateMockResponseRule,
+  deleteMockResponseRule,
+  getMockRequestLogs,
+} from "./mocks"
 
 /**
  * Create org-bound query functions.
@@ -516,5 +571,30 @@ export function getQueriesForOrg(organizationId: number) {
     isClustered: (executionId: number) => isClustered(executionId),
     findHistoricalClusters: (embedding: number[], options?: { threshold?: number; limit?: number; daysBack?: number }) =>
       findHistoricalClusters(embedding, organizationId, options),
+
+    // Mock API endpoints
+    createMockInterface: (data: CreateMockInterfaceRequest, createdBy: number | null) =>
+      createMockInterface(organizationId, data, createdBy),
+    getMockInterfaces: () => getMockInterfaces(organizationId),
+    getMockInterfaceById: (interfaceId: number) =>
+      getMockInterfaceById(organizationId, interfaceId),
+    updateMockInterface: (interfaceId: number, data: UpdateMockInterfaceRequest) =>
+      updateMockInterface(organizationId, interfaceId, data),
+    deleteMockInterface: (interfaceId: number) =>
+      deleteMockInterface(organizationId, interfaceId),
+    createMockRoute: (interfaceId: number, data: CreateMockRouteRequest) =>
+      createMockRoute(interfaceId, data),
+    getMockRoutes: (interfaceId: number) => getMockRoutes(interfaceId),
+    updateMockRoute: (routeId: number, data: UpdateMockRouteRequest) =>
+      updateMockRoute(routeId, data),
+    deleteMockRoute: (routeId: number) => deleteMockRoute(routeId),
+    createMockResponseRule: (routeId: number, data: CreateMockResponseRuleRequest) =>
+      createMockResponseRule(routeId, data),
+    getMockResponseRules: (routeId: number) => getMockResponseRules(routeId),
+    updateMockResponseRule: (ruleId: number, data: UpdateMockResponseRuleRequest) =>
+      updateMockResponseRule(ruleId, data),
+    deleteMockResponseRule: (ruleId: number) => deleteMockResponseRule(ruleId),
+    getMockRequestLogs: (interfaceId: number, limit?: number) =>
+      getMockRequestLogs(interfaceId, limit),
   }
 }

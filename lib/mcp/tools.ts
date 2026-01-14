@@ -63,7 +63,7 @@ Examples:
     name: "query_exolar_data",
     description: `Retrieve data from any dataset. Use explore_exolar_index(category="datasets") to see available datasets.
 
-Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures, setup_guide, org_suites, suite_tests, inactive_tests, clustered_failures, semantic_search
+Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures, setup_guide, org_suites, suite_tests, inactive_tests, clustered_failures, semantic_search, mock_interfaces, mock_routes, mock_rules, mock_logs
 
 Examples:
 - query_exolar_data({ dataset: "executions", filters: { branch: "main", limit: 10 } })
@@ -95,6 +95,10 @@ Examples:
             "inactive_tests",
             "clustered_failures",
             "semantic_search",
+            "mock_interfaces",
+            "mock_routes",
+            "mock_rules",
+            "mock_logs",
           ],
           description: "Dataset to query",
         },
@@ -130,6 +134,9 @@ Examples:
             status_filter: { type: "string", enum: ["all", "passed", "failed", "skipped"], description: "Filter by test status (semantic_search)" },
             search_mode: { type: "string", enum: ["semantic", "keyword", "hybrid"], description: "Search mode (semantic_search)" },
             rerank: { type: "boolean", description: "Enable Cohere reranking (semantic_search)" },
+            // Mock API filters
+            interface_id: { type: "number", description: "Mock interface ID (mock_routes, mock_rules, mock_logs)" },
+            route_id: { type: "number", description: "Mock route ID (mock_rules)" },
           },
         },
         view_mode: {
@@ -152,13 +159,17 @@ Examples:
   // ============================================
   {
     name: "perform_exolar_action",
-    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed tests.
+    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed tests, manage mock APIs.
 
 Actions:
 - compare: Side-by-side execution comparison (by ID or branch)
 - generate_report: Markdown failure report for an execution
 - classify: Determine if failure is FLAKE vs BUG
 - reembed: Generate embeddings for tests (type: error|test|suite)
+- create_mock_interface: Create a new mock API interface
+- create_mock_route: Add a route to a mock interface
+- create_mock_rule: Add a response rule to a route
+- delete_mock_interface: Remove a mock interface
 
 Examples:
 - perform_exolar_action({ action: "compare", params: { baseline_branch: "main", current_branch: "feature" } })
@@ -166,13 +177,16 @@ Examples:
 - perform_exolar_action({ action: "classify", params: { execution_id: 123, test_name: "login test" } })
 - perform_exolar_action({ action: "reembed", params: { type: "test", limit: 500 } })
 - perform_exolar_action({ action: "reembed", params: { type: "suite" } })
-- perform_exolar_action({ action: "reembed", params: { type: "error", force: true } })`,
+- perform_exolar_action({ action: "reembed", params: { type: "error", force: true } })
+- perform_exolar_action({ action: "create_mock_interface", params: { name: "User API", slug: "user-api" } })
+- perform_exolar_action({ action: "create_mock_route", params: { interface_id: 1, path_pattern: "/users/:id", method: "GET" } })
+- perform_exolar_action({ action: "create_mock_rule", params: { route_id: 1, name: "Success", response_status: 200, response_body: '{"id": "{{request.params.id}}"}' } })`,
     inputSchema: {
       type: "object" as const,
       properties: {
         action: {
           type: "string",
-          enum: ["compare", "generate_report", "classify", "reembed"],
+          enum: ["compare", "generate_report", "classify", "reembed", "create_mock_interface", "create_mock_route", "create_mock_rule", "delete_mock_interface"],
           description: "Action to perform",
         },
         params: {
@@ -204,6 +218,26 @@ Examples:
             force: { type: "boolean" },
             limit: { type: "number" },
             dry_run: { type: "boolean" },
+            // mock_interface
+            name: { type: "string", description: "Mock interface name" },
+            slug: { type: "string", description: "URL-safe slug" },
+            description: { type: "string", description: "Optional description" },
+            rate_limit_rpm: { type: "number", description: "Rate limit (requests per minute)" },
+            interface_id: { type: "number", description: "Mock interface ID" },
+            // mock_route
+            path_pattern: { type: "string", description: "Route path pattern (e.g., /users/:id)" },
+            method: { type: "string", enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "*"], description: "HTTP method" },
+            route_id: { type: "number", description: "Mock route ID" },
+            priority: { type: "number", description: "Matching priority (higher = first)" },
+            // mock_rule
+            match_headers: { type: "object", description: "Headers to match" },
+            match_query: { type: "object", description: "Query params to match" },
+            match_body: { type: "object", description: "Body JSON paths to match" },
+            match_body_contains: { type: "string", description: "Body substring to match" },
+            response_status: { type: "number", description: "HTTP status code" },
+            response_headers: { type: "object", description: "Response headers" },
+            response_body: { type: "string", description: "Response body (supports templating)" },
+            response_delay_ms: { type: "number", description: "Response delay in milliseconds" },
           },
         },
         format: {
