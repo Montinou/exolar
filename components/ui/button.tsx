@@ -53,6 +53,10 @@ function Button({
   }) {
   const Comp = asChild ? Slot : "button"
 
+  // When asChild is true, Slot expects exactly one child
+  // Don't render loader with asChild to avoid React.Children.only error
+  const showLoader = loading && !asChild
+
   return (
     <Comp
       data-slot="button"
@@ -62,8 +66,14 @@ function Button({
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     >
-      {loading && <Loader2 className="size-4 animate-spin" />}
-      {children}
+      {showLoader ? (
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          {children}
+        </>
+      ) : (
+        children
+      )}
     </Comp>
   )
 }
