@@ -221,6 +221,86 @@ GET|POST|PUT|DELETE|PATCH /api/mock/[orgSlug]/[interfaceSlug]/[...path]
 
 Example: `POST https://exolar.ai-innovation.site/api/mock/my-org/user-api/users`
 
+### Public Logs Endpoint (Unauthenticated)
+
+Access mock request logs without authentication - optimized for E2E test validation.
+
+```
+GET /api/mock/[orgSlug]/[interfaceSlug]/logs
+```
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `since` | ISO8601 | Last 5 minutes | Only logs after this timestamp |
+| `limit` | number | 50 | Max entries (1-500) |
+| `path` | string | - | Filter by path (partial match) |
+| `method` | string | - | Filter by HTTP method (GET, POST, etc.) |
+
+**Example Request:**
+```bash
+curl "https://exolar.ai-innovation.site/api/mock/attorneyshare/leaddocket-lcms/logs?since=2024-01-15T10:00:00Z&limit=10&path=/webhook&method=POST"
+```
+
+**Response Format:**
+```json
+{
+  "interface": {
+    "name": "LeadDocket LCMS",
+    "slug": "leaddocket-lcms"
+  },
+  "logs": [
+    {
+      "id": 123,
+      "method": "POST",
+      "path": "/leaddocket/v1/add-note/99999",
+      "headers": {...},
+      "query_params": {},
+      "body": "{\"note_text\":\"...\"}",
+      "response_status": 200,
+      "response_body": "{\"success\":true}",
+      "matched": true,
+      "request_at": "2024-01-15T10:05:00.258Z",
+      "response_time_ms": 43
+    }
+  ],
+  "count": 1
+}
+```
+
+**E2E Test Usage Pattern:**
+```typescript
+import { test, expect } from '@playwright/test'
+
+test('webhook is called during negotiation', async ({ page }) => {
+  // Capture start time before test actions
+  const testStartTime = new Date().toISOString()
+
+  // ... perform test actions that trigger webhooks ...
+  await page.click('[data-testid="send-proposal"]')
+  await page.waitForTimeout(1000) // Allow webhook to fire
+
+  // Fetch only logs from this test run
+  const response = await fetch(
+    `https://exolar.ai-innovation.site/api/mock/attorneyshare/leaddocket-lcms/logs?since=${testStartTime}&path=/add-note`
+  )
+  const { logs, count } = await response.json()
+
+  // Verify webhook was called with correct data
+  expect(count).toBeGreaterThan(0)
+  expect(logs[0].response_status).toBe(200)
+  expect(logs[0].body).toContain('proposal')
+})
+```
+
+**Security Notes:**
+- No authentication required (public by design)
+- Access requires knowing both org slug and interface slug
+- Default `since` of 5 minutes prevents fetching entire history
+- Maximum limit of 500 prevents large data dumps
+- Logs auto-cleanup after 7 days
+
 ## Features
 
 ### 1. Response Templating
