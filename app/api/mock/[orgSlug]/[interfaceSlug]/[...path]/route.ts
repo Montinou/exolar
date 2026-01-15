@@ -384,34 +384,63 @@ function createRateLimitResponse(
 }
 
 // Export handlers for all HTTP methods
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  return handleMockRequest(request, await params, "GET")
+export async function GET(request: NextRequest, context: RouteParams) {
+  try {
+    return handleMockRequest(request, await context.params, "GET")
+  } catch (error) {
+    console.error("[Mock Handler GET] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  return handleMockRequest(request, await params, "POST")
+export async function POST(request: NextRequest, context: RouteParams) {
+  try {
+    return handleMockRequest(request, await context.params, "POST")
+  } catch (error) {
+    console.error("[Mock Handler POST] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
-export async function PUT(request: NextRequest, { params }: RouteParams) {
-  return handleMockRequest(request, await params, "PUT")
+export async function PUT(request: NextRequest, context: RouteParams) {
+  try {
+    return handleMockRequest(request, await context.params, "PUT")
+  } catch (error) {
+    console.error("[Mock Handler PUT] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  return handleMockRequest(request, await params, "DELETE")
+export async function DELETE(request: NextRequest, context: RouteParams) {
+  try {
+    return handleMockRequest(request, await context.params, "DELETE")
+  } catch (error) {
+    console.error("[Mock Handler DELETE] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
-  return handleMockRequest(request, await params, "PATCH")
+export async function PATCH(request: NextRequest, context: RouteParams) {
+  try {
+    return handleMockRequest(request, await context.params, "PATCH")
+  } catch (error) {
+    console.error("[Mock Handler PATCH] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
 
-export async function OPTIONS(request: NextRequest, { params }: RouteParams) {
-  // Return CORS headers for preflight requests
-  const headers = new Headers({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-    "Access-Control-Allow-Headers": "*",
-    "Access-Control-Max-Age": "86400",
-  })
-
-  return new NextResponse(null, { status: 204, headers })
+export async function OPTIONS(request: NextRequest, context: RouteParams) {
+  try {
+    // Return CORS headers for preflight requests
+    const headers = new Headers({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Max-Age": "86400",
+    })
+    return new NextResponse(null, { status: 204, headers })
+  } catch (error) {
+    console.error("[Mock Handler OPTIONS] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }
