@@ -18,8 +18,9 @@ import {
 } from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserMenu } from "@/components/dashboard/user-menu"
-import { Plus, Users, Settings, ArrowLeft, Building, Loader2, Shield } from "lucide-react"
+import { Plus, Users, Settings, ArrowLeft, Building, Loader2, Shield, Crown } from "lucide-react"
 import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
 
 interface Organization {
   id: number
@@ -32,7 +33,7 @@ interface Organization {
 export default function OrganizationsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [isSuperadmin, setIsSuperadmin] = useState(false)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newOrg, setNewOrg] = useState({ name: "", slug: "" })
@@ -45,17 +46,18 @@ export default function OrganizationsPage() {
 
   async function loadData() {
     try {
-      // Check if user is admin
+      // Check if user is superadmin
       const accessRes = await fetch("/api/auth/check-access")
       const accessData = await accessRes.json()
 
-      if (!accessData.authorized || accessData.user?.role !== "admin") {
-        setIsAdmin(false)
+      // Only superadmins can access this page
+      if (!accessData.authorized || accessData.user?.is_superadmin !== true) {
+        setIsSuperadmin(false)
         setLoading(false)
         return
       }
 
-      setIsAdmin(true)
+      setIsSuperadmin(true)
       await fetchOrganizations()
     } catch (err) {
       console.error("Failed to load data:", err)
@@ -70,6 +72,9 @@ export default function OrganizationsPage() {
     if (res.ok) {
       const data = await res.json()
       setOrganizations(data.organizations || [])
+    } else if (res.status === 403) {
+      // Access denied - not superadmin
+      setIsSuperadmin(false)
     }
   }
 
@@ -131,23 +136,26 @@ export default function OrganizationsPage() {
     )
   }
 
-  if (!isAdmin) {
+  if (!isSuperadmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md glass-card">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-destructive" />
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+              <Crown className="h-6 w-6 text-purple-500" />
             </div>
-            <CardTitle>Admin Access Required</CardTitle>
+            <CardTitle>Superadmin Access Required</CardTitle>
             <CardDescription>
-              You need admin privileges to access this page.
+              This page is restricted to superadmins only. Contact your system administrator if you need access.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <Button variant="outline" onClick={() => router.push("/")}>
+          <CardContent className="flex justify-center gap-4">
+            <Button variant="outline" onClick={() => router.push("/admin")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back to Admin
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/")}>
+              Dashboard
             </Button>
           </CardContent>
         </Card>
@@ -175,6 +183,10 @@ export default function OrganizationsPage() {
                       backgroundClip: "text",
                     }}
                   >Organizations</span>
+                  <Badge className="bg-purple-600 hover:bg-purple-700">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Superadmin Only
+                  </Badge>
                 </h1>
                 <p className="text-sm text-muted-foreground">Manage multi-tenant organizations</p>
               </div>

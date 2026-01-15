@@ -1,24 +1,39 @@
 import { NextResponse } from "next/server"
-import { authServer } from "@/lib/auth/server"
-import { isAdmin, getAllUsers, updateUserRole, deleteUser, getUserByEmail } from "@/lib/db"
+import { getSessionContext, isSuperadmin } from "@/lib/session-context"
+import {
+  getAllUsers,
+  getUsersForOrg,
+  updateUserRole,
+  deleteUser,
+  getUserByEmail,
+} from "@/lib/db"
 
 /**
- * GET /api/admin/users - List all users
- * Requires admin role
+ * GET /api/admin/users - List users
+ * - Superadmin: sees all users across all organizations
+ * - Regular admin: sees only users in their organization
  */
 export async function GET() {
   try {
-    const { data } = await authServer.getSession()
-    if (!data?.session || !data?.user?.email) {
+    const context = await getSessionContext()
+    if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const adminCheck = await isAdmin(data.user.email)
-    if (!adminCheck) {
+    // Only admins can list users
+    if (context.userRole !== "admin") {
       return NextResponse.json({ error: "Forbidden - Admin only" }, { status: 403 })
     }
 
-    const users = await getAllUsers()
+    let users
+    if (isSuperadmin(context)) {
+      // Superadmin sees all users
+      users = await getAllUsers()
+    } else {
+      // Regular admin sees only their org's users
+      users = await getUsersForOrg(context.organizationId)
+    }
+
     return NextResponse.json({ users })
   } catch (error) {
     console.error("[admin/users] GET error:", error)
@@ -28,18 +43,18 @@ export async function GET() {
 
 /**
  * PATCH /api/admin/users - Update user role
- * Requires admin role
+ * - Superadmin: can update any user's role
+ * - Regular admin: can only update users in their organization
  * Body: { userId: number, role: "admin" | "viewer" }
  */
 export async function PATCH(request: Request) {
   try {
-    const { data } = await authServer.getSession()
-    if (!data?.session || !data?.user?.email) {
+    const context = await getSessionContext()
+    if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const adminUser = await getUserByEmail(data.user.email)
-    if (!adminUser || adminUser.role !== "admin") {
+    if (context.userRole !== "admin") {
       return NextResponse.json({ error: "Forbidden - Admin only" }, { status: 403 })
     }
 
@@ -55,8 +70,20 @@ export async function PATCH(request: Request) {
     }
 
     // Prevent admin from changing their own role
-    if (userId === adminUser.id) {
+    if (userId === context.userId) {
       return NextResponse.json({ error: "Cannot change your own role" }, { status: 400 })
+    }
+
+    // If not superadmin, verify user belongs to admin's organization
+    if (!isSuperadmin(context)) {
+      const orgUsers = await getUsersForOrg(context.organizationId)
+      const userInOrg = orgUsers.some((u) => u.id === userId)
+      if (!userInOrg) {
+        return NextResponse.json(
+          { error: "Cannot modify users outside your organization" },
+          { status: 403 }
+        )
+      }
     }
 
     const updatedUser = await updateUserRole(userId, role)
@@ -73,18 +100,18 @@ export async function PATCH(request: Request) {
 
 /**
  * DELETE /api/admin/users - Delete a user
- * Requires admin role
+ * - Superadmin: can delete any user
+ * - Regular admin: can only delete users in their organization
  * Body: { userId: number }
  */
 export async function DELETE(request: Request) {
   try {
-    const { data } = await authServer.getSession()
-    if (!data?.session || !data?.user?.email) {
+    const context = await getSessionContext()
+    if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const adminUser = await getUserByEmail(data.user.email)
-    if (!adminUser || adminUser.role !== "admin") {
+    if (context.userRole !== "admin") {
       return NextResponse.json({ error: "Forbidden - Admin only" }, { status: 403 })
     }
 
@@ -96,8 +123,20 @@ export async function DELETE(request: Request) {
     }
 
     // Prevent admin from deleting themselves
-    if (userId === adminUser.id) {
+    if (userId === context.userId) {
       return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 })
+    }
+
+    // If not superadmin, verify user belongs to admin's organization
+    if (!isSuperadmin(context)) {
+      const orgUsers = await getUsersForOrg(context.organizationId)
+      const userInOrg = orgUsers.some((u) => u.id === userId)
+      if (!userInOrg) {
+        return NextResponse.json(
+          { error: "Cannot delete users outside your organization" },
+          { status: 403 }
+        )
+      }
     }
 
     const deleted = await deleteUser(userId)

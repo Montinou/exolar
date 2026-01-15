@@ -10,6 +10,7 @@ export interface SessionContext {
   userId: number
   email: string
   userRole: "admin" | "viewer" // System-wide role
+  isSuperadmin: boolean // Full cross-org access (only agusmontoya@gmail.com)
   organizationId: number
   organizationName: string
   organizationSlug: string
@@ -40,6 +41,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
         u.id as user_id,
         u.email,
         u.role as user_role,
+        u.is_superadmin,
         u.default_org_id,
         o.id as organization_id,
         o.name as organization_name,
@@ -67,6 +69,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
       userId: row.user_id as number,
       email: row.email as string,
       userRole: row.user_role as "admin" | "viewer",
+      isSuperadmin: row.is_superadmin === true,
       organizationId: row.organization_id as number,
       organizationName: row.organization_name as string,
       organizationSlug: row.organization_slug as string,
@@ -89,10 +92,19 @@ export function isOrgAdmin(context: SessionContext): boolean {
 }
 
 /**
- * Check if user is a system admin
+ * Check if user is a superadmin (full cross-org access)
+ */
+export function isSuperadmin(context: SessionContext): boolean {
+  return context.isSuperadmin === true
+}
+
+/**
+ * Check if user is a system admin (superadmin with full access)
+ * Note: Now checks isSuperadmin instead of userRole === "admin"
+ * Regular admins no longer have system-wide access
  */
 export function isSystemAdmin(context: SessionContext): boolean {
-  return context.userRole === "admin"
+  return context.isSuperadmin === true
 }
 
 /**
@@ -124,6 +136,18 @@ export async function requireSystemAdmin(): Promise<SessionContext> {
   const context = await requireSessionContext()
   if (!isSystemAdmin(context)) {
     throw new Error("System admin access required")
+  }
+  return context
+}
+
+/**
+ * Require superadmin - throws if not authorized
+ * Use this for operations that need full cross-org access
+ */
+export async function requireSuperadmin(): Promise<SessionContext> {
+  const context = await requireSessionContext()
+  if (!isSuperadmin(context)) {
+    throw new Error("Superadmin access required")
   }
   return context
 }

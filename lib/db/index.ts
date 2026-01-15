@@ -42,17 +42,20 @@ export type {
 export {
   getUserByEmail,
   getAllUsers,
+  getUsersForOrg,
   createUser,
   updateUserRole,
   deleteUser,
   getInviteByEmail,
   getAllInvites,
+  getInvitesForOrg,
   createInvite,
   markInviteAsUsedById,
   markInviteAsUsed,
   deleteInvite,
   checkUserAccess,
   isAdmin,
+  isSuperadminByEmail,
 } from "./users"
 
 // Organization operations

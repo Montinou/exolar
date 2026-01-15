@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserMenu } from "@/components/dashboard/user-menu"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building } from "lucide-react"
+import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building, Crown } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import Link from "next/link"
 import type { DashboardUser, Invite, Organization } from "@/lib/db"
@@ -20,13 +20,14 @@ export default function AdminPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isSuperadmin, setIsSuperadmin] = useState(false)
   const [users, setUsers] = useState<DashboardUser[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
-  const [organizations, setOrganizations] = useState<Organization[]>([]) // Add organizations state
+  const [organizations, setOrganizations] = useState<Organization[]>([])
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteName, setInviteName] = useState("")
   const [inviteRole, setInviteRole] = useState<"admin" | "viewer">("viewer")
-  const [inviteOrg, setInviteOrg] = useState<string>("") // Add inviteOrg state
+  const [inviteOrg, setInviteOrg] = useState<string>("")
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,21 +46,29 @@ export default function AdminPage() {
         }
 
         setIsAdmin(true)
+        const userIsSuperadmin = accessData.user?.is_superadmin === true
+        setIsSuperadmin(userIsSuperadmin)
 
-        // Load users, invites, and organizations
-        const [usersRes, invitesRes, orgsRes] = await Promise.all([
+        // Load users and invites (always available for admins)
+        const [usersRes, invitesRes] = await Promise.all([
           fetch("/api/admin/users"),
           fetch("/api/admin/invites"),
-          fetch("/api/admin/organizations"),
         ])
 
         const usersData = await usersRes.json()
         const invitesData = await invitesRes.json()
-        const orgsData = await orgsRes.json()
 
         setUsers(usersData.users || [])
         setInvites(invitesData.invites || [])
-        setOrganizations(orgsData.organizations || [])
+
+        // Only superadmins can fetch all organizations
+        if (userIsSuperadmin) {
+          const orgsRes = await fetch("/api/admin/organizations")
+          if (orgsRes.ok) {
+            const orgsData = await orgsRes.json()
+            setOrganizations(orgsData.organizations || [])
+          }
+        }
       } catch (err) {
         console.error("Failed to load admin data:", err)
         setError("Failed to load data")
@@ -84,7 +93,8 @@ export default function AdminPage() {
           email: inviteEmail,
           name: inviteName,
           role: inviteRole,
-          organizationId: inviteOrg ? parseInt(inviteOrg) : undefined,
+          // Only superadmins can select organization - others are auto-assigned to their org
+          organizationId: isSuperadmin && inviteOrg ? parseInt(inviteOrg) : undefined,
         }),
       })
 
@@ -102,7 +112,7 @@ export default function AdminPage() {
          // Invite created
          setInvites([data.invite, ...invites])
       }
-      
+
       setInviteEmail("")
       setInviteName("")
       setInviteRole("viewer")
@@ -229,17 +239,28 @@ export default function AdminPage() {
                       backgroundClip: "text",
                     }}
                   >Admin Panel</h1>
+                  {isSuperadmin && (
+                    <Badge className="bg-purple-600 hover:bg-purple-700">
+                      <Crown className="h-3 w-3 mr-1" />
+                      Superadmin
+                    </Badge>
+                  )}
                 </div>
-                <p className="text-sm text-muted-foreground">Manage users and invites</p>
+                <p className="text-sm text-muted-foreground">
+                  {isSuperadmin ? "Manage all users and organizations" : "Manage users in your organization"}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
-              <Link href="/admin/organizations">
-                <Button variant="outline" size="sm" className="sm:size-default">
-                  <Building className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Organizations</span>
-                </Button>
-              </Link>
+              {/* Only show Organizations button for superadmins */}
+              {isSuperadmin && (
+                <Link href="/admin/organizations">
+                  <Button variant="outline" size="sm" className="sm:size-default">
+                    <Building className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Organizations</span>
+                  </Button>
+                </Link>
+              )}
               <UserMenu />
             </div>
           </div>
@@ -255,12 +276,15 @@ export default function AdminPage() {
               Invite User
             </CardTitle>
             <CardDescription>
-              Send an invite to allow a new user to access the dashboard
+              {isSuperadmin
+                ? "Send an invite to allow a new user to access any organization"
+                : "Send an invite to add a new user to your organization"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleInvite} className="flex flex-col gap-4">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className={`grid gap-4 sm:grid-cols-2 ${isSuperadmin ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <Input
@@ -282,20 +306,23 @@ export default function AdminPage() {
                     onChange={(e) => setInviteName(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="org">Organization (Optional)</Label>
-                  <Select value={inviteOrg} onValueChange={setInviteOrg}>
-                    <SelectTrigger id="org">
-                      <SelectValue placeholder="Select Organization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Default (Attorneyshare)</SelectItem>
-                      {organizations.map(org => (
-                        <SelectItem key={org.id} value={org.id.toString()}>{org.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Only show organization selector for superadmins */}
+                {isSuperadmin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="org">Organization</Label>
+                    <Select value={inviteOrg} onValueChange={setInviteOrg}>
+                      <SelectTrigger id="org">
+                        <SelectValue placeholder="Select Organization" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">Default (Attorneyshare)</SelectItem>
+                        {organizations.map(org => (
+                          <SelectItem key={org.id} value={org.id.toString()}>{org.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="role">Role</Label>
@@ -329,7 +356,10 @@ export default function AdminPage() {
               Pending Invites
             </CardTitle>
             <CardDescription>
-              Users who have been invited but haven&apos;t signed in yet
+              {isSuperadmin
+                ? "Users who have been invited but haven't signed in yet (all organizations)"
+                : "Users invited to your organization who haven't signed in yet"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -341,7 +371,7 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
-                    <TableHead>Organization</TableHead>
+                    {isSuperadmin && <TableHead>Organization</TableHead>}
                     <TableHead className="hidden sm:table-cell">Invited At</TableHead>
                     <TableHead className="w-[80px] sm:w-[100px]">Actions</TableHead>
                   </TableRow>
@@ -359,9 +389,11 @@ export default function AdminPage() {
                             {invite.role}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                           {org ? org.name : (invite.organization_id ? `ID: ${invite.organization_id}` : "Default")}
-                        </TableCell>
+                        {isSuperadmin && (
+                          <TableCell>
+                             {org ? org.name : (invite.organization_id ? `ID: ${invite.organization_id}` : "Default")}
+                          </TableCell>
+                        )}
                         <TableCell className="hidden sm:table-cell">{new Date(invite.created_at).toLocaleDateString()}</TableCell>
                         <TableCell>
                           <Button
@@ -389,7 +421,10 @@ export default function AdminPage() {
               Users
             </CardTitle>
             <CardDescription>
-              All users with access to the dashboard
+              {isSuperadmin
+                ? "All users with access to the dashboard (all organizations)"
+                : "Users in your organization"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -398,6 +433,7 @@ export default function AdminPage() {
                 <TableRow>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  {isSuperadmin && <TableHead>Superadmin</TableHead>}
                   <TableHead className="hidden sm:table-cell">Joined</TableHead>
                   <TableHead className="w-[80px] sm:w-[100px]">Actions</TableHead>
                 </TableRow>
@@ -405,7 +441,14 @@ export default function AdminPage() {
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="max-w-[150px] truncate sm:max-w-none">{user.email}</TableCell>
+                    <TableCell className="max-w-[150px] truncate sm:max-w-none">
+                      <div className="flex items-center gap-2">
+                        {user.email}
+                        {user.is_superadmin && (
+                          <Crown className="h-4 w-4 text-purple-500" />
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Select
                         value={user.role}
@@ -420,12 +463,22 @@ export default function AdminPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    {isSuperadmin && (
+                      <TableCell>
+                        {user.is_superadmin ? (
+                          <Badge className="bg-purple-600">Yes</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">No</span>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell className="hidden sm:table-cell">{new Date(user.created_at).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeleteUser(user.id)}
+                        disabled={user.is_superadmin} // Can't delete superadmin
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

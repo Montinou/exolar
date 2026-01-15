@@ -261,3 +261,45 @@ export async function isAdmin(email: string): Promise<boolean> {
   const user = await getUserByEmail(email)
   return user?.role === "admin"
 }
+
+/**
+ * Check if user is superadmin (full cross-org access)
+ */
+export async function isSuperadminByEmail(email: string): Promise<boolean> {
+  const user = await getUserByEmail(email)
+  return user?.is_superadmin === true
+}
+
+// ============================================
+// Organization-Scoped Queries
+// ============================================
+
+/**
+ * Get users for a specific organization
+ * Used by regular admins who can only see their own org's users
+ */
+export async function getUsersForOrg(organizationId: number): Promise<DashboardUser[]> {
+  const sql = getSql()
+  const result = await sql`
+    SELECT u.*
+    FROM dashboard_users u
+    JOIN organization_members om ON om.user_id = u.id
+    WHERE om.organization_id = ${organizationId}
+    ORDER BY u.created_at DESC
+  `
+  return result as DashboardUser[]
+}
+
+/**
+ * Get invites for a specific organization
+ * Used by regular admins who can only see their own org's invites
+ */
+export async function getInvitesForOrg(organizationId: number): Promise<Invite[]> {
+  const sql = getSql()
+  const result = await sql`
+    SELECT * FROM invites
+    WHERE organization_id = ${organizationId}
+    ORDER BY created_at DESC
+  `
+  return result as Invite[]
+}

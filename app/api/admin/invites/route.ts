@@ -1,34 +1,43 @@
 import { NextResponse } from "next/server"
-import { authServer } from "@/lib/auth/server"
+import { getSessionContext, isSuperadmin } from "@/lib/session-context"
 import {
-  isAdmin,
   getAllInvites,
+  getInvitesForOrg,
   createInvite,
   deleteInvite,
   getUserByEmail,
   createUser,
   addOrganizationMember,
 } from "@/lib/db"
+import { authServer } from "@/lib/auth/server"
 import { sendInviteEmail } from "@/lib/email/resend"
 import { generateSecurePassword } from "@/lib/utils"
 
 /**
- * GET /api/admin/invites - List all invites
- * Requires admin role
+ * GET /api/admin/invites - List invites
+ * - Superadmin: sees all invites across all organizations
+ * - Regular admin: sees only invites for their organization
  */
 export async function GET() {
   try {
-    const { data } = await authServer.getSession()
-    if (!data?.session || !data?.user?.email) {
+    const context = await getSessionContext()
+    if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const adminCheck = await isAdmin(data.user.email)
-    if (!adminCheck) {
+    if (context.userRole !== "admin") {
       return NextResponse.json({ error: "Forbidden - Admin only" }, { status: 403 })
     }
 
-    const invites = await getAllInvites()
+    let invites
+    if (isSuperadmin(context)) {
+      // Superadmin sees all invites
+      invites = await getAllInvites()
+    } else {
+      // Regular admin sees only their org's invites
+      invites = await getInvitesForOrg(context.organizationId)
+    }
+
     return NextResponse.json({ invites })
   } catch (error) {
     console.error("[admin/invites] GET error:", error)
@@ -37,26 +46,31 @@ export async function GET() {
 }
 
 /**
- * POST /api/admin/invites - Create a new invite
- * Requires admin role
- * Body: { email: string, role: "admin" | "viewer" }
+ * POST /api/admin/invites - Create a new invite and user
+ * - Superadmin: can invite to any organization
+ * - Regular admin: can only invite to their own organization
+ * Body: { email: string, role: "admin" | "viewer", organizationId?: number }
  */
 export async function POST(request: Request) {
   try {
-    const { data } = await authServer.getSession()
-    if (!data?.session || !data?.user?.email) {
+    const context = await getSessionContext()
+    if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const adminUser = await getUserByEmail(data.user.email)
-    if (!adminUser || adminUser.role !== "admin") {
+    if (context.userRole !== "admin") {
       return NextResponse.json({ error: "Forbidden - Admin only" }, { status: 403 })
     }
 
     const body = await request.json()
-    const { email, role, organizationId, password: providedPassword, template = "exolar", name: providedName } = body
-    
-
+    const {
+      email,
+      role,
+      organizationId,
+      password: providedPassword,
+      template = "exolar",
+      name: providedName,
+    } = body
 
     if (!email || !role) {
       return NextResponse.json({ error: "Email and role are required" }, { status: 400 })
@@ -65,6 +79,11 @@ export async function POST(request: Request) {
     if (role !== "admin" && role !== "viewer") {
       return NextResponse.json({ error: "Role must be 'admin' or 'viewer'" }, { status: 400 })
     }
+
+    // If not superadmin, force organizationId to be their own org
+    const targetOrgId = isSuperadmin(context)
+      ? organizationId || context.organizationId
+      : context.organizationId
 
     // Check if user already exists
     const existingUser = await getUserByEmail(email)
@@ -77,16 +96,15 @@ export async function POST(request: Request) {
 
     try {
       // Create user in Auth provider
-      // Use provided name or fallback to part of email
       const name = providedName || email.split("@")[0]
       const { data, error: createUserError } = await authServer.admin.createUser({
         email,
         password,
         name,
       })
-      
+
       const authUser = data?.user
-      
+
       if (createUserError) {
         console.error("Auth provider create user failed:", createUserError)
         return NextResponse.json({ error: "Failed to create user identity" }, { status: 500 })
@@ -95,20 +113,18 @@ export async function POST(request: Request) {
       // Determine roles
       // If an organization is selected, the Platform Role should be "viewer" (not System Admin)
       // The Org Role will be whatever was selected (Admin or Viewer)
-      const platformRole = organizationId ? "viewer" : role
+      const platformRole = targetOrgId ? "viewer" : role
       const orgRole = role
 
       // Create user in Dashboard DB
-      // Use organizationId if provided, otherwise default (null or 1 handled by createUser logic if we pass it)
-      // createUser signature: (email, role, invitedBy, defaultOrgId)
-      const user = await createUser(email, platformRole, adminUser.id, organizationId)
+      const user = await createUser(email, platformRole, context.userId, targetOrgId)
 
       // Add to Organization if provided
-      if (organizationId) {
-        await addOrganizationMember(organizationId, user.id, orgRole)
+      if (targetOrgId) {
+        await addOrganizationMember(targetOrgId, user.id, orgRole)
       }
 
-      // Send invite email with credentials (non-blocking - don't fail if email fails)
+      // Send invite email with credentials (non-blocking)
       try {
         const emailResult = await sendInviteEmail({
           email,
@@ -127,14 +143,17 @@ export async function POST(request: Request) {
         console.error("[Invites] Email sending error (non-blocking):", emailError)
       }
 
-      return NextResponse.json({
-        user,
-        passwordGenerated: !providedPassword,
-        emailSent: true,
-      }, { status: 201 })
+      return NextResponse.json(
+        {
+          user,
+          passwordGenerated: !providedPassword,
+          emailSent: true,
+        },
+        { status: 201 }
+      )
     } catch (err) {
-       console.error("Failed to create user with password:", err)
-       return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
+      console.error("Failed to create user with password:", err)
+      return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
     }
   } catch (error) {
     console.error("[admin/invites] POST error:", error)
@@ -144,18 +163,18 @@ export async function POST(request: Request) {
 
 /**
  * DELETE /api/admin/invites - Delete an invite
- * Requires admin role
+ * - Superadmin: can delete any invite
+ * - Regular admin: can only delete invites for their organization
  * Body: { inviteId: number }
  */
 export async function DELETE(request: Request) {
   try {
-    const { data } = await authServer.getSession()
-    if (!data?.session || !data?.user?.email) {
+    const context = await getSessionContext()
+    if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const adminCheck = await isAdmin(data.user.email)
-    if (!adminCheck) {
+    if (context.userRole !== "admin") {
       return NextResponse.json({ error: "Forbidden - Admin only" }, { status: 403 })
     }
 
@@ -164,6 +183,18 @@ export async function DELETE(request: Request) {
 
     if (!inviteId) {
       return NextResponse.json({ error: "Invite ID is required" }, { status: 400 })
+    }
+
+    // If not superadmin, verify invite belongs to admin's organization
+    if (!isSuperadmin(context)) {
+      const orgInvites = await getInvitesForOrg(context.organizationId)
+      const inviteInOrg = orgInvites.some((inv) => inv.id === inviteId)
+      if (!inviteInOrg) {
+        return NextResponse.json(
+          { error: "Cannot delete invites outside your organization" },
+          { status: 403 }
+        )
+      }
     }
 
     const deleted = await deleteInvite(inviteId)
