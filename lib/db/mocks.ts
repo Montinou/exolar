@@ -571,13 +571,10 @@ export async function logMockRequest(data: {
   response_body: string | null
   matched: boolean
   response_time_ms: number | null
-  // Note: validation_errors is accepted but not stored until migration 021 is run
   validation_errors?: Array<{ path: string; message: string; keyword: string }> | null
 }): Promise<void> {
   const sql = getSql()
 
-  // Note: validation_errors column removed from INSERT for backwards compatibility
-  // Run scripts/021_add_mock_schemas.sql to enable validation_errors storage
   await sql`
     INSERT INTO mock_request_logs (
       interface_id,
@@ -591,7 +588,8 @@ export async function logMockRequest(data: {
       response_status,
       response_body,
       matched,
-      response_time_ms
+      response_time_ms,
+      validation_errors
     ) VALUES (
       ${data.interface_id},
       ${data.route_id},
@@ -604,7 +602,8 @@ export async function logMockRequest(data: {
       ${data.response_status},
       ${data.response_body},
       ${data.matched},
-      ${data.response_time_ms}
+      ${data.response_time_ms},
+      ${data.validation_errors ? JSON.stringify(data.validation_errors) : null}
     )
   `
 }
@@ -908,31 +907,21 @@ export async function getMockWebhookActions(
 
 /**
  * Get active webhook actions for a rule
- * Returns empty array if webhook feature tables don't exist yet
  */
 export async function getActiveWebhookActions(
   ruleId: number
 ): Promise<MockWebhookAction[]> {
   const sql = getSql()
 
-  try {
-    const result = await sql`
-      SELECT *
-      FROM mock_webhook_actions
-      WHERE rule_id = ${ruleId}
-        AND is_active = true
-      ORDER BY created_at ASC
-    `
+  const result = await sql`
+    SELECT *
+    FROM mock_webhook_actions
+    WHERE rule_id = ${ruleId}
+      AND is_active = true
+    ORDER BY created_at ASC
+  `
 
-    return result as MockWebhookAction[]
-  } catch (error) {
-    // Table may not exist if migration 022 hasn't been run
-    // Return empty array to allow mock handler to work without webhooks
-    if (error instanceof Error && error.message.includes("does not exist")) {
-      return []
-    }
-    throw error
-  }
+  return result as MockWebhookAction[]
 }
 
 /**
