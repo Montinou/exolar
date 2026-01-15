@@ -1087,3 +1087,120 @@ export async function getWebhookLogsByRequestLog(
 
   return result as MockWebhookLog[]
 }
+
+// ============================================
+// Public Mock Logs (no auth required)
+// ============================================
+
+/**
+ * Filter options for public mock logs
+ */
+export interface PublicMockLogFilters {
+  since?: string // ISO8601 timestamp, defaults to 5 minutes ago
+  limit?: number // 1-500, defaults to 50
+  path?: string // Partial match
+  method?: string // GET, POST, etc.
+}
+
+/**
+ * Get mock logs publicly by org slug and interface slug.
+ * Optimized for test scenario validation.
+ */
+export async function getPublicMockLogs(
+  orgSlug: string,
+  interfaceSlug: string,
+  filters: PublicMockLogFilters = {}
+): Promise<{
+  interface: { name: string; slug: string } | null
+  logs: MockRequestLog[]
+  count: number
+}> {
+  const sql = getSql()
+
+  // First, look up the interface by slugs
+  const interfaceResult = await sql`
+    SELECT mi.id, mi.name, mi.slug, mi.is_active
+    FROM mock_interfaces mi
+    JOIN organizations o ON o.id = mi.organization_id
+    WHERE o.slug = ${orgSlug}
+      AND mi.slug = ${interfaceSlug}
+  `
+
+  if (interfaceResult.length === 0) {
+    return { interface: null, logs: [], count: 0 }
+  }
+
+  const mockInterface = interfaceResult[0]
+
+  // Check if interface is active
+  if (!mockInterface.is_active) {
+    return { interface: null, logs: [], count: 0 }
+  }
+
+  // Apply filters
+  const {
+    since,
+    limit = 50,
+    path,
+    method,
+  } = filters
+
+  // Default since to 5 minutes ago if not provided
+  const sinceDate = since
+    ? new Date(since)
+    : new Date(Date.now() - 5 * 60 * 1000)
+
+  // Clamp limit to 1-500
+  const clampedLimit = Math.min(Math.max(1, limit), 500)
+
+  // Get logs using parameterized query
+  const interfaceId = mockInterface.id as number
+
+  let result
+  if (path && method) {
+    result = await sql`
+      SELECT * FROM mock_request_logs
+      WHERE interface_id = ${interfaceId}
+        AND request_at >= ${sinceDate.toISOString()}
+        AND path ILIKE ${'%' + path + '%'}
+        AND method = ${method.toUpperCase()}
+      ORDER BY request_at DESC
+      LIMIT ${clampedLimit}
+    `
+  } else if (path) {
+    result = await sql`
+      SELECT * FROM mock_request_logs
+      WHERE interface_id = ${interfaceId}
+        AND request_at >= ${sinceDate.toISOString()}
+        AND path ILIKE ${'%' + path + '%'}
+      ORDER BY request_at DESC
+      LIMIT ${clampedLimit}
+    `
+  } else if (method) {
+    result = await sql`
+      SELECT * FROM mock_request_logs
+      WHERE interface_id = ${interfaceId}
+        AND request_at >= ${sinceDate.toISOString()}
+        AND method = ${method.toUpperCase()}
+      ORDER BY request_at DESC
+      LIMIT ${clampedLimit}
+    `
+  } else {
+    result = await sql`
+      SELECT * FROM mock_request_logs
+      WHERE interface_id = ${interfaceId}
+        AND request_at >= ${sinceDate.toISOString()}
+      ORDER BY request_at DESC
+      LIMIT ${clampedLimit}
+    `
+  }
+
+  return {
+    interface: {
+      name: mockInterface.name as string,
+      slug: mockInterface.slug as string,
+    },
+    logs: result as MockRequestLog[],
+    count: result.length,
+  }
+}
