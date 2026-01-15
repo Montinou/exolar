@@ -395,10 +395,12 @@ export async function GET(request: NextRequest, context: RouteParams) {
 
 export async function POST(request: NextRequest, context: RouteParams) {
   try {
-    return handleMockRequest(request, await context.params, "POST")
+    const params = await context.params
+    console.log("[Mock Handler POST] params:", params)
+    return handleMockRequest(request, params, "POST")
   } catch (error) {
-    console.error("[Mock Handler POST] Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[Mock Handler POST] Error:", error instanceof Error ? error.stack : error)
+    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
   }
 }
 
