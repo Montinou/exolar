@@ -66,7 +66,7 @@ export async function createMockInterface(
       ${data.name},
       ${data.slug},
       ${data.description ?? null},
-      ${data.rate_limit_rpm ?? 100},
+      ${data.rate_limit_rpm ?? 500},
       ${createdBy}
     )
     RETURNING *
