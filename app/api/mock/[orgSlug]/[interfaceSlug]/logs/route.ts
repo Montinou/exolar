@@ -20,19 +20,19 @@ export const dynamic = "force-dynamic"
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ orgSlug: string; interfaceSlug: string }> }
+  context: { params: Promise<{ orgSlug: string; interfaceSlug: string }> }
 ) {
-  const { orgSlug, interfaceSlug } = await params
-  const { searchParams } = new URL(request.url)
-
-  // Parse query params
-  const since = searchParams.get("since") || undefined
-  const limitParam = searchParams.get("limit")
-  const limit = limitParam ? parseInt(limitParam, 10) : undefined
-  const path = searchParams.get("path") || undefined
-  const method = searchParams.get("method") || undefined
-
   try {
+    const { orgSlug, interfaceSlug } = await context.params
+    const { searchParams } = new URL(request.url)
+
+    // Parse query params
+    const since = searchParams.get("since") || undefined
+    const limitParam = searchParams.get("limit")
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined
+    const path = searchParams.get("path") || undefined
+    const method = searchParams.get("method") || undefined
+
     const result = await getPublicMockLogs(orgSlug, interfaceSlug, {
       since,
       limit,
