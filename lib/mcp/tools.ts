@@ -28,7 +28,13 @@ export const allTools = [
   // ============================================
   {
     name: "explore_exolar_index",
-    description: `Discover available datasets, branches, suites, or metrics. Call FIRST to learn what data exists.
+    description: `Discover available data. ALWAYS call this FIRST before using query_exolar_data - it shows what datasets exist and their required filters.
+
+Categories:
+- datasets: See all 24 queryable datasets with descriptions
+- branches: List branches with execution counts
+- suites: List test suites with pass rates
+- metrics: See metric definitions (use with get_semantic_definition)
 
 Examples:
 - explore_exolar_index({ category: "datasets" }) → See all queryable datasets
@@ -61,9 +67,16 @@ Examples:
   // ============================================
   {
     name: "query_exolar_data",
-    description: `Retrieve data from any dataset. Use explore_exolar_index(category="datasets") to see available datasets.
+    description: `Retrieve data from any dataset. Call explore_exolar_index(category="datasets") FIRST to see descriptions.
 
-Available datasets: executions, execution_details, failures, flaky_tests, trends, dashboard_stats, error_analysis, test_search, test_history, flakiness_summary, reliability_score, performance_regressions, execution_summary, execution_failures, setup_guide, org_suites, suite_tests, inactive_tests, clustered_failures, semantic_search, mock_interfaces, mock_routes, mock_rules, mock_logs
+Dataset Patterns:
+- List data: executions, flaky_tests, org_suites (no required filters)
+- Single execution: execution_details, execution_failures (require: execution_id)
+- Search: test_search, semantic_search (require: query)
+- Time-series: trends, dashboard_stats (optional: branch, period)
+- Mock API: mock_interfaces, mock_routes, mock_rules, mock_logs
+
+Use view_mode: "summary" for metrics, "detailed" for analysis, "list" for tables.
 
 Examples:
 - query_exolar_data({ dataset: "executions", filters: { branch: "main", limit: 10 } })
@@ -107,29 +120,29 @@ Examples:
           description:
             "Filter object. Common: branch, suite, limit, offset, execution_id, from/to dates, query (for search)",
           properties: {
-            branch: { type: "string" },
-            suite: { type: "string" },
-            from: { type: "string", description: "ISO date" },
-            to: { type: "string", description: "ISO date" },
-            date_range: { type: "string", enum: ["last_24h", "last_7d", "last_30d", "last_90d"] },
-            limit: { type: "number" },
-            offset: { type: "number" },
-            execution_id: { type: "number" },
-            test_signature: { type: "string" },
-            query: { type: "string" },
-            status: { type: "string" },
-            min_runs: { type: "number" },
-            include_resolved: { type: "boolean" },
-            group_by: { type: "string" },
-            period: { type: "string", enum: ["hour", "day", "week", "month"] },
-            count: { type: "number" },
-            threshold: { type: "number" },
-            hours: { type: "number" },
-            sort_by: { type: "string" },
-            include_artifacts: { type: "boolean" },
-            include_retries: { type: "boolean" },
-            include_stack_traces: { type: "boolean" },
-            lastRunOnly: { type: "boolean" },
+            branch: { type: "string", description: "Git branch name (exact match)" },
+            suite: { type: "string", description: "Test suite name" },
+            from: { type: "string", description: "Start date (ISO format)" },
+            to: { type: "string", description: "End date (ISO format)" },
+            date_range: { type: "string", enum: ["last_24h", "last_7d", "last_30d", "last_90d"], description: "Preset date range" },
+            limit: { type: "number", description: "Max results (default: 20)" },
+            offset: { type: "number", description: "Skip N results for pagination" },
+            execution_id: { type: "number", description: "Specific execution ID (required for execution_details, execution_failures)" },
+            test_signature: { type: "string", description: "Test identifier for history lookup" },
+            query: { type: "string", description: "Search query (required for test_search, semantic_search)" },
+            status: { type: "string", description: "Filter by status: passed, failed, skipped" },
+            min_runs: { type: "number", description: "Minimum runs to include (flaky_tests)" },
+            include_resolved: { type: "boolean", description: "Include resolved flaky tests" },
+            group_by: { type: "string", description: "Group results by field" },
+            period: { type: "string", enum: ["hour", "day", "week", "month"], description: "Aggregation period (trends)" },
+            count: { type: "number", description: "Number of data points (trends/stats)" },
+            threshold: { type: "number", description: "Similarity threshold 0-1 (clustered_failures)" },
+            hours: { type: "number", description: "Time window in hours" },
+            sort_by: { type: "string", description: "Sort field: duration, name, status" },
+            include_artifacts: { type: "boolean", description: "Include video/trace/screenshot URLs" },
+            include_retries: { type: "boolean", description: "Include retry attempts" },
+            include_stack_traces: { type: "boolean", description: "Include full stack traces" },
+            lastRunOnly: { type: "boolean", description: "Only most recent run per test" },
             // Semantic search filters
             status_filter: { type: "string", enum: ["all", "passed", "failed", "skipped"], description: "Filter by test status (semantic_search)" },
             search_mode: { type: "string", enum: ["semantic", "keyword", "hybrid"], description: "Search mode (semantic_search)" },
@@ -170,6 +183,22 @@ Actions:
 - create_mock_route: Add a route to a mock interface
 - create_mock_rule: Add a response rule to a route
 - delete_mock_interface: Remove a mock interface
+
+Mock API Workflow:
+1. create_mock_interface → Returns interface_id
+2. create_mock_route (requires interface_id) → Returns route_id
+3. create_mock_rule (requires route_id) → Mock ready!
+4. Test at: /api/mock/{org-slug}/{interface-slug}/{path}
+
+Matching (in create_mock_rule):
+- match_headers: { "Authorization": "Bearer *" } (wildcard)
+- match_query: { "status": "active" }
+- match_body: { "user.email": "*@test.com" }
+
+Templating:
+- {{request.params.id}} - Path params
+- {{request.body.field}} - JSON body
+- {{uuid}}, {{timestamp}} - Dynamic values
 
 Examples:
 - perform_exolar_action({ action: "compare", params: { baseline_branch: "main", current_branch: "feature" } })
@@ -277,47 +306,18 @@ Example: get_semantic_definition({ metric_id: "reliability_score" })`,
   // ============================================
   {
     name: "get_installation_config",
-    description: `You are the Exolar Integration Engineer. Your purpose is to guide users through CI/CD integration.
+    description: `Get CI/CD setup instructions for connecting Playwright to Exolar QA.
 
-<role>
-  Ensure successful connection of Playwright test suites to the Exolar QA Dashboard.
-</role>
+Returns: Configuration sections for your CI provider.
 
-<interaction_protocol>
-  <phase name="1. Discovery">
-    ALWAYS ask before providing configuration:
-    - "Which CI provider are you using? (GitHub Actions recommended, or running locally?)"
-    - "Are you using a monorepo structure?"
-    - "Do you have existing Playwright tests?"
-  </phase>
+Sections:
+- api_endpoint: API URL and authentication
+- playwright_reporter: Reporter config for playwright.config.ts
+- github_actions: GitHub Actions workflow YAML
+- env_variables: Required environment variables
+- all: Complete setup guide (default)
 
-  <phase name="2. Adaptation">
-    When you receive configuration data from this tool:
-    - Filter instructions based on their CI provider (focus on GitHub Actions)
-    - Highlight CRITICAL steps:
-      * Token setup in GitHub Secrets (Settings > Secrets > Actions)
-      * MERGE the reporter into playwright.config.ts (do NOT replace the entire file)
-      * Install the npm package first
-    - Explain HOW to do it in their specific environment
-    - For monorepo: Explain where to place reporters and how to configure per-package
-  </phase>
-
-  <phase name="3. Validation">
-    After providing config, suggest a dry run:
-    - "Try running: npx playwright test --reporter=@exolar/reporter locally first"
-    - "Check the console logs for 200 OK response from the Exolar API"
-    - "Verify test data appears at your dashboard URL"
-  </phase>
-</interaction_protocol>
-
-<troubleshooting_guide>
-  IF "401 Unauthorized": Check token expiration at /settings/mcp, regenerate if needed
-  IF "No data in dashboard": Verify reporter is added to playwright.config.ts reporters array
-  IF "Module not found": Run 'npm install @exolar/reporter' (package name may vary)
-  IF "Connection refused": Verify API URL is correct and dashboard is accessible
-</troubleshooting_guide>
-
-Returns: Configuration sections (api_endpoint, playwright_reporter, github_actions, env_variables)`,
+Example: get_installation_config({ section: "playwright_reporter" })`,
     inputSchema: {
       type: "object" as const,
       properties: {
