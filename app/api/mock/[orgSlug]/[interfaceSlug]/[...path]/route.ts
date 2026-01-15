@@ -267,7 +267,8 @@ async function handleMockRequest(
       headers: responseHeaders,
     })
   } catch (error) {
-    console.error("[mock] Error handling request:", error)
+    console.error("[mock] Error handling request:", error instanceof Error ? error.stack : error)
+    const errorDetails = error instanceof Error ? error.message : String(error)
 
     // Log error
     try {
