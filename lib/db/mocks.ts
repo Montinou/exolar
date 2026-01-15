@@ -908,21 +908,31 @@ export async function getMockWebhookActions(
 
 /**
  * Get active webhook actions for a rule
+ * Returns empty array if webhook feature tables don't exist yet
  */
 export async function getActiveWebhookActions(
   ruleId: number
 ): Promise<MockWebhookAction[]> {
   const sql = getSql()
 
-  const result = await sql`
-    SELECT *
-    FROM mock_webhook_actions
-    WHERE rule_id = ${ruleId}
-      AND is_active = true
-    ORDER BY created_at ASC
-  `
+  try {
+    const result = await sql`
+      SELECT *
+      FROM mock_webhook_actions
+      WHERE rule_id = ${ruleId}
+        AND is_active = true
+      ORDER BY created_at ASC
+    `
 
-  return result as MockWebhookAction[]
+    return result as MockWebhookAction[]
+  } catch (error) {
+    // Table may not exist if migration 022 hasn't been run
+    // Return empty array to allow mock handler to work without webhooks
+    if (error instanceof Error && error.message.includes("does not exist")) {
+      return []
+    }
+    throw error
+  }
 }
 
 /**
