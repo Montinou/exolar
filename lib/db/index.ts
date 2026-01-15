@@ -140,6 +140,7 @@ export { getFailureClassification } from "./classification"
 export {
   createApiKey,
   getApiKeysByOrg,
+  getApiKeysByUser,
   getApiKeyByHash,
   revokeApiKey,
   updateApiKeyLastUsed,
@@ -350,6 +351,7 @@ import { getFailureClassification } from "./classification"
 import {
   createApiKey,
   getApiKeysByOrg,
+  getApiKeysByUser,
   revokeApiKey,
 } from "./api-keys"
 import {
@@ -493,6 +495,7 @@ export function getQueriesForOrg(organizationId: number) {
     createApiKey: (name: string, keyHash: string, keyPrefix: string, createdBy: number | null) =>
       createApiKey(organizationId, name, keyHash, keyPrefix, createdBy),
     getApiKeys: () => getApiKeysByOrg(organizationId),
+    getApiKeysByUser: (userId: number) => getApiKeysByUser(organizationId, userId),
     revokeApiKey: (keyId: number) => revokeApiKey(keyId, organizationId),
 
     // Performance regression functions

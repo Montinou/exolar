@@ -7,7 +7,9 @@ export const dynamic = "force-dynamic"
 
 /**
  * GET /api/settings/api-keys
- * List all API keys for the user's organization (excludes key hashes)
+ * List API keys based on user role:
+ * - Admins: See all organization API keys
+ * - Viewers: See only their own keys
  */
 export async function GET() {
   try {
@@ -16,15 +18,15 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Only org admins can view API keys
-    if (!isOrgAdmin(context)) {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
-    }
-
     const db = getQueriesForOrg(context.organizationId)
-    const apiKeys = await db.getApiKeys()
+    const isAdmin = isOrgAdmin(context)
 
-    return NextResponse.json({ apiKeys })
+    // Role-based filtering
+    const apiKeys = isAdmin
+      ? await db.getApiKeys() // Admins see all org keys
+      : await db.getApiKeysByUser(context.userId) // Viewers see only their own
+
+    return NextResponse.json({ apiKeys, isAdmin })
   } catch (error) {
     console.error("[api-keys] Error fetching API keys:", error)
     return NextResponse.json({ error: "Failed to fetch API keys" }, { status: 500 })
@@ -33,7 +35,8 @@ export async function GET() {
 
 /**
  * POST /api/settings/api-keys
- * Create a new API key for the organization
+ * Create a new API key
+ * All authenticated users can create their own keys
  * Returns the full key ONCE - it cannot be retrieved again
  */
 export async function POST(request: Request) {
@@ -41,11 +44,6 @@ export async function POST(request: Request) {
     const context = await getSessionContext()
     if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Only org admins can create API keys
-    if (!isOrgAdmin(context)) {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 
     const body = await request.json()
@@ -62,7 +60,7 @@ export async function POST(request: Request) {
     // Generate the API key
     const { key, hash, prefix } = generateApiKey()
 
-    // Store in database
+    // Store in database (createdBy tracks ownership)
     const db = getQueriesForOrg(context.organizationId)
     const apiKey = await db.createApiKey(name.trim(), hash, prefix, context.userId)
 
@@ -82,17 +80,14 @@ export async function POST(request: Request) {
 /**
  * DELETE /api/settings/api-keys
  * Revoke an API key (soft delete)
+ * - Admins: Can revoke any org key
+ * - Viewers: Can only revoke keys they created
  */
 export async function DELETE(request: Request) {
   try {
     const context = await getSessionContext()
     if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Only org admins can revoke API keys
-    if (!isOrgAdmin(context)) {
-      return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -103,6 +98,17 @@ export async function DELETE(request: Request) {
     }
 
     const db = getQueriesForOrg(context.organizationId)
+    const isAdmin = isOrgAdmin(context)
+
+    // For non-admins, verify they own the key
+    if (!isAdmin) {
+      const userKeys = await db.getApiKeysByUser(context.userId)
+      const ownsKey = userKeys.some(k => k.id === Number(keyId))
+      if (!ownsKey) {
+        return NextResponse.json({ error: "Forbidden: You can only revoke your own keys" }, { status: 403 })
+      }
+    }
+
     const revoked = await db.revokeApiKey(Number(keyId))
 
     if (!revoked) {

@@ -59,6 +59,7 @@ export default function ApiKeysSettingsPage() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   // Create dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -80,15 +81,12 @@ export default function ApiKeysSettingsPage() {
       setLoading(true)
       const res = await fetch("/api/settings/api-keys")
       if (!res.ok) {
-        if (res.status === 403) {
-          setError("You need admin access to manage API keys")
-        } else {
-          setError("Failed to load API keys")
-        }
+        setError("Failed to load API keys")
         return
       }
       const data = await res.json()
       setApiKeys(data.apiKeys || [])
+      setIsAdmin(data.isAdmin || false)
       setError(null)
     } catch {
       setError("Failed to load API keys")
@@ -199,10 +197,12 @@ export default function ApiKeysSettingsPage() {
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
                 }}
-              >API Keys</h1>
+              >{isAdmin ? "Organization API Keys" : "Your API Keys"}</h1>
             </div>
             <p className="text-muted-foreground">
-              Manage API keys for CI/CD integration
+              {isAdmin
+                ? "Manage API keys for your organization's CI/CD integrations"
+                : "Manage your personal API keys for CI/CD integration"}
             </p>
           </div>
           <Button className="btn-amber" onClick={() => setCreateDialogOpen(true)}>
@@ -223,7 +223,9 @@ export default function ApiKeysSettingsPage() {
           <CardHeader>
             <CardTitle>Active Keys ({activeKeys.length})</CardTitle>
             <CardDescription>
-              API keys used for GitHub Actions and CI/CD integrations
+              {isAdmin
+                ? "All organization API keys for GitHub Actions and CI/CD integrations"
+                : "Your personal API keys for CI/CD integrations"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -232,7 +234,7 @@ export default function ApiKeysSettingsPage() {
             ) : activeKeys.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Key className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No API keys yet</p>
+                <p>{isAdmin ? "No organization API keys yet" : "No API keys yet"}</p>
                 <p className="text-sm">Create one to start uploading test results from CI/CD</p>
               </div>
             ) : (

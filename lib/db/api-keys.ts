@@ -59,6 +59,35 @@ export async function getApiKeysByOrg(organizationId: number): Promise<OrgApiKey
 }
 
 /**
+ * Get API keys created by a specific user (for non-admin access)
+ */
+export async function getApiKeysByUser(
+  organizationId: number,
+  userId: number
+): Promise<OrgApiKey[]> {
+  const sql = getSql()
+
+  const result = await sql`
+    SELECT
+      id,
+      organization_id,
+      name,
+      key_prefix,
+      created_by,
+      created_at,
+      last_used_at,
+      expires_at,
+      revoked_at
+    FROM organization_api_keys
+    WHERE organization_id = ${organizationId}
+      AND created_by = ${userId}
+    ORDER BY created_at DESC
+  `
+
+  return result as OrgApiKey[]
+}
+
+/**
  * Get an API key by its hash (for validation)
  */
 export async function getApiKeyByHash(keyHash: string): Promise<OrgApiKeyWithHash | null> {

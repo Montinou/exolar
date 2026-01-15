@@ -14,6 +14,7 @@ import {
   ChevronUp,
   Shield,
   Webhook,
+  Key,
 } from "lucide-react"
 import { authClient } from "@/lib/auth/client"
 import { useAccess } from "@/components/auth/access-context"
@@ -157,6 +158,16 @@ function DashboardSidebarContent() {
 
       <SidebarFooter className="border-t border-border/40">
         <SidebarMenu>
+          {/* API Keys - visible to all */}
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={pathname.startsWith("/settings/api-keys")} tooltip="API Keys">
+              <Link href="/settings/api-keys">
+                <Key className="h-4 w-4" />
+                <span>API Keys</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           {/* Admin link if admin */}
           {isAdmin && (
             <SidebarMenuItem>
