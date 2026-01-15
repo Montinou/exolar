@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Clock,
   Activity,
+  Play,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,8 +59,9 @@ import type {
   MockInterface,
   MockRouteWithRuleCount,
   MockResponseRule,
-  MockRequestLog,
 } from "@/lib/types"
+import { TestEndpointModal } from "@/components/dashboard/mocks/test-endpoint-modal"
+import { MockLogsViewer } from "@/components/dashboard/mocks/mock-logs-viewer"
 
 interface MockInterfaceWithRoutes extends MockInterface {
   public_url: string
@@ -72,10 +74,11 @@ export default function MockDetailPage() {
   const interfaceId = params.id as string
 
   const [mockInterface, setMockInterface] = useState<MockInterfaceWithRoutes | null>(null)
-  const [logs, setLogs] = useState<MockRequestLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [logsLoading, setLogsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Test endpoint modal state
+  const [isTestModalOpen, setIsTestModalOpen] = useState(false)
 
   // Route dialog state
   const [isRouteDialogOpen, setIsRouteDialogOpen] = useState(false)
@@ -126,20 +129,6 @@ export default function MockDetailPage() {
       setLoading(false)
     }
   }, [interfaceId, router])
-
-  const fetchLogs = useCallback(async () => {
-    try {
-      setLogsLoading(true)
-      const res = await fetch(`/api/mocks/${interfaceId}/logs?limit=50`)
-      if (!res.ok) throw new Error("Failed to fetch logs")
-      const data = await res.json()
-      setLogs(data.logs)
-    } catch (err) {
-      console.error("Error fetching logs:", err)
-    } finally {
-      setLogsLoading(false)
-    }
-  }, [interfaceId])
 
   const fetchRulesForRoute = async (routeId: number) => {
     try {
@@ -369,6 +358,10 @@ export default function MockDetailPage() {
                 <ExternalLink className="h-4 w-4" />
               </a>
             </Button>
+            <Button onClick={() => setIsTestModalOpen(true)}>
+              <Play className="h-4 w-4 mr-2" />
+              Test Endpoint
+            </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
             Rate limit: {mockInterface.rate_limit_rpm} requests/minute
@@ -377,7 +370,7 @@ export default function MockDetailPage() {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="routes" onValueChange={(v) => v === "logs" && fetchLogs()}>
+      <Tabs defaultValue="routes">
         <TabsList>
           <TabsTrigger value="routes">
             Routes ({mockInterface.routes.length})
@@ -601,56 +594,23 @@ export default function MockDetailPage() {
         </TabsContent>
 
         <TabsContent value="logs">
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle>Recent Requests</CardTitle>
-              <CardDescription>Last 50 requests to this mock interface</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {logsLoading ? (
-                <div className="space-y-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
-              ) : logs.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  No requests logged yet
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {logs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg"
-                    >
-                      <Badge className={getMethodColor(log.method)}>{log.method}</Badge>
-                      <code className="text-sm flex-1 truncate">{log.path}</code>
-                      <Badge
-                        variant={
-                          log.matched
-                            ? log.response_status && log.response_status < 400
-                              ? "default"
-                              : "destructive"
-                            : "secondary"
-                        }
-                      >
-                        {log.response_status || "—"}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground w-[100px]">
-                        {log.response_time_ms}ms
-                      </span>
-                      <span className="text-xs text-muted-foreground w-[150px]">
-                        {formatDate(log.request_at)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <MockLogsViewer
+            interfaceId={parseInt(interfaceId, 10)}
+            interfaceName={mockInterface.slug}
+          />
         </TabsContent>
       </Tabs>
+
+      {/* Test Endpoint Modal */}
+      <TestEndpointModal
+        open={isTestModalOpen}
+        onOpenChange={setIsTestModalOpen}
+        baseUrl={mockInterface.public_url}
+        routes={mockInterface.routes.map((r) => ({
+          path_pattern: r.path_pattern,
+          method: r.method,
+        }))}
+      />
 
       {/* Add Rule Dialog */}
       <Dialog open={isRuleDialogOpen} onOpenChange={setIsRuleDialogOpen}>

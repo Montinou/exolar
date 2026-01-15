@@ -804,6 +804,10 @@ export interface MockRoute {
   description: string | null
   is_active: boolean
   priority: number
+  // JSON Schema fields
+  request_schema: Record<string, unknown> | null
+  response_schema: Record<string, unknown> | null
+  validate_request: boolean
   created_at: string
   updated_at: string
 }
@@ -859,6 +863,7 @@ export interface MockRequestLog {
   response_status: number | null
   response_body: string | null
   matched: boolean
+  validation_errors: Array<{ path: string; message: string; keyword: string }> | null
   request_at: string
   response_time_ms: number | null
 }
@@ -892,6 +897,10 @@ export interface CreateMockRouteRequest {
   method: string
   description?: string
   priority?: number
+  // JSON Schema fields
+  request_schema?: Record<string, unknown>
+  response_schema?: Record<string, unknown>
+  validate_request?: boolean
 }
 
 /**
@@ -903,6 +912,10 @@ export interface UpdateMockRouteRequest {
   description?: string
   is_active?: boolean
   priority?: number
+  // JSON Schema fields
+  request_schema?: Record<string, unknown> | null
+  response_schema?: Record<string, unknown> | null
+  validate_request?: boolean
 }
 
 /**
@@ -955,4 +968,86 @@ export interface MockRouteMatch {
   interface: MockInterface
   route: MockRoute
   params: Record<string, string>
+}
+
+// ============================================
+// Mock Webhook Types
+// ============================================
+
+/**
+ * Webhook action - triggers external HTTP request when a rule matches
+ */
+export interface MockWebhookAction {
+  id: number
+  rule_id: number
+  name: string
+  // Target configuration
+  target_url: string
+  target_method: string
+  target_headers: Record<string, string>
+  target_body: string | null
+  // Options
+  forward_request_body: boolean
+  forward_request_headers: boolean
+  timeout_ms: number
+  retry_count: number
+  // Metadata
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Webhook execution log
+ */
+export interface MockWebhookLog {
+  id: number
+  action_id: number
+  request_log_id: number | null
+  // Request sent
+  request_url: string
+  request_method: string
+  request_headers: Record<string, string> | null
+  request_body: string | null
+  // Response received
+  response_status: number | null
+  response_headers: Record<string, string> | null
+  response_body: string | null
+  // Execution details
+  success: boolean
+  error_message: string | null
+  duration_ms: number | null
+  retry_attempt: number
+  executed_at: string
+}
+
+/**
+ * Request to create a webhook action
+ */
+export interface CreateMockWebhookActionRequest {
+  name: string
+  target_url: string
+  target_method?: string
+  target_headers?: Record<string, string>
+  target_body?: string
+  forward_request_body?: boolean
+  forward_request_headers?: boolean
+  timeout_ms?: number
+  retry_count?: number
+}
+
+/**
+ * Request to update a webhook action
+ */
+export interface UpdateMockWebhookActionRequest {
+  name?: string
+  target_url?: string
+  target_method?: string
+  target_headers?: Record<string, string>
+  target_body?: string | null
+  forward_request_body?: boolean
+  forward_request_headers?: boolean
+  timeout_ms?: number
+  retry_count?: number
+  is_active?: boolean
 }

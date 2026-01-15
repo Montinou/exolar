@@ -6,6 +6,8 @@ import {
   logMockRequest,
   incrementRuleHitCount,
   checkRateLimit,
+  getActiveWebhookActions,
+  logWebhookExecution,
 } from "@/lib/db"
 import {
   matchPath,
@@ -15,6 +17,8 @@ import {
   headersToObject,
   searchParamsToObject,
 } from "@/lib/mock-utils"
+import { validateRequestBody } from "@/lib/mock-schema-validator"
+import { executeWebhooks } from "@/lib/services/mock-webhook-service"
 import type { MockRequestContext, MockRoute, MockResponseRule } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
@@ -108,7 +112,37 @@ async function handleMockRequest(
       })
     }
 
-    // 4. Build request context for rule matching
+    // 4. Validate request body against schema (if enabled)
+    if (matchedRoute.route.validate_request && matchedRoute.route.request_schema) {
+      const validation = validateRequestBody(requestBody, matchedRoute.route.request_schema)
+      if (!validation.valid) {
+        const errorResponse = {
+          error: "Request validation failed",
+          validation_errors: validation.errors,
+        }
+
+        // Log validation failure
+        await logMockRequest({
+          interface_id: mockInterface.id,
+          route_id: matchedRoute.route.id,
+          rule_id: null,
+          method,
+          path: requestPath,
+          headers: requestHeaders,
+          query_params: requestQuery,
+          body: typeof requestBody === "string" ? requestBody : JSON.stringify(requestBody),
+          response_status: 400,
+          response_body: JSON.stringify(errorResponse),
+          matched: false,
+          response_time_ms: Date.now() - startTime,
+          validation_errors: validation.errors,
+        })
+
+        return NextResponse.json(errorResponse, { status: 400 })
+      }
+    }
+
+    // 5. Build request context for rule matching
     const requestContext: MockRequestContext = {
       headers: requestHeaders,
       query: requestQuery,
@@ -174,7 +208,48 @@ async function handleMockRequest(
       response_time_ms: Date.now() - startTime,
     })
 
-    // 10. Build and return response
+    // 10. Trigger webhooks asynchronously (fire and forget)
+    const webhookActions = await getActiveWebhookActions(matchedRule.id)
+    if (webhookActions.length > 0) {
+      // Execute webhooks in background, don't block the response
+      executeWebhooks(webhookActions, requestContext, {
+        body: requestBody,
+        headers: requestHeaders,
+      })
+        .then(async (results) => {
+          // Log webhook executions
+          for (const { action, result } of results) {
+            try {
+              await logWebhookExecution({
+                action_id: action.id,
+                request_log_id: null, // We don't have the log ID here
+                request_url: action.target_url,
+                request_method: action.target_method,
+                request_headers: action.target_headers,
+                request_body: action.forward_request_body
+                  ? typeof requestBody === "string"
+                    ? requestBody
+                    : JSON.stringify(requestBody)
+                  : action.target_body,
+                response_status: result.responseStatus ?? null,
+                response_headers: result.responseHeaders ?? null,
+                response_body: result.responseBody ?? null,
+                success: result.success,
+                error_message: result.errorMessage ?? null,
+                duration_ms: result.durationMs,
+                retry_attempt: 0,
+              })
+            } catch (logError) {
+              console.error("[mock] Error logging webhook execution:", logError)
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("[mock] Error executing webhooks:", err)
+        })
+    }
+
+    // 11. Build and return response
     const responseHeaders = new Headers(matchedRule.response_headers || {})
 
     // Add rate limit headers

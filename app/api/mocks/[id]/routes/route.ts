@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg } from "@/lib/db"
+import { isValidJsonSchema } from "@/lib/mock-schema-validator"
 
 export const dynamic = "force-dynamic"
 
@@ -63,7 +64,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     const body = await request.json()
-    const { path_pattern, method, description, priority } = body
+    const { path_pattern, method, description, priority, request_schema, response_schema, validate_request } = body
 
     if (!path_pattern) {
       return NextResponse.json({ error: "path_pattern is required" }, { status: 400 })
@@ -81,11 +82,22 @@ export async function POST(request: Request, { params }: RouteParams) {
       )
     }
 
+    // Validate JSON schemas if provided
+    if (request_schema && !isValidJsonSchema(request_schema)) {
+      return NextResponse.json({ error: "Invalid request_schema: not a valid JSON Schema" }, { status: 400 })
+    }
+    if (response_schema && !isValidJsonSchema(response_schema)) {
+      return NextResponse.json({ error: "Invalid response_schema: not a valid JSON Schema" }, { status: 400 })
+    }
+
     const route = await db.createMockRoute(interfaceId, {
       path_pattern,
       method: method || "GET",
       description,
       priority,
+      request_schema,
+      response_schema,
+      validate_request,
     })
 
     return NextResponse.json({ route }, { status: 201 })

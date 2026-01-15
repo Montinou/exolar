@@ -229,6 +229,8 @@ export {
 
 // Mock API endpoints
 export {
+  // Table check
+  checkMockTablesExist,
   // Interface CRUD
   createMockInterface,
   getMockInterfaces,
@@ -255,9 +257,23 @@ export {
   // Request logging
   logMockRequest,
   getMockRequestLogs,
+  getMockRequestLogsFiltered,
+  getMockLogStats,
+  type MockRequestLogFilters,
   // Rate limiting
   checkRateLimit,
   cleanupRateLimitHits,
+  // Webhook actions
+  createMockWebhookAction,
+  getMockWebhookActions,
+  getActiveWebhookActions,
+  getMockWebhookActionById,
+  updateMockWebhookAction,
+  deleteMockWebhookAction,
+  // Webhook logs
+  logWebhookExecution,
+  getMockWebhookLogs,
+  getWebhookLogsByRequestLog,
 } from "./mocks"
 
 // ============================================
@@ -379,6 +395,7 @@ import {
   isClustered,
 } from "./cluster-cache"
 import {
+  checkMockTablesExist,
   createMockInterface,
   getMockInterfaces,
   getMockInterfaceById,
@@ -596,5 +613,8 @@ export function getQueriesForOrg(organizationId: number) {
     deleteMockResponseRule: (ruleId: number) => deleteMockResponseRule(ruleId),
     getMockRequestLogs: (interfaceId: number, limit?: number) =>
       getMockRequestLogs(interfaceId, limit),
+    getMockRequestLogsFiltered: (interfaceId: number, filters?: MockRequestLogFilters) =>
+      getMockRequestLogsFiltered(interfaceId, filters),
+    getMockLogStats: (interfaceId: number) => getMockLogStats(interfaceId),
   }
 }

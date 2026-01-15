@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSessionContext } from "@/lib/session-context"
-import { getQueriesForOrg, getMockInterfaceBySlug } from "@/lib/db"
+import { getQueriesForOrg, getMockInterfaceBySlug, checkMockTablesExist } from "@/lib/db"
 import { isValidSlug, generateSlug } from "@/lib/mock-utils"
 
 export const dynamic = "force-dynamic"
@@ -10,6 +10,17 @@ export const dynamic = "force-dynamic"
  */
 export async function GET() {
   try {
+    // Check if mock tables exist first
+    const tablesExist = await checkMockTablesExist()
+    if (!tablesExist) {
+      console.error("[/api/mocks] Mock tables do not exist. Run migration 020_add_mock_endpoints.sql")
+      return NextResponse.json({
+        error: "Mock API tables not initialized",
+        code: "TABLES_NOT_INITIALIZED",
+        message: "Please run migration scripts/020_add_mock_endpoints.sql",
+      }, { status: 503 })
+    }
+
     const context = await getSessionContext()
     if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -27,8 +38,11 @@ export async function GET() {
 
     return NextResponse.json({ interfaces: interfacesWithUrls })
   } catch (error) {
-    console.error("Error fetching mock interfaces:", error)
-    return NextResponse.json({ error: "Failed to fetch mock interfaces" }, { status: 500 })
+    console.error("[/api/mocks GET] Error:", error instanceof Error ? error.message : error)
+    return NextResponse.json({
+      error: "Failed to fetch mock interfaces",
+      details: process.env.NODE_ENV === "development" ? String(error) : undefined,
+    }, { status: 500 })
   }
 }
 
@@ -37,6 +51,16 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   try {
+    // Check if mock tables exist first
+    const tablesExist = await checkMockTablesExist()
+    if (!tablesExist) {
+      return NextResponse.json({
+        error: "Mock API tables not initialized",
+        code: "TABLES_NOT_INITIALIZED",
+        message: "Please run migration scripts/020_add_mock_endpoints.sql",
+      }, { status: 503 })
+    }
+
     const context = await getSessionContext()
     if (!context) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -87,7 +111,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ interface: interfaceWithUrl }, { status: 201 })
   } catch (error) {
-    console.error("Error creating mock interface:", error)
-    return NextResponse.json({ error: "Failed to create mock interface" }, { status: 500 })
+    console.error("[/api/mocks POST] Error:", error instanceof Error ? error.message : error)
+    return NextResponse.json({
+      error: "Failed to create mock interface",
+      details: process.env.NODE_ENV === "development" ? String(error) : undefined,
+    }, { status: 500 })
   }
 }

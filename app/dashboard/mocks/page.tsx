@@ -67,7 +67,13 @@ export default function MocksPage() {
     try {
       setLoading(true)
       const res = await fetch("/api/mocks")
-      if (!res.ok) throw new Error("Failed to fetch mock interfaces")
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Failed to fetch mock interfaces" }))
+        if (data.code === "TABLES_NOT_INITIALIZED") {
+          throw new Error("Mock API tables not initialized. Please run database migration 020_add_mock_endpoints.sql")
+        }
+        throw new Error(data.error || "Failed to fetch mock interfaces")
+      }
       const data = await res.json()
       setInterfaces(data.interfaces)
     } catch (err) {

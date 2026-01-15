@@ -73,7 +73,10 @@ export async function getSessionContext(): Promise<SessionContext | null> {
       orgRole: (row.org_role as "owner" | "admin" | "viewer") || "viewer",
     }
   } catch (error) {
-    console.error("Error getting session context:", error)
+    console.error("[session-context] Error getting session:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.split("\n").slice(0, 3).join("\n") : undefined,
+    })
     return null
   }
 }
