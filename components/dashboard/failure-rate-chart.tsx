@@ -22,6 +22,13 @@ interface FailureRateChartProps {
   failureRate?: number // Passed from getDashboardMetrics for consistent display
 }
 
+function getFilterLabel(dateFrom?: string, dateTo?: string): string {
+  if (dateFrom || dateTo) {
+    return "Filtered"
+  }
+  return "Last 15 days"
+}
+
 export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate }: FailureRateChartProps) {
   const [data, setData] = useState<FailureTrendData[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,12 +76,15 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate 
           })()
         : 0
 
+  const filterLabel = getFilterLabel(dateFrom, dateTo)
+
   if (loading) {
     return (
       <div className="glass-card glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
           <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+          <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
         <div className="h-[200px] sm:h-[220px] flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -89,6 +99,7 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate 
         <div className="flex items-center gap-2 mb-4">
           <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+          <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
         <div className="h-[200px] sm:h-[220px] flex items-center justify-center text-muted-foreground text-sm">
           No data available for selected period
@@ -103,6 +114,7 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate 
         <div className="flex items-center gap-2">
           <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+          <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
         <span className="text-xs stat-value-error">
           Avg: {avgFailureRate.toFixed(1)}%
