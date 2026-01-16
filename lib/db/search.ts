@@ -266,6 +266,24 @@ export async function getErrorTypeDistribution(
   // Ensure limit is within bounds (1-100)
   const safeLimit = Math.min(Math.max(1, limit), 100)
 
+  // CASE expression for tr2 (used in subquery for example_message)
+  const errorTypeCaseExpressionTr2 = `
+    CASE
+      WHEN tr2.ai_context->'error'->>'type' IS NOT NULL
+        THEN tr2.ai_context->'error'->>'type'
+      WHEN tr2.error_message ILIKE '%timeout%' OR tr2.error_message ILIKE '%exceeded%'
+        THEN 'TimeoutError'
+      WHEN tr2.error_message ILIKE '%strict mode violation%'
+        THEN 'StrictModeError'
+      WHEN tr2.error_message ILIKE '%expect(%' OR tr2.stack_trace ILIKE '%AssertionError%'
+        THEN 'AssertionError'
+      WHEN tr2.error_message ILIKE '%navigation%'
+        THEN 'NavigationError'
+      WHEN tr2.error_message ILIKE '%net::%'
+        THEN 'NetworkError'
+      ELSE 'Error'
+    END`
+
   // Query with percentage calculation using CTE and example_message from most recent occurrence
   const query = `
     WITH total_count AS (
@@ -295,7 +313,7 @@ export async function getErrorTypeDistribution(
         FROM test_results tr2
         JOIN test_executions te2 ON tr2.execution_id = te2.id
         WHERE ${groupBy === 'error_type'
-          ? "tr2.ai_context->'error'->>'type' = g.error_type"
+          ? `(${errorTypeCaseExpressionTr2}) = g.error_type`
           : groupBy === 'file'
             ? "tr2.test_file = g.error_type"
             : "te2.branch = g.error_type"}
