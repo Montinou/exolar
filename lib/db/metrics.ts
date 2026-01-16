@@ -697,7 +697,7 @@ export async function getReliabilityScore(
     ? ""
     : from && to
       ? `AND te.started_at BETWEEN '${from}'::timestamptz AND '${to}'::timestamptz`
-      : `AND te.started_at > NOW() - INTERVAL '7 days'`
+      : `AND te.started_at > NOW() - INTERVAL '15 days'`
 
   // Build optional branch/suite filters
   const branchFilter = branch ? `AND te.branch = '${branch}'` : ""

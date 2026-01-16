@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, differenceInDays } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -71,9 +71,29 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
 
   const hasFilters = (showStatus && currentStatus) || currentBranch || currentSuite || currentFrom || currentTo
 
+  // Calculate period label for showing active time range
+  const getPeriodLabel = () => {
+    if (currentFrom && currentTo) {
+      const fromDate = parseISO(currentFrom)
+      const toDate = parseISO(currentTo)
+      const days = differenceInDays(toDate, fromDate) + 1
+      return `${days} day${days !== 1 ? "s" : ""} selected`
+    }
+    if (currentFrom) {
+      return `From ${currentFrom}`
+    }
+    if (currentTo) {
+      return `Until ${currentTo}`
+    }
+    return "Last 15 days"
+  }
+
   return (
     <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
       <DateRangePicker value={dateRange} onChange={updateDateRange} className="w-full sm:w-auto" />
+      <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline-flex items-center">
+        {getPeriodLabel()}
+      </span>
 
       {showStatus && (
         <Select
