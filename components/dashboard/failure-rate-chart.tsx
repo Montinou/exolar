@@ -55,9 +55,14 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite }: FailureRat
     }),
   }))
 
+  // Weighted average: total_failed / total_tests (not average of daily rates)
   const avgFailureRate =
     data.length > 0
-      ? data.reduce((sum, d) => sum + Number(d.failure_rate), 0) / data.length
+      ? (() => {
+          const totalTests = data.reduce((sum, d) => sum + Number(d.total_tests), 0)
+          const totalFailed = data.reduce((sum, d) => sum + Number(d.failed_tests), 0)
+          return totalTests > 0 ? (totalFailed / totalTests) * 100 : 0
+        })()
       : 0
 
   if (loading) {
