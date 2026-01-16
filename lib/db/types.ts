@@ -202,3 +202,18 @@ export interface ErrorDistributionItem {
   percentage: number
   example_message: string | null
 }
+
+export interface GetSlowestTestsOptions {
+  limit?: number
+  minRuns?: number
+  from?: string
+  to?: string
+  branch?: string
+  suite?: string
+}
+
+export interface GetSuitePassRatesOptions {
+  from?: string
+  to?: string
+  branch?: string
+}

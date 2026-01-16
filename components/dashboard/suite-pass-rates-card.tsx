@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import {
   BarChart,
   Bar,
@@ -21,6 +21,12 @@ interface SuitePassRate {
   failed_count: number
 }
 
+interface SuitePassRatesCardProps {
+  dateFrom?: string
+  dateTo?: string
+  branch?: string
+}
+
 function getBarColor(passRate: number): string {
   if (passRate >= 90) return "var(--status-success)"
   if (passRate >= 75) return "var(--status-warning)"
@@ -33,14 +39,36 @@ function getValueClass(passRate: number): string {
   return "stat-value-error"
 }
 
-export function SuitePassRatesCard() {
+function getFilterLabel(dateFrom?: string, dateTo?: string): string {
+  if (dateFrom || dateTo) {
+    return "Filtered"
+  }
+  return "Last 15 days"
+}
+
+export function SuitePassRatesCard({
+  dateFrom,
+  dateTo,
+  branch,
+}: SuitePassRatesCardProps) {
   const [suites, setSuites] = useState<SuitePassRate[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Build stable API URL
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams()
+    if (dateFrom) params.set("from", dateFrom)
+    if (dateTo) params.set("to", dateTo)
+    if (branch) params.set("branch", branch)
+    const queryString = params.toString()
+    return queryString ? `/api/suite-pass-rates?${queryString}` : "/api/suite-pass-rates"
+  }, [dateFrom, dateTo, branch])
+
   useEffect(() => {
     async function fetchData() {
+      setLoading(true)
       try {
-        const response = await fetch("/api/suite-pass-rates")
+        const response = await fetch(apiUrl)
         const json = await response.json()
         setSuites(json.suites || [])
       } catch (error) {
@@ -51,7 +79,7 @@ export function SuitePassRatesCard() {
     }
 
     fetchData()
-  }, [])
+  }, [apiUrl])
 
   // Format suite names for display
   const formattedData = Array.isArray(suites)
@@ -96,6 +124,7 @@ export function SuitePassRatesCard() {
 
   // Calculate chart height based on number of suites
   const chartHeight = Math.max(180, formattedData.length * 40)
+  const filterLabel = getFilterLabel(dateFrom, dateTo)
 
   return (
     <div className="glass-card glass-card-glow p-6">
@@ -104,7 +133,7 @@ export function SuitePassRatesCard() {
           <Layers className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Suite Pass Rates</h3>
         </div>
-        <span className="text-xs text-muted-foreground">Last 7 days</span>
+        <span className="text-xs text-muted-foreground">{filterLabel}</span>
       </div>
       <div style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">

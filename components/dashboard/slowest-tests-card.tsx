@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Clock, FileCode, Loader2 } from "lucide-react"
 
@@ -12,21 +12,52 @@ interface SlowestTest {
   run_count: number
 }
 
+interface SlowestTestsCardProps {
+  dateFrom?: string
+  dateTo?: string
+  branch?: string
+  suite?: string
+}
+
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
   return `${(ms / 60000).toFixed(1)}m`
 }
 
-export function SlowestTestsCard() {
+function getFilterLabel(dateFrom?: string, dateTo?: string): string {
+  if (dateFrom || dateTo) {
+    return "Filtered"
+  }
+  return "Last 15 days"
+}
+
+export function SlowestTestsCard({
+  dateFrom,
+  dateTo,
+  branch,
+  suite,
+}: SlowestTestsCardProps) {
   const [tests, setTests] = useState<SlowestTest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Build stable API URL
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams()
+    params.set("limit", "5")
+    if (dateFrom) params.set("from", dateFrom)
+    if (dateTo) params.set("to", dateTo)
+    if (branch) params.set("branch", branch)
+    if (suite) params.set("suite", suite)
+    return `/api/slowest-tests?${params.toString()}`
+  }, [dateFrom, dateTo, branch, suite])
+
   useEffect(() => {
     async function fetchData() {
+      setLoading(true)
       try {
-        const response = await fetch("/api/slowest-tests?limit=5")
+        const response = await fetch(apiUrl)
         if (!response.ok) {
           throw new Error("Failed to fetch slowest tests")
         }
@@ -41,7 +72,7 @@ export function SlowestTestsCard() {
     }
 
     fetchData()
-  }, [])
+  }, [apiUrl])
 
   if (loading) {
     return (
@@ -91,6 +122,8 @@ export function SlowestTestsCard() {
     )
   }
 
+  const filterLabel = getFilterLabel(dateFrom, dateTo)
+
   return (
     <div className="glass-card glass-card-glow p-6">
       <div className="flex items-center justify-between mb-4">
@@ -98,7 +131,7 @@ export function SlowestTestsCard() {
           <Clock className="h-5 w-5 text-[var(--exolar-cyan)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Slowest Tests</h3>
         </div>
-        <Badge variant="secondary">Last 7 days</Badge>
+        <Badge variant="secondary">{filterLabel}</Badge>
       </div>
       <div className="space-y-2">
         {tests.map((test) => (

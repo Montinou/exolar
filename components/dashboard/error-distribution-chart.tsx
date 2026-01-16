@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import {
   BarChart,
   Bar,
@@ -20,14 +20,45 @@ interface ErrorDistribution {
   example_message: string | null
 }
 
-export function ErrorDistributionChart() {
+interface ErrorDistributionChartProps {
+  dateFrom?: string
+  dateTo?: string
+  branch?: string
+  suite?: string
+}
+
+function getFilterLabel(dateFrom?: string, dateTo?: string): string {
+  if (dateFrom || dateTo) {
+    return "Filtered"
+  }
+  return "Last 15 days"
+}
+
+export function ErrorDistributionChart({
+  dateFrom,
+  dateTo,
+  branch,
+  suite,
+}: ErrorDistributionChartProps) {
   const [data, setData] = useState<ErrorDistribution[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Build stable API URL - convert from/to to since for the API
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams()
+    // The API uses 'since' parameter, so we use dateFrom as since
+    if (dateFrom) params.set("since", dateFrom)
+    if (branch) params.set("branch", branch)
+    if (suite) params.set("suite", suite)
+    const queryString = params.toString()
+    return queryString ? `/api/error-distribution?${queryString}` : "/api/error-distribution"
+  }, [dateFrom, branch, suite])
+
   useEffect(() => {
     async function fetchData() {
+      setLoading(true)
       try {
-        const response = await fetch("/api/error-distribution")
+        const response = await fetch(apiUrl)
         const json = await response.json()
         setData(json.distribution || [])
       } catch (error) {
@@ -38,7 +69,7 @@ export function ErrorDistributionChart() {
     }
 
     fetchData()
-  }, [])
+  }, [apiUrl])
 
   // Format error type for display
   const formattedData = Array.isArray(data)
@@ -87,6 +118,8 @@ export function ErrorDistributionChart() {
     )
   }
 
+  const filterLabel = getFilterLabel(dateFrom, dateTo)
+
   return (
     <div className="glass-card glass-card-glow p-6">
       <div className="flex items-center justify-between mb-4">
@@ -94,7 +127,7 @@ export function ErrorDistributionChart() {
           <AlertCircle className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Error Distribution</h3>
         </div>
-        <span className="text-xs text-muted-foreground">Last 7 days</span>
+        <span className="text-xs text-muted-foreground">{filterLabel}</span>
       </div>
       <div className="h-[200px] sm:h-[220px]">
         <ResponsiveContainer width="100%" height="100%">

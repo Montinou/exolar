@@ -8,6 +8,8 @@ import type {
   SlowestTest,
   SuitePassRate,
   ReliabilityScoreOptions,
+  GetSlowestTestsOptions,
+  GetSuitePassRatesOptions,
 } from "./types"
 import type {
   DashboardMetrics,
@@ -455,10 +457,42 @@ export async function getSuites(
 
 export async function getSlowestTests(
   organizationId: number,
-  limit: number = 5,
-  minRuns: number = 3
+  options?: GetSlowestTestsOptions | number,
+  minRunsLegacy?: number
 ): Promise<SlowestTest[]> {
   const sql = getSql()
+
+  // Handle backwards compatibility: (limit, minRuns) or (options)
+  const opts: GetSlowestTestsOptions = typeof options === "number"
+    ? { limit: options, minRuns: minRunsLegacy }
+    : options || {}
+
+  const { limit = 5, minRuns = 3, from, to, branch, suite } = opts
+
+  // Build conditions
+  const conditions = [`te.organization_id = ${organizationId}`]
+
+  // Date range filtering - default to 15 days if no dates provided
+  if (from) {
+    conditions.push(`te.started_at >= '${from}'`)
+  } else if (!to) {
+    // Default: 15 days when no dates specified
+    conditions.push("te.started_at > NOW() - INTERVAL '15 days'")
+  }
+
+  if (to) {
+    conditions.push(`te.started_at <= '${to}'`)
+  }
+
+  // Optional branch/suite filters
+  if (branch) {
+    conditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+  }
+  if (suite) {
+    conditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+  }
+
+  const whereClause = conditions.join(" AND ")
 
   const result = await sql`
     SELECT
@@ -469,8 +503,7 @@ export async function getSlowestTests(
       COUNT(*) as run_count
     FROM test_results tr
     JOIN test_executions te ON tr.execution_id = te.id
-    WHERE te.organization_id = ${organizationId}
-      AND te.started_at > NOW() - INTERVAL '7 days'
+    WHERE ${sql.unsafe(whereClause)}
     GROUP BY tr.test_signature, tr.test_name, tr.test_file
     HAVING COUNT(*) >= ${minRuns}
     ORDER BY avg_duration_ms DESC
@@ -480,8 +513,30 @@ export async function getSlowestTests(
   return result as SlowestTest[]
 }
 
-export async function getSuitePassRates(organizationId: number): Promise<SuitePassRate[]> {
+export async function getSuitePassRates(
+  organizationId: number,
+  options?: GetSuitePassRatesOptions
+): Promise<SuitePassRate[]> {
   const sql = getSql()
+
+  const { from, to, branch } = options || {}
+
+  // Build date filter - default to 15 days when no dates specified
+  let dateFilter: string
+  if (from && to) {
+    dateFilter = `started_at >= '${from}' AND started_at <= '${to}'`
+  } else if (from) {
+    dateFilter = `started_at >= '${from}'`
+  } else if (to) {
+    dateFilter = `started_at <= '${to}'`
+  } else {
+    dateFilter = "started_at > NOW() - INTERVAL '15 days'"
+  }
+
+  // Build branch filter
+  const branchFilter = branch
+    ? ` AND branch = '${branch.replace(/'/g, "''")}'`
+    : ""
 
   const result = await sql`
     WITH suite_stats AS (
@@ -492,7 +547,8 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
       FROM test_executions
       WHERE organization_id = ${organizationId}
         AND suite IS NOT NULL
-        AND started_at > NOW() - INTERVAL '7 days'
+        AND ${sql.unsafe(dateFilter)}
+        ${sql.unsafe(branchFilter)}
       GROUP BY suite
     ),
     failed_tests AS (
@@ -504,7 +560,8 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
         AND te.suite IS NOT NULL
-        AND te.started_at > NOW() - INTERVAL '7 days'
+        AND ${sql.unsafe(dateFilter)}
+        ${sql.unsafe(branchFilter)}
         AND tr.status = 'failed'
       GROUP BY te.suite, tr.test_name
     ),

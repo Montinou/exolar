@@ -93,19 +93,33 @@ async function DashboardContent({
             flakyCount={flakyTests}
           />
           <FailureRateChart dateFrom={params.from} dateTo={params.to} />
-          <ErrorDistributionChart />
+          <ErrorDistributionChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
         </div>
 
         {/* Analysis Row - Flakiest, Slowest, and AI Insights */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
-          <SlowestTestsCard />
+          <SlowestTestsCard
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
           <AiInsightsCard />
         </div>
 
         {/* Suite Analysis Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SuitePassRatesCard />
+          <SuitePassRatesCard
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+          />
           <FlakinessBySuiteChart data={[]} />
           <CategoryDistributionChart />
         </div>
