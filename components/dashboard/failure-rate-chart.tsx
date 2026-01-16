@@ -19,9 +19,10 @@ interface FailureRateChartProps {
   dateTo?: string
   branch?: string
   suite?: string
+  failureRate?: number // Passed from getDashboardMetrics for consistent display
 }
 
-export function FailureRateChart({ dateFrom, dateTo, branch, suite }: FailureRateChartProps) {
+export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate }: FailureRateChartProps) {
   const [data, setData] = useState<FailureTrendData[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -55,15 +56,18 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite }: FailureRat
     }),
   }))
 
-  // Weighted average: total_failed / total_tests (not average of daily rates)
+  // Use passed failureRate from getDashboardMetrics for consistency with Stats Card
+  // Fall back to weighted average calculation if not provided
   const avgFailureRate =
-    data.length > 0
-      ? (() => {
-          const totalTests = data.reduce((sum, d) => sum + Number(d.total_tests), 0)
-          const totalFailed = data.reduce((sum, d) => sum + Number(d.failed_tests), 0)
-          return totalTests > 0 ? (totalFailed / totalTests) * 100 : 0
-        })()
-      : 0
+    failureRate !== undefined
+      ? failureRate
+      : data.length > 0
+        ? (() => {
+            const totalTests = data.reduce((sum, d) => sum + Number(d.total_tests), 0)
+            const totalFailed = data.reduce((sum, d) => sum + Number(d.failed_tests), 0)
+            return totalTests > 0 ? (totalFailed / totalTests) * 100 : 0
+          })()
+        : 0
 
   if (loading) {
     return (

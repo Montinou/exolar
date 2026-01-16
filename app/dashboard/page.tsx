@@ -96,6 +96,7 @@ async function DashboardContent({
             dateTo={params.to}
             branch={params.branch}
             suite={params.suite}
+            failureRate={metrics.failure_rate}
           />
           <ErrorDistributionChart
             dateFrom={params.from}
