@@ -90,7 +90,7 @@ export function formatTable<T extends Record<string, unknown>>(
  * Format a single metric value with proper unit display
  */
 export function formatMetricValue(
-  value: number | null | undefined,
+  value: number | string | null | undefined,
   type: "percentage" | "count" | "duration" | "score" | "rate",
   format: OutputFormat = "markdown"
 ): string {
@@ -98,24 +98,30 @@ export function formatMetricValue(
     return format === "json" ? "null" : "N/A"
   }
 
+  // Convert to number (PostgreSQL numeric types often returned as strings)
+  const num = typeof value === "string" ? parseFloat(value) : value
+  if (isNaN(num)) {
+    return format === "json" ? "null" : "N/A"
+  }
+
   switch (type) {
     case "percentage":
-      return format === "json" ? String(value) : `${value.toFixed(1)}%`
+      return format === "json" ? String(num) : `${num.toFixed(1)}%`
     case "duration":
-      if (value >= 60000) {
-        return format === "json" ? String(value) : `${(value / 60000).toFixed(1)}m`
-      } else if (value >= 1000) {
-        return format === "json" ? String(value) : `${(value / 1000).toFixed(1)}s`
+      if (num >= 60000) {
+        return format === "json" ? String(num) : `${(num / 60000).toFixed(1)}m`
+      } else if (num >= 1000) {
+        return format === "json" ? String(num) : `${(num / 1000).toFixed(1)}s`
       }
-      return format === "json" ? String(value) : `${Math.round(value)}ms`
+      return format === "json" ? String(num) : `${Math.round(num)}ms`
     case "count":
-      return format === "json" ? String(value) : value.toLocaleString()
+      return format === "json" ? String(num) : num.toLocaleString()
     case "score":
-      return format === "json" ? String(value) : `${Math.round(value)}/100`
+      return format === "json" ? String(num) : `${Math.round(num)}/100`
     case "rate":
-      return format === "json" ? String(value) : value.toFixed(2)
+      return format === "json" ? String(num) : num.toFixed(2)
     default:
-      return String(value)
+      return String(num)
   }
 }
 
@@ -123,27 +129,31 @@ export function formatMetricValue(
  * Format a comparison between two values
  */
 export function formatComparison(
-  current: number,
-  previous: number,
+  current: number | string,
+  previous: number | string,
   type: "percentage" | "count" | "duration" | "score" = "percentage",
   format: OutputFormat = "markdown"
 ): string {
-  const delta = current - previous
-  const deltaPercent = previous !== 0 ? ((current - previous) / previous) * 100 : 0
+  // Convert to numbers (PostgreSQL numeric types often returned as strings)
+  const currentNum = typeof current === "string" ? parseFloat(current) : current
+  const previousNum = typeof previous === "string" ? parseFloat(previous) : previous
+
+  const delta = currentNum - previousNum
+  const deltaPercent = previousNum !== 0 ? ((currentNum - previousNum) / previousNum) * 100 : 0
   const trend = delta > 0 ? "increasing" : delta < 0 ? "decreasing" : "stable"
   const arrow = delta > 0 ? "↑" : delta < 0 ? "↓" : "→"
 
   if (format === "json") {
     return JSON.stringify({
-      current,
-      previous,
+      current: currentNum,
+      previous: previousNum,
       delta,
       delta_percent: deltaPercent,
       trend,
     })
   }
 
-  const currentStr = formatMetricValue(current, type, format)
+  const currentStr = formatMetricValue(currentNum, type, format)
   const deltaStr =
     type === "percentage"
       ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}pp`
@@ -160,21 +170,27 @@ export function formatComparison(
  * Format a time series as a compact markdown table
  */
 export function formatTimeSeries(
-  data: Array<{ period: string; value: number; delta?: number }>,
+  data: Array<{ period: string; value: number | string; delta?: number | string }>,
   metricName: string,
   type: "percentage" | "count" | "duration" | "score" = "percentage",
   format: OutputFormat = "markdown"
 ): string {
+  // Helper to convert to number (PostgreSQL numeric types often returned as strings)
+  const toNum = (v: number | string | undefined): number => {
+    if (v === undefined) return 0
+    return typeof v === "string" ? parseFloat(v) : v
+  }
+
   if (format === "json") {
     return JSON.stringify(data, null, 2)
   }
 
   if (format === "csv") {
     const header = "period,value,delta"
-    const rows = data.map(
-      (d) =>
-        `${d.period},${formatMetricValue(d.value, type, "json")},${d.delta !== undefined ? (d.delta >= 0 ? "+" : "") + d.delta.toFixed(1) : ""}`
-    )
+    const rows = data.map((d) => {
+      const deltaNum = toNum(d.delta)
+      return `${d.period},${formatMetricValue(d.value, type, "json")},${d.delta !== undefined ? (deltaNum >= 0 ? "+" : "") + deltaNum.toFixed(1) : ""}`
+    })
     return [header, ...rows].join("\n")
   }
 
@@ -185,11 +201,15 @@ export function formatTimeSeries(
     data,
     [
       { key: "period", label: "Period" },
-      { key: "value", label: "Value", formatter: (v) => formatMetricValue(v as number, type, "markdown") },
+      { key: "value", label: "Value", formatter: (v) => formatMetricValue(v as number | string, type, "markdown") },
       {
         key: "delta",
         label: "Delta",
-        formatter: (v) => (v !== undefined ? `${(v as number) >= 0 ? "+" : ""}${(v as number).toFixed(1)}%` : "--"),
+        formatter: (v) => {
+          if (v === undefined || v === null) return "--"
+          const num = toNum(v as number | string)
+          return `${num >= 0 ? "+" : ""}${num.toFixed(1)}%`
+        },
       },
     ],
     "markdown"
@@ -199,7 +219,9 @@ export function formatTimeSeries(
   if (data.length > 0) {
     const latest = data[0]
     const oldest = data[data.length - 1]
-    const totalChange = latest.value - oldest.value
+    const latestValue = toNum(latest.value)
+    const oldestValue = toNum(oldest.value)
+    const totalChange = latestValue - oldestValue
     output += `\n\n**Summary:** ${formatMetricValue(latest.value, type, "markdown")} current`
     if (totalChange !== 0) {
       output += `, ${totalChange >= 0 ? "+" : ""}${totalChange.toFixed(1)}${type === "percentage" ? "pp" : ""} vs baseline`
