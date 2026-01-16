@@ -206,11 +206,11 @@ export function BranchSelector({
                 <p className="truncate text-sm font-medium">{selectedBranch.branch}</p>
                 <span
                   className={`rounded px-1.5 py-0.5 text-xs font-medium ${getPassRateColor(
-                    selectedBranch.pass_rate
+                    selectedBranch.latest_pass_rate
                   )}`}
-                  aria-label={`Pass rate: ${selectedBranch.pass_rate}%`}
+                  aria-label={`Pass rate: ${selectedBranch.latest_pass_rate}%`}
                 >
-                  {selectedBranch.pass_rate}%
+                  {selectedBranch.latest_pass_rate}%
                 </span>
               </div>
               <p className="truncate text-xs text-muted-foreground">
@@ -349,13 +349,13 @@ export function BranchSelector({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* Pass rate badge */}
+                    {/* Pass rate badge - uses test-level pass rate from latest execution */}
                     <span
                       className={`rounded px-1.5 py-0.5 text-xs font-medium ${getPassRateColor(
-                        branch.pass_rate
+                        branch.latest_pass_rate
                       )}`}
                     >
-                      {branch.pass_rate}%
+                      {branch.latest_pass_rate}%
                     </span>
                     {branch.branch === value && (
                       <Check className="h-4 w-4 text-[oklch(0.75_0.15_195)]" aria-hidden="true" />

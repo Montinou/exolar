@@ -399,7 +399,9 @@ export async function getBranches(
     branch_last_status AS (
       SELECT DISTINCT ON (branch)
         branch,
-        status as last_status
+        status as last_status,
+        passed as latest_passed,
+        total_tests as latest_total_tests
       FROM test_executions
       WHERE organization_id = ${organizationId}
         AND started_at > NOW() - MAKE_INTERVAL(days => ${days})
@@ -410,7 +412,12 @@ export async function getBranches(
       bs.last_run,
       bs.execution_count,
       bs.pass_rate,
-      bls.last_status
+      bls.last_status,
+      CASE
+        WHEN bls.latest_total_tests > 0
+        THEN ROUND((bls.latest_passed::numeric / bls.latest_total_tests::numeric) * 100, 1)
+        ELSE 0
+      END as latest_pass_rate
     FROM branch_stats bs
     LEFT JOIN branch_last_status bls ON bs.branch = bls.branch
     ORDER BY bs.last_run DESC NULLS LAST
@@ -421,6 +428,7 @@ export async function getBranches(
     last_run: r.last_run ? (r.last_run as Date).toISOString() : null,
     execution_count: Number(r.execution_count),
     pass_rate: Number(r.pass_rate) || 0,
+    latest_pass_rate: Number(r.latest_pass_rate) || 0,
     last_status: r.last_status as BranchStatistics["last_status"],
   }))
 }
