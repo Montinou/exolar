@@ -57,11 +57,11 @@ async function DashboardContent({
   const branches = branchStats.map((b) => b.branch)
   const suites = suiteStats.map((s) => s.suite)
 
-  // Extract metrics for new components
-  const totalTests = metrics.latestPassRate?.total_tests ?? 0
-  const passedTests = metrics.latestPassRate?.passed_tests ?? 0
-  const failedTests = metrics.latestPassRate?.failed_tests ?? 0
-  const skippedTests = metrics.latestPassRate?.skipped_tests ?? 0
+  // Extract metrics for new components - use aggregateTestCounts for consistency with Stats Cards
+  const totalTests = metrics.aggregateTestCounts.total_tests
+  const passedTests = metrics.aggregateTestCounts.passed_tests
+  const failedTests = metrics.aggregateTestCounts.failed_tests
+  const skippedTests = metrics.aggregateTestCounts.skipped_tests
   const flakyTests = metrics.flakyTests ?? 0
 
   return (

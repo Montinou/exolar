@@ -86,6 +86,12 @@ export async function getDashboardMetrics(
         failure_volume: 0,
         latestPassRate: null,
         flakyTests: 0,
+        aggregateTestCounts: {
+          total_tests: 0,
+          passed_tests: 0,
+          failed_tests: 0,
+          skipped_tests: 0,
+        },
       } as DashboardMetrics
     }
   }
@@ -114,16 +120,24 @@ export async function getDashboardMetrics(
   const metrics = await sql`
     SELECT
       COUNT(*) as total_executions,
-      ROUND(AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END), 2) as pass_rate,
       CASE
-        WHEN COUNT(*) > 0
-        THEN ROUND(COUNT(*) FILTER (WHERE status = 'failure')::decimal / COUNT(*) * 100, 1)
+        WHEN SUM(total_tests) > 0
+        THEN ROUND(SUM(passed)::decimal / SUM(total_tests) * 100, 1)
+        ELSE 0
+      END as pass_rate,
+      CASE
+        WHEN SUM(total_tests) > 0
+        THEN ROUND(SUM(failed)::decimal / SUM(total_tests) * 100, 1)
         ELSE 0
       END as failure_rate,
       ROUND(AVG(duration_ms)) as avg_duration_ms,
       COUNT(*) FILTER (WHERE status = 'failure' AND started_at > NOW() - INTERVAL '24 hours') as last_24h_failures,
       COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions,
-      COUNT(*) FILTER (WHERE status = 'failure') as failure_volume
+      COUNT(*) FILTER (WHERE status = 'failure') as failure_volume,
+      SUM(total_tests) as aggregate_total_tests,
+      SUM(passed) as aggregate_passed_tests,
+      SUM(failed) as aggregate_failed_tests,
+      SUM(skipped) as aggregate_skipped_tests
     FROM test_executions
     ${sql.unsafe(whereClause)}
   `
@@ -204,6 +218,12 @@ export async function getDashboardMetrics(
       skipped_tests: Number(latestExecution[0].skipped),
     } : null,
     flakyTests: Number(flakyCount[0].flaky_count) || 0,
+    aggregateTestCounts: {
+      total_tests: Number(metrics[0].aggregate_total_tests) || 0,
+      passed_tests: Number(metrics[0].aggregate_passed_tests) || 0,
+      failed_tests: Number(metrics[0].aggregate_failed_tests) || 0,
+      skipped_tests: Number(metrics[0].aggregate_skipped_tests) || 0,
+    },
   } as DashboardMetrics
 }
 
