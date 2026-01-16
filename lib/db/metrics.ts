@@ -300,8 +300,10 @@ export async function getTrendData(
 
 export async function getFailureTrendData(
   organizationId: number,
-  days = 7,
-  dateRange?: DateRangeFilter
+  days = 15,  // Default to 15 days for consistency with other charts
+  dateRange?: DateRangeFilter,
+  branch?: string,
+  suite?: string
 ): Promise<FailureTrendData[]> {
   const sql = getSql()
   const conditions = ["status != 'running'", `organization_id = ${organizationId}`]
@@ -314,6 +316,14 @@ export async function getFailureTrendData(
 
   if (dateRange?.to) {
     conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  // Add branch/suite filters
+  if (branch) {
+    conditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+  }
+  if (suite) {
+    conditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`

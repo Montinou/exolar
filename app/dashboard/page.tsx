@@ -91,7 +91,12 @@ async function DashboardContent({
             skippedRate={totalTests > 0 ? (skippedTests / totalTests) * 100 : 0}
             flakyCount={flakyTests}
           />
-          <FailureRateChart dateFrom={params.from} dateTo={params.to} />
+          <FailureRateChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
           <ErrorDistributionChart
             dateFrom={params.from}
             dateTo={params.to}

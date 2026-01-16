@@ -19,9 +19,11 @@ export async function GET(request: Request) {
     const toDate = searchParams.get("to") || undefined
     const type = searchParams.get("type") || "tests"
     const period = (searchParams.get("period") as TrendPeriod) || "day"
+    const branch = searchParams.get("branch") || undefined
+    const suite = searchParams.get("suite") || undefined
 
     if (type === "failures") {
-      const failureTrends = await db.getFailureTrendData(days, { from: fromDate, to: toDate })
+      const failureTrends = await db.getFailureTrendData(days, { from: fromDate, to: toDate }, branch, suite)
       return NextResponse.json(failureTrends)
     }
 

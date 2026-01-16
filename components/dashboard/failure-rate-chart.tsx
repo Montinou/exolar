@@ -17,9 +17,11 @@ import type { FailureTrendData } from "@/lib/types"
 interface FailureRateChartProps {
   dateFrom?: string
   dateTo?: string
+  branch?: string
+  suite?: string
 }
 
-export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
+export function FailureRateChart({ dateFrom, dateTo, branch, suite }: FailureRateChartProps) {
   const [data, setData] = useState<FailureTrendData[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -29,6 +31,8 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
         const params = new URLSearchParams({ type: "failures" })
         if (dateFrom) params.set("from", dateFrom)
         if (dateTo) params.set("to", dateTo)
+        if (branch) params.set("branch", branch)
+        if (suite) params.set("suite", suite)
 
         const response = await fetch(`/api/trends?${params.toString()}`)
         const json = await response.json()
@@ -41,7 +45,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
     }
 
     fetchData()
-  }, [dateFrom, dateTo])
+  }, [dateFrom, dateTo, branch, suite])
 
   const formattedData = data.map((item) => ({
     ...item,
