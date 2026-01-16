@@ -521,7 +521,7 @@ export async function getSuitePassRates(
 
   const { from, to, branch } = options || {}
 
-  // Build date filter - default to 15 days when no dates specified
+  // Build date filter for single-table queries - default to 15 days
   let dateFilter: string
   if (from && to) {
     dateFilter = `started_at >= '${from}' AND started_at <= '${to}'`
@@ -533,9 +533,24 @@ export async function getSuitePassRates(
     dateFilter = "started_at > NOW() - INTERVAL '15 days'"
   }
 
-  // Build branch filter
+  // Build date filter with 'te.' prefix for joined queries
+  let teDateFilter: string
+  if (from && to) {
+    teDateFilter = `te.started_at >= '${from}' AND te.started_at <= '${to}'`
+  } else if (from) {
+    teDateFilter = `te.started_at >= '${from}'`
+  } else if (to) {
+    teDateFilter = `te.started_at <= '${to}'`
+  } else {
+    teDateFilter = "te.started_at > NOW() - INTERVAL '15 days'"
+  }
+
+  // Build branch filters
   const branchFilter = branch
     ? ` AND branch = '${branch.replace(/'/g, "''")}'`
+    : ""
+  const teBranchFilter = branch
+    ? ` AND te.branch = '${branch.replace(/'/g, "''")}'`
     : ""
 
   const result = await sql`
@@ -560,8 +575,8 @@ export async function getSuitePassRates(
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
         AND te.suite IS NOT NULL
-        AND ${sql.unsafe(dateFilter)}
-        ${sql.unsafe(branchFilter)}
+        AND ${sql.unsafe(teDateFilter)}
+        ${sql.unsafe(teBranchFilter)}
         AND tr.status = 'failed'
       GROUP BY te.suite, tr.test_name
     ),

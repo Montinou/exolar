@@ -105,11 +105,15 @@ export function SuitePassRatesCard({
   }
 
   if (formattedData.length === 0) {
+    const emptyFilterLabel = getFilterLabel(dateFrom, dateTo)
     return (
       <div className="glass-card glass-card-glow p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Layers className="h-5 w-5 text-[var(--exolar-cyan)]" />
-          <h3 className="text-sm font-medium text-muted-foreground">Suite Pass Rates</h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-[var(--exolar-cyan)]" />
+            <h3 className="text-sm font-medium text-muted-foreground">Suite Pass Rates</h3>
+          </div>
+          <span className="text-xs text-muted-foreground">{emptyFilterLabel}</span>
         </div>
         <div className="h-[180px] flex items-center justify-center text-muted-foreground">
           <div className="text-center">
