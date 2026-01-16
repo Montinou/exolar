@@ -55,7 +55,7 @@ export function CategoryDistributionChart({
   onDaysChange,
   showFilter = true,
 }: CategoryDistributionChartProps) {
-  const [internalDays, setInternalDays] = useState<DateRange>("30")
+  const [internalDays, setInternalDays] = useState<DateRange>("15")
   const [data, setData] = useState<CategoryData[]>([])
   const [totalFailures, setTotalFailures] = useState(0)
   const [loading, setLoading] = useState(true)

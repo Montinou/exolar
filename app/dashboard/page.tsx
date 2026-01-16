@@ -7,7 +7,6 @@ import { TestSummaryBar } from "@/components/dashboard/test-summary-bar"
 import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
 import { ErrorDistributionChart } from "@/components/dashboard/error-distribution-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
-import { FlakinessBySuiteChart } from "@/components/dashboard/flakiness-by-suite-chart"
 import { CategoryDistributionChart } from "@/components/dashboard/charts/category-distribution-chart"
 import { ExecutionsView } from "@/components/dashboard/executions-view"
 import { Filters } from "@/components/dashboard/filters"
@@ -114,13 +113,12 @@ async function DashboardContent({
         </div>
 
         {/* Suite Analysis Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <SuitePassRatesCard
             dateFrom={params.from}
             dateTo={params.to}
             branch={params.branch}
           />
-          <FlakinessBySuiteChart data={[]} />
           <CategoryDistributionChart />
         </div>
 
@@ -158,8 +156,8 @@ function DashboardSkeleton() {
       </div>
 
       {/* Analysis Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[...Array(2)].map((_, i) => (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="glass-card glass-card-glow p-6">
             <Skeleton className="h-[200px] w-full bg-muted/30" />
           </div>
@@ -167,8 +165,8 @@ function DashboardSkeleton() {
       </div>
 
       {/* Suite Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, i) => (
           <div key={i} className="glass-card glass-card-glow p-6">
             <Skeleton className="h-[200px] w-full bg-muted/30" />
           </div>

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const db = getQueriesForOrg(context.organizationId)
 
     const { searchParams } = new URL(request.url)
-    const days = Number(searchParams.get("days")) || 7
+    const days = Number(searchParams.get("days")) || 15  // Default to 15 days for consistency
     const fromDate = searchParams.get("from") || undefined
     const toDate = searchParams.get("to") || undefined
     const type = searchParams.get("type") || "tests"
