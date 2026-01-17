@@ -90,6 +90,7 @@ async function ReliabilityContent({
       <div className="flex justify-center">
         <div className="w-full max-w-md">
           <ReliabilityScoreCard
+            initialScore={score}
             branch={params.branch}
             suite={params.suite}
             from={params.from}

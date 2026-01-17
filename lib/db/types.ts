@@ -110,7 +110,8 @@ export interface BranchStatistics {
   branch: string
   last_run: string | null
   execution_count: number
-  pass_rate: number
+  pass_rate: number // Execution-level: % of executions that succeeded
+  latest_pass_rate: number // Test-level: % of tests that passed in latest execution
   last_status: "success" | "failure" | "running" | null
 }
 
@@ -201,4 +202,19 @@ export interface ErrorDistributionItem {
   count: number
   percentage: number
   example_message: string | null
+}
+
+export interface GetSlowestTestsOptions {
+  limit?: number
+  minRuns?: number
+  from?: string
+  to?: string
+  branch?: string
+  suite?: string
+}
+
+export interface GetSuitePassRatesOptions {
+  from?: string
+  to?: string
+  branch?: string
 }

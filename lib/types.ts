@@ -121,6 +121,13 @@ export interface LatestPassRate {
   skipped_tests: number
 }
 
+export interface AggregateTestCounts {
+  total_tests: number
+  passed_tests: number
+  failed_tests: number
+  skipped_tests: number
+}
+
 export interface DashboardMetrics {
   total_executions: number
   pass_rate: number
@@ -131,6 +138,7 @@ export interface DashboardMetrics {
   failure_volume: number
   latestPassRate: LatestPassRate | null
   flakyTests: number
+  aggregateTestCounts: AggregateTestCounts
 }
 
 export interface TrendData {

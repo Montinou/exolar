@@ -7,7 +7,6 @@ import { TestSummaryBar } from "@/components/dashboard/test-summary-bar"
 import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
 import { ErrorDistributionChart } from "@/components/dashboard/error-distribution-chart"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
-import { FlakinessBySuiteChart } from "@/components/dashboard/flakiness-by-suite-chart"
 import { CategoryDistributionChart } from "@/components/dashboard/charts/category-distribution-chart"
 import { ExecutionsView } from "@/components/dashboard/executions-view"
 import { Filters } from "@/components/dashboard/filters"
@@ -58,11 +57,11 @@ async function DashboardContent({
   const branches = branchStats.map((b) => b.branch)
   const suites = suiteStats.map((s) => s.suite)
 
-  // Extract metrics for new components
-  const totalTests = metrics.latestPassRate?.total_tests ?? 0
-  const passedTests = metrics.latestPassRate?.passed_tests ?? 0
-  const failedTests = metrics.latestPassRate?.failed_tests ?? 0
-  const skippedTests = metrics.latestPassRate?.skipped_tests ?? 0
+  // Extract metrics for new components - use aggregateTestCounts for consistency with Stats Cards
+  const totalTests = metrics.aggregateTestCounts.total_tests
+  const passedTests = metrics.aggregateTestCounts.passed_tests
+  const failedTests = metrics.aggregateTestCounts.failed_tests
+  const skippedTests = metrics.aggregateTestCounts.skipped_tests
   const flakyTests = metrics.flakyTests ?? 0
 
   return (
@@ -92,21 +91,40 @@ async function DashboardContent({
             skippedRate={totalTests > 0 ? (skippedTests / totalTests) * 100 : 0}
             flakyCount={flakyTests}
           />
-          <FailureRateChart dateFrom={params.from} dateTo={params.to} />
-          <ErrorDistributionChart />
+          <FailureRateChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+            failureRate={metrics.failure_rate}
+          />
+          <ErrorDistributionChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
         </div>
 
         {/* Analysis Row - Flakiest, Slowest, and AI Insights */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
-          <SlowestTestsCard />
+          <SlowestTestsCard
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
           <AiInsightsCard />
         </div>
 
         {/* Suite Analysis Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SuitePassRatesCard />
-          <FlakinessBySuiteChart data={[]} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SuitePassRatesCard
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+          />
           <CategoryDistributionChart />
         </div>
 
@@ -144,8 +162,8 @@ function DashboardSkeleton() {
       </div>
 
       {/* Analysis Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[...Array(2)].map((_, i) => (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="glass-card glass-card-glow p-6">
             <Skeleton className="h-[200px] w-full bg-muted/30" />
           </div>
@@ -153,8 +171,8 @@ function DashboardSkeleton() {
       </div>
 
       {/* Suite Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[...Array(2)].map((_, i) => (
           <div key={i} className="glass-card glass-card-glow p-6">
             <Skeleton className="h-[200px] w-full bg-muted/30" />
           </div>

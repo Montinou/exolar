@@ -36,6 +36,8 @@ export type {
   PerformanceRegressionsOptions,
   ErrorDistributionOptions,
   ErrorDistributionItem,
+  GetSlowestTestsOptions,
+  GetSuitePassRatesOptions,
 } from "./types"
 
 // User operations
@@ -307,6 +309,8 @@ import type {
   ReliabilityScoreOptions,
   PerformanceRegressionsOptions,
   ErrorDistributionOptions,
+  GetSlowestTestsOptions,
+  GetSuitePassRatesOptions,
 } from "./types"
 
 // Import functions for binding
@@ -485,9 +489,10 @@ export function getQueriesForOrg(organizationId: number) {
     getTestFlakiness: (signature: string) => getTestFlakiness(organizationId, signature),
 
     // Dashboard analytics queries
-    getSlowestTests: (limit?: number, minRuns?: number) =>
-      getSlowestTests(organizationId, limit, minRuns),
-    getSuitePassRates: () => getSuitePassRates(organizationId),
+    getSlowestTests: (options?: GetSlowestTestsOptions | number, minRuns?: number) =>
+      getSlowestTests(organizationId, options, minRuns),
+    getSuitePassRates: (options?: GetSuitePassRatesOptions) =>
+      getSuitePassRates(organizationId, options),
 
     // Insert functions (auto-registers suites and tests)
     insertExecution: (data: ExecutionRequest) => insertExecution(organizationId, data),

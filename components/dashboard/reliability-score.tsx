@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
   RadialBarChart,
   RadialBar,
@@ -11,6 +11,7 @@ import { Activity, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import type { ReliabilityScore } from "@/lib/types"
 
 interface ReliabilityScoreCardProps {
+  initialScore?: ReliabilityScore
   branch?: string
   suite?: string
   from?: string
@@ -18,40 +19,72 @@ interface ReliabilityScoreCardProps {
   lastRunOnly?: boolean
 }
 
-export function ReliabilityScoreCard({ branch, suite, from, to, lastRunOnly }: ReliabilityScoreCardProps) {
-  const [score, setScore] = useState<ReliabilityScore | null>(null)
-  const [loading, setLoading] = useState(true)
+export function ReliabilityScoreCard({
+  initialScore,
+  branch,
+  suite,
+  from,
+  to,
+  lastRunOnly,
+}: ReliabilityScoreCardProps) {
+  const [score, setScore] = useState<ReliabilityScore | null>(initialScore || null)
+  const [loading, setLoading] = useState(!initialScore)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function fetchScore() {
-      try {
-        setLoading(true)
-        const params = new URLSearchParams()
-        if (branch) params.set("branch", branch)
-        if (suite) params.set("suite", suite)
-        if (from) params.set("from", from)
-        if (to) params.set("to", to)
-        if (lastRunOnly) params.set("lastRunOnly", "true")
+  // Track initial filter values to detect changes
+  const initialFiltersRef = useRef({ branch, suite, from, to, lastRunOnly })
+  const isInitialMount = useRef(true)
 
-        const url = `/api/reliability-score${params.toString() ? `?${params}` : ""}`
-        const response = await fetch(url)
-        if (!response.ok) {
-          throw new Error("Failed to fetch reliability score")
-        }
-        const data = await response.json()
-        if (data.error) throw new Error(data.error)
-        setScore(data)
-      } catch (err) {
-        console.error("Failed to fetch reliability score:", err)
-        setError(err instanceof Error ? err.message : "Unknown error")
-      } finally {
-        setLoading(false)
+  const fetchScore = useCallback(async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams()
+      if (branch) params.set("branch", branch)
+      if (suite) params.set("suite", suite)
+      if (from) params.set("from", from)
+      if (to) params.set("to", to)
+      if (lastRunOnly) params.set("lastRunOnly", "true")
+
+      const url = `/api/reliability-score${params.toString() ? `?${params}` : ""}`
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error("Failed to fetch reliability score")
+      }
+      const data = await response.json()
+      if (data.error) throw new Error(data.error)
+      setScore(data)
+      setError(null)
+    } catch (err) {
+      console.error("Failed to fetch reliability score:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
+  }, [branch, suite, from, to, lastRunOnly])
+
+  useEffect(() => {
+    // On initial mount, if we have initialScore, skip the fetch
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      if (initialScore) {
+        return
       }
     }
 
-    fetchScore()
-  }, [branch, suite, from, to, lastRunOnly])
+    // Check if filters changed from initial values
+    const initial = initialFiltersRef.current
+    const filtersChanged =
+      branch !== initial.branch ||
+      suite !== initial.suite ||
+      from !== initial.from ||
+      to !== initial.to ||
+      lastRunOnly !== initial.lastRunOnly
+
+    // Only fetch if filters changed or no initial data was provided
+    if (filtersChanged || !initialScore) {
+      fetchScore()
+    }
+  }, [branch, suite, from, to, lastRunOnly, initialScore, fetchScore])
 
   if (loading) {
     return (

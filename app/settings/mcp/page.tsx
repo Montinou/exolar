@@ -204,11 +204,14 @@ export default function MCPSettingsPage() {
                   <div>
                     <p className="text-sm font-medium mb-2">Option A: Command Line (Recommended)</p>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Run this command in your terminal:
+                      Run this command in your terminal for user-level installation:
                     </p>
                     <pre className="glass-panel p-3 text-xs overflow-x-auto font-mono">
-                      {`claude mcp add exolar-qa --url ${dashboardUrl}/api/mcp/mcp --header "Authorization: Bearer ${token.substring(0, 20)}..."`}
+                      {`claude mcp add exolar-qa --transport http ${dashboardUrl}/api/mcp/mcp -s user --header "Authorization: Bearer ${token.substring(0, 20)}..."`}
                     </pre>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      <strong>Verify:</strong> Run <code className="px-1 py-0.5 rounded bg-muted">claude mcp list</code> to confirm connection
+                    </p>
                   </div>
 
                   <div>

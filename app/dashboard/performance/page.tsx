@@ -29,7 +29,19 @@ async function PerformanceContent({
   const hasFilter = !!(params.branch || params.suite)
   const lastRunOnly = hasFilter && !historic
 
-  const [branchStats, suiteStats] = await Promise.all([
+  // Date range for metrics (default 15 days if not specified)
+  const dateRange = params.from || params.to
+    ? { from: params.from, to: params.to }
+    : undefined
+
+  const [metrics, branchStats, suiteStats] = await Promise.all([
+    db.getDashboardMetrics({
+      from: dateRange?.from,
+      to: dateRange?.to,
+      branch: params.branch,
+      suite: params.suite,
+      lastRunOnly,
+    }),
     db.getBranches(),
     db.getSuites(),
   ])
@@ -54,10 +66,21 @@ async function PerformanceContent({
       {/* Performance Analysis Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Slowest Tests */}
-        <SlowestTestsCard />
+        <SlowestTestsCard
+          dateFrom={params.from}
+          dateTo={params.to}
+          branch={params.branch}
+          suite={params.suite}
+        />
 
         {/* Failure Rate Over Time */}
-        <FailureRateChart dateFrom={params.from} dateTo={params.to} />
+        <FailureRateChart
+          dateFrom={params.from}
+          dateTo={params.to}
+          branch={params.branch}
+          suite={params.suite}
+          failureRate={metrics.failure_rate}
+        />
       </div>
 
       {/* Info Card */}

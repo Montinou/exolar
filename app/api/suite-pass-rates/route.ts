@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const context = await getSessionContext()
     if (!context) {
@@ -13,9 +13,25 @@ export async function GET() {
 
     const db = getQueriesForOrg(context.organizationId)
 
-    const suites = await db.getSuitePassRates()
+    const { searchParams } = new URL(request.url)
 
-    return NextResponse.json({ suites })
+    // Date range filters (default: 15 days handled in db function)
+    const from = searchParams.get("from") || undefined
+    const to = searchParams.get("to") || undefined
+
+    // Optional branch filter
+    const branch = searchParams.get("branch") || undefined
+
+    const suites = await db.getSuitePassRates({ from, to, branch })
+
+    return NextResponse.json({
+      suites,
+      filters: {
+        from: from || "default (15 days)",
+        to: to || "now",
+        branch: branch || "all",
+      },
+    })
   } catch (error) {
     console.error("Error fetching suite pass rates:", error)
     return NextResponse.json(

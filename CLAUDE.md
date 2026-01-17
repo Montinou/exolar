@@ -423,8 +423,8 @@ The dashboard exposes a MCP server for Claude Code integration at `/api/mcp/mcp`
 ### Quick Start (OAuth - Recommended)
 
 ```bash
-# Add the MCP server (one-time setup)
-claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp
+# Add the MCP server (one-time setup, user level)
+claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user
 ```
 
 When prompted to **Authenticate**, your browser opens → log in → done! No token copying needed.
@@ -434,7 +434,7 @@ When prompted to **Authenticate**, your browser opens → log in → done! No to
 If OAuth isn't working, get a token from `/settings/mcp` and use:
 
 ```bash
-claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp \
+claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user \
   --header "Authorization: Bearer <token>"
 ```
 

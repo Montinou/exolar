@@ -206,9 +206,9 @@ export async function getErrorTypeDistribution(
     `te.organization_id = ${organizationId}`,
   ]
 
-  // AI context is only required when grouping by error_type
+  // For error_type grouping, require either ai_context OR error_message to have categorizable data
   if (groupBy === 'error_type') {
-    conditions.push("tr.ai_context IS NOT NULL")
+    conditions.push("(tr.ai_context IS NOT NULL OR tr.error_message IS NOT NULL)")
   }
 
   if (since) {
@@ -229,6 +229,25 @@ export async function getErrorTypeDistribution(
   let groupColumn: string
   let selectColumn: string
 
+  // CASE expression to extract error type with fallback to error_message parsing
+  // Uses same logic as packages/playwright-reporter/src/utils.ts parseErrorType()
+  const errorTypeCaseExpression = `
+    CASE
+      WHEN tr.ai_context->'error'->>'type' IS NOT NULL
+        THEN tr.ai_context->'error'->>'type'
+      WHEN tr.error_message ILIKE '%timeout%' OR tr.error_message ILIKE '%exceeded%'
+        THEN 'TimeoutError'
+      WHEN tr.error_message ILIKE '%strict mode violation%'
+        THEN 'StrictModeError'
+      WHEN tr.error_message ILIKE '%expect(%' OR tr.stack_trace ILIKE '%AssertionError%'
+        THEN 'AssertionError'
+      WHEN tr.error_message ILIKE '%navigation%'
+        THEN 'NavigationError'
+      WHEN tr.error_message ILIKE '%net::%'
+        THEN 'NetworkError'
+      ELSE 'Error'
+    END`
+
   switch (groupBy) {
     case 'file':
       groupColumn = 'tr.test_file'
@@ -240,12 +259,30 @@ export async function getErrorTypeDistribution(
       break
     case 'error_type':
     default:
-      groupColumn = "tr.ai_context->'error'->>'type'"
-      selectColumn = "tr.ai_context->'error'->>'type' as error_type"
+      groupColumn = errorTypeCaseExpression
+      selectColumn = `${errorTypeCaseExpression} as error_type`
   }
 
   // Ensure limit is within bounds (1-100)
   const safeLimit = Math.min(Math.max(1, limit), 100)
+
+  // CASE expression for tr2 (used in subquery for example_message)
+  const errorTypeCaseExpressionTr2 = `
+    CASE
+      WHEN tr2.ai_context->'error'->>'type' IS NOT NULL
+        THEN tr2.ai_context->'error'->>'type'
+      WHEN tr2.error_message ILIKE '%timeout%' OR tr2.error_message ILIKE '%exceeded%'
+        THEN 'TimeoutError'
+      WHEN tr2.error_message ILIKE '%strict mode violation%'
+        THEN 'StrictModeError'
+      WHEN tr2.error_message ILIKE '%expect(%' OR tr2.stack_trace ILIKE '%AssertionError%'
+        THEN 'AssertionError'
+      WHEN tr2.error_message ILIKE '%navigation%'
+        THEN 'NavigationError'
+      WHEN tr2.error_message ILIKE '%net::%'
+        THEN 'NetworkError'
+      ELSE 'Error'
+    END`
 
   // Query with percentage calculation using CTE and example_message from most recent occurrence
   const query = `
@@ -276,7 +313,7 @@ export async function getErrorTypeDistribution(
         FROM test_results tr2
         JOIN test_executions te2 ON tr2.execution_id = te2.id
         WHERE ${groupBy === 'error_type'
-          ? "tr2.ai_context->'error'->>'type' = g.error_type"
+          ? `(${errorTypeCaseExpressionTr2}) = g.error_type`
           : groupBy === 'file'
             ? "tr2.test_file = g.error_type"
             : "te2.branch = g.error_type"}

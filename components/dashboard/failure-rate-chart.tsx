@@ -17,9 +17,19 @@ import type { FailureTrendData } from "@/lib/types"
 interface FailureRateChartProps {
   dateFrom?: string
   dateTo?: string
+  branch?: string
+  suite?: string
+  failureRate?: number // Passed from getDashboardMetrics for consistent display
 }
 
-export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
+function getFilterLabel(dateFrom?: string, dateTo?: string): string {
+  if (dateFrom || dateTo) {
+    return "Filtered"
+  }
+  return "Last 15 days"
+}
+
+export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate }: FailureRateChartProps) {
   const [data, setData] = useState<FailureTrendData[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -29,6 +39,8 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
         const params = new URLSearchParams({ type: "failures" })
         if (dateFrom) params.set("from", dateFrom)
         if (dateTo) params.set("to", dateTo)
+        if (branch) params.set("branch", branch)
+        if (suite) params.set("suite", suite)
 
         const response = await fetch(`/api/trends?${params.toString()}`)
         const json = await response.json()
@@ -41,7 +53,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
     }
 
     fetchData()
-  }, [dateFrom, dateTo])
+  }, [dateFrom, dateTo, branch, suite])
 
   const formattedData = data.map((item) => ({
     ...item,
@@ -51,10 +63,20 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
     }),
   }))
 
+  // Use passed failureRate from getDashboardMetrics for consistency with Stats Card
+  // Fall back to weighted average calculation if not provided
   const avgFailureRate =
-    data.length > 0
-      ? data.reduce((sum, d) => sum + Number(d.failure_rate), 0) / data.length
-      : 0
+    failureRate !== undefined
+      ? failureRate
+      : data.length > 0
+        ? (() => {
+            const totalTests = data.reduce((sum, d) => sum + Number(d.total_tests), 0)
+            const totalFailed = data.reduce((sum, d) => sum + Number(d.failed_tests), 0)
+            return totalTests > 0 ? (totalFailed / totalTests) * 100 : 0
+          })()
+        : 0
+
+  const filterLabel = getFilterLabel(dateFrom, dateTo)
 
   if (loading) {
     return (
@@ -62,6 +84,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
         <div className="flex items-center gap-2 mb-4">
           <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+          <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
         <div className="h-[200px] sm:h-[220px] flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -76,6 +99,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
         <div className="flex items-center gap-2 mb-4">
           <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+          <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
         <div className="h-[200px] sm:h-[220px] flex items-center justify-center text-muted-foreground text-sm">
           No data available for selected period
@@ -90,6 +114,7 @@ export function FailureRateChart({ dateFrom, dateTo }: FailureRateChartProps) {
         <div className="flex items-center gap-2">
           <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
+          <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
         <span className="text-xs stat-value-error">
           Avg: {avgFailureRate.toFixed(1)}%

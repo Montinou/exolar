@@ -20,12 +20,12 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : 10
     const groupBy = searchParams.get("group_by") as "error_type" | "file" | "branch" | undefined
 
-    // Default to last 7 days if no 'since' provided
+    // Default to last 15 days if no 'since' provided
     const sinceParam = searchParams.get("since")
     const since = sinceParam || (() => {
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-      return sevenDaysAgo.toISOString()
+      const fifteenDaysAgo = new Date()
+      fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15)
+      return fifteenDaysAgo.toISOString()
     })()
 
     const distribution = await db.getErrorTypeDistribution({

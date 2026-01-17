@@ -8,6 +8,8 @@ import type {
   SlowestTest,
   SuitePassRate,
   ReliabilityScoreOptions,
+  GetSlowestTestsOptions,
+  GetSuitePassRatesOptions,
 } from "./types"
 import type {
   DashboardMetrics,
@@ -84,6 +86,12 @@ export async function getDashboardMetrics(
         failure_volume: 0,
         latestPassRate: null,
         flakyTests: 0,
+        aggregateTestCounts: {
+          total_tests: 0,
+          passed_tests: 0,
+          failed_tests: 0,
+          skipped_tests: 0,
+        },
       } as DashboardMetrics
     }
   }
@@ -112,16 +120,24 @@ export async function getDashboardMetrics(
   const metrics = await sql`
     SELECT
       COUNT(*) as total_executions,
-      ROUND(AVG(CASE WHEN status = 'success' THEN 100 ELSE 0 END), 2) as pass_rate,
       CASE
-        WHEN COUNT(*) > 0
-        THEN ROUND(COUNT(*) FILTER (WHERE status = 'failure')::decimal / COUNT(*) * 100, 1)
+        WHEN SUM(total_tests) > 0
+        THEN ROUND(SUM(passed)::decimal / SUM(total_tests) * 100, 1)
+        ELSE 0
+      END as pass_rate,
+      CASE
+        WHEN SUM(total_tests) > 0
+        THEN ROUND(SUM(failed)::decimal / SUM(total_tests) * 100, 1)
         ELSE 0
       END as failure_rate,
       ROUND(AVG(duration_ms)) as avg_duration_ms,
       COUNT(*) FILTER (WHERE status = 'failure' AND started_at > NOW() - INTERVAL '24 hours') as last_24h_failures,
       COUNT(*) FILTER (WHERE started_at > NOW() - INTERVAL '24 hours') as last_24h_executions,
-      COUNT(*) FILTER (WHERE status = 'failure') as failure_volume
+      COUNT(*) FILTER (WHERE status = 'failure') as failure_volume,
+      SUM(total_tests) as aggregate_total_tests,
+      SUM(passed) as aggregate_passed_tests,
+      SUM(failed) as aggregate_failed_tests,
+      SUM(skipped) as aggregate_skipped_tests
     FROM test_executions
     ${sql.unsafe(whereClause)}
   `
@@ -202,6 +218,12 @@ export async function getDashboardMetrics(
       skipped_tests: Number(latestExecution[0].skipped),
     } : null,
     flakyTests: Number(flakyCount[0].flaky_count) || 0,
+    aggregateTestCounts: {
+      total_tests: Number(metrics[0].aggregate_total_tests) || 0,
+      passed_tests: Number(metrics[0].aggregate_passed_tests) || 0,
+      failed_tests: Number(metrics[0].aggregate_failed_tests) || 0,
+      skipped_tests: Number(metrics[0].aggregate_skipped_tests) || 0,
+    },
   } as DashboardMetrics
 }
 
@@ -298,8 +320,10 @@ export async function getTrendData(
 
 export async function getFailureTrendData(
   organizationId: number,
-  days = 7,
-  dateRange?: DateRangeFilter
+  days = 15,  // Default to 15 days for consistency with other charts
+  dateRange?: DateRangeFilter,
+  branch?: string,
+  suite?: string
 ): Promise<FailureTrendData[]> {
   const sql = getSql()
   const conditions = ["status != 'running'", `organization_id = ${organizationId}`]
@@ -312,6 +336,14 @@ export async function getFailureTrendData(
 
   if (dateRange?.to) {
     conditions.push(`started_at <= '${dateRange.to}'`)
+  }
+
+  // Add branch/suite filters
+  if (branch) {
+    conditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+  }
+  if (suite) {
+    conditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
@@ -367,7 +399,9 @@ export async function getBranches(
     branch_last_status AS (
       SELECT DISTINCT ON (branch)
         branch,
-        status as last_status
+        status as last_status,
+        passed as latest_passed,
+        total_tests as latest_total_tests
       FROM test_executions
       WHERE organization_id = ${organizationId}
         AND started_at > NOW() - MAKE_INTERVAL(days => ${days})
@@ -378,7 +412,12 @@ export async function getBranches(
       bs.last_run,
       bs.execution_count,
       bs.pass_rate,
-      bls.last_status
+      bls.last_status,
+      CASE
+        WHEN bls.latest_total_tests > 0
+        THEN ROUND((bls.latest_passed::numeric / bls.latest_total_tests::numeric) * 100, 1)
+        ELSE 0
+      END as latest_pass_rate
     FROM branch_stats bs
     LEFT JOIN branch_last_status bls ON bs.branch = bls.branch
     ORDER BY bs.last_run DESC NULLS LAST
@@ -389,6 +428,7 @@ export async function getBranches(
     last_run: r.last_run ? (r.last_run as Date).toISOString() : null,
     execution_count: Number(r.execution_count),
     pass_rate: Number(r.pass_rate) || 0,
+    latest_pass_rate: Number(r.latest_pass_rate) || 0,
     last_status: r.last_status as BranchStatistics["last_status"],
   }))
 }
@@ -455,10 +495,42 @@ export async function getSuites(
 
 export async function getSlowestTests(
   organizationId: number,
-  limit: number = 5,
-  minRuns: number = 3
+  options?: GetSlowestTestsOptions | number,
+  minRunsLegacy?: number
 ): Promise<SlowestTest[]> {
   const sql = getSql()
+
+  // Handle backwards compatibility: (limit, minRuns) or (options)
+  const opts: GetSlowestTestsOptions = typeof options === "number"
+    ? { limit: options, minRuns: minRunsLegacy }
+    : options || {}
+
+  const { limit = 5, minRuns = 3, from, to, branch, suite } = opts
+
+  // Build conditions
+  const conditions = [`te.organization_id = ${organizationId}`]
+
+  // Date range filtering - default to 15 days if no dates provided
+  if (from) {
+    conditions.push(`te.started_at >= '${from}'`)
+  } else if (!to) {
+    // Default: 15 days when no dates specified
+    conditions.push("te.started_at > NOW() - INTERVAL '15 days'")
+  }
+
+  if (to) {
+    conditions.push(`te.started_at <= '${to}'`)
+  }
+
+  // Optional branch/suite filters
+  if (branch) {
+    conditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+  }
+  if (suite) {
+    conditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+  }
+
+  const whereClause = conditions.join(" AND ")
 
   const result = await sql`
     SELECT
@@ -469,8 +541,7 @@ export async function getSlowestTests(
       COUNT(*) as run_count
     FROM test_results tr
     JOIN test_executions te ON tr.execution_id = te.id
-    WHERE te.organization_id = ${organizationId}
-      AND te.started_at > NOW() - INTERVAL '7 days'
+    WHERE ${sql.unsafe(whereClause)}
     GROUP BY tr.test_signature, tr.test_name, tr.test_file
     HAVING COUNT(*) >= ${minRuns}
     ORDER BY avg_duration_ms DESC
@@ -480,8 +551,45 @@ export async function getSlowestTests(
   return result as SlowestTest[]
 }
 
-export async function getSuitePassRates(organizationId: number): Promise<SuitePassRate[]> {
+export async function getSuitePassRates(
+  organizationId: number,
+  options?: GetSuitePassRatesOptions
+): Promise<SuitePassRate[]> {
   const sql = getSql()
+
+  const { from, to, branch } = options || {}
+
+  // Build date filter for single-table queries - default to 15 days
+  let dateFilter: string
+  if (from && to) {
+    dateFilter = `started_at >= '${from}' AND started_at <= '${to}'`
+  } else if (from) {
+    dateFilter = `started_at >= '${from}'`
+  } else if (to) {
+    dateFilter = `started_at <= '${to}'`
+  } else {
+    dateFilter = "started_at > NOW() - INTERVAL '15 days'"
+  }
+
+  // Build date filter with 'te.' prefix for joined queries
+  let teDateFilter: string
+  if (from && to) {
+    teDateFilter = `te.started_at >= '${from}' AND te.started_at <= '${to}'`
+  } else if (from) {
+    teDateFilter = `te.started_at >= '${from}'`
+  } else if (to) {
+    teDateFilter = `te.started_at <= '${to}'`
+  } else {
+    teDateFilter = "te.started_at > NOW() - INTERVAL '15 days'"
+  }
+
+  // Build branch filters
+  const branchFilter = branch
+    ? ` AND branch = '${branch.replace(/'/g, "''")}'`
+    : ""
+  const teBranchFilter = branch
+    ? ` AND te.branch = '${branch.replace(/'/g, "''")}'`
+    : ""
 
   const result = await sql`
     WITH suite_stats AS (
@@ -492,7 +600,8 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
       FROM test_executions
       WHERE organization_id = ${organizationId}
         AND suite IS NOT NULL
-        AND started_at > NOW() - INTERVAL '7 days'
+        AND ${sql.unsafe(dateFilter)}
+        ${sql.unsafe(branchFilter)}
       GROUP BY suite
     ),
     failed_tests AS (
@@ -504,7 +613,8 @@ export async function getSuitePassRates(organizationId: number): Promise<SuitePa
       JOIN test_executions te ON tr.execution_id = te.id
       WHERE te.organization_id = ${organizationId}
         AND te.suite IS NOT NULL
-        AND te.started_at > NOW() - INTERVAL '7 days'
+        AND ${sql.unsafe(teDateFilter)}
+        ${sql.unsafe(teBranchFilter)}
         AND tr.status = 'failed'
       GROUP BY te.suite, tr.test_name
     ),
@@ -595,7 +705,7 @@ export async function getReliabilityScore(
     ? ""
     : from && to
       ? `AND te.started_at BETWEEN '${from}'::timestamptz AND '${to}'::timestamptz`
-      : `AND te.started_at > NOW() - INTERVAL '7 days'`
+      : `AND te.started_at > NOW() - INTERVAL '15 days'`
 
   // Build optional branch/suite filters
   const branchFilter = branch ? `AND te.branch = '${branch}'` : ""
