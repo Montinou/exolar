@@ -273,12 +273,15 @@ export default function MCPDocsPage() {
               Quick Start (OAuth - Recommended)
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Run this command and authenticate via browser — no token copying needed:
+              One command to connect Claude Code to Exolar — authenticates via browser:
             </p>
-            <CodeBlock code={`claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp`} />
+            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user`} />
             <p className="text-xs text-muted-foreground mt-3">
               When prompted, select <strong>&quot;Authenticate&quot;</strong> → browser opens → log in → done!
             </p>
+            <div className="mt-3 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-xs">
+              <strong>Verify installation:</strong> Run <code className="px-1 py-0.5 rounded bg-muted">claude mcp list</code> to see &quot;exolar-qa&quot; connected
+            </div>
           </div>
 
           {/* Alternative: Manual Token */}
@@ -290,7 +293,7 @@ export default function MCPDocsPage() {
             <p className="text-sm text-muted-foreground mb-3">
               If OAuth doesn&apos;t work, get a token from <a href="/settings/mcp" className="text-primary hover:underline">/settings/mcp</a>:
             </p>
-            <CodeBlock code={`claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp \\
+            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user \\
   --header "Authorization: Bearer YOUR_TOKEN_HERE"`} />
           </div>
 

@@ -11,9 +11,13 @@
 > - ✅ **Easier setup** - No local OAuth flow, just get a token from dashboard
 >
 > **New Installation (Recommended):**
+> 1. Run: `claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user`
+> 2. When prompted, select "Authenticate" → browser opens → log in → done!
+>
+> **Or with manual token:**
 > 1. Visit [https://exolar.ai-innovation.site/settings/mcp](https://exolar.ai-innovation.site/settings/mcp)
 > 2. Copy your authentication token
-> 3. Run: `claude mcp add exolar-qa --url https://exolar.ai-innovation.site/api/mcp/mcp --header "Authorization: Bearer YOUR_TOKEN"`
+> 3. Run: `claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user --header "Authorization: Bearer YOUR_TOKEN"`
 >
 > See [MCP Integration Guide](https://exolar.ai-innovation.site/docs/mcp) for full documentation.
 >

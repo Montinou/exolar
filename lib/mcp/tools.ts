@@ -306,24 +306,29 @@ Example: get_semantic_definition({ metric_id: "reliability_score" })`,
   // ============================================
   {
     name: "get_installation_config",
-    description: `Get CI/CD setup instructions for connecting Playwright to Exolar QA.
+    description: `Get setup instructions for integrating Exolar QA with your Playwright tests and Claude Code.
 
-Returns: Configuration sections for your CI provider.
+**Start here** to configure Exolar - returns ready-to-use commands and code snippets.
 
 Sections:
-- api_endpoint: API URL and authentication
-- playwright_reporter: Reporter config for playwright.config.ts
+- mcp_setup: Connect Claude Code to Exolar (one command!)
+- quick_start: Step-by-step for new or existing projects
+- playwright_reporter: Reporter code for playwright.config.ts
 - github_actions: GitHub Actions workflow YAML
 - env_variables: Required environment variables
+- api_endpoint: API URL and authentication details
 - all: Complete setup guide (default)
 
-Example: get_installation_config({ section: "playwright_reporter" })`,
+Examples:
+- get_installation_config({ section: "mcp_setup" }) → One-liner to connect Claude Code
+- get_installation_config({ section: "quick_start" }) → Guide for new/existing projects
+- get_installation_config({ section: "all" }) → Everything you need`,
     inputSchema: {
       type: "object" as const,
       properties: {
         section: {
           type: "string",
-          enum: ["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"],
+          enum: ["mcp_setup", "quick_start", "api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"],
           description: "Section to return (default: all)",
         },
       },
@@ -375,7 +380,7 @@ export async function handleToolCall(
 }
 
 // ============================================
-// Installation Config Handler (kept inline)
+// Installation Config Handler (Integration Engineer Persona)
 // ============================================
 
 async function handleInstallationConfig(
@@ -385,15 +390,15 @@ async function handleInstallationConfig(
   const input = z
     .object({
       section: z
-        .enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "all"])
+        .enum(["api_endpoint", "playwright_reporter", "github_actions", "env_variables", "mcp_setup", "quick_start", "all"])
         .default("all"),
     })
     .parse(args)
 
-  // Infer dashboard URL from environment or use default
+  // Use the correct environment variable
   const dashboardUrl =
-    process.env.NEXT_PUBLIC_DASHBOARD_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://exolar.vercel.app")
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://exolar.ai-innovation.site"
 
   const guide = {
     organization: authContext.organizationSlug,
@@ -641,13 +646,150 @@ jobs:
       note: "API keys are scoped to your organization and never expire (but can be revoked)",
     },
 
-    quick_start: [
-      "1. Create an API key in the dashboard settings",
-      "2. Add EXOLAR_API_KEY to your CI secrets",
-      "3. Create the reporter file (reporters/exolar-reporter.ts)",
-      "4. Update playwright.config.ts to use the reporter",
-      "5. Run your tests - results appear in dashboard automatically",
-    ],
+    // ============================================
+    // MCP Setup (Claude Code Integration)
+    // ============================================
+    mcp_setup: {
+      description: "Connect Claude Code to Exolar QA for AI-powered test analysis",
+
+      // One-liner for quick setup (user level)
+      quick_command: `claude mcp add exolar-qa --transport http ${dashboardUrl}/api/mcp/mcp -s user`,
+
+      // Step-by-step for both methods
+      methods: {
+        oauth_recommended: {
+          name: "OAuth (Recommended - No token needed)",
+          command: `claude mcp add exolar-qa --transport http ${dashboardUrl}/api/mcp/mcp -s user`,
+          steps: [
+            "1. Run the command above in your terminal",
+            "2. When prompted, select 'Authenticate'",
+            "3. Your browser opens → Log in → Done!",
+            "4. Verify: Run 'claude mcp list' to see exolar-qa",
+          ],
+        },
+        manual_token: {
+          name: "Manual Token (If OAuth fails)",
+          steps: [
+            `1. Visit ${dashboardUrl}/settings/mcp`,
+            "2. Copy your authentication token",
+            "3. Run the command below:",
+          ],
+          command: `claude mcp add exolar-qa --transport http ${dashboardUrl}/api/mcp/mcp -s user --header "Authorization: Bearer YOUR_TOKEN"`,
+        },
+      },
+
+      // Verification
+      verify: {
+        command: "claude mcp list",
+        expected: "Should show 'exolar-qa' with status 'connected'",
+      },
+
+      // What you can do after connecting
+      capabilities: [
+        "🔍 'Show recent test failures' → Get failures with AI context",
+        "📊 'What's the health score?' → Reliability metrics",
+        "🔄 'Compare main vs feature branch' → Diff analysis",
+        "🧠 'Cluster failures by root cause' → AI-powered grouping",
+        "🔎 'Find tests with timeout errors' → Semantic search",
+      ],
+    },
+
+    // ============================================
+    // Quick Start Guides (New vs Existing Projects)
+    // ============================================
+    quick_start: {
+      summary: "Two integration points: (1) MCP for Claude Code, (2) Reporter for CI/CD",
+
+      // For existing Playwright projects
+      existing_project: {
+        title: "🔧 Existing Playwright Project",
+        estimated_time: "~5 minutes",
+        steps: [
+          {
+            step: 1,
+            action: "Connect Claude Code to Exolar (optional but recommended)",
+            command: `claude mcp add exolar-qa --transport http ${dashboardUrl}/api/mcp/mcp -s user`,
+            note: "Enables AI-powered test analysis in your terminal",
+          },
+          {
+            step: 2,
+            action: "Create the reporter file",
+            command: "mkdir -p reporters && touch reporters/exolar-reporter.ts",
+            note: "Copy the reporter code from playwright_reporter.code section",
+          },
+          {
+            step: 3,
+            action: "Add reporter to playwright.config.ts",
+            code: `// Add to your existing reporters array:
+reporter: [
+  ['list'],  // Keep your existing reporters
+  ['./reporters/exolar-reporter.ts', {
+    apiKey: process.env.EXOLAR_API_KEY,
+    suite: 'your-suite-name',  // e.g., 'e2e', 'smoke', 'regression'
+  }],
+],`,
+            note: "MERGE into existing config - don't replace!",
+          },
+          {
+            step: 4,
+            action: "Add API key to environment",
+            local: "export EXOLAR_API_KEY=exolar_your_key_here",
+            github_secrets: "Settings → Secrets → Actions → New: EXOLAR_API_KEY",
+            get_key: `${dashboardUrl}/settings/api-keys`,
+          },
+          {
+            step: 5,
+            action: "Run tests and verify",
+            command: "npx playwright test",
+            verify: `Check results at ${dashboardUrl}/dashboard`,
+          },
+        ],
+      },
+
+      // For new projects
+      new_project: {
+        title: "🆕 New Playwright Project",
+        estimated_time: "~10 minutes",
+        steps: [
+          {
+            step: 1,
+            action: "Initialize Playwright",
+            command: "npm init playwright@latest",
+            note: "Follow the prompts to set up Playwright",
+          },
+          {
+            step: 2,
+            action: "Connect Claude Code to Exolar",
+            command: `claude mcp add exolar-qa --transport http ${dashboardUrl}/api/mcp/mcp -s user`,
+            note: "Now you can ask Claude for help with your tests!",
+          },
+          {
+            step: 3,
+            action: "Create reporter and configure",
+            commands: [
+              "mkdir -p reporters",
+              "# Copy exolar-reporter.ts from playwright_reporter.code",
+              "# Update playwright.config.ts with reporter (see existing_project step 3)",
+            ],
+          },
+          {
+            step: 4,
+            action: "Set up GitHub Actions",
+            file: ".github/workflows/e2e-tests.yml",
+            note: "Copy from github_actions.code section",
+          },
+          {
+            step: 5,
+            action: "Add secrets and run",
+            commands: [
+              "# Add EXOLAR_API_KEY to GitHub Secrets",
+              "git add . && git commit -m 'Add Exolar integration'",
+              "git push  # Triggers CI and sends results to dashboard",
+            ],
+          },
+        ],
+      },
+    },
   }
 
   // Filter by section if specified
@@ -665,6 +807,11 @@ jobs:
     } else if (input.section === "env_variables") {
       filtered.env_variables = guide.env_variables
       filtered.api_key_setup = guide.api_key_setup
+    } else if (input.section === "mcp_setup") {
+      filtered.mcp_setup = guide.mcp_setup
+    } else if (input.section === "quick_start") {
+      filtered.quick_start = guide.quick_start
+      filtered.mcp_setup = guide.mcp_setup  // Include MCP setup since it's step 1
     }
     return jsonResponse(filtered)
   }
