@@ -1,5 +1,5 @@
 import { getSql } from "./connection"
-import type { OrgApiKey, OrgApiKeyWithHash } from "./types"
+import type { OrgApiKey, OrgApiKeyWithHash, ApiKeyScope } from "./types"
 
 /**
  * Create a new API key for an organization
@@ -9,7 +9,8 @@ export async function createApiKey(
   name: string,
   keyHash: string,
   keyPrefix: string,
-  createdBy: number | null
+  createdBy: number | null,
+  scope: ApiKeyScope = "read"
 ): Promise<OrgApiKey> {
   const sql = getSql()
 
@@ -19,15 +20,17 @@ export async function createApiKey(
       name,
       key_hash,
       key_prefix,
-      created_by
+      created_by,
+      scope
     ) VALUES (
       ${organizationId},
       ${name},
       ${keyHash},
       ${keyPrefix},
-      ${createdBy}
+      ${createdBy},
+      ${scope}
     )
-    RETURNING id, organization_id, name, key_prefix, created_by, created_at, last_used_at, expires_at, revoked_at
+    RETURNING id, organization_id, name, key_prefix, scope, created_by, created_at, last_used_at, expires_at, revoked_at
   `
 
   return result[0] as OrgApiKey
@@ -45,6 +48,7 @@ export async function getApiKeysByOrg(organizationId: number): Promise<OrgApiKey
       organization_id,
       name,
       key_prefix,
+      COALESCE(scope, 'read') as scope,
       created_by,
       created_at,
       last_used_at,
@@ -73,6 +77,7 @@ export async function getApiKeysByUser(
       organization_id,
       name,
       key_prefix,
+      COALESCE(scope, 'read') as scope,
       created_by,
       created_at,
       last_used_at,
@@ -94,7 +99,18 @@ export async function getApiKeyByHash(keyHash: string): Promise<OrgApiKeyWithHas
   const sql = getSql()
 
   const result = await sql`
-    SELECT *
+    SELECT
+      id,
+      organization_id,
+      name,
+      key_hash,
+      key_prefix,
+      COALESCE(scope, 'read') as scope,
+      created_by,
+      created_at,
+      last_used_at,
+      expires_at,
+      revoked_at
     FROM organization_api_keys
     WHERE key_hash = ${keyHash}
   `

@@ -112,6 +112,14 @@ Examples:
             "mock_routes",
             "mock_rules",
             "mock_logs",
+            // Relevance scoring
+            "tests_with_relevance",
+            "critical_tests",
+            "tests_needing_labels",
+            "relevance_stats",
+            // Root cause clustering
+            "root_causes",
+            "execution_root_causes",
           ],
           description: "Dataset to query",
         },
@@ -150,6 +158,9 @@ Examples:
             // Mock API filters
             interface_id: { type: "number", description: "Mock interface ID (mock_routes, mock_rules, mock_logs)" },
             route_id: { type: "number", description: "Mock route ID (mock_rules)" },
+            // Root cause filters
+            root_cause_status: { type: "string", enum: ["open", "investigating", "fixed", "wont_fix", "flaky"], description: "Filter root causes by status" },
+            error_category: { type: "string", enum: ["timeout", "assertion", "network", "element", "api", "other"], description: "Filter root causes by error category" },
           },
         },
         view_mode: {
@@ -172,7 +183,7 @@ Examples:
   // ============================================
   {
     name: "perform_exolar_action",
-    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed tests, manage mock APIs.
+    description: `Execute heavy operations: compare executions, generate reports, classify failures, reembed tests, manage mock APIs, update test relevance.
 
 Actions:
 - compare: Side-by-side execution comparison (by ID or branch)
@@ -183,6 +194,9 @@ Actions:
 - create_mock_route: Add a route to a mock interface
 - create_mock_rule: Add a response rule to a route
 - delete_mock_interface: Remove a mock interface
+- update_test_relevance: Assign relevance label to a test (requires write scope)
+- batch_update_relevance: Bulk update relevance labels (requires write scope)
+- update_root_cause_status: Update root cause status (open, investigating, fixed, wont_fix, flaky)
 
 Mock API Workflow:
 1. create_mock_interface → Returns interface_id
@@ -209,13 +223,16 @@ Examples:
 - perform_exolar_action({ action: "reembed", params: { type: "error", force: true } })
 - perform_exolar_action({ action: "create_mock_interface", params: { name: "User API", slug: "user-api" } })
 - perform_exolar_action({ action: "create_mock_route", params: { interface_id: 1, path_pattern: "/users/:id", method: "GET" } })
-- perform_exolar_action({ action: "create_mock_rule", params: { route_id: 1, name: "Success", response_status: 200, response_body: '{"id": "{{request.params.id}}"}' } })`,
+- perform_exolar_action({ action: "create_mock_rule", params: { route_id: 1, name: "Success", response_status: 200, response_body: '{"id": "{{request.params.id}}"}' } })
+- perform_exolar_action({ action: "update_test_relevance", params: { test_signature: "checkout.spec.ts::should complete purchase", label: "critical", reason: "Core checkout flow" } })
+- perform_exolar_action({ action: "batch_update_relevance", params: { updates: [{ test_signature: "...", label: "high" }] } })
+- perform_exolar_action({ action: "update_root_cause_status", params: { root_cause_id: 1, status: "fixed", note: "Fixed in PR #123" } })`,
     inputSchema: {
       type: "object" as const,
       properties: {
         action: {
           type: "string",
-          enum: ["compare", "generate_report", "classify", "reembed", "create_mock_interface", "create_mock_route", "create_mock_rule", "delete_mock_interface"],
+          enum: ["compare", "generate_report", "classify", "reembed", "create_mock_interface", "create_mock_route", "create_mock_rule", "delete_mock_interface", "update_test_relevance", "batch_update_relevance", "update_root_cause_status"],
           description: "Action to perform",
         },
         params: {
@@ -267,6 +284,9 @@ Examples:
             response_headers: { type: "object", description: "Response headers" },
             response_body: { type: "string", description: "Response body (supports templating)" },
             response_delay_ms: { type: "number", description: "Response delay in milliseconds" },
+            // root cause
+            root_cause_id: { type: "number", description: "Root cause ID (update_root_cause_status)" },
+            status_note: { type: "string", description: "Note explaining the status change" },
           },
         },
         format: {

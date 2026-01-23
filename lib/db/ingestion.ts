@@ -4,6 +4,30 @@ import { updateFlakinessHistory } from "./flakiness"
 import { detectTechStack, upsertSuite, upsertSuiteTest, updateSuiteTestCounts } from "./suites"
 import type { ExecutionRequest, TestResultRequest, ArtifactRequest } from "../types"
 
+// Lazy import for relevance scoring to avoid circular dependencies
+let calculateRelevanceScoresForExecution: ((orgId: number, execId: number) => Promise<number>) | null = null
+
+async function getRelevanceScoringService() {
+  if (!calculateRelevanceScoresForExecution) {
+    const service = await import("@/lib/services/relevance-scoring-service")
+    calculateRelevanceScoresForExecution = service.calculateRelevanceScoresForExecution
+  }
+  return calculateRelevanceScoresForExecution
+}
+
+// Lazy import for notification service to avoid circular dependencies
+let sendCriticalFailureNotification: ((orgId: number, execId: number) => Promise<{ emailSent: boolean; slackSent: boolean }>) | null = null
+let sendExecutionCompleteNotification: ((orgId: number, execId: number, stats: { passed: number; failed: number; skipped: number; duration: number }) => Promise<boolean>) | null = null
+
+async function getNotificationService() {
+  if (!sendCriticalFailureNotification || !sendExecutionCompleteNotification) {
+    const service = await import("@/lib/services/notification-service")
+    sendCriticalFailureNotification = service.sendCriticalFailureNotification
+    sendExecutionCompleteNotification = service.sendExecutionCompleteNotification
+  }
+  return { sendCriticalFailureNotification, sendExecutionCompleteNotification }
+}
+
 // ============================================
 // Insert Functions for Data Ingestion
 // ============================================
@@ -166,6 +190,39 @@ export async function insertTestResults(
   if (suiteId) {
     await updateSuiteTestCounts(organizationId)
   }
+
+  // Update relevance scores for tests in this execution (fire and forget)
+  getRelevanceScoringService()
+    .then(async (calculateScores) => {
+      if (calculateScores) {
+        await calculateScores(organizationId, executionId)
+      }
+    })
+    .catch((err) => {
+      console.warn("[ingestion] Relevance scoring failed (non-blocking):", err)
+    })
+
+  // Send notifications (fire and forget)
+  const hasFailures = results.some((r) => r.status === "failed" || r.status === "timedout")
+  getNotificationService()
+    .then(async ({ sendCriticalFailureNotification: sendCritical, sendExecutionCompleteNotification: sendComplete }) => {
+      // Send critical failure notification if there are failures
+      if (hasFailures && sendCritical) {
+        await sendCritical(organizationId, executionId)
+      }
+
+      // Send execution complete notification (Slack only)
+      if (sendComplete) {
+        const passed = results.filter((r) => r.status === "passed").length
+        const failed = results.filter((r) => r.status === "failed" || r.status === "timedout").length
+        const skipped = results.filter((r) => r.status === "skipped").length
+        const duration = results.reduce((acc, r) => acc + (r.duration_ms || 0), 0)
+        await sendComplete(organizationId, executionId, { passed, failed, skipped, duration })
+      }
+    })
+    .catch((err) => {
+      console.warn("[ingestion] Notification failed (non-blocking):", err)
+    })
 
   return signatureToIdMap
 }

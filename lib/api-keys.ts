@@ -16,10 +16,13 @@ export interface GeneratedApiKey {
   prefix: string   // Display prefix (e.g., "exolar_abc1...")
 }
 
+export type ApiKeyScope = "read" | "write" | "admin"
+
 export interface ValidatedApiKey {
   id: number
   organizationId: number
   name: string
+  scope: ApiKeyScope
 }
 
 /**
@@ -92,6 +95,7 @@ export async function validateOrgApiKey(
     id: apiKey.id,
     organizationId: apiKey.organization_id,
     name: apiKey.name,
+    scope: (apiKey.scope as ApiKeyScope) || "read",
   }
 }
 
