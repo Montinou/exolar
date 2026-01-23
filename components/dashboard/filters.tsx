@@ -89,18 +89,37 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
   }
 
   return (
-    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
+    <div
+      className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 p-4 rounded-xl animate-fade-in-up"
+      style={{
+        background: "oklch(0.1 0.015 260 / 0.4)",
+        border: "1px solid oklch(1 0 0 / 0.06)",
+        backdropFilter: "blur(8px)",
+      }}
+    >
       <DateRangePicker value={dateRange} onChange={updateDateRange} className="w-full sm:w-auto" />
       <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline-flex items-center">
         {getPeriodLabel()}
       </span>
+
+      <span
+        className="text-xs whitespace-nowrap hidden sm:inline-flex items-center px-2.5 py-1 rounded-md"
+        style={{
+          background: "oklch(0.75 0.15 195 / 0.1)",
+          color: "var(--exolar-cyan)",
+        }}
+      >
+        {getPeriodLabel()}
+      </span>
+
+      <div className="h-6 w-px bg-border/50 hidden sm:block" />
 
       {showStatus && (
         <Select
           value={currentStatus || "all"}
           onValueChange={(value) => updateFilter("status", value === "all" ? null : value)}
         >
-          <SelectTrigger className="w-full sm:w-[150px]">
+          <SelectTrigger className="w-full sm:w-[150px] transition-all duration-200 hover:border-[var(--exolar-cyan)]/40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -116,7 +135,7 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
         value={currentSuite || "all"}
         onValueChange={(value) => updateFilter("suite", value === "all" ? null : value)}
       >
-        <SelectTrigger className="w-full sm:w-[180px]">
+        <SelectTrigger className="w-full sm:w-[180px] transition-all duration-200 hover:border-[var(--exolar-cyan)]/40">
           <SelectValue placeholder="Suite" />
         </SelectTrigger>
         <SelectContent>
@@ -133,7 +152,7 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
         value={currentBranch || "all"}
         onValueChange={(value) => updateFilter("branch", value === "all" ? null : value)}
       >
-        <SelectTrigger className="w-full sm:w-[180px]">
+        <SelectTrigger className="w-full sm:w-[180px] transition-all duration-200 hover:border-[var(--exolar-cyan)]/40">
           <SelectValue placeholder="Branch" />
         </SelectTrigger>
         <SelectContent>
@@ -148,7 +167,12 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
 
       {/* Historic Summary switch - only shows when branch/suite filter is applied */}
       {hasFilter && (
-        <div className="flex items-center gap-2 px-2">
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-200"
+          style={{
+            background: currentHistoric ? "oklch(0.75 0.15 195 / 0.1)" : "transparent",
+          }}
+        >
           <Label htmlFor="historic" className="text-sm cursor-pointer whitespace-nowrap">
             Historic Summary
           </Label>
@@ -169,7 +193,12 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
       )}
 
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearFilters} className="w-full sm:w-auto">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearFilters}
+          className="w-full sm:w-auto text-muted-foreground hover:text-foreground hover:bg-destructive/10 transition-all duration-200"
+        >
           <X className="h-4 w-4 mr-1" />
           Clear
         </Button>

@@ -59,11 +59,12 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                 No test executions found. Run your Playwright tests to see results here.
               </div>
             ) : (
-              executions.map((execution) => (
+              executions.map((execution, index) => (
                 <div
                   key={execution.id}
                   onClick={() => setSelectedExecutionId(execution.id)}
-                  className="border rounded-lg p-3 cursor-pointer hover:bg-muted/50 active:bg-muted/70"
+                  className="border rounded-lg p-3 cursor-pointer execution-row group transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  style={{ animationDelay: `${index * 30}ms` }}
                 >
                   {/* Status + Branch Header */}
                   <div className="flex items-center justify-between mb-2">
@@ -110,7 +111,7 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                   {/* Date */}
                   <div className="text-xs text-muted-foreground mt-2 flex items-center justify-between">
                     <span>{formatDate(execution.started_at)}</span>
-                    <ChevronRight className="h-4 w-4" />
+                    <ChevronRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
                   </div>
                 </div>
               ))
@@ -141,11 +142,12 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  executions.map((execution) => (
+                  executions.map((execution, index) => (
                     <TableRow
                       key={execution.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer execution-row group"
                       onClick={() => setSelectedExecutionId(execution.id)}
+                      style={{ animationDelay: `${index * 30}ms` }}
                     >
                       <TableCell className="font-mono text-xs">
                         <div className="flex items-center gap-2">
@@ -204,7 +206,7 @@ export function ExecutionsTable({ executions }: ExecutionsTableProps) {
                         {formatDate(execution.started_at)}
                       </TableCell>
                       <TableCell>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
                       </TableCell>
                     </TableRow>
                   ))

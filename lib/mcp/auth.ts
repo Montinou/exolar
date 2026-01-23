@@ -8,6 +8,7 @@
  */
 
 import * as jose from "jose"
+// Note: getSql is only used for Neon Auth tokens, not MCP OAuth tokens
 import { getSql } from "@/lib/db"
 
 export interface MCPAuthContext {
@@ -97,13 +98,10 @@ async function validateMCPGeneratedToken(token: string): Promise<MCPAuthContext 
       return null
     }
 
-    // Get user role from database (not stored in token for security)
-    const sql = getSql()
-    const result = await sql`
-      SELECT role as user_role FROM dashboard_users WHERE id = ${userId}
-    `
-
-    const userRole = result.length > 0 ? (result[0].user_role as "admin" | "viewer") : "viewer"
+    // Use user_role from JWT payload (included at token generation time)
+    // This eliminates database queries on every MCP request, fixing random re-auth issues
+    // caused by serverless cold starts, connection pool exhaustion, or network timeouts
+    const userRole = (payload.user_role as "admin" | "viewer") || "viewer"
 
     return {
       userId,
