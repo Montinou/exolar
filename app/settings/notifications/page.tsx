@@ -344,7 +344,10 @@ export default function NotificationSettingsPage() {
 
               {/* Digest Schedule */}
               <div className="space-y-2">
-                <Label>Digest Schedule</Label>
+                <Label>Digest Type</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Digests are sent manually via API call: POST /api/notifications/digest
+                </p>
                 <div className="flex gap-4">
                   <Select
                     value={config.emailDigestSchedule || "none"}
@@ -356,33 +359,14 @@ export default function NotificationSettingsPage() {
                     }
                   >
                     <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select schedule" />
+                      <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No digest</SelectItem>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly (Monday)</SelectItem>
+                      <SelectItem value="daily">Daily digest</SelectItem>
+                      <SelectItem value="weekly">Weekly digest</SelectItem>
                     </SelectContent>
                   </Select>
-                  {config.emailDigestSchedule && (
-                    <Select
-                      value={String(config.emailDigestHour)}
-                      onValueChange={(value) =>
-                        setConfig({ ...config, emailDigestHour: parseInt(value) })
-                      }
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Hour (UTC)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <SelectItem key={i} value={String(i)}>
-                            {String(i).padStart(2, "0")}:00 UTC
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
               </div>
             </CardContent>
