@@ -98,6 +98,9 @@ export function Filters({ branches, suites, basePath, showStatus = true }: Filte
       }}
     >
       <DateRangePicker value={dateRange} onChange={updateDateRange} className="w-full sm:w-auto" />
+      <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline-flex items-center">
+        {getPeriodLabel()}
+      </span>
 
       <span
         className="text-xs whitespace-nowrap hidden sm:inline-flex items-center px-2.5 py-1 rounded-md"
