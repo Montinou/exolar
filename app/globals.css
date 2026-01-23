@@ -172,11 +172,207 @@
 }
 
 @layer components {
+  /* ========================================
+     Enhanced Animation System
+     ======================================== */
+
+  /* Page entrance animations */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in-scale {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Stagger animation classes */
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-fade-in-scale {
+    animation: fade-in-scale 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-slide-left {
+    animation: slide-in-left 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .animate-slide-right {
+    animation: slide-in-right 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  /* Animation delay utilities */
+  .delay-1 { animation-delay: 50ms; }
+  .delay-2 { animation-delay: 100ms; }
+  .delay-3 { animation-delay: 150ms; }
+  .delay-4 { animation-delay: 200ms; }
+  .delay-5 { animation-delay: 250ms; }
+  .delay-6 { animation-delay: 300ms; }
+  .delay-7 { animation-delay: 350ms; }
+  .delay-8 { animation-delay: 400ms; }
+
+  /* Smooth number counter animation */
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-count {
+    animation: count-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* Chart entrance animation */
+  @keyframes chart-reveal {
+    from {
+      opacity: 0;
+      clip-path: inset(0 100% 0 0);
+    }
+    to {
+      opacity: 1;
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  .animate-chart-reveal {
+    animation: chart-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation-delay: 200ms;
+    opacity: 0;
+  }
+
+  /* Donut chart spin-in */
+  @keyframes donut-spin-in {
+    from {
+      opacity: 0;
+      transform: rotate(-90deg) scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+  }
+
+  .animate-donut {
+    animation: donut-spin-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    opacity: 0;
+  }
+
+  /* Shimmer loading effect */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      oklch(0.15 0.02 260 / 0.3) 0%,
+      oklch(0.25 0.03 260 / 0.4) 50%,
+      oklch(0.15 0.02 260 / 0.3) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Subtle pulse for live data */
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .animate-subtle-pulse {
+    animation: subtle-pulse 2s ease-in-out infinite;
+  }
+
+  /* Micro-interaction: Button press */
+  .press-effect {
+    @apply transition-all duration-150;
+  }
+
+  .press-effect:active {
+    transform: scale(0.97);
+  }
+
+  /* Micro-interaction: Card hover lift */
+  .hover-lift {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  /* Glow pulse for important elements */
+  @keyframes glow-pulse {
+    0%, 100% {
+      box-shadow: 0 0 20px oklch(0.75 0.15 195 / 0.2);
+    }
+    50% {
+      box-shadow: 0 0 30px oklch(0.75 0.15 195 / 0.35);
+    }
+  }
+
+  .animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+
+  /* ========================================
+     Glass Panel System - Enhanced
+     ======================================== */
+
   /* Glass Panel */
   .glass-panel {
-    @apply backdrop-blur-xl border rounded-xl;
+    @apply backdrop-blur-xl border rounded-xl transition-all duration-300;
     background: var(--glass-bg);
     border-color: var(--glass-border);
+  }
+
+  .glass-panel:hover {
+    border-color: oklch(1 0 0 / 0.15);
   }
 
   /* Holographic border effect */
@@ -247,16 +443,28 @@
     transform: translateY(-2px);
   }
 
-  /* Glass Card with glow border */
+  /* Glass Card with glow border - Enhanced */
   .glass-card {
-    @apply backdrop-blur-xl rounded-xl border transition-all duration-300;
+    @apply backdrop-blur-xl rounded-xl border;
     background: oklch(0.12 0.02 260 / 0.6);
-    border-color: oklch(0.75 0.15 195 / 0.3);
-    box-shadow: 0 0 30px oklch(0.75 0.15 195 / 0.15);
+    border-color: oklch(0.75 0.15 195 / 0.25);
+    box-shadow:
+      0 0 30px oklch(0.75 0.15 195 / 0.1),
+      0 4px 20px oklch(0 0 0 / 0.3),
+      inset 0 1px 0 oklch(1 0 0 / 0.05);
+    transition:
+      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.3s ease;
   }
 
   .glass-card:hover {
-    box-shadow: 0 0 40px oklch(0.75 0.15 195 / 0.25);
+    transform: translateY(-2px);
+    border-color: oklch(0.75 0.15 195 / 0.4);
+    box-shadow:
+      0 0 40px oklch(0.75 0.15 195 / 0.2),
+      0 8px 30px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 oklch(1 0 0 / 0.08);
   }
 
   /* Keep glass-card-glow for backwards compatibility */
@@ -266,12 +474,67 @@
 
   /* Amber variant for warning/alert cards */
   .glass-card-amber {
-    border-color: oklch(0.78 0.18 75 / 0.3);
-    box-shadow: 0 0 30px oklch(0.78 0.18 75 / 0.15);
+    border-color: oklch(0.78 0.18 75 / 0.25);
+    box-shadow:
+      0 0 30px oklch(0.78 0.18 75 / 0.1),
+      0 4px 20px oklch(0 0 0 / 0.3),
+      inset 0 1px 0 oklch(1 0 0 / 0.05);
   }
 
   .glass-card-amber:hover {
-    box-shadow: 0 0 40px oklch(0.78 0.18 75 / 0.25);
+    border-color: oklch(0.78 0.18 75 / 0.4);
+    box-shadow:
+      0 0 40px oklch(0.78 0.18 75 / 0.2),
+      0 8px 30px oklch(0 0 0 / 0.4),
+      inset 0 1px 0 oklch(1 0 0 / 0.08);
+  }
+
+  /* Success variant for positive metrics */
+  .glass-card-success {
+    border-color: oklch(0.72 0.19 145 / 0.25);
+    box-shadow:
+      0 0 30px oklch(0.72 0.19 145 / 0.1),
+      0 4px 20px oklch(0 0 0 / 0.3);
+  }
+
+  .glass-card-success:hover {
+    border-color: oklch(0.72 0.19 145 / 0.4);
+    box-shadow:
+      0 0 40px oklch(0.72 0.19 145 / 0.2),
+      0 8px 30px oklch(0 0 0 / 0.4);
+  }
+
+  /* Error variant for failures */
+  .glass-card-error {
+    border-color: oklch(0.65 0.22 25 / 0.25);
+    box-shadow:
+      0 0 30px oklch(0.65 0.22 25 / 0.1),
+      0 4px 20px oklch(0 0 0 / 0.3);
+  }
+
+  .glass-card-error:hover {
+    border-color: oklch(0.65 0.22 25 / 0.4);
+    box-shadow:
+      0 0 40px oklch(0.65 0.22 25 / 0.2),
+      0 8px 30px oklch(0 0 0 / 0.4);
+  }
+
+  /* Static card variant (no hover animation for grids) */
+  .glass-card-static {
+    @apply backdrop-blur-xl rounded-xl border;
+    background: oklch(0.12 0.02 260 / 0.6);
+    border-color: oklch(0.75 0.15 195 / 0.25);
+    box-shadow:
+      0 0 30px oklch(0.75 0.15 195 / 0.1),
+      0 4px 20px oklch(0 0 0 / 0.3);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .glass-card-static:hover {
+    border-color: oklch(0.75 0.15 195 / 0.35);
+    box-shadow:
+      0 0 35px oklch(0.75 0.15 195 / 0.15),
+      0 4px 20px oklch(0 0 0 / 0.35);
   }
 
   /* Colored stat values with glow effect */
@@ -499,4 +762,283 @@
 /* Eclipse icon pulse */
 .eclipse-pulse {
   animation: eclipse-pulse 3s ease-in-out infinite;
+}
+
+/* ========================================
+   Navigation & Sidebar Enhancements
+   ======================================== */
+
+/* Sidebar smooth transitions */
+[data-slot="sidebar"] {
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-slot="sidebar-gap"] {
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-slot="sidebar-container"] {
+  transition:
+    left 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    right 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Menu button active state with glow */
+[data-sidebar="menu-button"][data-active="true"] {
+  background: oklch(0.75 0.15 195 / 0.12);
+  border: 1px solid oklch(0.75 0.15 195 / 0.25);
+  box-shadow:
+    0 0 15px oklch(0.75 0.15 195 / 0.15),
+    inset 0 1px 0 oklch(1 0 0 / 0.05);
+}
+
+/* Menu button hover enhancement */
+[data-sidebar="menu-button"]:not([data-active="true"]):hover {
+  background: oklch(0.2 0.02 260 / 0.6);
+}
+
+/* Navigation link underline animation */
+.nav-link-animated {
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-link-animated::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--exolar-cyan), var(--safety-amber));
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-link-animated:hover::after,
+.nav-link-animated[data-active="true"]::after {
+  transform: translateX(0);
+}
+
+/* Sidebar header brand animation */
+.brand-logo-container {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.brand-logo-container:hover {
+  transform: scale(1.02);
+}
+
+/* ========================================
+   Filter & Form Enhancements
+   ======================================== */
+
+/* Select trigger enhancements */
+[data-slot="select-trigger"] {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+[data-slot="select-trigger"]:focus {
+  border-color: oklch(0.75 0.15 195 / 0.5);
+  box-shadow: 0 0 0 2px oklch(0.75 0.15 195 / 0.15);
+}
+
+/* Filter bar container */
+.filter-bar {
+  @apply flex flex-wrap items-center gap-3 p-4 rounded-xl;
+  background: oklch(0.1 0.02 260 / 0.4);
+  border: 1px solid oklch(1 0 0 / 0.05);
+}
+
+/* ========================================
+   Chart Container Animations
+   ======================================== */
+
+/* Chart wrapper with entrance animation */
+.chart-container {
+  @apply relative overflow-hidden;
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 200ms;
+  opacity: 0;
+}
+
+/* Recharts tooltip styling enhancement */
+.recharts-tooltip-wrapper {
+  transition: opacity 0.15s ease, transform 0.15s ease !important;
+}
+
+/* Chart hover state */
+.recharts-surface:hover .recharts-area {
+  filter: brightness(1.1);
+}
+
+/* ========================================
+   Table & Data Grid Enhancements
+   ======================================== */
+
+/* Table row hover animation */
+.table-row-animated {
+  @apply transition-all duration-200;
+}
+
+.table-row-animated:hover {
+  background: oklch(0.15 0.02 260 / 0.5);
+  transform: scale(1.002);
+}
+
+/* Execution row highlight on hover */
+.execution-row {
+  @apply transition-all duration-200;
+  border-left: 3px solid transparent;
+}
+
+.execution-row:hover {
+  background: oklch(0.12 0.02 260 / 0.8);
+  border-left-color: var(--exolar-cyan);
+}
+
+/* ========================================
+   Badge & Status Animations
+   ======================================== */
+
+/* Status badge pulse for active states */
+.status-badge-live {
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+/* Badge entrance animation */
+.badge-animated {
+  animation: fade-in-scale 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Success/Error badge glow */
+.badge-success {
+  box-shadow: 0 0 10px oklch(0.72 0.19 145 / 0.3);
+}
+
+.badge-error {
+  box-shadow: 0 0 10px oklch(0.65 0.22 25 / 0.3);
+}
+
+.badge-warning {
+  box-shadow: 0 0 10px oklch(0.78 0.18 75 / 0.3);
+}
+
+/* ========================================
+   Modal & Dialog Animations
+   ======================================== */
+
+/* Modal backdrop blur */
+[data-slot="dialog-overlay"] {
+  backdrop-filter: blur(4px);
+  transition: opacity 0.2s ease;
+}
+
+/* Modal content entrance */
+[data-slot="dialog-content"] {
+  animation: modal-entrance 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modal-entrance {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Sheet slide animation enhancement */
+[data-slot="sheet-content"] {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: oklch(0.1 0.02 260 / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: oklch(0.3 0.02 260 / 0.5);
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.4 0.03 260 / 0.6);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.3 0.02 260 / 0.5) oklch(0.1 0.02 260 / 0.3);
+}
+
+/* ========================================
+   Responsive Enhancements
+   ======================================== */
+
+/* Touch-friendly hit areas on mobile */
+@media (max-width: 640px) {
+  [data-sidebar="menu-button"] {
+    min-height: 48px;
+  }
+
+  .glass-card {
+    /* Disable hover lift on mobile - can cause jank */
+    transform: none !important;
+  }
+
+  .glass-card:hover {
+    transform: none !important;
+  }
+
+  /* Larger touch targets */
+  button,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================
+   Focus Visible Enhancements
+   ======================================== */
+
+/* Enhanced focus ring */
+:focus-visible {
+  outline: 2px solid oklch(0.75 0.15 195 / 0.7);
+  outline-offset: 2px;
+}
+
+/* Skip focus ring for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
 }

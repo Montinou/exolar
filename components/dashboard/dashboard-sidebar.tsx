@@ -112,10 +112,22 @@ function DashboardSidebarContent() {
   return (
     <>
       <SidebarHeader className="border-b border-border/40 px-4 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
-        <Link href="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          <BrandLogo variant="animated-icon" width={28} />
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center brand-logo-container"
+        >
+          <div className="relative">
+            <BrandLogo variant="animated-icon" width={28} />
+            <div
+              className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              style={{
+                background: "radial-gradient(circle, oklch(0.75 0.15 195 / 0.2) 0%, transparent 70%)",
+                transform: "scale(1.5)",
+              }}
+            />
+          </div>
           <span
-            className="font-bold text-lg group-data-[collapsible=icon]:hidden"
+            className="font-bold text-lg group-data-[collapsible=icon]:hidden transition-all duration-300"
             style={{
               background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
               WebkitBackgroundClip: "text",

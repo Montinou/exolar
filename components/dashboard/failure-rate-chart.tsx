@@ -112,15 +112,20 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate 
     <div className="glass-card glass-card-glow p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <TrendingDown className="h-5 w-5 text-[var(--status-error)]" />
+          <div
+            className="p-1.5 rounded-lg"
+            style={{ background: "oklch(0.65 0.22 25 / 0.15)" }}
+          >
+            <TrendingDown className="h-4 w-4 text-[var(--status-error)]" />
+          </div>
           <h3 className="text-sm font-medium text-muted-foreground">Failure Rate Trend</h3>
           <span className="text-xs text-muted-foreground">({filterLabel})</span>
         </div>
-        <span className="text-xs stat-value-error">
+        <span className="text-xs stat-value-error tabular-nums">
           Avg: {avgFailureRate.toFixed(1)}%
         </span>
       </div>
-      <div className="h-[200px] sm:h-[220px]">
+      <div className="h-[200px] sm:h-[220px] chart-container">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={formattedData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid
@@ -143,21 +148,23 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate 
             />
             <Tooltip
               contentStyle={{
-                background: "oklch(0.12 0.02 260 / 0.9)",
-                border: "1px solid oklch(1 0 0 / 0.1)",
-                borderRadius: "8px",
-                backdropFilter: "blur(8px)",
+                background: "oklch(0.12 0.02 260 / 0.95)",
+                border: "1px solid oklch(0.65 0.22 25 / 0.3)",
+                borderRadius: "12px",
+                backdropFilter: "blur(12px)",
+                boxShadow: "0 4px 20px oklch(0 0 0 / 0.3)",
+                padding: "12px 16px",
               }}
               content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                   const tooltipData = payload[0].payload
                   return (
-                    <div className="glass-card p-3">
+                    <div className="space-y-1">
                       <p className="font-medium text-foreground">{tooltipData.date}</p>
-                      <p className="font-semibold stat-value-error">
-                        Failure Rate: {Number(tooltipData.failure_rate).toFixed(1)}%
+                      <p className="font-semibold stat-value-error text-lg">
+                        {Number(tooltipData.failure_rate).toFixed(1)}%
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs text-muted-foreground">
                         {tooltipData.failed_tests} failed / {tooltipData.total_tests} total
                       </p>
                     </div>
@@ -188,13 +195,18 @@ export function FailureRateChart({ dateFrom, dateTo, branch, suite, failureRate 
                 r: 3,
               }}
               activeDot={{
-                r: 5,
+                r: 6,
                 fill: "var(--status-error)",
-                style: { filter: "drop-shadow(0 0 8px var(--status-error))" },
+                stroke: "oklch(0.15 0.02 260)",
+                strokeWidth: 2,
+                style: { filter: "drop-shadow(0 0 10px var(--status-error))" },
               }}
               style={{
                 filter: "drop-shadow(0 0 6px oklch(0.65 0.22 25 / 0.5))",
               }}
+              animationBegin={300}
+              animationDuration={1000}
+              animationEasing="ease-out"
             />
           </LineChart>
         </ResponsiveContainer>
