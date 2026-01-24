@@ -40,27 +40,37 @@ export async function GET(request: Request) {
     let resolvedBaselineId: number | null = baselineId ? parseInt(baselineId, 10) : null
     let resolvedCurrentId: number | null = currentId ? parseInt(currentId, 10) : null
 
-    // If branch names provided, resolve to latest execution IDs
-    if (baselineBranch && !resolvedBaselineId) {
-      const baselineExecution = await db.getLatestExecutionByBranch(baselineBranch, suite)
-      if (!baselineExecution) {
-        return NextResponse.json(
-          { error: `No execution found for baseline branch: ${baselineBranch}` },
-          { status: 404 }
-        )
-      }
-      resolvedBaselineId = baselineExecution.id
-    }
+    // PERFORMANCE OPTIMIZATION: Parallelize branch lookups instead of sequential
+    // Expected improvement: ~50% faster for branch-based comparisons
+    if ((baselineBranch && !resolvedBaselineId) || (currentBranch && !resolvedCurrentId)) {
+      const [baselineExecution, currentExecution] = await Promise.all([
+        baselineBranch && !resolvedBaselineId
+          ? db.getLatestExecutionByBranch(baselineBranch, suite)
+          : null,
+        currentBranch && !resolvedCurrentId
+          ? db.getLatestExecutionByBranch(currentBranch, suite)
+          : null,
+      ])
 
-    if (currentBranch && !resolvedCurrentId) {
-      const currentExecution = await db.getLatestExecutionByBranch(currentBranch, suite)
-      if (!currentExecution) {
-        return NextResponse.json(
-          { error: `No execution found for current branch: ${currentBranch}` },
-          { status: 404 }
-        )
+      if (baselineBranch && !resolvedBaselineId) {
+        if (!baselineExecution) {
+          return NextResponse.json(
+            { error: `No execution found for baseline branch: ${baselineBranch}` },
+            { status: 404 }
+          )
+        }
+        resolvedBaselineId = baselineExecution.id
       }
-      resolvedCurrentId = currentExecution.id
+
+      if (currentBranch && !resolvedCurrentId) {
+        if (!currentExecution) {
+          return NextResponse.json(
+            { error: `No execution found for current branch: ${currentBranch}` },
+            { status: 404 }
+          )
+        }
+        resolvedCurrentId = currentExecution.id
+      }
     }
 
     // Validate we have both IDs

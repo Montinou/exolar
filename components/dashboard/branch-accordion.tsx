@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,6 +22,19 @@ interface BranchAccordionProps {
 export function BranchAccordion({ branchGroups }: BranchAccordionProps) {
   const router = useRouter()
   const [selectedExecutionId, setSelectedExecutionId] = useState<number | null>(null)
+
+  // PERFORMANCE OPTIMIZATION: Memoize handlers to prevent new function references on each render
+  const handleViewDetails = useCallback((executionId: number) => {
+    setSelectedExecutionId(executionId)
+  }, [])
+
+  const handleCompareWith = useCallback((executionId: number) => {
+    router.push(`/dashboard/compare?current=${executionId}`)
+  }, [router])
+
+  const handleCloseModal = useCallback((open: boolean) => {
+    if (!open) setSelectedExecutionId(null)
+  }, [])
 
   const getStatusIcon = (status: "success" | "failure" | "running") => {
     switch (status) {
@@ -129,15 +142,13 @@ export function BranchAccordion({ branchGroups }: BranchAccordionProps) {
                                       </Tooltip>
                                       <DropdownMenuContent align="start">
                                         <DropdownMenuItem
-                                          onClick={() => setSelectedExecutionId(result.executionId)}
+                                          onClick={() => handleViewDetails(result.executionId)}
                                         >
                                           <Eye className="mr-2 h-4 w-4" />
                                           View Details
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                          onClick={() =>
-                                            router.push(`/dashboard/compare?current=${result.executionId}`)
-                                          }
+                                          onClick={() => handleCompareWith(result.executionId)}
                                         >
                                           <GitCompare className="mr-2 h-4 w-4" />
                                           Compare with...
@@ -164,7 +175,7 @@ export function BranchAccordion({ branchGroups }: BranchAccordionProps) {
         <TestDetailModal
           executionId={selectedExecutionId}
           open={!!selectedExecutionId}
-          onOpenChange={(open) => !open && setSelectedExecutionId(null)}
+          onOpenChange={handleCloseModal}
         />
       )}
     </>

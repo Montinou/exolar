@@ -21,6 +21,40 @@ interface TrendAreaChartProps {
   title?: string
 }
 
+// PERFORMANCE OPTIMIZATION: Extract style objects to module-level constants
+// Prevents re-renders caused by new object references on each render
+const TOOLTIP_CONTENT_STYLE = {
+  background: "oklch(0.12 0.02 260 / 0.9)",
+  border: "1px solid oklch(1 0 0 / 0.1)",
+  borderRadius: "8px",
+  backdropFilter: "blur(8px)",
+} as const
+
+const TOOLTIP_ITEM_STYLE = { color: "oklch(0.985 0 0)" } as const
+const TOOLTIP_LABEL_STYLE = { color: "oklch(0.708 0 0)" } as const
+
+const XAXIS_TICK_STYLE = { fill: "oklch(0.708 0 0)", fontSize: 11 } as const
+const XAXIS_LINE_STYLE = { stroke: "oklch(1 0 0 / 0.1)" } as const
+
+const YAXIS_TICK_STYLE = { fill: "oklch(0.708 0 0)", fontSize: 11 } as const
+
+const DOT_STYLE = {
+  fill: "oklch(0.75 0.15 195)",
+  strokeWidth: 0,
+  r: 3,
+} as const
+
+const ACTIVE_DOT_STYLE = {
+  fill: "oklch(0.85 0.12 195)",
+  strokeWidth: 0,
+  r: 5,
+  style: { filter: "drop-shadow(0 0 8px oklch(0.75 0.15 195))" },
+} as const
+
+const AREA_STYLE = {
+  filter: "drop-shadow(0 0 8px oklch(0.75 0.15 195 / 0.5))",
+} as const
+
 export function TrendAreaChart({
   data,
   title = "Weekly Pass Rate Trend",
@@ -56,26 +90,21 @@ export function TrendAreaChart({
             />
             <XAxis
               dataKey="label"
-              tick={{ fill: "oklch(0.708 0 0)", fontSize: 11 }}
+              tick={XAXIS_TICK_STYLE}
               tickLine={false}
-              axisLine={{ stroke: "oklch(1 0 0 / 0.1)" }}
+              axisLine={XAXIS_LINE_STYLE}
             />
             <YAxis
-              tick={{ fill: "oklch(0.708 0 0)", fontSize: 11 }}
+              tick={YAXIS_TICK_STYLE}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => `${value}%`}
               domain={[0, 100]}
             />
             <Tooltip
-              contentStyle={{
-                background: "oklch(0.12 0.02 260 / 0.9)",
-                border: "1px solid oklch(1 0 0 / 0.1)",
-                borderRadius: "8px",
-                backdropFilter: "blur(8px)",
-              }}
-              itemStyle={{ color: "oklch(0.985 0 0)" }}
-              labelStyle={{ color: "oklch(0.708 0 0)" }}
+              contentStyle={TOOLTIP_CONTENT_STYLE}
+              itemStyle={TOOLTIP_ITEM_STYLE}
+              labelStyle={TOOLTIP_LABEL_STYLE}
               formatter={(value: number) => [`${value.toFixed(1)}%`, "Pass Rate"]}
             />
             <Area
@@ -84,20 +113,9 @@ export function TrendAreaChart({
               stroke="oklch(0.75 0.15 195)"
               strokeWidth={2}
               fill="url(#cyanGradient)"
-              dot={{
-                fill: "oklch(0.75 0.15 195)",
-                strokeWidth: 0,
-                r: 3,
-              }}
-              activeDot={{
-                fill: "oklch(0.85 0.12 195)",
-                strokeWidth: 0,
-                r: 5,
-                style: { filter: "drop-shadow(0 0 8px oklch(0.75 0.15 195))" },
-              }}
-              style={{
-                filter: "drop-shadow(0 0 8px oklch(0.75 0.15 195 / 0.5))",
-              }}
+              dot={DOT_STYLE}
+              activeDot={ACTIVE_DOT_STYLE}
+              style={AREA_STYLE}
             />
           </AreaChart>
         </ResponsiveContainer>

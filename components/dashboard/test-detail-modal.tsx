@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
@@ -60,9 +60,12 @@ export function TestDetailModal({ executionId, open, onOpenChange }: TestDetailM
     )
   }
 
-  const failedTests = testResults.filter((t) => t.status === "failed")
-  const passedTests = testResults.filter((t) => t.status === "passed")
-  const skippedTests = testResults.filter((t) => t.status === "skipped")
+  // PERFORMANCE OPTIMIZATION: Memoize filter arrays to prevent re-computation on every render
+  const { failedTests, passedTests, skippedTests } = useMemo(() => ({
+    failedTests: testResults.filter((t) => t.status === "failed"),
+    passedTests: testResults.filter((t) => t.status === "passed"),
+    skippedTests: testResults.filter((t) => t.status === "skipped"),
+  }), [testResults])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
