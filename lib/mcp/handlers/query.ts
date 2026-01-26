@@ -45,6 +45,14 @@ const QueryInputSchema = z.object({
     "mock_routes", // List routes for an interface
     "mock_rules", // List rules for a route
     "mock_logs", // Request logs for an interface
+    // Relevance scoring datasets
+    "tests_with_relevance", // All tests with relevance scores
+    "critical_tests", // Tests with score >= 80
+    "tests_needing_labels", // Tests without manual labels
+    "relevance_stats", // Relevance statistics summary
+    // Root cause clustering
+    "root_causes", // Hierarchical root causes for failures
+    "execution_root_causes", // Root causes for a specific execution
   ]),
   filters: z
     .object({
@@ -212,6 +220,7 @@ export async function handleQuery(
           since: f.from,
           runId: f.run_id,
           requireAIContext: !!f.error_type,
+          includeEnhancedContext: true, // Always include relevance/root cause context
         })
 
         // Defensive check: ensure failures is an array
@@ -219,26 +228,68 @@ export async function handleQuery(
           return errorResponse("Unexpected response from failures query - expected array")
         }
 
+        // Cast to enhanced type for proper typing
+        const enhancedFailures = failures as Array<{
+          id: number
+          test_name: string
+          test_file: string
+          test_signature: string
+          error_message: string | null
+          duration_ms: number
+          status: string
+          is_critical: boolean
+          ai_context?: unknown
+          relevance_score?: number | null
+          relevance_label?: string | null
+          root_cause_id?: number | null
+          root_cause_category?: string | null
+          root_cause_subcategory?: string | null
+          similar_failures_count?: number | null
+        }>
+
         if (format === "json") {
           return jsonResponse({
             organization: authContext.organizationSlug,
             dataset: "failures",
             execution_id: f.execution_id,
-            count: failures.length,
-            pagination: { offset: f.offset ?? 0, limit: f.limit ?? 20, has_more: failures.length === (f.limit ?? 20) },
-            data: failures,
+            count: enhancedFailures.length,
+            pagination: { offset: f.offset ?? 0, limit: f.limit ?? 20, has_more: enhancedFailures.length === (f.limit ?? 20) },
+            data: enhancedFailures.map(fail => ({
+              id: fail.id,
+              test_name: fail.test_name,
+              test_file: fail.test_file,
+              test_signature: fail.test_signature,
+              status: fail.status,
+              is_critical: fail.is_critical,
+              error_message: fail.error_message,
+              duration_ms: fail.duration_ms,
+              ai_context: fail.ai_context,
+              // Enhanced context fields
+              relevance: fail.relevance_score != null ? {
+                score: fail.relevance_score,
+                label: fail.relevance_label,
+              } : null,
+              root_cause: fail.root_cause_id != null ? {
+                id: fail.root_cause_id,
+                category: fail.root_cause_category,
+                subcategory: fail.root_cause_subcategory,
+                similar_failures_count: fail.similar_failures_count,
+              } : null,
+            })),
           })
         }
 
-        // Markdown format
-        let output = `## Failed Tests (${failures.length} results)\n\n`
-        output += "| Test | File | Error | Duration |\n"
-        output += "|------|------|-------|----------|\n"
-        for (const fail of failures.slice(0, 20)) {
-          const name = (fail.test_name || "").slice(0, 30)
-          const file = (fail.test_file || "").split("/").pop()?.slice(0, 20) || ""
-          const error = (fail.error_message || "").slice(0, 40).replace(/\|/g, "\\|")
-          output += `| ${name} | ${file} | ${error}... | ${fail.duration_ms}ms |\n`
+        // Markdown format with enhanced context
+        let output = `## Failed Tests (${enhancedFailures.length} results)\n\n`
+        output += "| Test | File | Error | Duration | Relevance | Root Cause |\n"
+        output += "|------|------|-------|----------|-----------|------------|\n"
+        for (const fail of enhancedFailures.slice(0, 20)) {
+          const name = (fail.test_name || "").slice(0, 25)
+          const file = (fail.test_file || "").split("/").pop()?.slice(0, 15) || ""
+          const error = (fail.error_message || "").slice(0, 30).replace(/\|/g, "\\|")
+          const relevance = fail.relevance_label ? `${fail.relevance_label} (${fail.relevance_score})` : "-"
+          const rootCause = fail.root_cause_category ? `${fail.root_cause_category}${fail.similar_failures_count ? ` (${fail.similar_failures_count} similar)` : ""}` : "-"
+          output += `| ${name} | ${file} | ${error}... | ${fail.duration_ms}ms | ${relevance} | ${rootCause} |\n`
         }
 
         return textResponse(output)
@@ -1031,6 +1082,215 @@ export async function handleQuery(
         return textResponse(output)
       }
 
+      // ============================================
+      // Relevance Scoring Datasets
+      // ============================================
+      case "tests_with_relevance": {
+        const scores = await db.getAllRelevanceScores(orgId, {
+          limit: f.limit ?? 50,
+          offset: f.offset ?? 0,
+          minScore: f.threshold ? Math.floor(f.threshold * 100) : undefined,
+        })
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "tests_with_relevance",
+            count: scores.length,
+            pagination: { offset: f.offset ?? 0, limit: f.limit ?? 50, has_more: scores.length === (f.limit ?? 50) },
+            data: scores.map(s => ({
+              test_signature: s.test_signature,
+              test_name: s.test_name,
+              test_file: s.test_file,
+              relevance_score: s.relevance_score,
+              auto_score: s.auto_relevance_score,
+              manual_label: s.manual_relevance_label,
+              factors: {
+                failure_frequency: s.failure_frequency_score,
+                failure_recency: s.failure_recency_score,
+                path_criticality: s.path_criticality_score,
+                deployment_blocking: s.deployment_blocking_score,
+              },
+              override_reason: s.override_reason,
+              updated_at: s.updated_at,
+            })),
+          })
+        }
+
+        let output = `## Tests with Relevance Scores (${scores.length})\n\n`
+        output += "| Test | File | Score | Label | Auto Score |\n"
+        output += "|------|------|-------|-------|------------|\n"
+        for (const s of scores) {
+          const label = s.manual_relevance_label || db.scoreToLabel(s.relevance_score)
+          output += `| ${s.test_name.slice(0, 35)} | ${s.test_file.split("/").pop()?.slice(0, 20) || ""} | ${s.relevance_score} | ${label} | ${s.auto_relevance_score} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "critical_tests": {
+        const critical = await db.getCriticalTests(orgId, f.limit ?? 50)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "critical_tests",
+            description: "Tests with relevance score >= 80",
+            count: critical.length,
+            data: critical.map(s => ({
+              test_signature: s.test_signature,
+              test_name: s.test_name,
+              test_file: s.test_file,
+              relevance_score: s.relevance_score,
+              manual_label: s.manual_relevance_label,
+              is_manually_set: !!s.manual_relevance_label,
+            })),
+          })
+        }
+
+        let output = `## Critical Tests (${critical.length})\n\n`
+        output += "_Tests with relevance score >= 80_\n\n"
+        output += "| Test | Score | Label | Manual |\n"
+        output += "|------|-------|-------|--------|\n"
+        for (const s of critical) {
+          const label = s.manual_relevance_label || "auto"
+          output += `| ${s.test_name.slice(0, 45)} | ${s.relevance_score} | ${label} | ${s.manual_relevance_label ? "Yes" : "No"} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "tests_needing_labels": {
+        const needingLabels = await db.getTestsNeedingLabels(orgId, f.limit ?? 20)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "tests_needing_labels",
+            description: "Tests without manual labels, sorted by failure frequency (review and assign labels)",
+            count: needingLabels.length,
+            data: needingLabels.map(s => ({
+              test_signature: s.test_signature,
+              test_name: s.test_name,
+              test_file: s.test_file,
+              auto_relevance_score: s.auto_relevance_score,
+              suggested_label: db.scoreToLabel(s.auto_relevance_score),
+              factors: {
+                failure_frequency: s.failure_frequency_score,
+                failure_recency: s.failure_recency_score,
+                path_criticality: s.path_criticality_score,
+                deployment_blocking: s.deployment_blocking_score,
+              },
+            })),
+            next_step: "Use perform_exolar_action with action='update_test_relevance' to assign labels",
+          })
+        }
+
+        let output = `## Tests Needing Labels (${needingLabels.length})\n\n`
+        output += "_Review these tests and assign relevance labels_\n\n"
+        output += "| Test | Auto Score | Suggested | Failure Freq |\n"
+        output += "|------|------------|-----------|-------------|\n"
+        for (const s of needingLabels) {
+          const suggested = db.scoreToLabel(s.auto_relevance_score)
+          output += `| ${s.test_name.slice(0, 40)} | ${s.auto_relevance_score} | ${suggested} | ${s.failure_frequency_score} |\n`
+        }
+        output += "\n**Next step:** Use `perform_exolar_action({ action: 'update_test_relevance', params: { test_signature: '...', label: '...' } })`"
+
+        return textResponse(output)
+      }
+
+      case "relevance_stats": {
+        const stats = await db.getRelevanceStats(orgId)
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "relevance_stats",
+            data: stats,
+          })
+        }
+
+        let output = `## Relevance Statistics\n\n`
+        output += `**Total Tests:** ${stats.totalTests}\n`
+        output += `**With Manual Labels:** ${stats.withManualLabels}\n`
+        output += `**Average Score:** ${stats.averageScore}\n\n`
+        output += `### By Label\n`
+        output += `- Critical: ${stats.byLabel.critical}\n`
+        output += `- High: ${stats.byLabel.high}\n`
+        output += `- Medium: ${stats.byLabel.medium}\n`
+        output += `- Low: ${stats.byLabel.low}\n`
+        output += `- Ignore: ${stats.byLabel.ignore}\n\n`
+        output += `### By Score\n`
+        output += `- Critical (>=80): ${stats.criticalCount}\n`
+        output += `- High (70-79): ${stats.highCount}\n`
+
+        return textResponse(output)
+      }
+
+      // ============================================
+      // Root Cause Clustering Datasets
+      // ============================================
+      case "root_causes": {
+        const rootCauses = await db.getRootCauses(orgId, {
+          status: f.status as db.RootCauseStatus | undefined,
+          limit: f.limit ?? 50,
+          offset: f.offset ?? 0,
+        })
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "root_causes",
+            description: "Hierarchical root causes for test failures",
+            count: rootCauses.length,
+            pagination: { offset: f.offset ?? 0, limit: f.limit ?? 50, has_more: rootCauses.length === (f.limit ?? 50) },
+            data: rootCauses.map(rc => ({
+              id: rc.id,
+              error_category: rc.errorCategory,
+              error_subcategory: rc.errorSubcategory,
+              representative_error: rc.representativeError.slice(0, 100) + (rc.representativeError.length > 100 ? "..." : ""),
+              total_occurrences: rc.totalOccurrences,
+              affected_tests: rc.affectedTests,
+              status: rc.status,
+              first_seen: rc.firstSeen,
+              last_seen: rc.lastSeen,
+              ai_root_cause: rc.aiRootCause,
+            })),
+          })
+        }
+
+        let output = `## Root Causes (${rootCauses.length})\n\n`
+        output += "| Category | Subcategory | Occurrences | Tests | Status | Last Seen |\n"
+        output += "|----------|-------------|-------------|-------|--------|----------|\n"
+        for (const rc of rootCauses) {
+          const lastSeen = new Date(rc.lastSeen).toLocaleDateString()
+          output += `| ${rc.errorCategory} | ${rc.errorSubcategory || "-"} | ${rc.totalOccurrences} | ${rc.affectedTests} | ${rc.status} | ${lastSeen} |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "execution_root_causes": {
+        if (!f.execution_id) {
+          return errorResponse("execution_root_causes requires filters.execution_id")
+        }
+
+        const clustered = await db.getClusteredFailuresForExecution(orgId, f.execution_id)
+
+        if (clustered.length === 0) {
+          // Try to cluster the failures first
+          const clusterResults = await db.clusterFailuresHierarchical(orgId, f.execution_id)
+          if (clusterResults.length === 0) {
+            return errorResponse(`No failures to cluster in execution ${f.execution_id}`)
+          }
+          // Re-fetch
+          const newClustered = await db.getClusteredFailuresForExecution(orgId, f.execution_id)
+          return formatExecutionRootCauses(authContext.organizationSlug, f.execution_id, newClustered, format)
+        }
+
+        return formatExecutionRootCauses(authContext.organizationSlug, f.execution_id, clustered, format)
+      }
+
       default:
         return errorResponse(`Unknown dataset: ${input.dataset}. Use explore_exolar_index(category="datasets") to see available datasets.`)
     }
@@ -1056,4 +1316,66 @@ function errorResponse(message: string): ToolResponse {
     content: [{ type: "text", text: JSON.stringify({ error: message }) }],
     isError: true,
   }
+}
+
+function formatExecutionRootCauses(
+  orgSlug: string,
+  executionId: number,
+  clustered: Awaited<ReturnType<typeof db.getClusteredFailuresForExecution>>,
+  format: OutputFormat
+): ToolResponse {
+  const totalFailures = clustered.reduce((sum, c) => sum + c.failures.length, 0)
+  const reduction = totalFailures > 0
+    ? ((1 - clustered.length / totalFailures) * 100).toFixed(1)
+    : "0"
+
+  if (format === "json") {
+    return jsonResponse({
+      organization: orgSlug,
+      dataset: "execution_root_causes",
+      execution_id: executionId,
+      total_failures: totalFailures,
+      total_root_causes: clustered.length,
+      reduction_percentage: reduction,
+      data: clustered.map(c => ({
+        root_cause_id: c.rootCause.id,
+        error_category: c.rootCause.errorCategory,
+        error_subcategory: c.rootCause.errorSubcategory,
+        representative_error: c.rootCause.representativeError.slice(0, 100),
+        status: c.rootCause.status,
+        failure_count: c.failures.length,
+        failures: c.failures.map(f => ({
+          test_name: f.testName,
+          test_file: f.testFile,
+        })),
+      })),
+    })
+  }
+
+  let output = `## Root Cause Analysis (Execution #${executionId})\n\n`
+  output += `**Total Failures:** ${totalFailures}\n`
+  output += `**Root Causes:** ${clustered.length}\n`
+  output += `**Reduction:** ${reduction}%\n\n`
+
+  for (const cluster of clustered) {
+    output += `### ${cluster.rootCause.errorCategory.toUpperCase()}`
+    if (cluster.rootCause.errorSubcategory) {
+      output += ` / ${cluster.rootCause.errorSubcategory}`
+    }
+    output += ` (${cluster.failures.length} failures)\n`
+    output += `**Error:** ${cluster.rootCause.representativeError.slice(0, 80)}...\n`
+    output += `**Status:** ${cluster.rootCause.status}\n\n`
+
+    output += `| Test | File |\n`
+    output += `|------|------|\n`
+    for (const f of cluster.failures.slice(0, 5)) {
+      output += `| ${f.testName.slice(0, 40)} | ${f.testFile.split("/").pop()?.slice(0, 25) || ""} |\n`
+    }
+    if (cluster.failures.length > 5) {
+      output += `| ... | +${cluster.failures.length - 5} more |\n`
+    }
+    output += "\n"
+  }
+
+  return textResponse(output)
 }

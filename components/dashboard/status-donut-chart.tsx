@@ -17,6 +17,26 @@ const COLORS = {
   skipped: "var(--status-muted)",
 }
 
+// PERFORMANCE OPTIMIZATION: Extract style objects to module-level constants
+// Prevents re-renders caused by new object references on each render
+const TOOLTIP_CONTENT_STYLE = {
+  background: "oklch(0.12 0.02 260 / 0.95)",
+  border: "1px solid oklch(0.75 0.15 195 / 0.3)",
+  borderRadius: "12px",
+  backdropFilter: "blur(12px)",
+  boxShadow: "0 4px 20px oklch(0 0 0 / 0.3)",
+  padding: "12px 16px",
+} as const
+
+const TOOLTIP_ITEM_STYLE = { color: "oklch(0.985 0 0)" } as const
+
+const TOOLTIP_CURSOR_STYLE = { fill: "oklch(1 0 0 / 0.05)" } as const
+
+const CELL_STYLE = {
+  filter: "drop-shadow(0 0 8px currentColor)",
+  cursor: "pointer",
+} as const
+
 // Animated percentage display
 function AnimatedPercentage({ value }: { value: number }) {
   const [displayValue, setDisplayValue] = useState(0)
@@ -96,25 +116,15 @@ export function StatusDonutChart({
                     key={`cell-${index}`}
                     fill={entry.color}
                     className="transition-all duration-300 hover:opacity-80"
-                    style={{
-                      filter: "drop-shadow(0 0 8px currentColor)",
-                      cursor: "pointer",
-                    }}
+                    style={CELL_STYLE}
                   />
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  background: "oklch(0.12 0.02 260 / 0.95)",
-                  border: "1px solid oklch(0.75 0.15 195 / 0.3)",
-                  borderRadius: "12px",
-                  backdropFilter: "blur(12px)",
-                  boxShadow: "0 4px 20px oklch(0 0 0 / 0.3)",
-                  padding: "12px 16px",
-                }}
-                itemStyle={{ color: "oklch(0.985 0 0)" }}
+                contentStyle={TOOLTIP_CONTENT_STYLE}
+                itemStyle={TOOLTIP_ITEM_STYLE}
                 formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
-                cursor={{ fill: "oklch(1 0 0 / 0.05)" }}
+                cursor={TOOLTIP_CURSOR_STYLE}
               />
             </PieChart>
           </ResponsiveContainer>

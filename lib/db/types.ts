@@ -156,11 +156,14 @@ export interface SuitePassRate {
   failed_count: number
 }
 
+export type ApiKeyScope = "read" | "write" | "admin"
+
 export interface OrgApiKey {
   id: number
   organization_id: number
   name: string
   key_prefix: string
+  scope: ApiKeyScope
   created_by: number | null
   created_at: string
   last_used_at: string | null

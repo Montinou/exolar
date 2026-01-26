@@ -12,6 +12,9 @@ const nextConfig = {
     "@xenova/transformers",
     "sharp",
     "onnxruntime-node",
+    // AWS SDK - prevent bundling in client (server-only for R2 integration)
+    "@aws-sdk/client-s3",
+    "@aws-sdk/s3-request-presigner",
   ],
 }
 

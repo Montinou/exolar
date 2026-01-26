@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod"
-import type { MCPAuthContext } from "../auth"
+import { type MCPAuthContext, requireWriteScope } from "../auth"
 import * as db from "@/lib/db"
 
 const ActionInputSchema = z.object({
@@ -20,6 +20,11 @@ const ActionInputSchema = z.object({
     "create_mock_route",
     "create_mock_rule",
     "delete_mock_interface",
+    // Relevance scoring mutations
+    "update_test_relevance",
+    "batch_update_relevance",
+    // Root cause clustering mutations
+    "update_root_cause_status",
   ]),
   params: z
     .object({
@@ -79,6 +84,23 @@ const ActionInputSchema = z.object({
       response_headers: z.record(z.string()).optional(),
       response_body: z.string().optional(),
       response_delay_ms: z.number().optional(),
+
+      // Para update_test_relevance
+      test_signature: z.string().optional(),
+      label: z.enum(["critical", "high", "medium", "low", "ignore"]).optional(),
+      reason: z.string().optional(),
+
+      // Para batch_update_relevance
+      updates: z.array(z.object({
+        test_signature: z.string(),
+        label: z.enum(["critical", "high", "medium", "low", "ignore"]),
+        reason: z.string().optional(),
+      })).optional(),
+
+      // Para update_root_cause_status
+      root_cause_id: z.number().optional(),
+      status: z.enum(["open", "investigating", "fixed", "wont_fix", "flaky"]).optional(),
+      status_note: z.string().optional(),
     })
     .optional()
     .default({}),
@@ -1066,6 +1088,120 @@ ${error_distribution.map((e) => `| ${e.error_pattern} | ${e.count} |`).join("\n"
           action: "delete_mock_interface",
           deleted_interface_id: p.interface_id,
           message: "Mock interface and all associated routes, rules, and logs have been deleted",
+        })
+      }
+
+      // ============================================
+      // Relevance Scoring Mutations
+      // ============================================
+      case "update_test_relevance": {
+        // Requires write scope
+        requireWriteScope(authContext)
+
+        if (!p.test_signature) {
+          return errorResponse("update_test_relevance requires params.test_signature")
+        }
+        if (!p.label) {
+          return errorResponse("update_test_relevance requires params.label (critical, high, medium, low, ignore)")
+        }
+
+        const score = db.labelToScore(p.label)
+        const result = await db.setRelevanceOverride(
+          orgId,
+          p.test_signature,
+          score,
+          p.label,
+          p.reason || null,
+          authContext.userId
+        )
+
+        if (!result) {
+          return errorResponse(`Test not found: ${p.test_signature}`)
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "update_test_relevance",
+          success: true,
+          data: {
+            test_signature: p.test_signature,
+            label: p.label,
+            score: score,
+            previous_auto_score: result.auto_relevance_score,
+            reason: p.reason || null,
+          },
+        })
+      }
+
+      case "batch_update_relevance": {
+        // Requires write scope
+        requireWriteScope(authContext)
+
+        if (!p.updates || !Array.isArray(p.updates) || p.updates.length === 0) {
+          return errorResponse("batch_update_relevance requires params.updates array")
+        }
+
+        if (p.updates.length > 100) {
+          return errorResponse("batch_update_relevance is limited to 100 updates at a time")
+        }
+
+        const result = await db.batchSetRelevanceOverride(
+          orgId,
+          p.updates.map(u => ({
+            testSignature: u.test_signature,
+            label: u.label,
+            reason: u.reason,
+          })),
+          authContext.userId
+        )
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "batch_update_relevance",
+          success: true,
+          updated: result.updated,
+          failed: result.failed,
+          total_requested: p.updates.length,
+        })
+      }
+
+      // ============================================
+      // Root Cause Status Update
+      // ============================================
+      case "update_root_cause_status": {
+        // Requires write scope
+        requireWriteScope(authContext)
+
+        if (!p.root_cause_id) {
+          return errorResponse("update_root_cause_status requires params.root_cause_id")
+        }
+        if (!p.status) {
+          return errorResponse("update_root_cause_status requires params.status (open, investigating, fixed, wont_fix, flaky)")
+        }
+
+        const result = await db.updateRootCauseStatus(
+          orgId,
+          p.root_cause_id,
+          p.status,
+          p.status_note || null,
+          authContext.userId
+        )
+
+        if (!result) {
+          return errorResponse(`Root cause not found: ${p.root_cause_id}`)
+        }
+
+        return jsonResponse({
+          organization: authContext.organizationSlug,
+          action: "update_root_cause_status",
+          success: true,
+          data: {
+            root_cause_id: p.root_cause_id,
+            previous_status: result.previous_status,
+            new_status: p.status,
+            note: p.status_note || null,
+            affected_tests: result.affected_tests,
+          },
         })
       }
 

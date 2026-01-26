@@ -244,6 +244,88 @@ export const METRIC_DEFINITIONS: Record<string, MetricDefinition> = {
     },
     relatedTools: ["query_exolar_data (semantic_search)"],
   },
+
+  // Relevance Scoring Metrics (Phase 1)
+  relevance_score: {
+    id: "relevance_score",
+    name: "Test Relevance Score",
+    category: "reliability",
+    type: "score",
+    formula: "(FailureFrequency × 30%) + (FailureRecency × 25%) + (PathCriticality × 30%) + (DeploymentBlocking × 15%)",
+    description: "Hybrid auto-inferred + manual override score indicating test importance. Higher scores mean the test is more critical to the application.",
+    unit: "points",
+    thresholds: {
+      healthy: 80,
+      warning: 50,
+      critical: 30,
+    },
+    relatedTools: ["query_exolar_data (tests_with_relevance)", "query_exolar_data (critical_tests)", "perform_exolar_action (update_test_relevance)"],
+  },
+  failure_frequency_score: {
+    id: "failure_frequency_score",
+    name: "Failure Frequency Score",
+    category: "reliability",
+    type: "score",
+    formula: "percentile_rank(failure_count) × 100",
+    description: "Percentile rank of how often this test fails compared to other tests. Higher = fails more often than peers.",
+    unit: "points",
+    thresholds: {
+      healthy: 0,
+      warning: 50,
+      critical: 80,
+    },
+    relatedTools: ["query_exolar_data (tests_with_relevance)"],
+  },
+  failure_recency_score: {
+    id: "failure_recency_score",
+    name: "Failure Recency Score",
+    category: "reliability",
+    type: "score",
+    formula: "100 × e^(-days_since_failure / 30)",
+    description: "Exponential decay based on days since last failure. Higher = failed more recently.",
+    unit: "points",
+    thresholds: {
+      healthy: 0,
+      warning: 50,
+      critical: 80,
+    },
+    relatedTools: ["query_exolar_data (tests_with_relevance)"],
+  },
+  path_criticality_score: {
+    id: "path_criticality_score",
+    name: "Path Criticality Score",
+    category: "reliability",
+    type: "score",
+    formula: "pattern_match(test_file, criticality_patterns)",
+    description: "Score based on test file path patterns. Tests in payment/, auth/, checkout/ directories score higher (90+).",
+    unit: "points",
+    thresholds: {
+      healthy: 90,
+      warning: 50,
+      critical: 0,
+    },
+    relatedTools: ["query_exolar_data (tests_with_relevance)"],
+  },
+
+  // Root Cause Clustering Metrics (Phase 3)
+  root_cause_count: {
+    id: "root_cause_count",
+    name: "Root Cause Count",
+    category: "ai_insights",
+    type: "count",
+    formula: "COUNT(DISTINCT failure_root_causes) for execution",
+    description: "Number of unique root causes identified for failures. Lower count with many failures = repetitive issues.",
+    relatedTools: ["query_exolar_data (execution_root_causes)", "query_exolar_data (root_causes)"],
+  },
+  similar_failures_count: {
+    id: "similar_failures_count",
+    name: "Similar Failures Count",
+    category: "ai_insights",
+    type: "count",
+    formula: "COUNT(failures linked to same root_cause)",
+    description: "How many other failures share the same root cause. Higher = more widespread issue.",
+    relatedTools: ["query_exolar_data (execution_root_causes)"],
+  },
 }
 
 /**

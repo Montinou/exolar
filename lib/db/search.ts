@@ -111,6 +111,20 @@ export async function getTestStatistics(organizationId: number, signature: strin
 // AI Context Analysis Functions
 // ============================================
 
+/**
+ * Enhanced failure result with relevance and root cause context
+ */
+export interface EnhancedFailureResult extends TestResult {
+  // Relevance scoring fields
+  relevance_score: number | null
+  relevance_label: string | null
+  // Root cause clustering fields
+  root_cause_id: number | null
+  root_cause_category: string | null
+  root_cause_subcategory: string | null
+  similar_failures_count: number | null
+}
+
 export async function getFailuresWithAIContext(
   organizationId: number,
   options: {
@@ -122,10 +136,21 @@ export async function getFailuresWithAIContext(
     executionId?: number
     requireAIContext?: boolean
     runId?: string
+    includeEnhancedContext?: boolean
   } = {}
-): Promise<TestResult[]> {
+): Promise<TestResult[] | EnhancedFailureResult[]> {
   const sql = getSql()
-  const { errorType, testFile, limit = 50, offset = 0, since, executionId, requireAIContext = false, runId } = options
+  const {
+    errorType,
+    testFile,
+    limit = 50,
+    offset = 0,
+    since,
+    executionId,
+    requireAIContext = false,
+    runId,
+    includeEnhancedContext = true,
+  } = options
 
   const conditions = [
     "tr.status IN ('failed', 'timedout')",
@@ -159,19 +184,53 @@ export async function getFailuresWithAIContext(
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
 
-  // Build query with dynamic conditions
-  const query = `
-    SELECT
-      tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
-      tr.status, tr.duration_ms, tr.is_critical, tr.error_message, tr.stack_trace,
-      tr.browser, tr.retry_count, tr.ai_context, tr.created_at
-    FROM test_results tr
-    JOIN test_executions te ON tr.execution_id = te.id
-    ${whereClause}
-    ORDER BY tr.created_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `
+  // Build enhanced query with relevance and root cause data
+  const query = includeEnhancedContext
+    ? `
+      SELECT
+        tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+        tr.status, tr.duration_ms, tr.is_critical, tr.error_message, tr.stack_trace,
+        tr.browser, tr.retry_count, tr.ai_context, tr.created_at,
+        -- Relevance scoring fields
+        trs.relevance_score,
+        COALESCE(trs.manual_relevance_label,
+          CASE
+            WHEN trs.relevance_score >= 90 THEN 'critical'
+            WHEN trs.relevance_score >= 70 THEN 'high'
+            WHEN trs.relevance_score >= 40 THEN 'medium'
+            WHEN trs.relevance_score >= 10 THEN 'low'
+            ELSE 'ignore'
+          END
+        ) as relevance_label,
+        -- Root cause clustering fields
+        frc.id as root_cause_id,
+        frc.error_category as root_cause_category,
+        frc.error_subcategory as root_cause_subcategory,
+        frc.affected_tests as similar_failures_count
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      LEFT JOIN test_relevance_scores trs
+        ON trs.organization_id = te.organization_id
+        AND trs.test_signature = tr.test_signature
+      LEFT JOIN failure_root_cause_links frcl ON frcl.test_result_id = tr.id
+      LEFT JOIN failure_root_causes frc ON frc.id = frcl.root_cause_id
+      ${whereClause}
+      ORDER BY tr.created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
+    : `
+      SELECT
+        tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+        tr.status, tr.duration_ms, tr.is_critical, tr.error_message, tr.stack_trace,
+        tr.browser, tr.retry_count, tr.ai_context, tr.created_at
+      FROM test_results tr
+      JOIN test_executions te ON tr.execution_id = te.id
+      ${whereClause}
+      ORDER BY tr.created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
 
   const result = await sql.unsafe(query)
 
@@ -181,7 +240,7 @@ export async function getFailuresWithAIContext(
     return []
   }
 
-  return result as unknown as TestResult[]
+  return result as unknown as (TestResult[] | EnhancedFailureResult[])
 }
 
 // ============================================

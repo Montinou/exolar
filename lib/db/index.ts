@@ -116,6 +116,7 @@ export {
   getFailuresWithAIContext,
   getErrorTypeDistribution,
 } from "./search"
+export type { EnhancedFailureResult } from "./search"
 
 // Flakiness detection
 export {
@@ -232,6 +233,43 @@ export {
   getSuiteTestsWithSuiteName,
   getSuiteCountsSummary,
 } from "./suites"
+
+// Relevance scoring
+export {
+  getRelevanceScore,
+  getRelevanceScores,
+  getAllRelevanceScores,
+  getTestsNeedingLabels,
+  getCriticalTests,
+  upsertRelevanceScore,
+  setRelevanceOverride,
+  batchSetRelevanceOverride,
+  removeRelevanceOverride,
+  getPathCriticalityPatterns,
+  addPathCriticalityPattern,
+  deletePathCriticalityPattern,
+  getRelevanceStats,
+  labelToScore,
+  scoreToLabel,
+  type TestRelevanceScore,
+  type RelevanceLabel,
+  type PathCriticalityPattern,
+  type RelevanceScoreFactors,
+} from "./relevance"
+
+// Root cause clustering (re-export from service for convenience)
+export {
+  clusterFailuresHierarchical,
+  getRootCauses,
+  getClusteredFailuresForExecution,
+  updateRootCauseStatus,
+  extractErrorCategory,
+  extractErrorSubcategory,
+  type RootCause,
+  type ErrorCategory,
+  type RootCauseStatus,
+  type ClusteringResult,
+} from "@/lib/services/root-cause-clustering-service"
 
 // Mock API endpoints
 export {

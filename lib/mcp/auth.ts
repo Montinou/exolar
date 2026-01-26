@@ -11,6 +11,8 @@ import * as jose from "jose"
 // Note: getSql is only used for Neon Auth tokens, not MCP OAuth tokens
 import { getSql } from "@/lib/db"
 
+export type ApiKeyScope = "read" | "write" | "admin"
+
 export interface MCPAuthContext {
   userId: number
   email: string
@@ -18,6 +20,30 @@ export interface MCPAuthContext {
   organizationSlug: string
   orgRole: "owner" | "admin" | "viewer"
   userRole: "admin" | "viewer"
+  // API key scope (for MCP tokens generated from API keys)
+  // If not set, defaults based on orgRole (owner/admin = write, viewer = read)
+  apiKeyScope?: ApiKeyScope
+}
+
+/**
+ * Check if context has write scope (can perform mutations)
+ */
+export function hasWriteScope(context: MCPAuthContext): boolean {
+  // API key scope takes precedence
+  if (context.apiKeyScope) {
+    return context.apiKeyScope === "write" || context.apiKeyScope === "admin"
+  }
+  // OAuth tokens: owners and admins have write access
+  return context.orgRole === "owner" || context.orgRole === "admin"
+}
+
+/**
+ * Require write scope - throws if not authorized
+ */
+export function requireWriteScope(context: MCPAuthContext): void {
+  if (!hasWriteScope(context)) {
+    throw new Error("Write access required. Use an API key with 'write' scope or authenticate as org admin.")
+  }
 }
 
 // Neon Auth JWKS endpoint
