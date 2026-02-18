@@ -20,6 +20,7 @@ export interface ValidatedApiKey {
   id: number
   organizationId: number
   name: string
+  createdBy: number | null
 }
 
 /**
@@ -92,6 +93,7 @@ export async function validateOrgApiKey(
     id: apiKey.id,
     organizationId: apiKey.organization_id,
     name: apiKey.name,
+    createdBy: apiKey.created_by,
   }
 }
 

@@ -10,6 +10,7 @@
 import * as jose from "jose"
 // Note: getSql is only used for Neon Auth tokens, not MCP OAuth tokens
 import { getSql } from "@/lib/db"
+import { validateOrgApiKey, isExolarApiKey } from "@/lib/api-keys"
 
 export interface MCPAuthContext {
   userId: number
@@ -60,7 +61,12 @@ export async function validateMCPToken(
     return null
   }
 
-  // First, try to validate as an MCP token (HS256 signed)
+  // First, check if it's an Exolar API key (exolar_* prefix)
+  if (isExolarApiKey(authHeader)) {
+    return validateApiKeyForMCP(authHeader)
+  }
+
+  // Then, try to validate as an MCP token (HS256 signed)
   const mcpContext = await validateMCPGeneratedToken(token)
   if (mcpContext) {
     return mcpContext
@@ -173,6 +179,76 @@ async function validateNeonAuthToken(token: string): Promise<MCPAuthContext | nu
     }
   } catch (error) {
     console.error("[mcp-auth] Token validation failed:", error)
+    return null
+  }
+}
+
+/**
+ * Validate an Exolar API key (exolar_*) and return MCP auth context.
+ * This allows API keys created in the dashboard to be used with the MCP endpoint.
+ */
+async function validateApiKeyForMCP(
+  authHeader: string
+): Promise<MCPAuthContext | null> {
+  try {
+    const apiKey = await validateOrgApiKey(authHeader)
+    if (!apiKey) {
+      console.error("[mcp-auth] API key validation failed")
+      return null
+    }
+
+    // Look up organization and user details
+    const sql = getSql()
+
+    let result: Record<string, unknown>[] = []
+    if (apiKey.createdBy) {
+      result = await sql`
+        SELECT
+          u.id as user_id,
+          u.email,
+          u.role as user_role,
+          o.id as organization_id,
+          o.slug as organization_slug,
+          om.role as org_role
+        FROM organizations o
+        LEFT JOIN dashboard_users u ON u.id = ${apiKey.createdBy}
+        LEFT JOIN organization_members om ON om.user_id = u.id AND om.organization_id = o.id
+        WHERE o.id = ${apiKey.organizationId}
+      `
+    }
+
+    // If we can't find user details (key may not have created_by), use org-level defaults
+    if (!result || result.length === 0 || !result[0].user_id) {
+      // Fallback: get org info without user
+      const orgResult = await sql`
+        SELECT id, slug FROM organizations WHERE id = ${apiKey.organizationId}
+      `
+      if (!orgResult || orgResult.length === 0) {
+        console.error(`[mcp-auth] Organization ${apiKey.organizationId} not found for API key`)
+        return null
+      }
+
+      return {
+        userId: 0, // System/API key user
+        email: `apikey-${apiKey.name}@exolar.local`,
+        organizationId: apiKey.organizationId,
+        organizationSlug: orgResult[0].slug as string,
+        orgRole: "viewer",
+        userRole: "viewer",
+      }
+    }
+
+    const userInfo = result[0]
+    return {
+      userId: userInfo.user_id as number,
+      email: userInfo.email as string,
+      organizationId: userInfo.organization_id as number,
+      organizationSlug: userInfo.organization_slug as string,
+      orgRole: (userInfo.org_role as "owner" | "admin" | "viewer") || "viewer",
+      userRole: userInfo.user_role as "admin" | "viewer",
+    }
+  } catch (error) {
+    console.error("[mcp-auth] API key validation error:", error)
     return null
   }
 }
