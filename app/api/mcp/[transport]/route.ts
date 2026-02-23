@@ -18,7 +18,7 @@ import { allTools, handleToolCall } from "@/lib/mcp/tools"
 import type { MCPAuthContext } from "@/lib/mcp/auth"
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js"
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.triqual.dev"
 
 /**
  * Token verification: validates Bearer token and returns AuthInfo

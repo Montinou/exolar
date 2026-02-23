@@ -3,25 +3,35 @@
  *
  * Required by MCP clients to discover authorization servers.
  * URL: /.well-known/oauth-protected-resource
+ *
+ * Hardcoded URLs (not auto-detected) to avoid proxy issues on Vercel.
  */
 
-import { protectedResourceHandler, metadataCorsOptionsRequestHandler } from "mcp-handler"
+import { NextResponse } from "next/server"
 
-// Get the auth server URL from environment or use the same origin
-const getAuthServerUrl = (request: Request) => {
-  const url = new URL(request.url)
-  return `${url.protocol}//${url.host}`
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.triqual.dev"
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "*",
+  "Access-Control-Max-Age": "86400",
+  "Cache-Control": "max-age=3600",
 }
 
-export async function GET(request: Request) {
-  const authServerUrl = getAuthServerUrl(request)
+export async function GET() {
+  const metadata = {
+    resource: `${APP_URL}/api/mcp/mcp`,
+    authorization_servers: [APP_URL],
+    scopes_supported: ["read:tests", "read:metrics"],
+  }
 
-  const handler = protectedResourceHandler({
-    authServerUrls: [authServerUrl],
-    // resourceUrl will be auto-detected from request
+  return NextResponse.json(metadata, { headers: corsHeaders })
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: corsHeaders,
   })
-
-  return handler(request)
 }
-
-export const OPTIONS = metadataCorsOptionsRequestHandler()
