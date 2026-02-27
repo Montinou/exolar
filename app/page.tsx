@@ -6,6 +6,7 @@ import { DeviceShowcase } from "@/components/landing/DeviceShowcase"
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid"
 import { InstallTabs } from "@/components/landing/InstallTabs"
 import { WishlistFooter } from "@/components/landing/WishlistFooter"
+import { EcosystemBanner } from "@/components/landing/EcosystemBanner"
 
 export const dynamic = "force-dynamic"
 
@@ -23,6 +24,7 @@ export default async function LandingPage() {
       <DeviceShowcase />
       <FeaturesGrid />
       <InstallTabs />
+      <EcosystemBanner />
       <WishlistFooter />
     </main>
   )
