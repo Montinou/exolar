@@ -1,17 +1,12 @@
 import { neonAuthMiddleware } from "@neondatabase/auth/next"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { checkRateLimit } from "@/lib/rate-limit"
 
 const authMiddleware = neonAuthMiddleware({
   loginUrl: "/auth/sign-in",
 })
 
-export default async function middleware(request: NextRequest) {
-  // Rate limit check first
-  const rateLimitResponse = await checkRateLimit(request);
-  if (rateLimitResponse) return rateLimitResponse;
-
+export default function middleware(request: NextRequest) {
   const hostname = request.headers.get("host") || ""
   const pathname = request.nextUrl.pathname
 
