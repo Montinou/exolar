@@ -157,6 +157,8 @@ var ExolarReporter = class {
     this.failed = 0;
     this.skipped = 0;
     this.enabled = false;
+    // Maps "<testFile>::<testTitle>" → accumulated retry entries across onTestEnd calls
+    this.retryMap = /* @__PURE__ */ new Map();
     this.options = {
       endpoint: options.endpoint || process.env.EXOLAR_URL || DEFAULT_ENDPOINT,
       apiKey: options.apiKey || process.env.EXOLAR_API_KEY || "",
@@ -164,7 +166,9 @@ var ExolarReporter = class {
       includeArtifacts: options.includeArtifacts ?? true,
       maxArtifactSize: options.maxArtifactSize ?? 5 * 1024 * 1024,
       // 5MB
-      disabled: options.disabled ?? false
+      disabled: options.disabled ?? false,
+      ticketMapping: options.ticketMapping ?? {},
+      autoDetectTicket: options.autoDetectTicket ?? true
     };
   }
   /**
@@ -201,14 +205,21 @@ var ExolarReporter = class {
     const logs = extractLogs(result);
     const testFile = this.getRelativeTestFile(test);
     const execution = getExecutionContext();
+    this.buildRetryHistory(test, result, testFile, status);
     if (status === "failed" || status === "timedout") {
-      const aiContext = buildAIContext(
+      const aiContextBase = buildAIContext(
         test,
         result,
         logs,
         execution,
         this.rootDir
       );
+      const retryKey = `${testFile}::${test.title}`;
+      const aiContext = {
+        ...aiContextBase,
+        linked_ticket: this.detectLinkedTicket(test, testFile),
+        retry_history: this.retryMap.get(retryKey)
+      };
       this.exportLocalJson(aiContext);
       if (!this.enabled) return;
       const testResult2 = {
@@ -388,6 +399,33 @@ var ExolarReporter = class {
     } catch (error) {
       console.error("[Exolar] Failed to export AI context:", error);
     }
+  }
+  detectLinkedTicket(test, testFile) {
+    for (const [pattern, ticket] of Object.entries(this.options.ticketMapping)) {
+      if (pattern.startsWith("@")) {
+        if (test.tags?.includes(pattern)) return ticket;
+      } else if (testFile.includes(pattern)) {
+        return ticket;
+      }
+    }
+    if (this.options.autoDetectTicket) {
+      const context = getExecutionContext();
+      const match = context.branch.match(/([A-Z]+-\d+)/i);
+      if (match) return match[1];
+    }
+    return void 0;
+  }
+  buildRetryHistory(test, result, testFile, status) {
+    const key = `${testFile}::${test.title}`;
+    const existing = this.retryMap.get(key) ?? [];
+    const entry = {
+      attempt: result.retry,
+      status: status === "passed" ? "passed" : "failed",
+      error_message: result.error?.message,
+      duration_ms: result.duration
+    };
+    existing.push(entry);
+    this.retryMap.set(key, existing);
   }
   async sendToDashboard(payload) {
     const url = `${this.options.endpoint}/api/test-results`;

@@ -41,6 +41,17 @@ interface ExolarReporterOptions {
      * Defaults to false.
      */
     disabled?: boolean;
+    /**
+     * Map test file paths or tag names to Linear ticket IDs.
+     * Keys starting with "@" are matched against test tags; others against the test file path.
+     * Example: { "@smoke": "ENG-123", "auth/login": "ENG-456" }
+     */
+    ticketMapping?: Record<string, string>;
+    /**
+     * Automatically detect a linked ticket by parsing the branch name for patterns like ENG-123.
+     * Defaults to true.
+     */
+    autoDetectTicket?: boolean;
 }
 /**
  * Log entry for structured test logging
@@ -142,6 +153,27 @@ interface IngestPayload {
     results: TestResultPayload[];
     artifacts: ArtifactPayload[];
 }
+interface NetworkEntry {
+    url: string;
+    method: string;
+    status: number;
+    timing_ms: number;
+    is_api_call: boolean;
+}
+interface RetryEntry {
+    attempt: number;
+    status: "passed" | "failed";
+    error_message?: string;
+    duration_ms: number;
+}
+interface AIFailureContextV2 extends AIFailureContext {
+    dom_snapshot?: string;
+    network_log?: NetworkEntry[];
+    retry_history?: RetryEntry[];
+    git_diff_summary?: string;
+    selector_candidates?: string[];
+    linked_ticket?: string;
+}
 /**
  * API response from Exolar
  */
@@ -188,6 +220,7 @@ declare class ExolarReporter implements Reporter {
     private failed;
     private skipped;
     private enabled;
+    private retryMap;
     constructor(options?: ExolarReporterOptions);
     /**
      * Called once at the beginning of the test run
@@ -206,6 +239,8 @@ declare class ExolarReporter implements Reporter {
     private isCriticalTest;
     private collectArtifacts;
     private exportLocalJson;
+    private detectLinkedTicket;
+    private buildRetryHistory;
     private sendToDashboard;
 }
 /**
@@ -222,4 +257,4 @@ declare class ExolarReporter implements Reporter {
  */
 declare const exolar: typeof ExolarReporter;
 
-export { type AIFailureContext, type ArtifactPayload, type ExecutionPayload, type ExolarReporterOptions, type IngestPayload, type IngestResponse, type LogEntry, type TestResultPayload, ExolarReporter as default, exolar };
+export { type AIFailureContext, type AIFailureContextV2, type ArtifactPayload, type ExecutionPayload, type ExolarReporterOptions, type IngestPayload, type IngestResponse, type LogEntry, type NetworkEntry, type RetryEntry, type TestResultPayload, ExolarReporter as default, exolar };

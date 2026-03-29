@@ -31,11 +31,13 @@ import * as path from "path"
 import type {
   ExolarReporterOptions,
   AIFailureContext,
+  AIFailureContextV2,
   ArtifactPayload,
   ExecutionPayload,
   IngestPayload,
   IngestResponse,
   LogEntry,
+  RetryEntry,
   TestResultPayload,
 } from "./types"
 
@@ -50,11 +52,14 @@ import {
 export type {
   ExolarReporterOptions,
   AIFailureContext,
+  AIFailureContextV2,
   ArtifactPayload,
   ExecutionPayload,
   IngestPayload,
   IngestResponse,
   LogEntry,
+  NetworkEntry,
+  RetryEntry,
   TestResultPayload,
 } from "./types"
 
@@ -77,6 +82,8 @@ class ExolarReporter implements Reporter {
   private failed = 0
   private skipped = 0
   private enabled = false
+  // Maps "<testFile>::<testTitle>" → accumulated retry entries across onTestEnd calls
+  private retryMap: Map<string, RetryEntry[]> = new Map()
 
   constructor(options: ExolarReporterOptions = {}) {
     this.options = {
@@ -86,6 +93,8 @@ class ExolarReporter implements Reporter {
       includeArtifacts: options.includeArtifacts ?? true,
       maxArtifactSize: options.maxArtifactSize ?? 5 * 1024 * 1024, // 5MB
       disabled: options.disabled ?? false,
+      ticketMapping: options.ticketMapping ?? {},
+      autoDetectTicket: options.autoDetectTicket ?? true,
     }
   }
 
@@ -131,15 +140,25 @@ class ExolarReporter implements Reporter {
     const testFile = this.getRelativeTestFile(test)
     const execution = getExecutionContext()
 
+    // Track retry history for every test attempt
+    this.buildRetryHistory(test, result, testFile, status)
+
     // Build AI context for failed tests
     if (status === "failed" || status === "timedout") {
-      const aiContext = buildAIContext(
+      const aiContextBase = buildAIContext(
         test,
         result,
         logs,
         execution,
         this.rootDir
       )
+
+      const retryKey = `${testFile}::${test.title}`
+      const aiContext: AIFailureContextV2 = {
+        ...aiContextBase,
+        linked_ticket: this.detectLinkedTicket(test, testFile),
+        retry_history: this.retryMap.get(retryKey),
+      }
 
       // Export local JSON file for AI consumption
       this.exportLocalJson(aiContext)
@@ -353,7 +372,7 @@ class ExolarReporter implements Reporter {
     }
   }
 
-  private exportLocalJson(aiContext: AIFailureContext): void {
+  private exportLocalJson(aiContext: AIFailureContext | AIFailureContextV2): void {
     try {
       const outputDir = path.join(
         this.rootDir || process.cwd(),
@@ -377,6 +396,42 @@ class ExolarReporter implements Reporter {
     } catch (error) {
       console.error("[Exolar] Failed to export AI context:", error)
     }
+  }
+
+  private detectLinkedTicket(test: TestCase, testFile: string): string | undefined {
+    // Check explicit mapping first
+    for (const [pattern, ticket] of Object.entries(this.options.ticketMapping)) {
+      if (pattern.startsWith("@")) {
+        if (test.tags?.includes(pattern)) return ticket
+      } else if (testFile.includes(pattern)) {
+        return ticket
+      }
+    }
+    // Auto-detect from branch name
+    if (this.options.autoDetectTicket) {
+      const context = getExecutionContext()
+      const match = context.branch.match(/([A-Z]+-\d+)/i)
+      if (match) return match[1]
+    }
+    return undefined
+  }
+
+  private buildRetryHistory(
+    test: TestCase,
+    result: TestResult,
+    testFile: string,
+    status: TestResultPayload["status"]
+  ): void {
+    const key = `${testFile}::${test.title}`
+    const existing = this.retryMap.get(key) ?? []
+    const entry: RetryEntry = {
+      attempt: result.retry,
+      status: status === "passed" ? "passed" : "failed",
+      error_message: result.error?.message,
+      duration_ms: result.duration,
+    }
+    existing.push(entry)
+    this.retryMap.set(key, existing)
   }
 
   private async sendToDashboard(payload: IngestPayload): Promise<void> {
