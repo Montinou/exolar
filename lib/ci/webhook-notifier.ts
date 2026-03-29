@@ -5,7 +5,7 @@ import { getSql } from "@/lib/db/connection"
 import { createHmac } from "crypto"
 
 export interface WebhookPayload {
-  event: "ci.failure"
+  event: "failure"
   execution_id: number
   organization_id: number
   run_id: string
@@ -25,7 +25,7 @@ interface WebhookConfig {
     only_critical?: boolean
     branches?: string[]
   }
-  secret_hash: string | null
+  secret: string | null  // raw secret for HMAC signing (stored encrypted in DB via webhook_secret column)
 }
 
 /**
@@ -34,7 +34,7 @@ interface WebhookConfig {
 async function getActiveWebhooks(orgId: number, event: string): Promise<WebhookConfig[]> {
   const sql = getSql()
   const rows = await sql`
-    SELECT id, url, events, filters, secret_hash
+    SELECT id, url, events, filters, secret_hash AS secret
     FROM org_webhooks
     WHERE organization_id = ${orgId}
       AND is_active = true
@@ -79,8 +79,8 @@ export async function notifyWebhooks(payload: WebhookPayload): Promise<void> {
           "X-Exolar-Event": payload.event,
           "X-Exolar-Delivery": `${payload.execution_id}-${Date.now()}`,
         }
-        if (wh.secret_hash) {
-          headers["X-Exolar-Signature"] = `sha256=${signPayload(body, wh.secret_hash)}`
+        if (wh.secret) {
+          headers["X-Exolar-Signature"] = `sha256=${signPayload(body, wh.secret)}`
         }
 
         const response = await fetch(wh.url, {

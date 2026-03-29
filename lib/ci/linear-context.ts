@@ -87,7 +87,7 @@ export async function fetchLinearTicket(ticketId: string): Promise<LinearTicketC
  * If WIP, auto-bug-reports should be suppressed.
  */
 export function isTicketWIP(ticket: LinearTicketContext): boolean {
-  const wipStates = ["in progress", "in review", "started", "unstarted", "backlog"]
+  const wipStates = ["in progress", "in review", "started"]
   return wipStates.includes(ticket.state.toLowerCase())
 }
 

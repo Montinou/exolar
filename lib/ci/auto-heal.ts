@@ -32,6 +32,7 @@ export interface HealInstruction {
 
 export interface HealResult {
   test_signature: string
+  fix_strategy: string
   status: "success" | "failed" | "skipped"
   attempts: number
   pr_url?: string
@@ -99,7 +100,7 @@ export async function recordHealAttempt(
     ) VALUES (
       ${analysisId},
       ${result.test_signature},
-      'auto',
+      ${result.fix_strategy},
       ${result.attempts},
       ${result.status},
       ${result.pr_url ?? null},

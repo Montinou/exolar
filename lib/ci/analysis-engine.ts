@@ -94,7 +94,7 @@ function isInfraError(errorMessage: string | null, errorType: string | null): bo
     msg.includes("networkerror") ||
     msg.includes("econnrefused") ||
     msg.includes("net::") ||
-    /\b5\d{2}\b/.test(msg)
+    /\b(?:status|http|error)\s*:?\s*5\d{2}\b/i.test(msg)
   )
 }
 
@@ -122,9 +122,9 @@ export async function analyzeExecution(
 ): Promise<AnalysisResult> {
   const sql = getSql()
 
-  // 1. Fetch all failed/timedout test results
-  const rawFailures = await sql.unsafe(`
-    SELECT
+  // 1. Fetch all failed/timedout test results (parameterized to prevent SQL injection)
+  const rawFailures = await sql.unsafe(
+    `SELECT
       tr.id,
       COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) AS test_signature,
       tr.test_name,
@@ -134,14 +134,23 @@ export async function analyzeExecution(
       tr.error_message,
       tr.stack_trace,
       tr.ai_context,
-      te.commit_sha
+      te.commit_sha,
+      EXISTS (
+        SELECT 1 FROM test_results tr2
+        WHERE tr2.execution_id = tr.execution_id
+          AND tr2.test_signature = tr.test_signature
+          AND tr2.status = 'passed'
+          AND tr2.retry_count > tr.retry_count
+      ) AS passed_on_retry
     FROM test_results tr
     JOIN test_executions te ON tr.execution_id = te.id
-    WHERE tr.execution_id = ${executionId}
-      AND te.organization_id = ${orgId}
+    WHERE tr.execution_id = $1
+      AND te.organization_id = $2
       AND tr.status IN ('failed', 'timedout')
     ORDER BY tr.id ASC
-  `)
+    LIMIT 500`,
+    [executionId, orgId]
+  )
 
   const failures = rawFailures as Array<Record<string, unknown>>
 
@@ -182,7 +191,7 @@ export async function analyzeExecution(
     const confidence = clf ? clf.confidence * 100 : 0
     const classification = clf?.suggested_classification ?? "UNKNOWN"
     const flakinessRate = clf?.historical_metrics.flakiness_rate ?? 0
-    const passedOnRetry = retryCount > 0 && status === "passed"
+    const passedOnRetry = Boolean(row.passed_on_retry)
 
 
     // 3. Decision matrix

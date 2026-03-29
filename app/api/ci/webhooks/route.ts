@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { createHash } from "crypto"
 import { getSessionContext, isOrgAdmin } from "@/lib/session-context"
 import { getSql } from "@/lib/db/connection"
 
@@ -60,7 +59,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "url is required" }, { status: 400 })
     }
     try {
-      new URL(url)
+      const parsed = new URL(url)
+      if (!["https:", "http:"].includes(parsed.protocol)) {
+        return NextResponse.json({ error: "url must use https:// or http://" }, { status: 400 })
+      }
+      const hostname = parsed.hostname
+      if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" ||
+          hostname.startsWith("10.") || hostname.startsWith("192.168.") ||
+          hostname.startsWith("169.254.") || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
+        return NextResponse.json({ error: "url must not point to a private or loopback address" }, { status: 400 })
+      }
     } catch {
       return NextResponse.json({ error: "url must be a valid URL" }, { status: 400 })
     }
@@ -69,13 +77,14 @@ export async function POST(request: Request) {
     }
 
     const validEvents = ["failure", "flake", "healed"]
-    const invalidEvent = events.find((e: unknown) => !validEvents.includes(e as string))
+    const invalidEvent = events.find((e: unknown) => typeof e !== "string" || !validEvents.includes(e))
     if (invalidEvent) {
       return NextResponse.json({ error: `invalid event: ${invalidEvent}` }, { status: 400 })
     }
 
-    const secretHash = secret
-      ? createHash("sha256").update(secret as string).digest("hex")
+    // Store raw secret for HMAC signing (Neon provides encryption at rest)
+    const secretValue = secret && typeof secret === "string" && secret.length > 0
+      ? secret
       : null
 
     const filtersJson = filters && typeof filters === "object" ? filters : {}
@@ -89,7 +98,7 @@ export async function POST(request: Request) {
         ${url.trim()},
         ${events},
         ${JSON.stringify(filtersJson)},
-        ${secretHash}
+        ${secretValue}
       )
       RETURNING id, name, url, events, filters, is_active, created_at, updated_at
     `
