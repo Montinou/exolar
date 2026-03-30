@@ -2,13 +2,13 @@
  * MCP Auth - Token Validation for MCP Server
  *
  * Validates JWT tokens from:
- * 1. Neon Auth (browser sessions)
+ * 1. Clerk (browser sessions)
  * 2. MCP tokens (generated via /api/auth/mcp-token)
  * 3. OAuth tokens (generated via /api/mcp/oauth/token)
  */
 
 import * as jose from "jose"
-// Note: getSql is only used for Neon Auth tokens, not MCP OAuth tokens
+// Note: getSql is only used for Clerk tokens, not MCP OAuth tokens
 import { getSql } from "@/lib/db"
 import { validateOrgApiKey, isExolarApiKey } from "@/lib/api-keys"
 
@@ -21,9 +21,9 @@ export interface MCPAuthContext {
   userRole: "admin" | "viewer"
 }
 
-// Neon Auth JWKS endpoint
-const NEON_AUTH_JWKS_URL =
-  process.env.NEON_AUTH_JWKS_URL || "https://auth.neon.tech/.well-known/jwks.json"
+// Clerk JWKS endpoint
+const CLERK_JWKS_URL =
+  process.env.CLERK_JWKS_URL || ""
 
 // Secret for MCP tokens - should match the one in /api/auth/mcp-token
 // IMPORTANT: Set MCP_TOKEN_SECRET in production environment
@@ -39,7 +39,7 @@ let jwks: jose.JWTVerifyGetKey | null = null
 
 async function getJWKS(): Promise<jose.JWTVerifyGetKey> {
   if (!jwks) {
-    jwks = jose.createRemoteJWKSet(new URL(NEON_AUTH_JWKS_URL))
+    jwks = jose.createRemoteJWKSet(new URL(CLERK_JWKS_URL))
   }
   return jwks
 }
@@ -72,8 +72,8 @@ export async function validateMCPToken(
     return mcpContext
   }
 
-  // If that fails, try Neon Auth token (RS256 signed via JWKS)
-  return validateNeonAuthToken(token)
+  // If that fails, try Clerk token (RS256 signed via JWKS)
+  return validateClerkToken(token)
 }
 
 /**
@@ -124,18 +124,18 @@ async function validateMCPGeneratedToken(token: string): Promise<MCPAuthContext 
 }
 
 /**
- * Validate a Neon Auth token
+ * Validate a Clerk token
  */
-async function validateNeonAuthToken(token: string): Promise<MCPAuthContext | null> {
+async function validateClerkToken(token: string): Promise<MCPAuthContext | null> {
   try {
-    // Verify JWT signature with Neon's JWKS
+    // Verify JWT signature with Clerk's JWKS
     const keySet = await getJWKS()
     const { payload } = await jose.jwtVerify(token, keySet)
 
-    // Extract email from token
-    const email = payload.email as string
-    if (!email) {
-      console.error("[mcp-auth] Token missing email claim")
+    // Extract Clerk user ID from sub claim
+    const clerkUserId = payload.sub as string
+    if (!clerkUserId) {
+      console.error("[mcp-auth] Token missing sub claim")
       return null
     }
 
@@ -154,18 +154,18 @@ async function validateNeonAuthToken(token: string): Promise<MCPAuthContext | nu
       FROM dashboard_users u
       LEFT JOIN organizations o ON o.id = u.default_org_id
       LEFT JOIN organization_members om ON om.user_id = u.id AND om.organization_id = o.id
-      WHERE u.email = ${email}
+      WHERE u.clerk_user_id = ${clerkUserId}
     `
 
     if (!result || result.length === 0) {
-      console.error(`[mcp-auth] User not found for email: ${email}`)
+      console.error(`[mcp-auth] User not found for Clerk ID: ${clerkUserId}`)
       return null
     }
 
     const userInfo = result[0]
 
     if (!userInfo.organization_id) {
-      console.error(`[mcp-auth] User ${email} has no organization assigned`)
+      console.error(`[mcp-auth] User ${userInfo.email} has no organization assigned`)
       return null
     }
 

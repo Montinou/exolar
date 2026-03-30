@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { authClient } from "@/lib/auth/client"
+import { useUser } from "@clerk/nextjs"
 import type { DashboardUser } from "@/lib/db"
 
 interface AccessState {
@@ -31,19 +31,18 @@ interface AccessProviderProps {
 }
 
 export function AccessProvider({ children }: AccessProviderProps) {
-  // Use Neon Auth SDK's useSession hook for session state (with caching/deduplication)
-  const { data: sessionData, isPending: sessionPending } = authClient.useSession()
-  
+  const { user, isLoaded } = useUser()
+
   const [accessState, setAccessState] = useState<AccessState>({
     loading: true,
     authorized: false,
   })
 
-  // Only check invite status after session is confirmed from SDK
+  // Only check invite status after session is confirmed from Clerk
   useEffect(() => {
     async function checkInviteStatus() {
-      // If no session, user is not authenticated
-      if (!sessionData?.session) {
+      // If no user, not authenticated
+      if (!user) {
         setAccessState({
           loading: false,
           authorized: false,
@@ -53,7 +52,7 @@ export function AccessProvider({ children }: AccessProviderProps) {
         return
       }
 
-      // Session exists - now check if user is invited (app-specific authorization)
+      // User exists - now check if user is invited (app-specific authorization)
       try {
         const response = await fetch("/api/auth/check-access")
         const data = await response.json()
@@ -75,15 +74,15 @@ export function AccessProvider({ children }: AccessProviderProps) {
       }
     }
 
-    // Only run when session loading is complete
-    if (!sessionPending) {
+    // Only run when Clerk has loaded
+    if (isLoaded) {
       checkInviteStatus()
     }
-  }, [sessionData?.session?.id, sessionPending])
+  }, [user?.id, isLoaded])
 
   const value: AccessContextValue = {
     ...accessState,
-    loading: sessionPending || accessState.loading,
+    loading: !isLoaded || accessState.loading,
     isAdmin: accessState.user?.role === "admin",
   }
 

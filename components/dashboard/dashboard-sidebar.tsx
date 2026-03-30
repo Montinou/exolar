@@ -16,7 +16,7 @@ import {
   Webhook,
   Key,
 } from "lucide-react"
-import { authClient } from "@/lib/auth/client"
+import { useUser, useClerk } from "@clerk/nextjs"
 import { useAccess } from "@/components/auth/access-context"
 import { BrandLogo } from "@/components/ui/brand-logo"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -84,10 +84,11 @@ function DashboardSidebarContent() {
   const router = useRouter()
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
-  const { data: session } = authClient.useSession()
+  const { user } = useUser()
+  const { signOut } = useClerk()
   const { isAdmin } = useAccess()
-  
-  const userEmail = session?.user?.email || ""
+
+  const userEmail = user?.primaryEmailAddress?.emailAddress || ""
   const userInitials = userEmail
     ? userEmail
         .split("@")[0]
@@ -99,7 +100,7 @@ function DashboardSidebarContent() {
     : "U"
 
   const handleSignOut = async () => {
-    await authClient.signOut()
+    await signOut()
     // Domain-based redirect after sign out
     const hostname = window.location.hostname
     if (hostname.includes("e2e-test-dashboard")) {

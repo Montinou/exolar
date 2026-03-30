@@ -1,6 +1,7 @@
 import "server-only"
-import { createAuthServer } from "@neondatabase/auth/next/server"
+import { auth } from "@clerk/nextjs/server"
 
-// Note: createAuthServer() uses NEON_AUTH_BASE_URL from environment variables
-// Trusted origins are configured in the Neon Auth dashboard
-export const authServer = createAuthServer()
+export async function getClerkAuth() {
+  const { userId, orgId, sessionClaims } = await auth()
+  return { userId, orgId, sessionClaims }
+}

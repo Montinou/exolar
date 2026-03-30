@@ -1,12 +1,20 @@
-import { neonAuthMiddleware } from "@neondatabase/auth/next"
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-const authMiddleware = neonAuthMiddleware({
-  loginUrl: "/auth/sign-in",
-})
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/auth/sign-in(.*)",
+  "/auth/sign-up(.*)",
+  "/api/webhooks/clerk(.*)",
+  "/api/test-results(.*)",
+  "/api/v1/health(.*)",
+  "/docs(.*)",
+  "/api/mcp/(.*)",
+  "/m/(.*)",
+])
 
-export default function middleware(request: NextRequest) {
+export default clerkMiddleware(async (auth, request: NextRequest) => {
   const hostname = request.headers.get("host") || ""
   const pathname = request.nextUrl.pathname
 
@@ -14,13 +22,14 @@ export default function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 
-  if (pathname === "/") {
+  if (isPublicRoute(request)) {
     return NextResponse.next()
   }
 
-  return authMiddleware(request)
-}
+  await auth.protect()
+  return NextResponse.next()
+})
 
 export const config = {
-  matcher: ["/", "/dashboard/:path*", "/admin/:path*", "/account/:path*", "/settings/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 }

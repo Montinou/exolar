@@ -1,5 +1,5 @@
 import "server-only"
-import { authServer } from "./auth/server"
+import { auth } from "@clerk/nextjs/server"
 import { getSql } from "./db"
 
 /**
@@ -25,17 +25,14 @@ export interface SessionContext {
  */
 export async function getSessionContext(): Promise<SessionContext | null> {
   try {
-    // Get session from Neon Auth
-    const { data } = await authServer.getSession()
-    if (!data?.user?.email) {
+    const { userId: clerkUserId } = await auth()
+    if (!clerkUserId) {
       return null
     }
 
-    const email = data.user.email
     const sql = getSql()
 
-
-    // Get user with their default org and org role
+    // Get user with their default org and org role (lookup by Clerk ID)
     const result = await sql`
       SELECT
         u.id as user_id,
@@ -50,7 +47,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
       FROM dashboard_users u
       LEFT JOIN organizations o ON o.id = u.default_org_id
       LEFT JOIN organization_members om ON om.user_id = u.id AND om.organization_id = o.id
-      WHERE u.email = ${email}
+      WHERE u.clerk_user_id = ${clerkUserId}
     `
 
     if (!result || result.length === 0) {
@@ -61,7 +58,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
     // Handle case where user exists but has no organization assigned yet
     if (!row.organization_id) {
-      console.warn(`[session-context] User ${email} has no default organization assigned`)
+      console.warn(`[session-context] User ${clerkUserId} has no default organization assigned`)
       return null
     }
 

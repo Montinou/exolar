@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { authServer } from "@/lib/auth/server"
+import { auth } from "@clerk/nextjs/server"
+import { getSql } from "@/lib/db"
 import { checkUserAccess } from "@/lib/db"
 
 /**
@@ -8,10 +9,9 @@ import { checkUserAccess } from "@/lib/db"
  */
 export async function GET() {
   try {
-    const { data } = await authServer.getSession()
+    const { userId: clerkUserId } = await auth()
 
-    // Not logged in with Neon Auth
-    if (!data?.session || !data?.user?.email) {
+    if (!clerkUserId) {
       return NextResponse.json({
         authorized: false,
         authenticated: false,
@@ -19,9 +19,21 @@ export async function GET() {
       })
     }
 
-    const email = data.user.email
+    // Look up email by Clerk user ID
+    const sql = getSql()
+    const userResult = await sql`
+      SELECT email FROM dashboard_users WHERE clerk_user_id = ${clerkUserId}
+    `
 
-    // Check if user has access (exists in dashboard_users or has valid invite)
+    if (!userResult.length) {
+      return NextResponse.json({
+        authorized: false,
+        authenticated: true,
+        reason: "not_invited"
+      })
+    }
+
+    const email = userResult[0].email as string
     const accessResult = await checkUserAccess(email)
 
     if (!accessResult.authorized) {
