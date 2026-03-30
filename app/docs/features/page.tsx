@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Gauge, GitBranch, Zap, BarChart3, Building2, GitCompare } from "lucide-react"
+import { ArrowRight, Gauge, GitBranch, Zap, BarChart3, Building2, GitCompare, Bot } from "lucide-react"
 import {
   Accordion,
   AccordionContent,
@@ -286,6 +286,61 @@ export default function FeaturesPage() {
                   <li>• RLS policies enforce access at the database level</li>
                   <li>• Users can belong to multiple organizations</li>
                 </ul>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </FeatureCard>
+      </section>
+
+      {/* CI Auto-Analysis Pipeline */}
+      <section id="ci-analysis" className="scroll-mt-20">
+        <FeatureCard
+          icon={Bot}
+          title="CI Auto-Analysis Pipeline"
+          description="Automatically analyze CI failures, auto-heal flaky tests, and report real bugs — closing the loop between CI and fixes."
+        >
+          <Accordion type="single" collapsible>
+            <AccordionItem value="analysis">
+              <AccordionTrigger>Intelligent Failure Classification</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm text-muted-foreground">
+                  Every CI failure is classified into one of 5 categories: HEALABLE (auto-fixable flakes),
+                  REAL_BUG (create GitHub issue), KNOWN_FLAKE (annotate), INFRA (infrastructure issue),
+                  or MANUAL_REVIEW (low confidence). Classification uses error type, retry history,
+                  flakiness rate, and semantic clustering with a 70% confidence threshold.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="autoheal">
+              <AccordionTrigger>Auto-Heal with 5 Fix Strategies</AccordionTrigger>
+              <AccordionContent>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
+                  <li><strong>selector_update</strong> — Replace fragile selectors with getByRole/getByTestId</li>
+                  <li><strong>wait_adjustment</strong> — Add explicit waits for page/element readiness</li>
+                  <li><strong>race_condition</strong> — Add visibility guards before actions</li>
+                  <li><strong>api_timing</strong> — Add waitForResponse for API calls</li>
+                  <li><strong>retry_logic</strong> — Re-query locators to avoid stale references</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="webhooks">
+              <AccordionTrigger>Webhook Notifications</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm text-muted-foreground">
+                  Configure per-org webhooks to receive failure notifications. Supports HMAC-SHA256
+                  payload signing, branch filtering, and minimum failure count thresholds.
+                  Manage webhooks in Settings &gt; Webhooks.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="linear">
+              <AccordionTrigger>Linear Ticket Integration</AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm text-muted-foreground">
+                  Link tests to Linear tickets via reporter config or auto-detect from branch names.
+                  The analysis engine fetches acceptance criteria to distinguish test issues from real bugs,
+                  and suppresses auto-reports for work-in-progress features.
+                </p>
               </AccordionContent>
             </AccordionItem>
           </Accordion>

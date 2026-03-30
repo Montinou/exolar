@@ -147,6 +147,87 @@ export default defineConfig({
           That&apos;s it! The reporter will automatically send results to Exolar QA when running in CI.
         </p>
       </section>
+
+      {/* V2 Features */}
+      <section className="space-y-6">
+        <h2 className="text-xl sm:text-2xl font-semibold">V2 Features &mdash; Ticket Linking &amp; Enhanced Context</h2>
+
+        {/* Ticket Linking */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Ticket Linking</h3>
+          <p className="text-sm text-muted-foreground">
+            Link test files or tagged specs to Linear tickets using explicit mappings or automatic branch-name detection.
+            Two approaches are supported and can be combined.
+          </p>
+          <CodeBlock
+            title="playwright.config.ts"
+            code={`// playwright.config.ts
+import { defineConfig } from "@playwright/test";
+import { exolar } from "@exolar-qa/playwright-reporter";
+
+export default defineConfig({
+  reporter: [
+    [exolar, {
+      apiKey: process.env.EXOLAR_API_KEY,
+      ticketMapping: {
+        "tests/auth/login.spec.ts": "ENG-123",
+        "@checkout": "ENG-456",
+      },
+      autoDetectTicket: true,  // detects ENG-123 from branch name
+    }]
+  ],
+});`}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="p-4 rounded-xl glass-card">
+              <h4 className="font-medium mb-2">Explicit Mapping</h4>
+              <p className="text-sm text-muted-foreground">
+                Map individual spec files or test tags (prefixed with <code className="text-xs bg-muted px-1 py-0.5 rounded">@</code>) directly to ticket IDs in <code className="text-xs bg-muted px-1 py-0.5 rounded">ticketMapping</code>.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl glass-card">
+              <h4 className="font-medium mb-2">Auto-Detection</h4>
+              <p className="text-sm text-muted-foreground">
+                Set <code className="text-xs bg-muted px-1 py-0.5 rounded">autoDetectTicket: true</code> to extract a ticket ID from the current git branch name (e.g. <code className="text-xs bg-muted px-1 py-0.5 rounded">feat/ENG-123-login</code>).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Enhanced Failure Context */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Enhanced Failure Context (AIFailureContextV2)</h3>
+          <p className="text-sm text-muted-foreground">
+            Failed tests now capture richer context in the <code className="text-xs bg-muted px-1 py-0.5 rounded">AIFailureContextV2</code> payload, giving AI assistants and your team more signal when diagnosing failures.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="p-4 rounded-xl glass-card">
+              <h4 className="font-medium mb-2">retry_history</h4>
+              <p className="text-sm text-muted-foreground">
+                Full history of every retry attempt: attempt number, pass/fail status, and duration in milliseconds. Identifies flaky tests that fail intermittently across retries.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl glass-card">
+              <h4 className="font-medium mb-2">linked_ticket</h4>
+              <p className="text-sm text-muted-foreground">
+                The Linear ticket ID associated with the failing test, populated from either the explicit <code className="text-xs bg-muted px-1 py-0.5 rounded">ticketMapping</code> or branch-name auto-detection.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl glass-card">
+              <h4 className="font-medium mb-2">dom_snapshot <span className="text-xs font-normal text-muted-foreground/60">(coming soon)</span></h4>
+              <p className="text-sm text-muted-foreground">
+                Accessibility tree captured at the exact point of failure, providing a lightweight structural snapshot of the page without a full screenshot.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl glass-card">
+              <h4 className="font-medium mb-2">network_log <span className="text-xs font-normal text-muted-foreground/60">(coming soon)</span></h4>
+              <p className="text-sm text-muted-foreground">
+                Recent network requests made during the test, including URLs, methods, and status codes, to surface unexpected API errors or missing responses.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

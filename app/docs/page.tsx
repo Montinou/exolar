@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Terminal, Github, Code, ArrowRight, Rocket, Package, HelpCircle } from "lucide-react"
+import { Terminal, Github, Code, ArrowRight, Rocket, Package, HelpCircle, Zap } from "lucide-react"
 
 export const metadata = {
   title: "Documentation - Exolar QA",
@@ -31,6 +31,12 @@ const quickLinks = [
     description: "Automatically upload Playwright results from CI/CD",
     href: "/docs/github-action",
     icon: Github,
+  },
+  {
+    title: "CI Auto-Analysis",
+    description: "Auto-heal flaky tests and detect real bugs from CI failures",
+    href: "/docs/ci-analysis",
+    icon: Zap,
   },
   {
     title: "API Reference",
