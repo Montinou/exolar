@@ -87,7 +87,7 @@ export async function getPerformanceRegressions(
   }
 
   const threshold = options.threshold ?? 0.20
-  const hours = options.hours ?? 24
+  const safeHours = Math.max(1, Math.min(8760, Math.floor(Number(options.hours ?? 24) || 24)))
   const branch = options.branch
   const suite = options.suite
   const limit = options.limit ?? 20
@@ -107,7 +107,8 @@ export async function getPerformanceRegressions(
         : "regression_ratio DESC"
 
   // Build interval clause (can't use parameterized value inside INTERVAL)
-  const hoursIntervalClause = `AND te.started_at > NOW() - INTERVAL '${hours} hours'`
+  // safeHours is guaranteed to be a bounded integer, so string interpolation is safe here
+  const hoursIntervalClause = `AND te.started_at > NOW() - INTERVAL '${safeHours} hours'`
 
   const regressions = await sql`
     WITH recent_performance AS (
@@ -205,6 +206,9 @@ export async function getTestDurationHistory(
 ): Promise<DurationHistoryPoint[]> {
   const sql = getSql()
 
+  // Validate days to prevent SQL injection via string interpolation in INTERVAL
+  const safeDays = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)))
+
   const result = await sql`
     SELECT
       DATE(te.started_at) as date,
@@ -214,7 +218,7 @@ export async function getTestDurationHistory(
     JOIN test_executions te ON tr.execution_id = te.id
     WHERE te.organization_id = ${organizationId}
       AND COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) = ${testSignature}
-      AND te.started_at > NOW() - INTERVAL '${days} days'
+      AND te.started_at > NOW() - INTERVAL '${safeDays} days'
       AND tr.status IN ('passed', 'failed')
     GROUP BY DATE(te.started_at)
     ORDER BY date ASC

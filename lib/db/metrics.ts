@@ -257,13 +257,17 @@ export async function getTrendData(
   if (from) {
     conditions.push(`started_at >= '${from}'`)
   } else if (count || days) {
-    const lookback = count || days || 7
+    // Validate lookback to prevent SQL injection via string interpolation in INTERVAL
+    const rawLookback = count || days || 7
+    const safeLookback = Math.max(1, Math.min(3650, Math.floor(Number(rawLookback) || 7)))
+    // interval is derived from a whitelist of period values — safe to interpolate
     const interval = period === 'hour' ? 'hours' :
                      period === 'day' ? 'days' :
                      period === 'week' ? 'weeks' : 'months'
-    conditions.push(`started_at > NOW() - INTERVAL '${lookback} ${interval}'`)
+    conditions.push(`started_at > NOW() - INTERVAL '${safeLookback} ${interval}'`)
   } else {
     // Default: last 7 of the period type
+    // interval is derived from a whitelist of period values — safe to interpolate
     const interval = period === 'hour' ? 'hours' :
                      period === 'day' ? 'days' :
                      period === 'week' ? 'weeks' : 'months'
@@ -331,7 +335,9 @@ export async function getFailureTrendData(
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
   } else {
-    conditions.push(`started_at > NOW() - INTERVAL '${days} days'`)
+    // Validate days to prevent SQL injection via string interpolation in INTERVAL
+    const safeDays = Math.max(1, Math.min(365, Math.floor(Number(days) || 15)))
+    conditions.push(`started_at > NOW() - INTERVAL '${safeDays} days'`)
   }
 
   if (dateRange?.to) {

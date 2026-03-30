@@ -206,7 +206,7 @@ export async function insertArtifacts(
         ${resultId},
         ${artifact.type},
         ${artifact.r2_key},
-        ${artifact.r2_key},
+        ${`r2://${artifact.r2_key}`},
         ${artifact.size_bytes ?? null},
         ${artifact.mime_type ?? null}
       )
