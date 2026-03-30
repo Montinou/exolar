@@ -120,11 +120,8 @@ export async function getDashboardMetrics(
   const metrics = await sql`
     SELECT
       COUNT(*) as total_executions,
-      CASE
-        WHEN SUM(total_tests) > 0
-        THEN ROUND(SUM(passed)::decimal / SUM(total_tests) * 100, 1)
-        ELSE 0
-      END as pass_rate,
+      -- Canonical pass rate: passed / (passed + failed). Skipped tests excluded.
+      ROUND(SUM(passed)::decimal / NULLIF(SUM(passed) + SUM(failed), 0) * 100, 1) as pass_rate,
       CASE
         WHEN SUM(total_tests) > 0
         THEN ROUND(SUM(failed)::decimal / SUM(total_tests) * 100, 1)
@@ -205,7 +202,7 @@ export async function getDashboardMetrics(
 
   return {
     total_executions: Number(metrics[0].total_executions),
-    pass_rate: Number(metrics[0].pass_rate),
+    pass_rate: Number(metrics[0].pass_rate) || 0,
     failure_rate: Number(metrics[0].failure_rate),
     avg_duration_ms: Number(metrics[0].avg_duration_ms),
     critical_failures: Number(criticalFailures[0].critical_failures),
@@ -666,6 +663,11 @@ export async function getSuitePassRates(
 /**
  * Calculate overall test suite reliability score (0-100)
  * Formula: (PassRate * 0.4) + ((1 - FlakyRate) * 0.3) + (DurationStability * 0.3)
+ *
+ * Note: This is a composite metric and intentionally uses a different formula than
+ * the canonical pass rate (passed / (passed + failed)). The pass rate component here
+ * is derived from test_results rows (not executions) and contributes only 40% of the
+ * final score. The remaining 60% accounts for flakiness and duration stability.
  */
 export async function getReliabilityScore(
   organizationId: number,

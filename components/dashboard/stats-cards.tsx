@@ -72,7 +72,7 @@ export function StatsCards({ metrics }: StatsCardsProps) {
       icon: CheckCircle2,
       trend: metrics.pass_rate >= 90 ? "positive" : metrics.pass_rate >= 75 ? "neutral" : "negative",
       type: "passRate",
-      tooltip: "Pass Rate = Passed ÷ (Passed + Failed). Skipped tests are excluded.",
+      tooltip: "Pass Rate = Passed / (Passed + Failed). Skipped tests are excluded.",
     },
     {
       label: "Failure Rate",

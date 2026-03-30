@@ -306,6 +306,7 @@ import type {
   DateRangeFilter,
   TrendOptions,
   GetFlakiestTestsOptions,
+  GetFlakinessSummaryOptions,
   ReliabilityScoreOptions,
   PerformanceRegressionsOptions,
   ErrorDistributionOptions,
@@ -485,7 +486,7 @@ export function getQueriesForOrg(organizationId: number) {
     // Flakiness queries
     getFlakiestTests: (options?: GetFlakiestTestsOptions | number) =>
       getFlakiestTests(organizationId, options),
-    getFlakinessSummary: () => getFlakinessSummary(organizationId),
+    getFlakinessSummary: (options?: GetFlakinessSummaryOptions) => getFlakinessSummary(organizationId, options),
     getTestFlakiness: (signature: string) => getTestFlakiness(organizationId, signature),
 
     // Dashboard analytics queries
