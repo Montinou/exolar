@@ -1,56 +1,72 @@
-# Exolar QA - E2E Test Dashboard
+# Exolar QA — Technical Overview
 
-## What It Is
+## Architecture
 
-A dashboard for monitoring Playwright test executions in real-time. It provides comprehensive analytics, failure analysis, and integrates directly with Claude Code for AI-assisted debugging.
+Next.js 16 App Router monorepo deployed on Vercel. PostgreSQL via NeonDB with pgvector
+extension for vector search. Cloudflare R2 for artifact storage (videos, traces,
+screenshots). Upstash Redis for rate limiting (60 req/min per IP, applied at middleware).
+Multi-tenant: all data isolated per organization via Row-Level Security.
 
-## Key Capabilities
+## Database
 
-### Test Monitoring
+27 migration files (scripts/001 through 027). RLS policies enforce org-level isolation
+across all tables. test_results rows carry 3 pgvector columns: error embedding, stack
+trace embedding, and semantic cluster centroid. Indexes optimized for execution + org
+filtering.
 
-- **Real-time execution tracking** - View pass/fail/flaky rates as tests run
-- **Branch & suite filtering** - Focus on specific test areas
-- **Test search with history** - Find any test and see its run history
+## Packages
 
-### Analytics & Metrics
+- `@exolar-qa/playwright-reporter` v1.0.0 — Playwright reporter that ships test results,
+  retry history, DOM snapshots, network logs, and Linear ticket IDs to the ingestion API.
+  Auto-detects Linear tickets from branch names (e.g. `feature/ENG-123-login`).
+- `@exolar-qa/mcp-server` v1.0.0 — Standalone MCP server exposing 5 consolidated tools
+  and 16 datasets. Mirrors the hosted `/api/mcp` endpoint for local use.
 
-- **Reliability Score** - Single 0-100 gauge showing test suite health
-- **Performance regression detection** - Automatic alerts when tests slow down
-- **Flakiness tracking** - Identify and monitor unreliable tests
-- **Trend charts** - Visualize test health over time
+## API Surface
 
-### Failure Analysis
+| Group | Endpoints |
+|---|---|
+| Ingestion | `POST /api/test-results` (API key auth) |
+| Executions | `GET /api/executions`, `GET /api/executions/[id]` |
+| Metrics | `GET /api/metrics`, `GET /api/trends`, `GET /api/flakiness` |
+| Tests | `GET /api/search`, `GET /api/tests/[signature]` |
+| Artifacts | `GET /api/artifacts/[id]/signed-url` |
+| CI Pipeline | `POST /api/ci/analyze`, `POST /api/ci/webhooks` |
+| MCP | `GET /api/mcp` (health), `POST /api/mcp` (JSON-RPC) |
+| Organizations | `GET/POST /api/organizations`, `GET/PATCH/DELETE /api/organizations/[id]` |
+| Members | `GET/POST /api/organizations/[id]/members`, `PATCH/DELETE .../members/[userId]` |
+| Admin | `GET /api/admin/organizations`, `GET/POST/DELETE /api/admin/users`, `.../invites` |
 
-- **AI context for failures** - Structured information to help debug issues
-- **Error distribution charts** - See patterns in failure types
-- **Comparative run analysis** - Compare two executions side-by-side to spot regressions
+## AI Features
 
-### Artifacts
+Embeddings via Jina v3 (`jina-embeddings-v3`). Each test failure is embedded on ingest.
+Semantic clustering groups failures by similarity — surfaces root cause counts ("50
+failures → 3 issues"). Natural language search via `/api/search` and the `semantic_search`
+MCP dataset. Failure classification: `HEALABLE`, `REAL_BUG`, `KNOWN_FLAKE`, `INFRA`.
+Decision matrix weighs error type, retry count, historical flakiness rate, and cluster
+membership.
 
-- **Video recordings** - Watch test failures
-- **Trace files** - Step-by-step Playwright traces
-- **Screenshots** - Failure snapshots
+## CI Pipeline (v2.4)
 
-### Claude Code Integration (MCP)
+- `POST /api/ci/analyze` — classifies failures with confidence score, returns per-test
+  verdict and recommended action.
+- Auto-heal: 5 fix strategies (`selector_update`, `wait_adjustment`, `race_condition`,
+  `api_timing`, `retry_logic`). Generates fix instructions consumed by Claude Code or
+  OpenClaw agents, which open PRs automatically.
+- Auto-bug-report: REAL_BUG failures are filed as GitHub issues with full context (stack
+  trace, cluster, affected tests). Deduplication prevents spam.
+- Webhook notifier: `POST /api/ci/webhooks` with HMAC-SHA256 signing, event filtering,
+  and branch-based routing.
+- Linear integration: links tests to tickets via reporter config or branch name
+  auto-detection; fetches acceptance criteria to distinguish test issues from real bugs.
 
-Query test data directly from Claude Code:
+## Test Coverage
 
-- Get failed tests with context
-- Search test history
-- Compare executions
-- Analyze flaky tests
+57 unit tests (vitest) covering: analysis engine, auto-heal strategies, webhook notifier,
+bug reporter, and Linear integration modules. Located in `tests/`.
 
-## Benefits
+## Ecosystem
 
-| Benefit | Impact |
-|---------|--------|
-| **Faster debugging** | AI context + artifacts reduce investigation time |
-| **Early regression detection** | Performance alerts catch slowdowns before production |
-| **Flakiness visibility** | Stop wasting time on unreliable tests |
-| **No infrastructure** | Serverless on Neon + Vercel |
-
-## Access
-
-**Dashboard:** https://e2e-test-dashboard.vercel.app
-
-**Docs:** https://e2e-test-dashboard.vercel.app/docs
+- **Triqual** — test automation plugin that consumes the reporter package and ingestion API.
+- **Quoth** — AI memory and A2A bus; Exolar feeds failure vectors into Quoth for cross-agent
+  knowledge sharing and persistent test intelligence.

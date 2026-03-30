@@ -213,6 +213,70 @@ export default defineConfig({
         />
       </section>
 
+      {/* Webhook-Based Auto-Analysis */}
+      <section id="webhook-auto-analysis" className="space-y-4 sm:space-y-6 scroll-mt-20">
+        <h2 className="text-xl sm:text-2xl font-semibold">Alternative: Webhook-Based Auto-Analysis</h2>
+        <p className="text-muted-foreground">
+          Instead of (or in addition to) the GitHub Action upload step, you can configure Exolar
+          to automatically analyze failures via webhooks. When a CI run fails, Exolar fires a
+          <code className="px-1 py-0.5 rounded glass-panel mx-1">ci.run.failed</code> webhook to
+          your endpoint, which can then call <code className="px-1 py-0.5 rounded glass-panel">POST /api/ci/analyze</code> to
+          classify the failure and optionally open a fix PR.
+        </p>
+
+        <div className="space-y-4">
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+            <h3 className="font-semibold mb-2 flex items-center gap-3">
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">1</span>
+              Configure a webhook in Settings
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Go to <a href="/settings/webhooks" className="text-primary hover:underline">Settings &rarr; Webhooks</a> and
+              add your endpoint. Subscribe to <code className="px-1 py-0.5 rounded glass-panel">ci.run.failed</code>.
+              Copy the generated HMAC secret.
+            </p>
+            <CodeBlock code={`// Settings > Webhooks > New Webhook
+{
+  "url": "https://your-server.com/hooks/exolar",
+  "secret": "your-hmac-secret",
+  "events": ["ci.run.failed", "ci.run.fixed"]
+}`} />
+          </div>
+
+          <div className="p-4 sm:p-6 rounded-xl glass-card glass-card-glow">
+            <h3 className="font-semibold mb-2 flex items-center gap-3">
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs sm:text-sm">2</span>
+              Trigger analysis from a GitHub Actions step
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add a step that calls <code className="px-1 py-0.5 rounded glass-panel">POST /api/ci/analyze</code> on failure.
+              This returns a classification and, if HEALABLE, opens a draft fix PR automatically.
+            </p>
+            <CodeBlock code={`- name: Trigger Exolar CI Analysis
+  if: failure()
+  run: |
+    curl -X POST https://your-dashboard.com/api/ci/analyze \\
+      -H "Authorization: Bearer \${{ secrets.EXOLAR_API_KEY }}" \\
+      -H "Content-Type: application/json" \\
+      -d '{"run_id":"\${{ github.run_id }}"}'`} />
+          </div>
+
+          <div className="p-4 rounded-xl glass-card bg-cyan-500/5 border border-cyan-500/30">
+            <h3 className="font-semibold mb-2 text-sm">When to use webhooks vs the GitHub Action</h3>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>• <strong className="text-foreground">GitHub Action</strong> — best for uploading results and artifacts after each run</li>
+              <li>• <strong className="text-foreground">Webhook + /api/ci/analyze</strong> — best for automated failure classification and auto-heal PRs</li>
+              <li>• Both can be used together for full coverage</li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          See the <a href="/docs/ci-analysis" className="text-primary hover:underline">CI Auto-Analysis docs</a> for
+          full details on classification categories, auto-heal strategies, and guardrails.
+        </p>
+      </section>
+
       {/* Troubleshooting */}
       <section id="troubleshooting" className="space-y-4 sm:space-y-6 scroll-mt-20">
         <h2 className="text-xl sm:text-2xl font-semibold">Troubleshooting</h2>

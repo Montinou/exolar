@@ -21,7 +21,7 @@ const consolidatedTools = [
       { name: "format", type: "string", default: "markdown", description: "Output format: json | markdown" },
     ],
     responseFields: [
-      "For datasets: List of 14 queryable datasets with descriptions",
+      "For datasets: List of 24 queryable datasets with descriptions",
       "For branches: Branch names with stats (last_run, execution_count, pass_rate)",
       "For suites: Suite names with stats",
       "For metrics: Metric definitions with formulas and thresholds",
@@ -31,14 +31,14 @@ const consolidatedTools = [
   },
   {
     name: "query_exolar_data",
-    description: "Universal data retrieval router. Retrieves data from any of the 16 available datasets using a unified filter interface.",
+    description: "Universal data retrieval router. Retrieves data from any of the 24 available datasets using a unified filter interface.",
     category: "query" as const,
     parameters: [
       {
         name: "dataset",
         type: "string",
         required: true,
-        description: "Dataset to query: executions | execution_details | failures | flaky_tests | trends | dashboard_stats | error_analysis | test_search | test_history | flakiness_summary | reliability_score | performance_regressions | execution_summary | execution_failures | clustered_failures | semantic_search"
+        description: "Dataset to query: executions | execution_details | failures | flaky_tests | trends | dashboard_stats | error_analysis | test_search | test_history | flakiness_summary | reliability_score | performance_regressions | execution_summary | execution_failures | clustered_failures | semantic_search | setup_guide | org_suites | suite_tests | inactive_tests | mock_interfaces | mock_routes | mock_rules | mock_logs"
       },
       {
         name: "filters",
@@ -74,20 +74,20 @@ const consolidatedTools = [
   },
   {
     name: "perform_exolar_action",
-    description: "Execute heavy operations: compare executions, generate reports, classify failures, or find similar failures using AI.",
+    description: "Execute heavy operations: compare executions, generate reports, classify failures, find similar failures, re-embed tests, or manage mock APIs.",
     category: "action" as const,
     parameters: [
       {
         name: "action",
         type: "string",
         required: true,
-        description: "Action to perform: compare | generate_report | classify | find_similar"
+        description: "Action to perform: compare | generate_report | classify | find_similar | reembed | create_mock_interface | create_mock_route | create_mock_rule | delete_mock_interface"
       },
       {
         name: "params",
         type: "object",
         required: true,
-        description: "Action-specific parameters (e.g., baseline_id, current_id, execution_id, test_name, test_result_id, scope)"
+        description: "Action-specific parameters (e.g., baseline_id, current_id, execution_id, test_name, type, interface_id, route_id)"
       },
     ],
     responseFields: [
@@ -95,9 +95,11 @@ const consolidatedTools = [
       "generate_report: Markdown report with failures, error distribution, and recommendations",
       "classify: FLAKE vs BUG classification with confidence score and reasoning",
       "find_similar: Similar failures from current execution or historical runs with similarity scores",
+      "reembed: Regenerate AI embeddings for errors, tests, or suites",
+      "create_mock_interface / create_mock_route / create_mock_rule: Build mock APIs for testing",
     ],
     example: `"Compare main vs feature-auth branch and show regressions"`,
-    replaces: ["compare_executions", "generate_failure_report", "classify_failure", "(NEW: find_similar)"],
+    replaces: ["compare_executions", "generate_failure_report", "classify_failure", "(NEW: find_similar, reembed, mock API actions)"],
   },
   {
     name: "get_semantic_definition",
@@ -143,7 +145,7 @@ const consolidatedTools = [
   },
 ]
 
-// 16 Available Datasets via query_exolar_data
+// 24 Available Datasets via query_exolar_data
 const datasets = [
   { name: "executions", description: "List test executions with optional filters (branch, suite, status, dates)" },
   { name: "execution_details", description: "Full execution data with all test results and artifacts (requires execution_id)" },
@@ -161,6 +163,14 @@ const datasets = [
   { name: "execution_failures", description: "Only failed tests from an execution with error grouping" },
   { name: "clustered_failures", description: "AI-grouped failures by similarity (requires execution_id, reduces 50+ failures to root causes)" },
   { name: "semantic_search", description: "Natural language search for failures using vector embeddings (requires query)" },
+  { name: "setup_guide", description: "CI/CD integration setup instructions filtered by provider and framework" },
+  { name: "org_suites", description: "All test suites for the organization with pass rates and last-run stats" },
+  { name: "suite_tests", description: "Individual tests within a suite (requires suite filter)" },
+  { name: "inactive_tests", description: "Tests that haven't run recently — useful for test suite cleanup" },
+  { name: "mock_interfaces", description: "List mock API interfaces created for the organization" },
+  { name: "mock_routes", description: "Routes configured on a mock interface (requires interface_id)" },
+  { name: "mock_rules", description: "Response rules for a mock route (requires route_id)" },
+  { name: "mock_logs", description: "Request logs for a mock interface with matched rule details" },
 ]
 
 const usageExamples = [
@@ -197,6 +207,11 @@ const usageExamples = [
   "Is this test failure a flake or a real bug?",
   "Classify the failure in test 'should login successfully'",
 
+  // Mock APIs
+  "Create a mock API for the user service",
+  "List all mock interfaces for my org",
+  "Add a route that returns 404 for unknown users",
+
   // Setup
   "Help me set up MCP integration",
   "How do I configure GitHub Actions?",
@@ -213,7 +228,7 @@ export default function MCPDocsPage() {
       {/* Hero */}
       <div className="space-y-4">
         <div className="inline-block px-3 py-1 rounded-full glass-panel text-xs sm:text-sm font-medium mb-2">
-          New: 🧠 AI Vector Search • Semantic Clustering • 16 Datasets
+          New: 🧠 AI Vector Search • Semantic Clustering • Mock APIs • 24 Datasets
         </div>
         <h1
           className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
@@ -226,7 +241,7 @@ export default function MCPDocsPage() {
         >MCP Integration</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Connect Claude Code to your test data using the Model Context Protocol (MCP).
-          Now with <strong>5 consolidated tools</strong> (down from 24) using an efficient router pattern.
+          Five consolidated tools (down from 24) with an efficient router pattern, 24 queryable datasets, and built-in mock API management.
         </p>
       </div>
 
@@ -240,7 +255,7 @@ export default function MCPDocsPage() {
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-cyan-500 shrink-0 mt-0.5" />
-            <span><strong>16 queryable datasets</strong> - Added clustered_failures and semantic_search</span>
+            <span><strong>24 queryable datasets</strong> - Including clustered_failures, semantic_search, mock APIs, org_suites, suite_tests, inactive_tests, and setup_guide</span>
           </li>
           <li className="flex items-start gap-2">
             <Check className="h-5 w-5 text-cyan-500 shrink-0 mt-0.5" />
@@ -339,7 +354,9 @@ export default function MCPDocsPage() {
             <ul className="mt-2 space-y-1 text-sm">
               <li>• executions, failures</li>
               <li>• flaky_tests, trends</li>
-              <li>• compare, classify</li>
+              <li>• mock_interfaces, mock_routes</li>
+              <li>• org_suites, suite_tests</li>
+              <li>• compare, classify, reembed</li>
               <li>• metric formulas</li>
               <li>• CI/CD snippets</li>
             </ul>
@@ -371,7 +388,7 @@ export default function MCPDocsPage() {
 
       {/* Available Tools */}
       <section id="tools" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Available Tools (5 Total + AI Features)</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold">Available Tools (5 Total)</h2>
         <p className="text-muted-foreground">
           All tools support organization-scoped access with automatic filtering.
         </p>
@@ -384,7 +401,7 @@ export default function MCPDocsPage() {
 
       {/* Available Datasets */}
       <section id="datasets" className="space-y-4 sm:space-y-6 scroll-mt-20">
-        <h2 className="text-xl sm:text-2xl font-semibold">Available Datasets</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold">Available Datasets (24 Total)</h2>
         <p className="text-muted-foreground">
           Use <code className="px-1 py-0.5 rounded glass-panel">query_exolar_data</code> with these datasets:
         </p>
