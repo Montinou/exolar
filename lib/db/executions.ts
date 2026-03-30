@@ -46,7 +46,10 @@ export async function getExecutions(
   const whereClause = `WHERE ${conditions.join(" AND ")}`
 
   const result = await sql`
-    SELECT * FROM test_executions
+    SELECT id, run_id, branch, commit_sha, commit_message, triggered_by,
+           workflow_name, suite, suite_id, status, total_tests, passed, failed,
+           skipped, duration_ms, started_at, completed_at
+    FROM test_executions
     ${sql.unsafe(whereClause)}
     ORDER BY started_at DESC
     LIMIT ${limit}
@@ -106,7 +109,10 @@ export async function searchExecutions(
   const safeLimit = Math.min(Math.max(1, limit), 50)
 
   const result = await sql`
-    SELECT * FROM test_executions
+    SELECT id, run_id, branch, commit_sha, commit_message, triggered_by,
+           workflow_name, suite, suite_id, status, total_tests, passed, failed,
+           skipped, duration_ms, started_at, completed_at
+    FROM test_executions
     ${sql.unsafe(whereClause)}
     ORDER BY started_at DESC
     LIMIT ${safeLimit}
@@ -117,7 +123,13 @@ export async function searchExecutions(
 
 export async function getExecutionById(organizationId: number, id: number) {
   const sql = getSql()
-  const result = await sql`SELECT * FROM test_executions WHERE id = ${id} AND organization_id = ${organizationId}`
+  const result = await sql`
+    SELECT id, run_id, branch, commit_sha, commit_message, triggered_by,
+           workflow_name, suite, suite_id, status, total_tests, passed, failed,
+           skipped, duration_ms, started_at, completed_at
+    FROM test_executions
+    WHERE id = ${id} AND organization_id = ${organizationId}
+  `
   return result[0] as TestExecution | undefined
 }
 
@@ -156,6 +168,7 @@ export async function getExecutionsGroupedByBranch(
     FROM test_executions
     ${sql.unsafe(whereClause)}
     ORDER BY started_at DESC
+    LIMIT 500
   `
 
   // Group by branch

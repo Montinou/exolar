@@ -45,6 +45,19 @@ export interface ExolarReporterOptions {
    * Defaults to false.
    */
   disabled?: boolean
+
+  /**
+   * Map test file paths or tag names to Linear ticket IDs.
+   * Keys starting with "@" are matched against test tags; others against the test file path.
+   * Example: { "@smoke": "ENG-123", "auth/login": "ENG-456" }
+   */
+  ticketMapping?: Record<string, string>
+
+  /**
+   * Automatically detect a linked ticket by parsing the branch name for patterns like ENG-123.
+   * Defaults to true.
+   */
+  autoDetectTicket?: boolean
 }
 
 /**
@@ -151,6 +164,30 @@ export interface IngestPayload {
   execution: ExecutionPayload
   results: TestResultPayload[]
   artifacts: ArtifactPayload[]
+}
+
+export interface NetworkEntry {
+  url: string
+  method: string
+  status: number
+  timing_ms: number
+  is_api_call: boolean
+}
+
+export interface RetryEntry {
+  attempt: number
+  status: "passed" | "failed"
+  error_message?: string
+  duration_ms: number
+}
+
+export interface AIFailureContextV2 extends AIFailureContext {
+  dom_snapshot?: string
+  network_log?: NetworkEntry[]
+  retry_history?: RetryEntry[]
+  git_diff_summary?: string
+  selector_candidates?: string[]
+  linked_ticket?: string
 }
 
 /**

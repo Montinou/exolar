@@ -146,6 +146,96 @@ const endpoints = [
   -d '{"suite":"e2e-tests",...}' \\
   "https://your-dashboard.com/api/ingest"`,
   },
+  {
+    method: "POST" as const,
+    path: "/api/ci/analyze",
+    description: "Trigger CI failure analysis. Returns a classification (HEALABLE, REAL_BUG, KNOWN_FLAKE, INFRA) with an action plan.",
+    parameters: [],
+    requestBody: `{
+  "execution_id": "exec_abc123",
+  "run_id": "run_gh_456"
+}`,
+    curlExample: `curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"execution_id":"exec_abc123"}' \\
+  "https://your-dashboard.com/api/ci/analyze"`,
+    responseExample: `{
+  "analysis_id": "anl_789",
+  "classification": "HEALABLE",
+  "confidence": 0.92,
+  "action_plan": {
+    "action": "open_pr",
+    "title": "fix: update selector in checkout spec",
+    "files": ["tests/checkout.spec.ts"],
+    "patch": "...",
+    "ticket": "ENG-1042"
+  },
+  "summary": "CSS selector outdated after design system update."
+}`,
+  },
+  {
+    method: "GET" as const,
+    path: "/api/ci/webhooks",
+    description: "List all configured webhooks for the authenticated organization",
+    parameters: [],
+    curlExample: `curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/ci/webhooks"`,
+    responseExample: `{
+  "success": true,
+  "data": [
+    {
+      "id": "wh_123",
+      "url": "https://your-server.com/hooks/exolar",
+      "events": ["ci.run.failed", "ci.run.fixed"],
+      "active": true,
+      "created_at": "2026-01-15T10:00:00Z"
+    }
+  ]
+}`,
+  },
+  {
+    method: "POST" as const,
+    path: "/api/ci/webhooks",
+    description: "Create a new webhook endpoint with event subscriptions and optional HMAC secret",
+    parameters: [],
+    requestBody: `{
+  "url": "https://your-server.com/hooks/exolar",
+  "secret": "your-hmac-secret",
+  "events": ["ci.run.failed", "ci.run.fixed"],
+  "branch_filter": "main",
+  "min_failures": 1
+}`,
+    curlExample: `curl -X POST -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"url":"https://your-server.com/hooks/exolar","events":["ci.run.failed"]}' \\
+  "https://your-dashboard.com/api/ci/webhooks"`,
+  },
+  {
+    method: "PATCH" as const,
+    path: "/api/ci/webhooks/[id]",
+    description: "Update an existing webhook (URL, events, secret, active status)",
+    parameters: [
+      { name: "id", type: "string", required: true, description: "Webhook ID" },
+    ],
+    requestBody: `{
+  "active": false,
+  "events": ["ci.run.failed"]
+}`,
+    curlExample: `curl -X PATCH -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"active":false}' \\
+  "https://your-dashboard.com/api/ci/webhooks/wh_123"`,
+  },
+  {
+    method: "DELETE" as const,
+    path: "/api/ci/webhooks/[id]",
+    description: "Delete a webhook permanently",
+    parameters: [
+      { name: "id", type: "string", required: true, description: "Webhook ID" },
+    ],
+    curlExample: `curl -X DELETE -H "Authorization: Bearer YOUR_API_KEY" \\
+  "https://your-dashboard.com/api/ci/webhooks/wh_123"`,
+  },
 ]
 
 export default function APIDocsPage() {

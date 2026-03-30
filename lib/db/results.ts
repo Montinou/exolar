@@ -10,7 +10,10 @@ import type { TestResult } from "../types"
 export async function getTestResultsByExecutionId(organizationId: number, executionId: number) {
   const sql = getSql()
   const results = await sql`
-    SELECT tr.*,
+    SELECT tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+           tr.status, tr.duration_ms, tr.is_critical, tr.is_flaky,
+           tr.error_message, tr.stack_trace, tr.browser, tr.retry_count,
+           tr.logs, tr.started_at, tr.completed_at, tr.created_at,
            json_agg(
              json_build_object(
                'id', ta.id,
@@ -28,7 +31,10 @@ export async function getTestResultsByExecutionId(organizationId: number, execut
     LEFT JOIN test_artifacts ta ON ta.test_result_id = tr.id
     WHERE tr.execution_id = ${executionId}
       AND te.organization_id = ${organizationId}
-    GROUP BY tr.id
+    GROUP BY tr.id, tr.execution_id, tr.test_name, tr.test_file, tr.test_signature,
+             tr.status, tr.duration_ms, tr.is_critical, tr.is_flaky,
+             tr.error_message, tr.stack_trace, tr.browser, tr.retry_count,
+             tr.logs, tr.started_at, tr.completed_at, tr.created_at
     ORDER BY tr.started_at ASC
   `
 

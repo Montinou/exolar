@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Orbitron } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { ClerkProvider } from "@clerk/nextjs"
 import "./globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -41,7 +42,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`font-sans antialiased ${orbitron.variable}`}>
-        {children}
+        <ClerkProvider>
+          {children}
+        </ClerkProvider>
         <Analytics />
         <script
           dangerouslySetInnerHTML={{

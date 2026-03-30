@@ -71,6 +71,7 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZoneName: "short",
     })
   }
 
@@ -246,10 +247,17 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {testResults.length > 0
-                  ? `${Math.round((passedTests.length / testResults.length) * 100)}%`
-                  : "N/A"
-                }
+                {(() => {
+                  // Canonical pass rate: passed / (passed + failed). Skipped tests excluded.
+                  // Only count final attempts (retry_count === 0) to avoid inflating the rate.
+                  const finalAttempts = testResults.filter((t) => !t.retry_count)
+                  const finalPassed = finalAttempts.filter((t) => t.status === "passed").length
+                  const finalFailed = finalAttempts.filter((t) => t.status === "failed").length
+                  const denominator = finalPassed + finalFailed
+                  return denominator > 0
+                    ? `${Math.round((finalPassed / denominator) * 100)}%`
+                    : "N/A"
+                })()}
               </div>
               <p className="text-xs text-muted-foreground">
                 {skippedTests.length} skipped

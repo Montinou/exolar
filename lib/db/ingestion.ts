@@ -80,6 +80,25 @@ export async function insertExecution(
   return { executionId, suiteId }
 }
 
+// Batch size for concurrent flakiness/suite upserts
+const BATCH_SIZE = 50
+
+/**
+ * Run an array of async tasks in batches of batchSize with Promise.all
+ */
+async function runInBatches<T>(
+  tasks: (() => Promise<T>)[],
+  batchSize: number
+): Promise<T[]> {
+  const results: T[] = []
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize)
+    const batchResults = await Promise.all(batch.map((fn) => fn()))
+    results.push(...batchResults)
+  }
+  return results
+}
+
 export async function insertTestResults(
   organizationId: number,
   executionId: number,
@@ -89,78 +108,163 @@ export async function insertTestResults(
   const sql = getSql()
   const signatureToIdMap = new Map<string, number>()
 
-  // Insert each result individually to get the ID back
-  // Note: For very large result sets, consider batch insert with UNNEST
-  for (const result of results) {
+  if (results.length === 0) {
+    return signatureToIdMap
+  }
+
+  // Pre-compute derived fields for every result
+  type PreparedRow = {
+    signature: string
+    retryCount: number
+    flaky: boolean
+    isCritical: boolean
+    result: TestResultRequest
+  }
+
+  const prepared: PreparedRow[] = results.map((result) => {
     const signature = generateTestSignature(result.test_file, result.test_name)
     const retryCount = result.retry_count ?? 0
-    const flaky = isTestFlaky(retryCount, result.status)
-    const isCritical = result.is_critical ?? false
-
-    const inserted = await sql`
-      INSERT INTO test_results (
-        execution_id,
-        test_name,
-        test_file,
-        test_signature,
-        status,
-        duration_ms,
-        is_critical,
-        is_flaky,
-        error_message,
-        stack_trace,
-        browser,
-        retry_count,
-        logs,
-        ai_context,
-        started_at,
-        completed_at
-      ) VALUES (
-        ${executionId},
-        ${result.test_name},
-        ${result.test_file},
-        ${signature},
-        ${result.status},
-        ${result.duration_ms},
-        ${isCritical},
-        ${flaky},
-        ${result.error_message ?? null},
-        ${result.stack_trace ?? null},
-        ${result.browser ?? "chromium"},
-        ${retryCount},
-        ${result.logs ? JSON.stringify(result.logs) : null},
-        ${result.ai_context ? JSON.stringify(result.ai_context) : null},
-        ${result.started_at || new Date().toISOString()},
-        ${result.completed_at || null}
-      )
-      RETURNING id
-    `
-
-    signatureToIdMap.set(signature, inserted[0].id as number)
-
-    // Update flakiness history for this test
-    await updateFlakinessHistory(
-      organizationId,
+    return {
       signature,
-      result.test_name,
-      result.test_file,
-      result.status,
       retryCount,
-      result.duration_ms
+      flaky: isTestFlaky(retryCount, result.status),
+      isCritical: result.is_critical ?? false,
+      result,
+    }
+  })
+
+  // -------------------------------------------------------
+  // 1. Batch INSERT test_results via UNNEST — single query
+  // -------------------------------------------------------
+  const executionIds = prepared.map(() => executionId)
+  const testNames = prepared.map((r) => r.result.test_name)
+  const testFiles = prepared.map((r) => r.result.test_file)
+  const signatures = prepared.map((r) => r.signature)
+  const statuses = prepared.map((r) => r.result.status)
+  const durations = prepared.map((r) => r.result.duration_ms)
+  const criticals = prepared.map((r) => r.isCritical)
+  const flakies = prepared.map((r) => r.flaky)
+  const errors = prepared.map((r) => r.result.error_message ?? null)
+  const stacks = prepared.map((r) => r.result.stack_trace ?? null)
+  const browsers = prepared.map((r) => r.result.browser ?? "chromium")
+  const retryCounts = prepared.map((r) => r.retryCount)
+  const logs = prepared.map((r) =>
+    r.result.logs ? JSON.stringify(r.result.logs) : null
+  )
+  const aiContexts = prepared.map((r) =>
+    r.result.ai_context ? JSON.stringify(r.result.ai_context) : null
+  )
+  const startedAts = prepared.map(
+    (r) => r.result.started_at || new Date().toISOString()
+  )
+  const completedAts = prepared.map((r) => r.result.completed_at || null)
+
+  const inserted = await sql`
+    INSERT INTO test_results (
+      execution_id,
+      test_name,
+      test_file,
+      test_signature,
+      status,
+      duration_ms,
+      is_critical,
+      is_flaky,
+      error_message,
+      stack_trace,
+      browser,
+      retry_count,
+      logs,
+      ai_context,
+      started_at,
+      completed_at
+    )
+    SELECT * FROM UNNEST(
+      ${sql.array(executionIds)}::int[],
+      ${sql.array(testNames)}::text[],
+      ${sql.array(testFiles)}::text[],
+      ${sql.array(signatures)}::text[],
+      ${sql.array(statuses)}::text[],
+      ${sql.array(durations)}::int[],
+      ${sql.array(criticals)}::boolean[],
+      ${sql.array(flakies)}::boolean[],
+      ${sql.array(errors)}::text[],
+      ${sql.array(stacks)}::text[],
+      ${sql.array(browsers)}::text[],
+      ${sql.array(retryCounts)}::int[],
+      ${sql.array(logs)}::text[],
+      ${sql.array(aiContexts)}::text[],
+      ${sql.array(startedAts)}::timestamptz[],
+      ${sql.array(completedAts)}::timestamptz[]
+    ) AS t(
+      execution_id,
+      test_name,
+      test_file,
+      test_signature,
+      status,
+      duration_ms,
+      is_critical,
+      is_flaky,
+      error_message,
+      stack_trace,
+      browser,
+      retry_count,
+      logs,
+      ai_context,
+      started_at,
+      completed_at
+    )
+    RETURNING id, test_signature
+  `
+
+  for (const row of inserted) {
+    signatureToIdMap.set(row.test_signature as string, row.id as number)
+  }
+
+  // -------------------------------------------------------
+  // 2. Batch updateFlakinessHistory — groups of BATCH_SIZE
+  //    Use unique signatures to avoid duplicate work within
+  //    the same ingestion call.
+  // -------------------------------------------------------
+  const seenSignatures = new Set<string>()
+  const flakinessTasks = prepared
+    .filter((r) => {
+      if (seenSignatures.has(r.signature)) return false
+      seenSignatures.add(r.signature)
+      return true
+    })
+    .map(
+      (r) => () =>
+        updateFlakinessHistory(
+          organizationId,
+          r.signature,
+          r.result.test_name,
+          r.result.test_file,
+          r.result.status,
+          r.retryCount,
+          r.result.duration_ms
+        )
     )
 
-    // Auto-register test in suite_tests table
-    await upsertSuiteTest(
-      organizationId,
-      signature,
-      result.test_name,
-      result.test_file,
-      result.status,
-      result.duration_ms,
-      isCritical,
-      suiteId ?? null
-    )
-  }
+  await runInBatches(flakinessTasks, BATCH_SIZE)
+
+  // -------------------------------------------------------
+  // 3. Batch upsertSuiteTest — groups of BATCH_SIZE
+  // -------------------------------------------------------
+  const suiteTasks = prepared.map(
+    (r) => () =>
+      upsertSuiteTest(
+        organizationId,
+        r.signature,
+        r.result.test_name,
+        r.result.test_file,
+        r.result.status,
+        r.result.duration_ms,
+        r.isCritical,
+        suiteId ?? null
+      )
+  )
+
+  await runInBatches(suiteTasks, BATCH_SIZE)
 
   // Update suite test count if suiteId is provided
   if (suiteId) {
@@ -206,7 +310,7 @@ export async function insertArtifacts(
         ${resultId},
         ${artifact.type},
         ${artifact.r2_key},
-        ${artifact.r2_key},
+        ${`r2://${artifact.r2_key}`},
         ${artifact.size_bytes ?? null},
         ${artifact.mime_type ?? null}
       )

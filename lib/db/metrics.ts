@@ -120,11 +120,8 @@ export async function getDashboardMetrics(
   const metrics = await sql`
     SELECT
       COUNT(*) as total_executions,
-      CASE
-        WHEN SUM(total_tests) > 0
-        THEN ROUND(SUM(passed)::decimal / SUM(total_tests) * 100, 1)
-        ELSE 0
-      END as pass_rate,
+      -- Canonical pass rate: passed / (passed + failed). Skipped tests excluded.
+      ROUND(SUM(passed)::decimal / NULLIF(SUM(passed) + SUM(failed), 0) * 100, 1) as pass_rate,
       CASE
         WHEN SUM(total_tests) > 0
         THEN ROUND(SUM(failed)::decimal / SUM(total_tests) * 100, 1)
@@ -205,7 +202,7 @@ export async function getDashboardMetrics(
 
   return {
     total_executions: Number(metrics[0].total_executions),
-    pass_rate: Number(metrics[0].pass_rate),
+    pass_rate: Number(metrics[0].pass_rate) || 0,
     failure_rate: Number(metrics[0].failure_rate),
     avg_duration_ms: Number(metrics[0].avg_duration_ms),
     critical_failures: Number(criticalFailures[0].critical_failures),
@@ -257,13 +254,17 @@ export async function getTrendData(
   if (from) {
     conditions.push(`started_at >= '${from}'`)
   } else if (count || days) {
-    const lookback = count || days || 7
+    // Validate lookback to prevent SQL injection via string interpolation in INTERVAL
+    const rawLookback = count || days || 7
+    const safeLookback = Math.max(1, Math.min(3650, Math.floor(Number(rawLookback) || 7)))
+    // interval is derived from a whitelist of period values — safe to interpolate
     const interval = period === 'hour' ? 'hours' :
                      period === 'day' ? 'days' :
                      period === 'week' ? 'weeks' : 'months'
-    conditions.push(`started_at > NOW() - INTERVAL '${lookback} ${interval}'`)
+    conditions.push(`started_at > NOW() - INTERVAL '${safeLookback} ${interval}'`)
   } else {
     // Default: last 7 of the period type
+    // interval is derived from a whitelist of period values — safe to interpolate
     const interval = period === 'hour' ? 'hours' :
                      period === 'day' ? 'days' :
                      period === 'week' ? 'weeks' : 'months'
@@ -331,7 +332,9 @@ export async function getFailureTrendData(
   if (dateRange?.from) {
     conditions.push(`started_at >= '${dateRange.from}'`)
   } else {
-    conditions.push(`started_at > NOW() - INTERVAL '${days} days'`)
+    // Validate days to prevent SQL injection via string interpolation in INTERVAL
+    const safeDays = Math.max(1, Math.min(365, Math.floor(Number(days) || 15)))
+    conditions.push(`started_at > NOW() - INTERVAL '${safeDays} days'`)
   }
 
   if (dateRange?.to) {
@@ -660,6 +663,11 @@ export async function getSuitePassRates(
 /**
  * Calculate overall test suite reliability score (0-100)
  * Formula: (PassRate * 0.4) + ((1 - FlakyRate) * 0.3) + (DurationStability * 0.3)
+ *
+ * Note: This is a composite metric and intentionally uses a different formula than
+ * the canonical pass rate (passed / (passed + failed)). The pass rate component here
+ * is derived from test_results rows (not executions) and contributes only 40% of the
+ * final score. The remaining 60% accounts for flakiness and duration stability.
  */
 export async function getReliabilityScore(
   organizationId: number,

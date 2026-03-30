@@ -9,9 +9,8 @@ import {
   createUser,
   addOrganizationMember,
 } from "@/lib/db"
-import { authServer } from "@/lib/auth/server"
+import { clerkClient } from "@clerk/nextjs/server"
 import { sendInviteEmail } from "@/lib/email/resend"
-import { generateSecurePassword } from "@/lib/utils"
 
 /**
  * GET /api/admin/invites - List invites
@@ -67,7 +66,6 @@ export async function POST(request: Request) {
       email,
       role,
       organizationId,
-      password: providedPassword,
       template = "exolar",
       name: providedName,
     } = body
@@ -91,24 +89,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User already exists" }, { status: 409 })
     }
 
-    // Generate password if not provided
-    const password = providedPassword || generateSecurePassword(16)
-
     try {
-      // Create user in Auth provider
       const name = providedName || email.split("@")[0]
-      const { data, error: createUserError } = await authServer.admin.createUser({
-        email,
-        password,
-        name,
+
+      // Send Clerk invitation (handles credentials automatically)
+      const clerk = await clerkClient()
+      await clerk.invitations.createInvitation({
+        emailAddress: email,
+        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://exolar.triqual.dev"}/auth/sign-in`,
+        publicMetadata: { role, organizationId: targetOrgId },
       })
-
-      const authUser = data?.user
-
-      if (createUserError) {
-        console.error("Auth provider create user failed:", createUserError)
-        return NextResponse.json({ error: "Failed to create user identity" }, { status: 500 })
-      }
 
       // Determine roles
       // If an organization is selected, the Platform Role should be "viewer" (not System Admin)
@@ -128,7 +118,7 @@ export async function POST(request: Request) {
       try {
         const emailResult = await sendInviteEmail({
           email,
-          password,
+          password: "", // Clerk handles credentials
           role,
           name,
           template: template as "attorneyshare" | "exolar",
@@ -146,13 +136,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           user,
-          passwordGenerated: !providedPassword,
           emailSent: true,
         },
         { status: 201 }
       )
     } catch (err) {
-      console.error("Failed to create user with password:", err)
+      console.error("Failed to create user:", err)
       return NextResponse.json({ error: "Failed to create user" }, { status: 500 })
     }
   } catch (error) {

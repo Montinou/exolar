@@ -290,7 +290,7 @@ export async function updateFlakinessHistory(
       NOW(),
       NOW()
     )
-    ON CONFLICT (test_signature) DO UPDATE SET
+    ON CONFLICT (organization_id, test_signature) DO UPDATE SET
       total_runs = test_flakiness_history.total_runs + 1,
       flaky_runs = test_flakiness_history.flaky_runs + ${isFlaky ? 1 : 0},
       passed_runs = test_flakiness_history.passed_runs + ${status === "passed" ? 1 : 0},

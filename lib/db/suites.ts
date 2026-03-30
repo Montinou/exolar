@@ -57,7 +57,9 @@ export async function getSuiteRegistry(
   const whereClause = conditions.join(" AND ")
 
   const result = await sql`
-    SELECT *
+    SELECT id, organization_id, name, tech_stack, description, repository_url,
+           is_active, test_count, last_execution_id, last_execution_at,
+           first_seen_at, updated_at
     FROM org_suites
     WHERE ${sql.unsafe(whereClause)}
     ORDER BY last_execution_at DESC NULLS LAST
@@ -77,7 +79,10 @@ export async function getSuiteByName(
   const sql = getSql()
 
   const result = await sql`
-    SELECT * FROM org_suites
+    SELECT id, organization_id, name, tech_stack, description, repository_url,
+           is_active, test_count, last_execution_id, last_execution_at,
+           first_seen_at, updated_at
+    FROM org_suites
     WHERE organization_id = ${organizationId}
       AND name = ${name}
     LIMIT 1
@@ -96,7 +101,10 @@ export async function getSuiteById(
   const sql = getSql()
 
   const result = await sql`
-    SELECT * FROM org_suites
+    SELECT id, organization_id, name, tech_stack, description, repository_url,
+           is_active, test_count, last_execution_id, last_execution_at,
+           first_seen_at, updated_at
+    FROM org_suites
     WHERE id = ${suiteId}
       AND organization_id = ${organizationId}
     LIMIT 1

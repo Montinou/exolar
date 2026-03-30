@@ -167,6 +167,112 @@ env:
     ],
   },
   {
+    id: "webhook-not-firing",
+    title: "CI analysis webhook not firing",
+    symptoms: [
+      "No webhook deliveries in Settings > Webhooks > Recent Deliveries",
+      "ci.run.failed event never received",
+      "Analysis never triggers after a failed run",
+    ],
+    causes: [
+      "Webhook URL is unreachable from Exolar servers",
+      "Subscribed to wrong event type",
+      "Run did not fail (webhook only fires on failure)",
+      "Branch filter excludes the branch being tested",
+    ],
+    solutions: [
+      {
+        step: "Check Recent Deliveries",
+        detail: "Go to Settings > Webhooks and click your webhook. The Recent Deliveries tab shows every attempt and the HTTP response code.",
+      },
+      {
+        step: "Verify your endpoint is publicly reachable",
+        detail: "Exolar must be able to POST to your URL. Use a service like ngrok for local testing:",
+        code: `ngrok http 3000
+# Use the ngrok HTTPS URL as your webhook endpoint`,
+      },
+      {
+        step: "Check event subscription",
+        detail: "Ensure you subscribed to ci.run.failed (not just ci.run.fixed). You can update this in Settings > Webhooks.",
+      },
+      {
+        step: "Check branch filter",
+        detail: "If you set a branch_filter when creating the webhook, only runs on that branch will trigger it. Remove or update the filter if needed.",
+      },
+    ],
+  },
+  {
+    id: "analysis-empty",
+    title: "CI analysis returns empty or low-confidence result",
+    symptoms: [
+      "classification is MANUAL_REVIEW",
+      "confidence is below 0.70",
+      "action_plan is null or missing",
+    ],
+    causes: [
+      "Not enough historical data for the failing test",
+      "execution_id not provided — analysis used run_id fallback with less context",
+      "Failure is genuinely ambiguous (e.g. intermittent network issue)",
+    ],
+    solutions: [
+      {
+        step: "Pass execution_id instead of run_id",
+        detail: "The reporter logs the execution_id after a successful upload. Use this for more accurate analysis:",
+        code: `# Good: use the reporter execution_id
+curl -X POST .../api/ci/analyze \\
+  -d '{"execution_id": "exec_abc123"}'
+
+# Fallback: use GitHub run_id (less context)
+curl -X POST .../api/ci/analyze \\
+  -d '{"run_id": "\${{ github.run_id }}"}'`,
+      },
+      {
+        step: "Ensure AI embeddings are enabled",
+        detail: "Go to Settings > AI Embeddings and check embedding coverage. If coverage is low, trigger a backfill so the classifier has historical context.",
+      },
+      {
+        step: "Run more tests first",
+        detail: "Classification accuracy improves with more historical data. After 10+ runs, confidence scores typically stabilize.",
+      },
+    ],
+  },
+  {
+    id: "autoheal-no-pr",
+    title: "Auto-heal classified as HEALABLE but no PR was opened",
+    symptoms: [
+      "analysis returns classification: HEALABLE",
+      "No draft PR visible in the repository",
+      "action_plan is present but nothing happened",
+    ],
+    causes: [
+      "autoHeal.enabled is false in reporter config",
+      "Confidence below the configured threshold",
+      "Daily PR rate limit reached (5 PRs/repo/day)",
+      "GitHub token not configured or lacks permissions",
+    ],
+    solutions: [
+      {
+        step: "Check autoHeal config",
+        detail: "Ensure autoHeal is enabled in your reporter config:",
+        code: `[exolar, {
+  apiKey: process.env.EXOLAR_API_KEY,
+  autoHeal: {
+    enabled: true,
+    confidenceThreshold: 0.85,
+  },
+}]`,
+      },
+      {
+        step: "Check the confidence value",
+        detail: "If confidence is below your threshold (default 0.85), the PR will not be opened. Lower the threshold or wait for more data.",
+      },
+      {
+        step: "Check daily rate limit",
+        detail: "At most 5 auto-heal PRs are opened per repo per day. Check your repository for recently opened draft PRs from the exolar bot.",
+      },
+    ],
+  },
+  {
     id: "wrong-branch",
     title: "Results showing wrong branch name",
     symptoms: [

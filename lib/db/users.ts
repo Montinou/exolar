@@ -29,7 +29,7 @@ export async function getUserByEmail(email: string): Promise<DashboardUser | nul
 export async function getAllUsers(): Promise<DashboardUser[]> {
   const sql = getSql()
   const result = await sql`
-    SELECT * FROM dashboard_users ORDER BY created_at DESC
+    SELECT * FROM dashboard_users ORDER BY created_at DESC LIMIT 1000
   `
   return result as DashboardUser[]
 }
@@ -103,7 +103,7 @@ export async function getInviteByEmail(email: string): Promise<Invite | null> {
 export async function getAllInvites(): Promise<Invite[]> {
   const sql = getSql()
   const result = await sql`
-    SELECT * FROM invites ORDER BY created_at DESC
+    SELECT * FROM invites ORDER BY created_at DESC LIMIT 1000
   `
   return result as Invite[]
 }

@@ -32,6 +32,52 @@ export interface ChangelogEntry {
  */
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    id: "ci-auto-analysis",
+    date: "2026-03-30",
+    version: "v2.4",
+    title: "CI Auto-Analysis Pipeline — Auto-Heal Flaky Tests & Bug Detection",
+    description: "Close the loop between CI failures and fixes. When Playwright tests fail in CI, Exolar automatically analyzes failures, classifies them as flaky tests or real bugs, and dispatches auto-healing via Claude Code or creates GitHub issues with full context.",
+    type: "feature",
+    features: [
+      {
+        icon: "🔬",
+        title: "Intelligent Failure Analysis",
+        description: "POST /api/ci/analyze classifies each failure as HEALABLE, REAL_BUG, KNOWN_FLAKE, or INFRA with confidence scoring. Decision matrix considers error type, retry history, flakiness rate, and semantic clustering.",
+        docsUrl: "/docs/ci-analysis",
+      },
+      {
+        icon: "🔧",
+        title: "Auto-Heal Flaky Tests",
+        description: "For HEALABLE failures, Exolar generates fix instructions with 5 strategies: selector_update, wait_adjustment, race_condition, api_timing, retry_logic. Claude Code or OpenClaw agents apply fixes and create PRs automatically.",
+        docsUrl: "/docs/ci-analysis#auto-heal",
+      },
+      {
+        icon: "🐛",
+        title: "Auto Bug Reporting",
+        description: "Real bugs are automatically reported as GitHub issues with full context: error message, stack trace, affected tests, root cause cluster, and linked Linear ticket. Deduplication prevents issue spam.",
+        docsUrl: "/docs/ci-analysis#bug-reports",
+      },
+      {
+        icon: "🔗",
+        title: "Webhook Notifications",
+        description: "Configure webhooks per organization to receive POST notifications when CI runs have failures. Supports HMAC-SHA256 signing, event filtering, and branch-based routing.",
+        docsUrl: "/docs/ci-analysis#webhooks",
+      },
+      {
+        icon: "🎫",
+        title: "Linear Ticket Integration",
+        description: "Link tests to Linear tickets via the reporter's ticketMapping config or auto-detect from branch names. Analysis engine fetches acceptance criteria to distinguish test issues from real bugs.",
+        docsUrl: "/docs/ci-analysis#linear",
+      },
+      {
+        icon: "📊",
+        title: "Enhanced Reporter V2",
+        description: "AIFailureContextV2 captures retry history, DOM snapshots, network logs, and linked ticket IDs. Auto-detects Linear tickets from branch names (e.g., feature/ENG-123-login).",
+        docsUrl: "/docs/reporter",
+      },
+    ],
+  },
+  {
     id: "ai-vector-search",
     date: "2026-01-12",
     version: "v2.3",

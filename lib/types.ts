@@ -142,7 +142,7 @@ export interface DashboardMetrics {
 }
 
 export interface TrendData {
-  date: string
+  period: string
   passed: number
   failed: number
   total: number

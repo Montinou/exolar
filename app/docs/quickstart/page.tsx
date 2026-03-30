@@ -197,6 +197,47 @@ jobs:
       {/* Step 6 */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+            6
+          </div>
+          <h2 className="text-xl sm:text-2xl font-semibold">Enable CI Auto-Analysis (Optional)</h2>
+        </div>
+        <div className="pl-11 space-y-4">
+          <p className="text-muted-foreground">
+            Let Exolar automatically classify failures and open fix PRs when your CI run fails.
+          </p>
+          <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+            <li>
+              Go to{" "}
+              <Link href="/settings/webhooks" className="text-primary hover:underline">
+                Settings &rarr; Webhooks
+              </Link>{" "}
+              and add your endpoint URL
+            </li>
+            <li>
+              Subscribe to the <code className="px-1.5 py-0.5 rounded bg-muted text-xs">ci.run.failed</code> event
+            </li>
+            <li>Copy the generated HMAC secret and store it securely</li>
+            <li>
+              Add <code className="px-1.5 py-0.5 rounded bg-muted text-xs">autoDetectTicket</code> and{" "}
+              <code className="px-1.5 py-0.5 rounded bg-muted text-xs">autoHeal</code> options to your reporter config
+              (see{" "}
+              <Link href="/docs/ci-analysis" className="text-primary hover:underline">
+                CI Auto-Analysis docs
+              </Link>
+              )
+            </li>
+          </ol>
+          <pre className="p-4 rounded-lg glass-panel text-xs sm:text-sm overflow-x-auto">
+            <code>{`# Verify webhook delivery in Settings > Webhooks > Recent Deliveries
+# A ping event is sent immediately after saving the webhook`}</code>
+          </pre>
+        </div>
+      </section>
+
+      {/* Step 7 */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-green-500 text-white font-bold text-sm">
             <CheckCircle className="h-5 w-5" />
           </div>
