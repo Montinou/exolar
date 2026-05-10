@@ -15,6 +15,7 @@ import {
   Shield,
   Webhook,
   Key,
+  Bot,
 } from "lucide-react"
 import { useUser, useClerk } from "@clerk/nextjs"
 import { useAccess } from "@/components/auth/access-context"
@@ -66,6 +67,11 @@ const navItems = [
     label: "AI Search",
     href: "/dashboard/search",
     icon: Sparkles,
+  },
+  {
+    label: "Smart Selection",
+    href: "/dashboard/smart-selection",
+    icon: Bot,
   },
   {
     label: "Mock APIs",
