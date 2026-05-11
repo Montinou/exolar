@@ -290,7 +290,7 @@ export default function MCPDocsPage() {
             <p className="text-sm text-muted-foreground mb-4">
               One command to connect Claude Code to Exolar — authenticates via browser:
             </p>
-            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user`} />
+            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.agentical.work/api/mcp/mcp -s user`} />
             <p className="text-xs text-muted-foreground mt-3">
               When prompted, select <strong>&quot;Authenticate&quot;</strong> → browser opens → log in → done!
             </p>
@@ -308,7 +308,7 @@ export default function MCPDocsPage() {
             <p className="text-sm text-muted-foreground mb-3">
               If OAuth doesn&apos;t work, get a token from <a href="/settings/mcp" className="text-primary hover:underline">/settings/mcp</a>:
             </p>
-            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user \\
+            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.agentical.work/api/mcp/mcp -s user \\
   --header "Authorization: Bearer YOUR_TOKEN_HERE"`} />
           </div>
 

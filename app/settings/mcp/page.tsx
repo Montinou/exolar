@@ -46,7 +46,7 @@ export default function MCPSettingsPage() {
 
   const dashboardUrl = typeof window !== "undefined"
     ? window.location.origin
-    : "https://exolar.ai-innovation.site"
+    : "https://exolar.agentical.work"
 
   const mcpConfig = token ? JSON.stringify({
     mcpServers: {

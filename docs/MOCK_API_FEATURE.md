@@ -219,7 +219,7 @@ pnpm add ajv ajv-formats
 GET|POST|PUT|DELETE|PATCH /api/mock/[orgSlug]/[interfaceSlug]/[...path]
 ```
 
-Example: `POST https://exolar.ai-innovation.site/api/mock/my-org/user-api/users`
+Example: `POST https://exolar.agentical.work/api/mock/my-org/user-api/users`
 
 ### Public Logs Endpoint (Unauthenticated)
 
@@ -240,7 +240,7 @@ GET /api/mock/[orgSlug]/[interfaceSlug]/logs
 
 **Example Request:**
 ```bash
-curl "https://exolar.ai-innovation.site/api/mock/attorneyshare/leaddocket-lcms/logs?since=2024-01-15T10:00:00Z&limit=10&path=/webhook&method=POST"
+curl "https://exolar.agentical.work/api/mock/attorneyshare/leaddocket-lcms/logs?since=2024-01-15T10:00:00Z&limit=10&path=/webhook&method=POST"
 ```
 
 **Response Format:**
@@ -283,7 +283,7 @@ test('webhook is called during negotiation', async ({ page }) => {
 
   // Fetch only logs from this test run
   const response = await fetch(
-    `https://exolar.ai-innovation.site/api/mock/attorneyshare/leaddocket-lcms/logs?since=${testStartTime}&path=/add-note`
+    `https://exolar.agentical.work/api/mock/attorneyshare/leaddocket-lcms/logs?since=${testStartTime}&path=/add-note`
   )
   const { logs, count } = await response.json()
 
@@ -460,21 +460,21 @@ Logs are retained for 7 days (configurable via `cleanup_mock_request_logs()` fun
 
 1. **Create Interface**
 ```bash
-curl -X POST https://exolar.ai-innovation.site/api/mocks \
+curl -X POST https://exolar.agentical.work/api/mocks \
   -H "Content-Type: application/json" \
   -d '{"name": "User API", "slug": "user-api"}'
 ```
 
 2. **Create Route**
 ```bash
-curl -X POST https://exolar.ai-innovation.site/api/mocks/1/routes \
+curl -X POST https://exolar.agentical.work/api/mocks/1/routes \
   -H "Content-Type: application/json" \
   -d '{"path_pattern": "/users/:id", "method": "GET"}'
 ```
 
 3. **Create Response Rule**
 ```bash
-curl -X POST https://exolar.ai-innovation.site/api/mocks/1/routes/1/rules \
+curl -X POST https://exolar.agentical.work/api/mocks/1/routes/1/rules \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Success Response",
@@ -485,7 +485,7 @@ curl -X POST https://exolar.ai-innovation.site/api/mocks/1/routes/1/rules \
 
 4. **Test the Mock**
 ```bash
-curl https://exolar.ai-innovation.site/api/mock/my-org/user-api/users/123
+curl https://exolar.agentical.work/api/mock/my-org/user-api/users/123
 # Response: {"id": "123", "name": "Test User"}
 ```
 
@@ -550,7 +550,7 @@ import { TestEndpointModal } from "@/components/dashboard/mocks/test-endpoint-mo
 <TestEndpointModal
   open={isOpen}
   onOpenChange={setIsOpen}
-  baseUrl="https://exolar.ai-innovation.site/api/mock/org/interface"
+  baseUrl="https://exolar.agentical.work/api/mock/org/interface"
   routes={[
     { path_pattern: "/users", method: "GET" },
     { path_pattern: "/users/:id", method: "GET" },
@@ -739,7 +739,7 @@ psql $DATABASE_URL -f scripts/020_add_mock_endpoints.sql
 
 Increase `rate_limit_rpm` on the interface (default: 100):
 ```bash
-curl -X PUT https://exolar.ai-innovation.site/api/mocks/1 \
+curl -X PUT https://exolar.agentical.work/api/mocks/1 \
   -H "Content-Type: application/json" \
   -d '{"rate_limit_rpm": 1000}'
 ```

@@ -11,7 +11,7 @@ A container that groups related mock routes under a single endpoint. Each interf
 - **Name**: Human-readable identifier
 - **Slug**: URL-safe identifier (auto-generated from name)
 - **Rate Limit**: Requests per minute limit (default: 100)
-- **Public URL**: `https://exolar.ai-innovation.site/api/mock/{org-slug}/{interface-slug}/`
+- **Public URL**: `https://exolar.agentical.work/api/mock/{org-slug}/{interface-slug}/`
 
 ### Mock Route
 A specific path/method combination within an interface:
@@ -207,7 +207,7 @@ Each interface has a configurable rate limit (requests per minute):
 ### Public Mock Endpoints
 
 ```
-https://exolar.ai-innovation.site/api/mock/{org-slug}/{interface-slug}/{path}
+https://exolar.agentical.work/api/mock/{org-slug}/{interface-slug}/{path}
 ```
 
 Supports: GET, POST, PUT, DELETE, PATCH, OPTIONS

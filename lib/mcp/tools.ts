@@ -398,7 +398,7 @@ async function handleInstallationConfig(
   // Use the correct environment variable
   const dashboardUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://exolar.ai-innovation.site"
+    "https://exolar.agentical.work"
 
   const guide = {
     organization: authContext.organizationSlug,

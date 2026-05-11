@@ -27,7 +27,7 @@ if (!process.env.RESEND_API_KEY) {
   process.exit(1)
 }
 
-const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
 const DRY_RUN = process.env.DRY_RUN === "true"
 
 // Check for test mode and scheduling
@@ -123,7 +123,7 @@ function renderCombinedEmail(name: string): string {
       <p style="text-align: center; color: #71717a; font-size: 12px; margin: 0;">
         <a href="${DASHBOARD_URL}/docs/whats-new" style="color: #22d3ee; text-decoration: none;">What's New</a> ·
         <a href="${DASHBOARD_URL}/settings/mcp" style="color: #22d3ee; text-decoration: none;">MCP Settings</a> ·
-        <a href="${DASHBOARD_URL}" style="color: #52525b; text-decoration: none;">exolar.ai-innovation.site</a>
+        <a href="${DASHBOARD_URL}" style="color: #52525b; text-decoration: none;">exolar.agentical.work</a>
         <!-- ${uniqueId} -->
       </p>
     </div>

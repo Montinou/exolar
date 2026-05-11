@@ -70,7 +70,7 @@ async function clearOldEmbeddings() {
   console.log("\n✅ Done! Now ready to reindex.")
   console.log("\nNext step: Use MCP to trigger reindexing:")
   console.log(
-    'curl -X POST "https://exolar.ai-innovation.site/api/admin/backfill-embeddings" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"limit": 50}\''
+    'curl -X POST "https://exolar.agentical.work/api/admin/backfill-embeddings" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"limit": 50}\''
   )
 }
 

@@ -19,7 +19,7 @@ if (!process.env.RESEND_API_KEY) {
   process.exit(1)
 }
 
-const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
 const TEST_EMAIL = "agusmontoya@gmail.com"
 
 async function testMCPEmail() {

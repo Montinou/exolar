@@ -136,7 +136,7 @@ HOW TO USE:
 
 No more guessing where to put tokens or how to merge config files!
 
-👉 Learn More: https://exolar.ai-innovation.site/docs/mcp#conversational-setup
+👉 Learn More: https://exolar.agentical.work/docs/mcp#conversational-setup
 
 ---
 © 2026 Exolar QA. All rights reserved.
