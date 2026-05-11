@@ -2,6 +2,7 @@ import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
 import { getQueriesForOrg, type DateRangeFilter } from "@/lib/db"
+import { PageContainer, PageHeader, PageSection } from "@/components/shell"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { TestSummaryBar } from "@/components/dashboard/test-summary-bar"
 import { StatusDonutChart } from "@/components/dashboard/status-donut-chart"
@@ -20,7 +21,14 @@ export const dynamic = "force-dynamic"
 async function DashboardContent({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string; historic?: string }>
+  searchParams: Promise<{
+    status?: string
+    branch?: string
+    suite?: string
+    from?: string
+    to?: string
+    historic?: string
+  }>
 }) {
   const context = await getSessionContext()
   if (!context) {
@@ -52,11 +60,9 @@ async function DashboardContent({
     db.getSuites(),
   ])
 
-  // Extract names for dropdown filters
   const branches = branchStats.map((b) => b.branch)
   const suites = suiteStats.map((s) => s.suite)
 
-  // Extract metrics for new components - use aggregateTestCounts for consistency with Stats Cards
   const totalTests = metrics.aggregateTestCounts.total_tests
   const passedTests = metrics.aggregateTestCounts.passed_tests
   const failedTests = metrics.aggregateTestCounts.failed_tests
@@ -65,197 +71,114 @@ async function DashboardContent({
 
   return (
     <>
-      <div className="space-y-6">
-        {/* Filters - positioned at top below nav tabs */}
-        <Filters branches={branches} suites={suites} />
+      <PageHeader
+        eyebrow="Dashboard"
+        title="What changed in your CI"
+        lede="A debrief of recent runs — pass rate, failure clusters, suite health, and where the time went."
+      />
 
-        {/* Stats Overview */}
+      <Filters branches={branches} suites={suites} />
+
+      <PageSection eyebrow="Health · last window">
         <StatsCards metrics={metrics} />
+        <div className="mt-6">
+          <TestSummaryBar
+            total={totalTests}
+            passed={passedTests}
+            failed={failedTests}
+            skipped={skippedTests}
+            flaky={flakyTests}
+          />
+        </div>
+      </PageSection>
 
-        {/* Test Summary Progress Bar */}
-        <TestSummaryBar
-          total={totalTests}
-          passed={passedTests}
-          failed={failedTests}
-          skipped={skippedTests}
-          flaky={flakyTests}
-        />
-
-        {/* Charts Row - 3 columns on large screens */}
-        {/* TODO: FailureRateChart is also in /dashboard/performance - consolidate in future dashboard redesign */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <PageSection eyebrow="Read by chart">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           <StatusDonutChart
             passRate={totalTests > 0 ? (passedTests / totalTests) * 100 : 0}
             failRate={totalTests > 0 ? (failedTests / totalTests) * 100 : 0}
             skippedRate={totalTests > 0 ? (skippedTests / totalTests) * 100 : 0}
             flakyCount={flakyTests}
           />
-          <div className="animate-fade-in-up delay-3">
-            <FailureRateChart
-              dateFrom={params.from}
-              dateTo={params.to}
-              branch={params.branch}
-              suite={params.suite}
-              failureRate={metrics.failure_rate}
-            />
-          </div>
-          <div className="animate-fade-in-up delay-4">
-            <ErrorDistributionChart
-              dateFrom={params.from}
-              dateTo={params.to}
-              branch={params.branch}
-              suite={params.suite}
-            />
-          </div>
+          <FailureRateChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+            failureRate={metrics.failure_rate}
+          />
+          <ErrorDistributionChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
         </div>
+      </PageSection>
 
-        {/* Analysis Row - Flakiest, Slowest, and AI Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="animate-fade-in-up delay-5">
-            <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
-          </div>
-          <div className="animate-fade-in-up delay-6">
-            <SlowestTestsCard
-              dateFrom={params.from}
-              dateTo={params.to}
-              branch={params.branch}
-              suite={params.suite}
-            />
-          </div>
-          <div className="animate-fade-in-up delay-7">
-            <AiInsightsCard />
-          </div>
+      <PageSection eyebrow="Hot tests + AI signal">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
+          <SlowestTestsCard
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
+          <AiInsightsCard />
         </div>
+      </PageSection>
 
-        {/* Suite Analysis Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="animate-fade-in-up delay-6">
-            <SuitePassRatesCard
-              dateFrom={params.from}
-              dateTo={params.to}
-              branch={params.branch}
-            />
-          </div>
-          <div className="animate-fade-in-up delay-7">
-            <CategoryDistributionChart />
-          </div>
+      <PageSection eyebrow="Suite health">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <SuitePassRatesCard
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+          />
+          <CategoryDistributionChart />
         </div>
+      </PageSection>
 
-        {/* Executions */}
-        <div className="animate-fade-in-up delay-8">
-          <ExecutionsView executions={executions} branchGroups={branchGroups} />
-        </div>
-      </div>
+      <PageSection eyebrow="Executions" title="Recent runs">
+        <ExecutionsView executions={executions} branchGroups={branchGroups} />
+      </PageSection>
     </>
   )
 }
 
 function DashboardSkeleton() {
-  const delayClasses = ["delay-1", "delay-2", "delay-3", "delay-4", "delay-5", "delay-6", "delay-7", "delay-8"]
-
   return (
-    <div className="space-y-6">
-      {/* Filter Bar Skeleton */}
-      <div
-        className="h-16 rounded-xl animate-fade-in-up animate-shimmer"
-        style={{ animationDelay: "0ms" }}
-      />
+    <div className="space-y-10">
+      {/* Header skeleton */}
+      <div className="space-y-3">
+        <div className="h-3 w-24 animate-pulse rounded bg-border/60" />
+        <div className="h-9 w-80 max-w-full animate-pulse rounded bg-border/60" />
+        <div className="h-4 w-[28rem] max-w-full animate-pulse rounded bg-border/40" />
+      </div>
 
-      {/* Stats Cards Skeleton */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div
-            key={i}
-            className={`glass-card glass-card-glow p-6 animate-fade-in-up ${delayClasses[i]}`}
-          >
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="h-4 w-20 rounded animate-shimmer" />
-                <div className="h-8 w-8 rounded-lg animate-shimmer" />
-              </div>
-              <div className="h-10 w-24 rounded animate-shimmer" />
-              <div className="h-3 w-32 rounded animate-shimmer" />
-            </div>
-          </div>
+      {/* Filters skeleton */}
+      <div className="h-12 w-full animate-pulse rounded-lg bg-border/40" />
+
+      {/* Metric cards skeleton */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="surface-raised h-28 animate-pulse opacity-60" />
         ))}
       </div>
 
-      {/* Test Summary Bar Skeleton */}
-      <div className="glass-card glass-card-glow p-4 animate-fade-in-up delay-5">
-        <div className="space-y-3">
-          <div className="flex justify-between">
-            <div className="h-4 w-20 rounded animate-shimmer" />
-            <div className="flex gap-4">
-              <div className="h-4 w-24 rounded animate-shimmer" />
-              <div className="h-4 w-24 rounded animate-shimmer" />
-            </div>
-          </div>
-          <div className="h-3 w-full rounded-full animate-shimmer" />
-        </div>
-      </div>
-
-      {/* Charts Row Skeleton */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className={`glass-card glass-card-glow p-6 animate-fade-in-up ${delayClasses[i + 2]}`}
-          >
-            <div className="space-y-4">
-              <div className="h-4 w-40 rounded animate-shimmer" />
-              <div className="h-[200px] rounded-lg animate-shimmer" />
-            </div>
-          </div>
+      {/* Chart row skeleton */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="surface-raised h-64 animate-pulse opacity-60" />
         ))}
       </div>
 
-      {/* Analysis Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className={`glass-card glass-card-glow p-6 animate-fade-in-up ${delayClasses[i + 5]}`}
-          >
-            <div className="space-y-4">
-              <div className="h-4 w-32 rounded animate-shimmer" />
-              <div className="space-y-2">
-                {[...Array(4)].map((_, j) => (
-                  <div key={j} className="h-8 w-full rounded animate-shimmer" style={{ animationDelay: `${j * 50}ms` }} />
-                ))}
-              </div>
-            </div>
-          </div>
+      {/* Analysis row skeleton */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="surface-raised h-80 animate-pulse opacity-60" />
         ))}
-      </div>
-
-      {/* Suite Row Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[...Array(2)].map((_, i) => (
-          <div
-            key={i}
-            className={`glass-card glass-card-glow p-6 animate-fade-in-up ${delayClasses[i + 6]}`}
-          >
-            <div className="space-y-4">
-              <div className="h-4 w-36 rounded animate-shimmer" />
-              <div className="h-[180px] rounded-lg animate-shimmer" />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Executions Skeleton */}
-      <div className="glass-card glass-card-glow p-6 animate-fade-in-up delay-8">
-        <div className="space-y-4">
-          <div className="flex justify-between">
-            <div className="h-5 w-32 rounded animate-shimmer" />
-            <div className="h-8 w-40 rounded animate-shimmer" />
-          </div>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 w-full rounded-lg animate-shimmer" style={{ animationDelay: `${i * 50}ms` }} />
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   )
@@ -264,14 +187,21 @@ function DashboardSkeleton() {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; branch?: string; suite?: string; from?: string; to?: string; historic?: string }>
+  searchParams: Promise<{
+    status?: string
+    branch?: string
+    suite?: string
+    from?: string
+    to?: string
+    historic?: string
+  }>
 }) {
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <PageContainer width="wide">
       <Suspense fallback={<DashboardSkeleton />}>
         {/* @ts-expect-error Async Server Component */}
         <DashboardContent searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageContainer>
   )
 }
