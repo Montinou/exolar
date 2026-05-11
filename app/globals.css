@@ -1042,3 +1042,132 @@
 :focus:not(:focus-visible) {
   outline: none;
 }
+
+/* ============================================================
+   Exolar shell language — maker-tool surfaces
+   New utility classes that replace glass-card without leaning
+   on glassmorphism (banned as default per design language).
+   Existing .glass-card stays for legacy callers; do not migrate
+   yet. New components opt in via .surface / .surface-raised etc.
+   ============================================================ */
+
+@layer components {
+  /* Base atmospheric panel — flat, bordered, faint tint. */
+  .surface {
+    background: color-mix(in oklch, var(--background) 92%, var(--exolar-cyan) 1.5%);
+    border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+    border-radius: calc(var(--radius) + 2px);
+  }
+
+  /* Raised panel for primary content. One level above .surface. */
+  .surface-raised {
+    background: color-mix(in oklch, var(--background) 84%, var(--exolar-cyan) 2%);
+    border: 1px solid color-mix(in oklch, var(--border) 90%, transparent);
+    border-radius: calc(var(--radius) + 2px);
+    box-shadow:
+      0 1px 0 0 color-mix(in oklch, var(--foreground) 4%, transparent) inset,
+      0 12px 32px -16px color-mix(in oklch, var(--background) 80%, black);
+  }
+
+  /* Sunken panel — for code, terminals, log viewers. */
+  .surface-sunken {
+    background: color-mix(in oklch, var(--background) 70%, black 6%);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+    border-radius: calc(var(--radius) + 2px);
+  }
+
+  /* Atmospheric "drench" panel — cyan ambient gradient. Used sparingly
+     (hero of a section, signature moments, page header backdrops). */
+  .surface-drench {
+    position: relative;
+    background: var(--background);
+    border: 1px solid color-mix(in oklch, var(--exolar-cyan) 25%, var(--border));
+    border-radius: calc(var(--radius) + 2px);
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .surface-drench::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(
+      80% 60% at 50% 0%,
+      color-mix(in oklch, var(--exolar-cyan) 18%, transparent) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+
+  /* Section header rhythm — eyebrow + title + lede. */
+  .page-eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .page-title {
+    font-size: clamp(1.875rem, 2.2vw + 1rem, 2.75rem);
+    line-height: 1.04;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    color: var(--foreground);
+    text-wrap: balance;
+  }
+
+  .page-lede {
+    margin-top: 0.75rem;
+    max-width: 60ch;
+    color: var(--muted-foreground);
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  /* Atmospheric grid background overlay — for full-bleed sections. */
+  .bg-grid-floor {
+    background-image:
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 30%, black 30%, transparent 85%);
+    mask-image: radial-gradient(ellipse 70% 50% at 50% 30%, black 30%, transparent 85%);
+  }
+
+  /* Cyan accent text — solid color only (gradient text is banned). */
+  .text-cyan {
+    color: var(--exolar-cyan);
+  }
+}
+
+/* Atmospheric vignette used by auth + onboarding shells. */
+.exolar-vignette {
+  position: relative;
+  background: var(--background);
+  isolation: isolate;
+}
+.exolar-vignette::before,
+.exolar-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.exolar-vignette::before {
+  background: radial-gradient(
+    60% 50% at 50% 0%,
+    color-mix(in oklch, var(--exolar-cyan) 14%, transparent) 0%,
+    transparent 70%
+  );
+}
+.exolar-vignette::after {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, black 30%, transparent 85%);
+  mask-image: radial-gradient(ellipse 70% 50% at 50% 50%, black 30%, transparent 85%);
+  opacity: 0.5;
+}
