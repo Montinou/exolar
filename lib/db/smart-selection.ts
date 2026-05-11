@@ -54,7 +54,15 @@ export async function insertSmartSelectionDecision(
   rec: SmartSelectionDecisionRecord,
 ): Promise<{ event_id: string }> {
   const sql = getSql()
-  const rows = await sql`
+  // RLS bypass for service-account writes from CI: `SET LOCAL` only applies
+  // within the same transaction, and the Neon serverless driver returns a
+  // fresh pooled connection on every top-level `sql` call. Submitting both
+  // statements inside `sql.transaction([...])` guarantees they hit the SAME
+  // connection in ONE HTTP round-trip, so the SET LOCAL is active when the
+  // INSERT runs and doesn't leak to other requests.
+  const results = await sql.transaction([
+    sql`SET LOCAL app.is_service_account = 'true'`,
+    sql`
     INSERT INTO smart_selection_decisions (
       organization_id,
       repository,
@@ -101,8 +109,11 @@ export async function insertSmartSelectionDecision(
       catalog_drift = EXCLUDED.catalog_drift,
       created_at = NOW()
     RETURNING id
-  `
-  return { event_id: String(rows[0].id) }
+  `,
+  ])
+  // sql.transaction([SET LOCAL, INSERT RETURNING id]) → [setRows, insertRows]
+  const insertRows = results[1] as Array<{ id: number | string }>
+  return { event_id: String(insertRows[0].id) }
 }
 
 export interface ListDecisionsOptions {
@@ -172,7 +183,7 @@ export async function getRecentFalseNegativeStats(
       COUNT(*) FILTER (WHERE mode = 'shadow' AND (metrics->>'false_negatives')::int > 0) AS shadow_false_negatives
     FROM smart_selection_decisions
     WHERE organization_id = ${organizationId}
-      AND created_at > NOW() - (${windowDays} || ' days')::interval
+      AND created_at > NOW() - (${windowDays} * INTERVAL '1 day')
   `
   const r = rows[0]
   return {

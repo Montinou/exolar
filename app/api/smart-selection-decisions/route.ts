@@ -3,7 +3,6 @@ import { z } from "zod"
 import { validateApiKey } from "@/lib/auth"
 import { validateOrgApiKey, isExolarApiKey } from "@/lib/api-keys"
 import {
-  setServiceAccountContext,
   insertSmartSelectionDecision,
   type SmartSelectionDecisionRecord,
 } from "@/lib/db"
@@ -155,7 +154,12 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
   }
 
   try {
-    await setServiceAccountContext()
+    // RLS bypass is handled inside insertSmartSelectionDecision: it submits
+    // `SET LOCAL app.is_service_account = 'true'` + INSERT in a single
+    // sql.transaction([...]) so the SET applies on the same connection as
+    // the INSERT (Neon serverless returns a fresh pooled connection per
+    // top-level call, so the previous setServiceAccountContext() pattern
+    // didn't actually take effect).
     const { event_id } = await insertSmartSelectionDecision(record)
     return NextResponse.json({ success: true, event_id })
   } catch (error) {
