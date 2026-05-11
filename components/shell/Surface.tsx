@@ -18,7 +18,6 @@ export function Surface({
   sunken,
   drench,
   padding = "default",
-  asChild,
 }: {
   children: ReactNode
   className?: string
@@ -26,7 +25,6 @@ export function Surface({
   sunken?: boolean
   drench?: boolean
   padding?: "none" | "tight" | "default" | "loose"
-  asChild?: boolean
 }) {
   const variant = raised
     ? "surface-raised"
@@ -45,12 +43,5 @@ export function Surface({
           ? "p-8"
           : "p-5 sm:p-6"
 
-  const classes = cn(variant, pad, className)
-
-  if (asChild) {
-    // Render the child directly with the classes merged (for cases where
-    // the consumer wants a different element type like <button> or <a>).
-    return <div className={classes}>{children}</div>
-  }
-  return <div className={classes}>{children}</div>
+  return <div className={cn(variant, pad, className)}>{children}</div>
 }
