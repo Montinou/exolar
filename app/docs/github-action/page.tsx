@@ -122,15 +122,8 @@ export default function GitHubActionDocsPage() {
 
       {/* Hero */}
       <div className="space-y-4">
-        <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >GitHub Action</h1>
+        <p className="page-eyebrow">Docs · GitHub Action</p>
+        <h1 className="page-title">GitHub Action</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Automatically upload your Playwright test results to Exolar
           from GitHub Actions. Track test history, detect flaky tests, and analyze failures.
@@ -264,8 +257,8 @@ export default defineConfig({
           <div className="p-4 rounded-xl glass-card bg-cyan-500/5 border border-cyan-500/30">
             <h3 className="font-semibold mb-2 text-sm">When to use webhooks vs the GitHub Action</h3>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>• <strong className="text-foreground">GitHub Action</strong> — best for uploading results and artifacts after each run</li>
-              <li>• <strong className="text-foreground">Webhook + /api/ci/analyze</strong> — best for automated failure classification and auto-heal PRs</li>
+              <li>• <strong className="text-foreground">GitHub Action</strong>: best for uploading results and artifacts after each run</li>
+              <li>• <strong className="text-foreground">Webhook + /api/ci/analyze</strong>: best for automated failure classification and auto-heal PRs</li>
               <li>• Both can be used together for full coverage</li>
             </ul>
           </div>

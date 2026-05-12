@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserMenu } from "@/components/dashboard/user-menu"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, UserPlus, Trash2, Shield, User, Mail, Loader2, Building, Crown } from "lucide-react"
 import { BrandLogo } from "@/components/ui/brand-logo"
@@ -219,55 +220,41 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <BrandLogo variant="animated-icon" width={24} />
-                  <h1
-                    className="text-2xl font-bold"
-                    style={{
-                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                  >Admin Panel</h1>
-                  {isSuperadmin && (
-                    <Badge className="bg-purple-600 hover:bg-purple-700">
-                      <Crown className="h-3 w-3 mr-1" />
-                      Superadmin
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {isSuperadmin ? "Manage all users and organizations" : "Manage users in your organization"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              {/* Only show Organizations button for superadmins */}
-              {isSuperadmin && (
-                <Link href="/admin/organizations">
-                  <Button variant="outline" size="sm" className="sm:size-default">
-                    <Building className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Organizations</span>
-                  </Button>
-                </Link>
-              )}
-              <UserMenu />
-            </div>
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Admin"
+        title="Admin panel"
+        lede={isSuperadmin ? "Manage all users and organizations." : "Manage users in your organization."}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Back to dashboard"
+              onClick={() => router.push("/dashboard")}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            {isSuperadmin && (
+              <Badge className="bg-purple-600 hover:bg-purple-700">
+                <Crown className="mr-1 h-3 w-3" />
+                Superadmin
+              </Badge>
+            )}
+            {isSuperadmin && (
+              <Link href="/admin/organizations">
+                <Button variant="outline" size="sm">
+                  <Building className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Organizations</span>
+                </Button>
+              </Link>
+            )}
+            <UserMenu />
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="container mx-auto px-4 py-8 space-y-8">
+      <div className="space-y-8">
         {/* Invite Form */}
         <Card className="glass-card glass-card-glow">
           <CardHeader>
@@ -490,6 +477,6 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageContainer>
   )
 }

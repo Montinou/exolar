@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -164,34 +165,25 @@ export default function OrganizationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => router.push("/admin")}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <Building className="h-6 w-6" />
-                  <span
-                    style={{
-                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                  >Organizations</span>
-                  <Badge className="bg-purple-600 hover:bg-purple-700">
-                    <Crown className="h-3 w-3 mr-1" />
-                    Superadmin Only
-                  </Badge>
-                </h1>
-                <p className="text-sm text-muted-foreground">Manage multi-tenant organizations</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 self-end sm:self-auto">
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Admin · Organizations"
+        title="Organizations"
+        lede="Manage multi-tenant organizations for data isolation."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="Back to admin" onClick={() => router.push("/admin")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Badge className="bg-purple-600 hover:bg-purple-700">
+              <Crown className="mr-1 h-3 w-3" />
+              Superadmin only
+            </Badge>
+          </div>
+        }
+      />
+
+      <div className="flex items-center justify-end gap-4">
               <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
                   <Button>
@@ -251,12 +243,9 @@ export default function OrganizationsPage() {
                 </DialogContent>
               </Dialog>
               <UserMenu />
-            </div>
-          </div>
-        </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="mt-6">
         <Card className="glass-card glass-card-glow">
           <CardHeader>
             <CardTitle>All Organizations</CardTitle>
@@ -314,6 +303,6 @@ export default function OrganizationsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageContainer>
   )
 }

@@ -47,7 +47,7 @@ const MODE_BADGE: Record<
 }
 
 function pct(n: number, d: number): string {
-  if (d === 0) return "—"
+  if (d === 0) return "·"
   return `${Math.round((n / d) * 100)}%`
 }
 
@@ -119,7 +119,7 @@ async function SmartSelectionContent() {
         <StatsCard1
           className="max-w-none"
           title="Avg confidence (last 50)"
-          value={avgConfidence > 0 ? avgConfidence.toFixed(2) : "—"}
+          value={avgConfidence > 0 ? avgConfidence.toFixed(2) : "·"}
           change={0}
           changeLabel="0–1 scale"
         />
@@ -220,7 +220,7 @@ async function SmartSelectionContent() {
                             {driftCount}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">·</span>
                         )}
                       </TableCell>
                     </TableRow>

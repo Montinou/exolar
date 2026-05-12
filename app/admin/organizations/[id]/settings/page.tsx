@@ -182,14 +182,7 @@ export default function OrgSettingsPage({ params }: { params: Promise<{ id: stri
               <div>
                 <h1 className="text-2xl font-bold flex items-center gap-2">
                   <Settings className="h-6 w-6" />
-                  <span
-                    style={{
-                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                  >{organization?.name || "Organization"} - Settings</span>
+                  <span>{organization?.name || "Organization"} · Settings</span>
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   Update organization details or delete

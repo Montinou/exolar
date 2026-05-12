@@ -23,7 +23,7 @@ export default function AiSearchDocsPage() {
         </h1>
         <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl">
           Transform test failure triage from hours to minutes. Smart clustering groups 50+ failures into root causes, 
-          and semantic search finds failures by intent — not just keywords.
+          and semantic search finds failures by intent : not just keywords.
         </p>
       </div>
 
@@ -87,15 +87,15 @@ export default function AiSearchDocsPage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>Dashboard search bar</strong> — Select &quot;AI&quot; or &quot;Hybrid&quot; mode from the dropdown</span>
+                  <span><strong>Dashboard search bar</strong> : Select &quot;AI&quot; or &quot;Hybrid&quot; mode from the dropdown</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>Dedicated search page</strong> — <Link href="/dashboard/search" className="text-cyan-400 hover:underline">/dashboard/search</Link> for full-page search with export</span>
+                  <span><strong>Dedicated search page</strong> : <Link href="/dashboard/search" className="text-cyan-400 hover:underline">/dashboard/search</Link> for full-page search with export</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>MCP dataset</strong> — <code className="text-xs bg-muted px-1 py-0.5 rounded">semantic_search</code> via Claude Code</span>
+                  <span><strong>MCP dataset</strong> : <code className="text-xs bg-muted px-1 py-0.5 rounded">semantic_search</code> via Claude Code</span>
                 </li>
               </ul>
             </div>
@@ -123,15 +123,15 @@ export default function AiSearchDocsPage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>Execution details</strong> — Toggle &quot;Clustered&quot; view in the failures section</span>
+                  <span><strong>Execution details</strong> : Toggle &quot;Clustered&quot; view in the failures section</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>Executions table</strong> — Hover over the AI badge next to failed count</span>
+                  <span><strong>Executions table</strong> : Hover over the AI badge next to failed count</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>MCP dataset</strong> — <code className="text-xs bg-muted px-1 py-0.5 rounded">clustered_failures</code> via Claude Code</span>
+                  <span><strong>MCP dataset</strong> : <code className="text-xs bg-muted px-1 py-0.5 rounded">clustered_failures</code> via Claude Code</span>
                 </li>
               </ul>
             </div>
@@ -151,15 +151,15 @@ export default function AiSearchDocsPage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>Test History modal</strong> — Click &quot;Similar Issues&quot; tab</span>
+                  <span><strong>Test History modal</strong> : Click &quot;Similar Issues&quot; tab</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>Failure cards</strong> — Click &quot;Find Similar&quot; button</span>
+                  <span><strong>Failure cards</strong> : Click &quot;Find Similar&quot; button</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-500 mt-0.5" />
-                  <span><strong>MCP action</strong> — <code className="text-xs bg-muted px-1 py-0.5 rounded">find_similar</code> via Claude Code</span>
+                  <span><strong>MCP action</strong> : <code className="text-xs bg-muted px-1 py-0.5 rounded">find_similar</code> via Claude Code</span>
                 </li>
               </ul>
             </div>
@@ -181,15 +181,15 @@ export default function AiSearchDocsPage() {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
               <Check className="h-4 w-4 text-green-500 mt-0.5" />
-              <span><strong>Embedding Coverage</strong> — Percentage of failures with AI embeddings</span>
+              <span><strong>Embedding Coverage</strong> : Percentage of failures with AI embeddings</span>
             </li>
             <li className="flex items-start gap-2">
               <Check className="h-4 w-4 text-green-500 mt-0.5" />
-              <span><strong>Indexed Failures</strong> — Total count of searchable failures</span>
+              <span><strong>Indexed Failures</strong> : Total count of searchable failures</span>
             </li>
             <li className="flex items-start gap-2">
               <Check className="h-4 w-4 text-green-500 mt-0.5" />
-              <span><strong>Cluster Reduction</strong> — How effectively clustering reduces noise</span>
+              <span><strong>Cluster Reduction</strong> : How effectively clustering reduces noise</span>
             </li>
           </ul>
         </div>

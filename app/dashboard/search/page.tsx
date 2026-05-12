@@ -438,7 +438,7 @@ export default function SearchPage() {
               <Sparkles className="h-12 w-12 mx-auto mb-4 text-cyan-400" />
               <p className="text-lg font-medium">AI-Powered Test Search</p>
               <p className="text-sm text-muted-foreground mb-6">
-                Search tests by behavior, error patterns, or description — not just keywords
+                Search tests by behavior, error patterns, or description (not just keywords)
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {["timeout errors", "login failures", "API rate limiting", "flaky tests", "network issues"].map((example) => (
