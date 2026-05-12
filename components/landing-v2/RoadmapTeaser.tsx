@@ -19,7 +19,7 @@ export function RoadmapTeaser() {
           <p className="mt-7 text-balance text-3xl font-medium leading-[1.18] tracking-[-0.02em] sm:text-4xl">
             AI triage layer is shipping next. <br />
             <span className="text-muted-foreground">
-              Every failed run lands in your inbox as a draft post-mortem — clusters, suspects, the
+              Every failed run lands in your inbox as a draft post-mortem: clusters, suspects, the
               line of code that&apos;s probably wrong.
             </span>
           </p>

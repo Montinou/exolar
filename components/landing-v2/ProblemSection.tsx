@@ -60,7 +60,7 @@ export function ProblemSection() {
                 "",
                 "  ...identical stack...",
                 "",
-                "  (no retries — bailed)",
+                "  (no retries, bailed)",
               ]}
               dim
             />

@@ -74,7 +74,7 @@ async function DashboardContent({
       <PageHeader
         eyebrow="Dashboard"
         title="What changed in your CI"
-        lede="A debrief of recent runs — pass rate, failure clusters, suite health, and where the time went."
+        lede="A debrief of recent runs: pass rate, failure clusters, suite health, and where the time went."
       />
 
       <Filters branches={branches} suites={suites} />

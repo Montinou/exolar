@@ -16,7 +16,7 @@ const TABS = [
     id: "mcp",
     label: "MCP server",
     lang: "bash",
-    caption: "One command — adds Exolar to Claude Code",
+    caption: "One command. Adds Exolar to Claude Code.",
     code: `claude mcp add exolar-qa \\
   --transport http https://exolar.agentical.work/api/mcp/mcp \\
   -s user
