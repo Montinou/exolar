@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2 } from "lucide-react"
 import { AnimatedLogo } from "@/components/ui/animated-logo"
+import { BrandLogo } from "@/components/ui/brand-logo"
 import { AccessProvider, useAccess } from "./access-context"
 
 interface AccessGateProps {
