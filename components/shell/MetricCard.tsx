@@ -9,6 +9,17 @@ import type { ReactNode } from "react"
  *
  *   <MetricCard label="Pass rate (7d)" value="94.2%" trend={{ direction: "up", value: "+1.4" }} />
  */
+
+type Accent = "neutral" | "cyan" | "danger" | "warning" | "success"
+
+const ACCENT_LINE: Record<Accent, string> = {
+  neutral: "bg-muted-foreground/40",
+  cyan: "bg-[var(--exolar-cyan)]",
+  danger: "bg-rose-500/80",
+  warning: "bg-amber-500/80",
+  success: "bg-emerald-500/80",
+}
+
 export function MetricCard({
   label,
   value,
@@ -23,19 +34,10 @@ export function MetricCard({
   hint?: string
   trend?: { direction: "up" | "down" | "flat"; value: string }
   icon?: LucideIcon
-  accent?: "neutral" | "cyan" | "danger" | "warning" | "success"
+  accent?: Accent
   className?: string
 }) {
-  const accentLine =
-    accent === "cyan"
-      ? "bg-[var(--exolar-cyan)]"
-      : accent === "danger"
-        ? "bg-rose-500/80"
-        : accent === "warning"
-          ? "bg-amber-500/80"
-          : accent === "success"
-            ? "bg-emerald-500/80"
-            : "bg-muted-foreground/40"
+  const accentLine = ACCENT_LINE[accent]
 
   return (
     <div
