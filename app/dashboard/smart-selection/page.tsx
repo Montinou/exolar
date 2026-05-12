@@ -65,7 +65,7 @@ function relativeTime(iso: string): string {
 async function SmartSelectionContent() {
   const context = await getSessionContext()
   if (!context) {
-    redirect("/auth/sign-in")
+    redirect("/auth/no-access")
   }
 
   const [recent, stats] = await Promise.all([

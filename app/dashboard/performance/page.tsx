@@ -19,7 +19,7 @@ async function PerformanceContent({
 }) {
   const context = await getSessionContext()
   if (!context) {
-    redirect("/auth/sign-in")
+    redirect("/auth/no-access")
   }
 
   const db = getQueriesForOrg(context.organizationId)
