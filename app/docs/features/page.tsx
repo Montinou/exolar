@@ -40,15 +40,8 @@ export default function FeaturesPage() {
     <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >Features</h1>
+        <p className="page-eyebrow">Docs · Features</p>
+        <h1 className="page-title">Features</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Learn about the key features that make Exolar QA powerful for E2E test monitoring
           and analysis.
@@ -79,13 +72,13 @@ export default function FeaturesPage() {
                   </div>
                   <ul className="space-y-2 text-sm text-muted-foreground">
                     <li>
-                      <strong className="text-foreground">Pass Rate (40%)</strong> — Percentage of tests passing
+                      <strong className="text-foreground">Pass Rate (40%)</strong>: Percentage of tests passing
                     </li>
                     <li>
-                      <strong className="text-foreground">Flakiness (30%)</strong> — Inverse of flaky test percentage
+                      <strong className="text-foreground">Flakiness (30%)</strong>: Inverse of flaky test percentage
                     </li>
                     <li>
-                      <strong className="text-foreground">Duration Stability (30%)</strong> — Consistency of test run times
+                      <strong className="text-foreground">Duration Stability (30%)</strong>: Consistency of test run times
                     </li>
                   </ul>
                 </div>
@@ -161,10 +154,10 @@ export default function FeaturesPage() {
               </AccordionTrigger>
               <AccordionContent>
                 <ul className="space-y-2 pt-2 text-sm text-muted-foreground">
-                  <li>• <strong className="text-foreground">Flakiness Rate</strong> — % of runs requiring retries</li>
-                  <li>• <strong className="text-foreground">Total Flaky Runs</strong> — Count of flaky executions</li>
-                  <li>• <strong className="text-foreground">Last Flaky</strong> — When it was last flaky</li>
-                  <li>• <strong className="text-foreground">Worst Offenders</strong> — Top 5 flakiest tests</li>
+                  <li>• <strong className="text-foreground">Flakiness Rate</strong>: % of runs requiring retries</li>
+                  <li>• <strong className="text-foreground">Total Flaky Runs</strong>: Count of flaky executions</li>
+                  <li>• <strong className="text-foreground">Last Flaky</strong>: When it was last flaky</li>
+                  <li>• <strong className="text-foreground">Worst Offenders</strong>: Top 5 flakiest tests</li>
                 </ul>
               </AccordionContent>
             </AccordionItem>
@@ -232,8 +225,8 @@ export default function FeaturesPage() {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-3 pt-2 text-sm text-muted-foreground">
-                  <p><strong className="text-foreground">By Execution ID</strong> — Compare specific runs using their IDs</p>
-                  <p><strong className="text-foreground">By Branch</strong> — Compare latest executions from two branches (e.g., main vs feature-x)</p>
+                  <p><strong className="text-foreground">By Execution ID</strong>: Compare specific runs using their IDs</p>
+                  <p><strong className="text-foreground">By Branch</strong>: Compare latest executions from two branches (e.g., main vs feature-x)</p>
                 </div>
               </AccordionContent>
             </AccordionItem>
@@ -297,7 +290,7 @@ export default function FeaturesPage() {
         <FeatureCard
           icon={Bot}
           title="CI Auto-Analysis Pipeline"
-          description="Automatically analyze CI failures, auto-heal flaky tests, and report real bugs — closing the loop between CI and fixes."
+          description="Automatically analyze CI failures, auto-heal flaky tests, and report real bugs · closing the loop between CI and fixes."
         >
           <Accordion type="single" collapsible>
             <AccordionItem value="analysis">
@@ -315,11 +308,11 @@ export default function FeaturesPage() {
               <AccordionTrigger>Auto-Heal with 5 Fix Strategies</AccordionTrigger>
               <AccordionContent>
                 <ul className="text-sm text-muted-foreground space-y-1 list-disc pl-4">
-                  <li><strong>selector_update</strong> — Replace fragile selectors with getByRole/getByTestId</li>
-                  <li><strong>wait_adjustment</strong> — Add explicit waits for page/element readiness</li>
-                  <li><strong>race_condition</strong> — Add visibility guards before actions</li>
-                  <li><strong>api_timing</strong> — Add waitForResponse for API calls</li>
-                  <li><strong>retry_logic</strong> — Re-query locators to avoid stale references</li>
+                  <li><strong>selector_update</strong>: Replace fragile selectors with getByRole/getByTestId</li>
+                  <li><strong>wait_adjustment</strong>: Add explicit waits for page/element readiness</li>
+                  <li><strong>race_condition</strong>: Add visibility guards before actions</li>
+                  <li><strong>api_timing</strong>: Add waitForResponse for API calls</li>
+                  <li><strong>retry_logic</strong>: Re-query locators to avoid stale references</li>
                 </ul>
               </AccordionContent>
             </AccordionItem>

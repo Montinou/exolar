@@ -118,32 +118,18 @@ function DashboardSidebarContent() {
 
   return (
     <>
-      <SidebarHeader className="border-b border-border/40 px-4 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
+      <SidebarHeader className="border-b border-border/40 px-4 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center brand-logo-container"
+          className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center"
         >
-          <div className="relative">
-            <BrandLogo variant="animated-icon" width={28} />
-            <div
-              className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              style={{
-                background: "radial-gradient(circle, oklch(0.75 0.15 195 / 0.2) 0%, transparent 70%)",
-                transform: "scale(1.5)",
-              }}
-            />
+          <BrandLogo variant="animated-icon" width={28} />
+          <div className="flex flex-col leading-none group-data-[collapsible=icon]:hidden">
+            <span className="text-base font-semibold tracking-tight">Exolar</span>
+            <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              QA · v0.7
+            </span>
           </div>
-          <span
-            className="font-bold text-lg group-data-[collapsible=icon]:hidden transition-all duration-300"
-            style={{
-              background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
-            Exolar
-          </span>
         </Link>
       </SidebarHeader>
 
@@ -219,7 +205,7 @@ function DashboardSidebarContent() {
                   tooltip={userEmail}
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg bg-gradient-to-br from-cyan-500 to-orange-500 text-white text-xs">
+                    <AvatarFallback className="rounded-lg border border-[var(--exolar-cyan)]/30 bg-[var(--exolar-cyan)]/10 text-[11px] font-medium text-[var(--exolar-cyan)]">
                       {userInitials}
                     </AvatarFallback>
                   </Avatar>

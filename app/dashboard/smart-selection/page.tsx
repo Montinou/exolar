@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { StatsCard1 } from "@/components/stats-card1"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export const dynamic = "force-dynamic"
 
@@ -46,7 +47,7 @@ const MODE_BADGE: Record<
 }
 
 function pct(n: number, d: number): string {
-  if (d === 0) return "—"
+  if (d === 0) return "·"
   return `${Math.round((n / d) * 100)}%`
 }
 
@@ -88,22 +89,12 @@ async function SmartSelectionContent() {
   const avgConfidence = totalDecisions > 0 ? totalConfidence / totalDecisions : 0
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Bot className="size-5 text-[var(--exolar-cyan)]" />
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Smart Test Selection
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            LLM-driven Playwright suite recommendations per PR. Audit + calibration
-            for shadow mode; circuit breaker telemetry for active mode.
-          </p>
-        </div>
-      </div>
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Smart selection"
+        title="Smart test selection"
+        lede="LLM-driven Playwright suite recommendations per PR. Audit and calibration for shadow mode; circuit-breaker telemetry for active mode."
+      />
 
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -128,7 +119,7 @@ async function SmartSelectionContent() {
         <StatsCard1
           className="max-w-none"
           title="Avg confidence (last 50)"
-          value={avgConfidence > 0 ? avgConfidence.toFixed(2) : "—"}
+          value={avgConfidence > 0 ? avgConfidence.toFixed(2) : "·"}
           change={0}
           changeLabel="0–1 scale"
         />
@@ -229,7 +220,7 @@ async function SmartSelectionContent() {
                             {driftCount}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">·</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -249,7 +240,7 @@ async function SmartSelectionContent() {
           skips at confidence ≥0.9 + zero failure-based misses.
         </span>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 

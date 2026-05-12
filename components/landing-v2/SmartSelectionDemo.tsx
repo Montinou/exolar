@@ -54,7 +54,7 @@ const SCENARIOS = [
     runs: ["all"],
     skips: [],
     confidence: 0.0,
-    reasoning: "Schema change. Fans out unpredictably — running the full suite.",
+    reasoning: "Schema change. Fans out unpredictably. Running the full suite.",
   },
 ]
 
@@ -93,7 +93,7 @@ export function SmartSelectionDemo() {
                 onClick={() => setActive(s.id)}
                 aria-pressed={s.id === active}
                 className={cn(
-                  "group block w-full rounded-xl border bg-background/50 p-5 text-left backdrop-blur transition-all",
+                  "group block w-full rounded-xl border bg-background/70 p-5 text-left transition-all",
                   s.id === active
                     ? "border-[var(--exolar-cyan)]/50 bg-background/80 shadow-[0_0_0_1px_color-mix(in_oklch,var(--exolar-cyan)_30%,transparent),0_8px_28px_-12px_color-mix(in_oklch,var(--exolar-cyan)_50%,transparent)]"
                     : "border-border/50 hover:border-border hover:bg-background/70",
@@ -129,7 +129,7 @@ export function SmartSelectionDemo() {
             initial={reduce ? false : { opacity: 0, y: 10 }}
             animate={reduce ? undefined : { opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="relative overflow-hidden rounded-xl border border-border/50 bg-background/70 p-6 backdrop-blur sm:p-7"
+            className="relative overflow-hidden rounded-xl border border-border/50 bg-background/85 p-6 sm:p-7"
           >
             <div
               aria-hidden
@@ -171,7 +171,7 @@ export function SmartSelectionDemo() {
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {scenario.skips.length === 0 ? (
                       <span className="font-mono text-[11px] text-muted-foreground">
-                        — none —
+                        (none)
                       </span>
                     ) : (
                       scenario.skips.map((s) => (

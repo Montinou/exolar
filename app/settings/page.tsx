@@ -1,15 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowLeft, ChevronRight, Key, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Users, ChevronRight, Key } from "lucide-react"
+import {
+  PageContainer,
+  PageHeader,
+  PageSection,
+  Surface,
+} from "@/components/shell"
 import { EmbeddingStatusCard } from "@/components/settings/embedding-status-card"
 
 export default function SettingsPage() {
-  const router = useRouter()
   const [isOrgAdmin, setIsOrgAdmin] = useState(false)
   const [orgName, setOrgName] = useState<string | null>(null)
 
@@ -23,79 +26,88 @@ export default function SettingsPage() {
           setOrgName(data.organization?.name || null)
         }
       } catch {
-        // User is not org admin, that's fine
+        // Not org admin — that's fine, the section just stays hidden.
       }
     }
     checkOrgAdmin()
   }, [])
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <div className="mb-8 flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/")}>
-           <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1
-          className="text-3xl font-bold"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >Settings</h1>
-      </div>
-
-      <div className="space-y-6">
-        {/* Team Management Link - Only for org admins */}
-        {isOrgAdmin && (
-          <>
-            <Link href="/settings/team">
-              <Card className="glass-card glass-card-glow hover:border-primary/50 transition-colors cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">Team Management</CardTitle>
-                        <CardDescription>
-                          Manage members and invitations{orgName ? ` for ${orgName}` : ""}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-              </Card>
+    <PageContainer width="narrow">
+      <PageHeader
+        eyebrow="Settings"
+        title="Account and workspace"
+        lede={
+          orgName
+            ? `You're managing ${orgName}. Keys, members, and AI embeddings live here.`
+            : "Account-level configuration. Team and API keys appear once you're an org admin."
+        }
+        actions={
+          <Button variant="ghost" size="icon" asChild aria-label="Back to dashboard">
+            <Link href="/dashboard">
+              <ArrowLeft className="size-5" />
             </Link>
-            <Link href="/settings/api-keys">
-              <Card className="glass-card glass-card-glow hover:border-primary/50 transition-colors cursor-pointer">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Key className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">API Keys</CardTitle>
-                        <CardDescription>
-                          Manage API keys for CI/CD integration
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-              </Card>
-            </Link>
-          </>
-        )}
+          </Button>
+        }
+      />
 
-        {/* AI Embeddings Status - Only shown to admins */}
+      {isOrgAdmin && (
+        <PageSection eyebrow="Workspace">
+          <div className="grid gap-3">
+            <SettingsLink
+              href="/settings/team"
+              icon={<Users className="size-4" />}
+              title="Team management"
+              description={`Members and invitations${orgName ? ` for ${orgName}` : ""}`}
+            />
+            <SettingsLink
+              href="/settings/api-keys"
+              icon={<Key className="size-4" />}
+              title="API keys"
+              description="CI/CD ingestion + MCP tokens"
+            />
+          </div>
+        </PageSection>
+      )}
+
+      <PageSection eyebrow="AI">
         <EmbeddingStatusCard />
-      </div>
-    </div>
+      </PageSection>
+    </PageContainer>
+  )
+}
+
+function SettingsLink({
+  href,
+  icon,
+  title,
+  description,
+}: {
+  href: string
+  icon: React.ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="group block transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--exolar-cyan)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <Surface
+        className="flex items-center justify-between gap-4 transition-colors group-hover:border-[var(--exolar-cyan)]/40"
+        padding="default"
+      >
+        <div className="flex items-center gap-4">
+          <span className="flex size-9 items-center justify-center rounded-md border border-border/60 bg-background/60 text-[var(--exolar-cyan)]">
+            {icon}
+          </span>
+          <div>
+            <p className="text-base font-medium tracking-tight">{title}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      </Surface>
+    </Link>
   )
 }

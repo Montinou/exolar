@@ -8,6 +8,7 @@ import { PerformanceAlertsCard } from "@/components/dashboard/performance-alerts
 import { SlowestTestsCard } from "@/components/dashboard/slowest-tests-card"
 import { FailureRateChart } from "@/components/dashboard/failure-rate-chart"
 import { Gauge } from "lucide-react"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export const dynamic = "force-dynamic"
 
@@ -150,11 +151,16 @@ export default async function PerformancePage({
   searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Performance"
+        title="Performance regressions"
+        lede="Tests that slowed down vs. their recent baseline. The slowest absolute, the biggest delta, the suspects to investigate."
+      />
       <Suspense fallback={<PerformanceSkeleton />}>
         {/* @ts-expect-error Async Server Component */}
         <PerformanceContent searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageContainer>
   )
 }

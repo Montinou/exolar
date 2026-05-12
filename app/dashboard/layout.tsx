@@ -16,29 +16,36 @@ export default function DashboardLayout({
     <ProtectedLayout>
       <SidebarProvider defaultOpen={true}>
         <DashboardSidebar />
-        <SidebarInset>
-          {/* Enhanced header with glass effect */}
-          <header
-            className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b px-4 transition-all duration-300"
+        <SidebarInset className="relative">
+          {/* Atmospheric backdrop — same language as the landing's hero, dialed
+              way down. Sits behind everything so the page header has an
+              ambient cyan presence that fades within the first viewport. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] bg-grid-floor opacity-[0.35]"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px]"
             style={{
-              background: "oklch(0.145 0 0 / 0.85)",
-              backdropFilter: "blur(12px) saturate(180%)",
-              borderColor: "oklch(1 0 0 / 0.08)",
-              boxShadow: "0 1px 3px oklch(0 0 0 / 0.1), 0 1px 2px oklch(0 0 0 / 0.06)",
+              background:
+                "radial-gradient(60% 100% at 50% 0%, color-mix(in oklch, var(--exolar-cyan) 9%, transparent) 0%, transparent 70%)",
             }}
-          >
-            <SidebarTrigger className="-ml-1 hover:bg-[var(--exolar-cyan)]/10 transition-colors duration-200" />
+          />
+
+          {/* Top bar — quiet hairline, no glassmorphism shadow stack. */}
+          <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border/40 bg-background/85 px-4 backdrop-blur-sm">
+            <SidebarTrigger
+              className="-ml-1 rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Toggle sidebar"
+            />
             <div className="flex-1" />
             <SearchTests />
           </header>
 
-          {/* Announcement Banner */}
           <AnnouncementBanner />
 
-          {/* Page content with smooth fade-in */}
-          <div className="flex-1 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
-            {children}
-          </div>
+          <div className="flex-1">{children}</div>
         </SidebarInset>
       </SidebarProvider>
     </ProtectedLayout>

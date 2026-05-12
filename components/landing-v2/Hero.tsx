@@ -18,7 +18,7 @@ export function Hero() {
             initial={reduce ? false : { opacity: 0, y: 14 }}
             animate={reduce ? undefined : { opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/40 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground backdrop-blur"
+            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground"
           >
             <span className="relative flex size-1.5">
               <span className="absolute inset-0 animate-ping rounded-full bg-[var(--exolar-cyan)] opacity-60" />
@@ -63,7 +63,7 @@ export function Hero() {
             </Link>
             <Link
               href="#mechanism"
-              className="inline-flex h-12 items-center rounded-md border border-border/70 bg-background/30 px-5 text-sm font-medium backdrop-blur transition-colors hover:bg-background/60"
+              className="inline-flex h-12 items-center rounded-md border border-border/70 bg-background/60 px-5 text-sm font-medium transition-colors hover:bg-background/85"
             >
               See how it reads CI
             </Link>

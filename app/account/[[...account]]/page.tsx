@@ -1,11 +1,15 @@
 import { UserProfile } from "@clerk/nextjs"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export default function AccountPage() {
   return (
-    <main className="min-h-screen bg-background">
-      <div className="container mx-auto p-4 md:p-6">
-        <UserProfile routing="path" path="/account" />
-      </div>
-    </main>
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Account"
+        title="Profile and security"
+        lede="Update your personal info, password, connected accounts, and active sessions."
+      />
+      <UserProfile routing="path" path="/account" />
+    </PageContainer>
   )
 }

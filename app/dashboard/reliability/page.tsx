@@ -17,6 +17,7 @@ import {
   Minus,
 } from "lucide-react"
 import type { ReliabilityScore } from "@/lib/types"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export const dynamic = "force-dynamic"
 
@@ -326,11 +327,16 @@ export default async function ReliabilityPage({
   searchParams: Promise<{ from?: string; to?: string; branch?: string; suite?: string; historic?: string }>
 }) {
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Reliability"
+        title="Suite reliability"
+        lede="A single 0–100 health score per suite, plus the flake taxonomy and trend that shaped it."
+      />
       <Suspense fallback={<ReliabilitySkeleton />}>
         {/* @ts-expect-error Async Server Component */}
         <ReliabilityContent searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageContainer>
   )
 }

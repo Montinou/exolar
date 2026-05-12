@@ -66,7 +66,7 @@ export function WishlistCTA() {
               }
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
               className={cn(
-                "flex h-14 items-center rounded-xl border bg-background/70 pl-5 pr-1.5 backdrop-blur-md transition-colors",
+                "flex h-14 items-center rounded-xl border bg-background/85 pl-5 pr-1.5 transition-colors",
                 state === "success"
                   ? "border-[var(--exolar-cyan)]/60"
                   : state === "error"

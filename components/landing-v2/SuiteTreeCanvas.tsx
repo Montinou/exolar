@@ -63,7 +63,7 @@ export function SuiteTreeCanvas() {
   }, [reduce])
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border/50 bg-background/30 p-5 backdrop-blur-md sm:p-7">
+    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-border/50 bg-background/85 p-5 sm:p-7">
       {/* Inner gradient — quietly cyan, lifts the panel from the section's drench */}
       <div
         aria-hidden
@@ -85,7 +85,7 @@ export function SuiteTreeCanvas() {
           <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             <span>triage</span>
             <span className="font-mono lowercase text-[var(--exolar-cyan)]">
-              {phase >= 3 ? "done" : phase >= 2 ? "running" : "—"}
+              {phase >= 3 ? "done" : phase >= 2 ? "running" : "·"}
             </span>
           </div>
         </div>
@@ -192,7 +192,7 @@ export function SuiteTreeCanvas() {
                   ease: [0.16, 1, 0.3, 1],
                 }}
                 className={cn(
-                  "rounded-lg border bg-background/60 p-3 backdrop-blur",
+                  "rounded-lg border bg-background/85 p-3",
                   v.hue === "fail" && "border-rose-500/30",
                   v.hue === "flaky" && "border-amber-500/30",
                   v.hue === "pass" && "border-[var(--exolar-cyan)]/30",

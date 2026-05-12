@@ -211,7 +211,7 @@ env:
     ],
     causes: [
       "Not enough historical data for the failing test",
-      "execution_id not provided — analysis used run_id fallback with less context",
+      "execution_id not provided; analysis used run_id fallback with less context",
       "Failure is genuinely ambiguous (e.g. intermittent network issue)",
     ],
     solutions: [
@@ -300,15 +300,8 @@ export default function TroubleshootingPage() {
     <div className="space-y-8 sm:space-y-12">
       {/* Hero */}
       <div className="space-y-4">
-        <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >Troubleshooting</h1>
+        <p className="page-eyebrow">Docs · Troubleshooting</p>
+        <h1 className="page-title">Troubleshooting</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Common issues and solutions for Exolar integration. Can&apos;t find your issue?{" "}
           <Link href="https://github.com/Montinou/e2e-test-dashboard/issues" className="text-primary hover:underline">
@@ -372,7 +365,7 @@ export default function TroubleshootingPage() {
             <div className="space-y-4">
               <h3 className="text-sm font-medium text-muted-foreground">Solutions</h3>
               {issue.solutions.map((solution, i) => (
-                <div key={i} className="pl-4 border-l-2 border-primary/30">
+                <div key={i} className="rounded-md border border-border/40 bg-muted/30 p-3">
                   <div className="flex items-center gap-2 mb-1">
                     <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                     <span className="font-medium text-sm">{solution.step}</span>

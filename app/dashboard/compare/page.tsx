@@ -5,6 +5,7 @@ import { getQueriesForOrg } from "@/lib/db"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CompareClient } from "./compare-client"
 import type { TestExecution } from "@/lib/types"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export const dynamic = "force-dynamic"
 
@@ -124,11 +125,16 @@ export default async function ComparePage({
   }>
 }) {
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Compare"
+        title="Compare two runs"
+        lede="Side-by-side delta between a baseline run and a current run. Spot regressions, new failures, fixed flakes."
+      />
       <Suspense fallback={<CompareSkeleton />}>
         {/* @ts-expect-error Async Server Component */}
         <CompareContent searchParams={searchParams} />
       </Suspense>
-    </div>
+    </PageContainer>
   )
 }
