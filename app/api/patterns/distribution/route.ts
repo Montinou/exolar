@@ -12,11 +12,21 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get("days") || "30", 10)
+    const from = searchParams.get("from") || undefined
+    const to = searchParams.get("to") || undefined
+    const branch = searchParams.get("branch") || undefined
+    const suite = searchParams.get("suite") || undefined
+    const daysParam = searchParams.get("days")
+
+    // If no explicit date range is provided but a legacy `days` param is, use it as a lookback
+    const options =
+      !from && !to && daysParam
+        ? parseInt(daysParam, 10)
+        : { from, to, branch, suite }
 
     const { totalFailures, categories } = await getCategoryDistribution(
       context.organizationId,
-      days
+      options
     )
 
     return NextResponse.json({

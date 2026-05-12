@@ -95,6 +95,8 @@ export interface TrendOptions {
   days?: number // Deprecated: use count + period instead
   from?: string // Explicit start date (ISO 8601)
   to?: string // Explicit end date (ISO 8601)
+  branch?: string
+  suite?: string
 }
 
 export interface TrendDataPoint {
@@ -217,4 +219,5 @@ export interface GetSuitePassRatesOptions {
   from?: string
   to?: string
   branch?: string
+  suite?: string
 }

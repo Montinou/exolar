@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts"
 import { PieChartIcon, Loader2 } from "lucide-react"
 import {
@@ -45,28 +45,45 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 interface CategoryDistributionChartProps {
-  days?: number
-  onDaysChange?: (days: number) => void
+  dateFrom?: string
+  dateTo?: string
+  branch?: string
+  suite?: string
+  /** When true, hides the lookback dropdown (e.g. when a global date range filter is active). Defaults to true if dateFrom/dateTo are provided. */
   showFilter?: boolean
 }
 
 export function CategoryDistributionChart({
-  days: externalDays,
-  onDaysChange,
-  showFilter = true,
+  dateFrom,
+  dateTo,
+  branch,
+  suite,
+  showFilter,
 }: CategoryDistributionChartProps) {
   const [internalDays, setInternalDays] = useState<DateRange>("15")
   const [data, setData] = useState<CategoryData[]>([])
   const [totalFailures, setTotalFailures] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  const activeDays = externalDays ?? parseInt(internalDays, 10)
+  // When URL-level date filters are active, the internal lookback dropdown is irrelevant.
+  const hasUrlDateFilter = !!(dateFrom || dateTo)
+  const dropdownVisible = showFilter ?? !hasUrlDateFilter
+
+  const apiUrl = useMemo(() => {
+    const params = new URLSearchParams()
+    if (dateFrom) params.set("from", dateFrom)
+    if (dateTo) params.set("to", dateTo)
+    if (branch) params.set("branch", branch)
+    if (suite) params.set("suite", suite)
+    if (!hasUrlDateFilter) params.set("days", internalDays)
+    return `/api/patterns/distribution?${params.toString()}`
+  }, [dateFrom, dateTo, branch, suite, internalDays, hasUrlDateFilter])
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true)
       try {
-        const response = await fetch(`/api/patterns/distribution?days=${activeDays}`)
+        const response = await fetch(apiUrl)
         const json = await response.json()
         setData(json.categories || [])
         setTotalFailures(json.totalFailures || 0)
@@ -78,11 +95,10 @@ export function CategoryDistributionChart({
     }
 
     fetchData()
-  }, [activeDays])
+  }, [apiUrl])
 
   const handleDaysChange = (value: DateRange) => {
     setInternalDays(value)
-    onDaysChange?.(parseInt(value, 10))
   }
 
   // Filter out zero-count categories for cleaner display
@@ -104,7 +120,7 @@ export function CategoryDistributionChart({
               Failure Categories
             </h3>
           </div>
-          {showFilter && (
+          {dropdownVisible && (
             <Select value={internalDays} onValueChange={handleDaysChange}>
               <SelectTrigger className="w-[140px] h-8 text-xs">
                 <SelectValue placeholder="Select range" />
@@ -136,7 +152,7 @@ export function CategoryDistributionChart({
               Failure Categories
             </h3>
           </div>
-          {showFilter && (
+          {dropdownVisible && (
             <Select value={internalDays} onValueChange={handleDaysChange}>
               <SelectTrigger className="w-[140px] h-8 text-xs">
                 <SelectValue placeholder="Select range" />

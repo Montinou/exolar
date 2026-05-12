@@ -32,6 +32,8 @@ export async function GET(request: Request) {
       days,
       from: fromDate,
       to: toDate,
+      branch,
+      suite,
     })
     return NextResponse.json(trends)
   } catch (error) {

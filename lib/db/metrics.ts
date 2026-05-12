@@ -243,7 +243,7 @@ export async function getTrendData(
     ? { days: options, period: 'day' }
     : options
 
-  const { period = 'day', count, days, from, to } = opts
+  const { period = 'day', count, days, from, to, branch, suite } = opts
 
   const conditions = [
     "completed_at IS NOT NULL",
@@ -273,6 +273,13 @@ export async function getTrendData(
 
   if (to) {
     conditions.push(`started_at <= '${to}'`)
+  }
+
+  if (branch) {
+    conditions.push(`branch = '${branch.replace(/'/g, "''")}'`)
+  }
+  if (suite) {
+    conditions.push(`suite = '${suite.replace(/'/g, "''")}'`)
   }
 
   const whereClause = `WHERE ${conditions.join(" AND ")}`
@@ -560,7 +567,7 @@ export async function getSuitePassRates(
 ): Promise<SuitePassRate[]> {
   const sql = getSql()
 
-  const { from, to, branch } = options || {}
+  const { from, to, branch, suite } = options || {}
 
   // Build date filter for single-table queries - default to 15 days
   let dateFilter: string
@@ -586,12 +593,18 @@ export async function getSuitePassRates(
     teDateFilter = "te.started_at > NOW() - INTERVAL '15 days'"
   }
 
-  // Build branch filters
+  // Build branch/suite filters
   const branchFilter = branch
     ? ` AND branch = '${branch.replace(/'/g, "''")}'`
     : ""
   const teBranchFilter = branch
     ? ` AND te.branch = '${branch.replace(/'/g, "''")}'`
+    : ""
+  const suiteFilter = suite
+    ? ` AND suite = '${suite.replace(/'/g, "''")}'`
+    : ""
+  const teSuiteFilter = suite
+    ? ` AND te.suite = '${suite.replace(/'/g, "''")}'`
     : ""
 
   const result = await sql`
@@ -605,6 +618,7 @@ export async function getSuitePassRates(
         AND suite IS NOT NULL
         AND ${sql.unsafe(dateFilter)}
         ${sql.unsafe(branchFilter)}
+        ${sql.unsafe(suiteFilter)}
       GROUP BY suite
     ),
     failed_tests AS (
@@ -618,6 +632,7 @@ export async function getSuitePassRates(
         AND te.suite IS NOT NULL
         AND ${sql.unsafe(teDateFilter)}
         ${sql.unsafe(teBranchFilter)}
+        ${sql.unsafe(teSuiteFilter)}
         AND tr.status = 'failed'
       GROUP BY te.suite, tr.test_name
     ),

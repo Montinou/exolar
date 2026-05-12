@@ -118,7 +118,12 @@ async function DashboardContent({
 
       <PageSection eyebrow="Hot tests + AI signal">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <FlakiestTestsCard branch={params.branch || undefined} since={params.from || undefined} />
+          <FlakiestTestsCard
+            branch={params.branch || undefined}
+            suite={params.suite || undefined}
+            since={params.from || undefined}
+            lastRunOnly={lastRunOnly}
+          />
           <SlowestTestsCard
             dateFrom={params.from}
             dateTo={params.to}
@@ -135,8 +140,14 @@ async function DashboardContent({
             dateFrom={params.from}
             dateTo={params.to}
             branch={params.branch}
+            suite={params.suite}
           />
-          <CategoryDistributionChart />
+          <CategoryDistributionChart
+            dateFrom={params.from}
+            dateTo={params.to}
+            branch={params.branch}
+            suite={params.suite}
+          />
         </div>
       </PageSection>
 

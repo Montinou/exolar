@@ -97,32 +97,80 @@ export async function getTopPatterns(
   }))
 }
 
+/** Options for category distribution filtering */
+export interface CategoryDistributionOptions {
+  from?: string
+  to?: string
+  branch?: string
+  suite?: string
+}
+
 /**
  * Get category distribution
+ *
+ * Backwards compatible: pass a number for legacy `days` lookback, or pass
+ * an options object to filter by date range / branch / suite.
  */
 export async function getCategoryDistribution(
   organizationId: number,
-  days: number = 30
+  options: CategoryDistributionOptions | number = {}
 ): Promise<{
   totalFailures: number
   categories: CategoryDistribution[]
 }> {
   const sql = getSql()
-  const dateThreshold = new Date()
-  dateThreshold.setDate(dateThreshold.getDate() - days)
 
-  // Get category counts based on occurrence counts within time range
-  const results = await sql`
+  // Normalize legacy `days` argument into a from-date
+  const opts: CategoryDistributionOptions =
+    typeof options === "number"
+      ? (() => {
+          const threshold = new Date()
+          threshold.setDate(threshold.getDate() - options)
+          return { from: threshold.toISOString() }
+        })()
+      : options
+
+  const { from, to, branch, suite } = opts
+
+  // Build WHERE clauses
+  const conditions: string[] = [`ep.organization_id = ${organizationId}`]
+  if (from) {
+    conditions.push(`epo.created_at >= '${from}'`)
+  } else {
+    // Default lookback: 15 days, matching other dashboard queries
+    conditions.push(`epo.created_at > NOW() - INTERVAL '15 days'`)
+  }
+  if (to) {
+    conditions.push(`epo.created_at <= '${to}'`)
+  }
+  if (branch) {
+    conditions.push(`te.branch = '${branch.replace(/'/g, "''")}'`)
+  }
+  if (suite) {
+    conditions.push(`te.suite = '${suite.replace(/'/g, "''")}'`)
+  }
+  const whereClause = `WHERE ${conditions.join(" AND ")}`
+
+  // Only join through test_results/test_executions when filtering by branch/suite
+  const needsExecutionJoin = !!(branch || suite)
+  const joinClause = needsExecutionJoin
+    ? `JOIN test_results tr ON epo.test_result_id = tr.id
+       JOIN test_executions te ON tr.execution_id = te.id`
+    : ""
+
+  const query = `
     SELECT
       ep.category,
       COUNT(epo.id) as failure_count
     FROM error_patterns ep
     JOIN error_pattern_occurrences epo ON ep.id = epo.pattern_id
-    WHERE ep.organization_id = ${organizationId}
-      AND epo.created_at >= ${dateThreshold.toISOString()}
+    ${joinClause}
+    ${whereClause}
     GROUP BY ep.category
     ORDER BY failure_count DESC
   `
+
+  const results = await sql.unsafe(query)
 
   const totalFailures = results.reduce((sum, row) => sum + Number(row.failure_count), 0)
 

@@ -467,8 +467,12 @@ export function getQueriesForOrg(organizationId: number) {
     getLatestExecutionId: (branch?: string, suite?: string) =>
       getLatestExecutionId(organizationId, branch, suite),
     getTrendData: (options?: TrendOptions) => getTrendData(organizationId, options || {}),
-    getFailureTrendData: (days?: number, dateRange?: DateRangeFilter) =>
-      getFailureTrendData(organizationId, days, dateRange),
+    getFailureTrendData: (
+      days?: number,
+      dateRange?: DateRangeFilter,
+      branch?: string,
+      suite?: string
+    ) => getFailureTrendData(organizationId, days, dateRange, branch, suite),
     getReliabilityScore: (options?: ReliabilityScoreOptions | DateRangeFilter) =>
       getReliabilityScore(organizationId, options),
 

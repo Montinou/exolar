@@ -25,6 +25,7 @@ interface SuitePassRatesCardProps {
   dateFrom?: string
   dateTo?: string
   branch?: string
+  suite?: string
 }
 
 function getBarColor(passRate: number): string {
@@ -50,6 +51,7 @@ export function SuitePassRatesCard({
   dateFrom,
   dateTo,
   branch,
+  suite,
 }: SuitePassRatesCardProps) {
   const [suites, setSuites] = useState<SuitePassRate[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,9 +62,10 @@ export function SuitePassRatesCard({
     if (dateFrom) params.set("from", dateFrom)
     if (dateTo) params.set("to", dateTo)
     if (branch) params.set("branch", branch)
+    if (suite) params.set("suite", suite)
     const queryString = params.toString()
     return queryString ? `/api/suite-pass-rates?${queryString}` : "/api/suite-pass-rates"
-  }, [dateFrom, dateTo, branch])
+  }, [dateFrom, dateTo, branch, suite])
 
   useEffect(() => {
     async function fetchData() {

@@ -19,10 +19,11 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get("from") || undefined
     const to = searchParams.get("to") || undefined
 
-    // Optional branch filter
+    // Optional branch/suite filters
     const branch = searchParams.get("branch") || undefined
+    const suite = searchParams.get("suite") || undefined
 
-    const suites = await db.getSuitePassRates({ from, to, branch })
+    const suites = await db.getSuitePassRates({ from, to, branch, suite })
 
     return NextResponse.json({
       suites,
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
         from: from || "default (15 days)",
         to: to || "now",
         branch: branch || "all",
+        suite: suite || "all",
       },
     })
   } catch (error) {
