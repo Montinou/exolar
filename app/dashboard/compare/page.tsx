@@ -23,7 +23,7 @@ interface CompareContentProps {
 async function CompareContent({ searchParams }: CompareContentProps) {
   const context = await getSessionContext()
   if (!context) {
-    redirect("/auth/signin")
+    redirect("/auth/sign-in")
   }
 
   const db = getQueriesForOrg(context.organizationId)
