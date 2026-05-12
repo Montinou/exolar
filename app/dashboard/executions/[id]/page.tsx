@@ -13,6 +13,7 @@ import { ArrowLeft, Calendar, GitBranch, Hash, Clock, CheckCircle2, XCircle, Ale
 import type { TestExecution, TestResult } from "@/lib/types"
 import { TestResultCard } from "@/components/dashboard/test-result-card"
 import { UserMenu } from "@/components/dashboard/user-menu"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { ClusteredFailuresView } from "@/components/dashboard/clustered-failures-view"
 import { SimilarFailuresModal } from "@/components/dashboard/similar-failures-modal"
 
@@ -85,20 +86,14 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="border-b bg-card/50">
-          <div className="container mx-auto px-4 py-6">
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-96 mt-2" />
-          </div>
+      <PageContainer width="wide">
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="mt-4 h-10 w-80" />
+        <div className="mt-8 space-y-6">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-[400px] w-full" />
         </div>
-        <div className="container mx-auto px-4 py-8">
-          <div className="space-y-6">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-[400px] w-full" />
-          </div>
-        </div>
-      </div>
+      </PageContainer>
     )
   }
 
@@ -138,61 +133,46 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/dashboard")}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1
-                    className="text-xl sm:text-2xl font-bold"
-                    style={{
-                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                  >Test Execution Details</h1>
-                  <Badge variant={execution.status === "success" ? "default" : "destructive"}>
-                    {execution.status}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Run #{execution.run_id} &bull; {formatDate(execution.started_at)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={copyUrl}>
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy URL
-                  </>
-                )}
-              </Button>
-              <UserMenu />
-            </div>
-          </div>
-        </div>
+    <PageContainer width="wide">
+      <div className="mb-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2 text-muted-foreground hover:text-foreground"
+          onClick={() => router.push("/dashboard")}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to dashboard
+        </Button>
       </div>
 
-      {/* Content */}
-      <div className="container mx-auto px-4 py-8 space-y-6">
+      <PageHeader
+        eyebrow={`Run #${execution.run_id} · ${formatDate(execution.started_at)}`}
+        title="Test execution details"
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant={execution.status === "success" ? "default" : "destructive"}>
+              {execution.status}
+            </Badge>
+            <Button variant="outline" size="sm" onClick={copyUrl}>
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy URL
+                </>
+              )}
+            </Button>
+            <UserMenu />
+          </div>
+        }
+      />
+
+      <div className="space-y-6">
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="glass-card glass-card-glow">
@@ -397,6 +377,6 @@ export default function ExecutionDetailPage({ params }: { params: Promise<{ id: 
           }}
         />
       )}
-    </div>
+    </PageContainer>
   )
 }

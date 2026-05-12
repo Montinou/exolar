@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { StatsCard1 } from "@/components/stats-card1"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export const dynamic = "force-dynamic"
 
@@ -88,22 +89,12 @@ async function SmartSelectionContent() {
   const avgConfidence = totalDecisions > 0 ? totalConfidence / totalDecisions : 0
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Bot className="size-5 text-[var(--exolar-cyan)]" />
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Smart Test Selection
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            LLM-driven Playwright suite recommendations per PR. Audit + calibration
-            for shadow mode; circuit breaker telemetry for active mode.
-          </p>
-        </div>
-      </div>
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Smart selection"
+        title="Smart test selection"
+        lede="LLM-driven Playwright suite recommendations per PR. Audit and calibration for shadow mode; circuit-breaker telemetry for active mode."
+      />
 
       {/* Stats row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -249,7 +240,7 @@ async function SmartSelectionContent() {
           skips at confidence ≥0.9 + zero failure-based misses.
         </span>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 
