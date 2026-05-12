@@ -27,7 +27,7 @@ if (!process.env.DATABASE_URL) {
   process.exit(1)
 }
 
-const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
 const DRY_RUN = process.env.DRY_RUN === "true"
 
 async function sendMCPAnnouncement() {

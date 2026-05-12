@@ -267,7 +267,7 @@ export default function MockDetailPage() {
   }
 
   const formatDate = (dateString: string | null) => {
-    if (!dateString) return "—"
+    if (!dateString) return "·"
     return new Date(dateString).toLocaleString("en-US", {
       month: "short",
       day: "numeric",

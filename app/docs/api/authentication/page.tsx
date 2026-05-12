@@ -18,15 +18,8 @@ export default function ApiAuthenticationPage() {
           <span>/</span>
           <span className="text-foreground">Authentication</span>
         </div>
-        <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >API Authentication</h1>
+        <p className="page-eyebrow">Docs · API</p>
+        <h1 className="page-title">API authentication</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Exolar uses API keys to authenticate requests. API keys are scoped to your organization
           and can be managed from your dashboard settings.
@@ -50,7 +43,7 @@ export default function ApiAuthenticationPage() {
           <li>Enter a descriptive name (e.g., &quot;GitHub Actions - Main Repo&quot;)</li>
           <li>Copy the key immediately &mdash; it won&apos;t be shown again</li>
         </ol>
-        <div className="p-4 rounded-lg glass-panel border-l-4 border-amber-500">
+        <div className="relative overflow-hidden rounded-lg border border-amber-500/30 bg-amber-500/[0.04] p-4">
           <div className="flex items-center gap-2 text-amber-500 mb-2">
             <AlertTriangle className="h-4 w-4" />
             <span className="font-medium text-sm">Important</span>

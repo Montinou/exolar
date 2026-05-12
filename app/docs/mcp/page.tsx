@@ -166,7 +166,7 @@ const datasets = [
   { name: "setup_guide", description: "CI/CD integration setup instructions filtered by provider and framework" },
   { name: "org_suites", description: "All test suites for the organization with pass rates and last-run stats" },
   { name: "suite_tests", description: "Individual tests within a suite (requires suite filter)" },
-  { name: "inactive_tests", description: "Tests that haven't run recently — useful for test suite cleanup" },
+  { name: "inactive_tests", description: "Tests that haven't run recently : useful for test suite cleanup" },
   { name: "mock_interfaces", description: "List mock API interfaces created for the organization" },
   { name: "mock_routes", description: "Routes configured on a mock interface (requires interface_id)" },
   { name: "mock_rules", description: "Response rules for a mock route (requires route_id)" },
@@ -230,15 +230,8 @@ export default function MCPDocsPage() {
         <div className="inline-block px-3 py-1 rounded-full glass-panel text-xs sm:text-sm font-medium mb-2">
           New: 🧠 AI Vector Search • Semantic Clustering • Mock APIs • 24 Datasets
         </div>
-        <h1
-          className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >MCP Integration</h1>
+        <p className="page-eyebrow">Docs · MCP</p>
+        <h1 className="page-title">MCP integration</h1>
         <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
           Connect Claude Code to your test data using the Model Context Protocol (MCP).
           Five consolidated tools (down from 24) with an efficient router pattern, 24 queryable datasets, and built-in mock API management.
@@ -288,9 +281,9 @@ export default function MCPDocsPage() {
               Quick Start (OAuth - Recommended)
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
-              One command to connect Claude Code to Exolar — authenticates via browser:
+              One command to connect Claude Code to Exolar : authenticates via browser:
             </p>
-            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user`} />
+            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.agentical.work/api/mcp/mcp -s user`} />
             <p className="text-xs text-muted-foreground mt-3">
               When prompted, select <strong>&quot;Authenticate&quot;</strong> → browser opens → log in → done!
             </p>
@@ -308,7 +301,7 @@ export default function MCPDocsPage() {
             <p className="text-sm text-muted-foreground mb-3">
               If OAuth doesn&apos;t work, get a token from <a href="/settings/mcp" className="text-primary hover:underline">/settings/mcp</a>:
             </p>
-            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.ai-innovation.site/api/mcp/mcp -s user \\
+            <CodeBlock code={`claude mcp add exolar-qa --transport http https://exolar.agentical.work/api/mcp/mcp -s user \\
   --header "Authorization: Bearer YOUR_TOKEN_HERE"`} />
           </div>
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { AnimatedLogo } from "@/components/ui/animated-logo"
+import { PageContainer, PageHeader, Surface } from "@/components/shell"
 import {
   Card,
   CardHeader,
@@ -46,7 +46,7 @@ export default function MCPSettingsPage() {
 
   const dashboardUrl = typeof window !== "undefined"
     ? window.location.origin
-    : "https://exolar.ai-innovation.site"
+    : "https://exolar.agentical.work"
 
   const mcpConfig = token ? JSON.stringify({
     mcpServers: {
@@ -94,55 +94,50 @@ export default function MCPSettingsPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 max-w-3xl px-4">
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Dashboard
-          </Link>
-        </div>
+    <PageContainer width="narrow">
+      <div className="mb-6">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to dashboard
+        </Link>
+      </div>
 
-        <div className="flex items-center gap-3 mb-2">
-          <AnimatedLogo size="md" />
-          <div className="flex items-center gap-3">
-            <h1
-              className="text-2xl font-bold"
-              style={{
-                background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >MCP Integration</h1>
-            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-              <Sparkles className="h-3 w-3 mr-1" />
-              v2.0
-            </Badge>
+      <PageHeader
+        eyebrow="Settings · MCP integration"
+        title="MCP integration"
+        lede="Query your test data directly from Claude Code with HTTP Streamable transport."
+        actions={
+          <Badge variant="outline" className="border-[var(--exolar-cyan)]/30 bg-[var(--exolar-cyan)]/10 text-[var(--exolar-cyan)]">
+            <Sparkles className="mr-1 h-3 w-3" />
+            v2.0
+          </Badge>
+        }
+      />
+
+      {/* What's new — uses top hairline accent (banned: side-stripe border-l-4). */}
+      <Surface variant="raised" className="relative mb-6 overflow-hidden">
+        <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-[var(--exolar-cyan)]" />
+        <div className="flex items-start gap-3">
+          <Sparkles className="h-5 w-5 shrink-0 text-[var(--exolar-cyan)]" />
+          <div>
+            <h3 className="mb-1 text-sm font-semibold tracking-tight">
+              New in v2.0: router pattern + semantic layer
+            </h3>
+            <p className="mb-2 text-sm text-muted-foreground">
+              83% token savings with 5-tool consolidation, AI safety definitions, and HTTP Streamable transport.
+            </p>
+            <Link
+              href="/docs/whats-new"
+              className="inline-flex items-center gap-1 text-sm text-[var(--exolar-cyan)] hover:underline"
+            >
+              Learn more <ExternalLink className="h-3 w-3" />
+            </Link>
           </div>
         </div>
-        <p className="text-muted-foreground mb-6">
-          Query your test data directly from Claude Code with HTTP Streamable transport
-        </p>
-
-        {/* What's New Banner */}
-        <div className="glass-card glass-card-glow mb-6 p-4 border-l-4 border-primary">
-          <div className="flex items-start gap-3">
-            <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-sm mb-1">New in v2.0: Router Pattern & Semantic Layer</h3>
-              <p className="text-sm text-muted-foreground mb-2">
-                83% token savings with 5-tool consolidation, AI safety definitions, and HTTP Streamable transport.
-              </p>
-              <Link href="/docs/whats-new" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
-                Learn more <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
-          </div>
-        </div>
+      </Surface>
 
         <Card className="mb-6 glass-card glass-card-glow">
           <CardHeader>
@@ -317,9 +312,8 @@ export default function MCPSettingsPage() {
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageContainer>
   )
 }

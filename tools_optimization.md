@@ -106,7 +106,7 @@ The "Exolar Analyst" Persona
 
 4. UX Integration (Frontend)
 
-Para que el MCP brille en tu dashboard (exolar.ai-innovation.site), la respuesta de la IA no debe ser solo texto.
+Para que el MCP brille en tu dashboard (exolar.agentical.work), la respuesta de la IA no debe ser solo texto.
 
 Generative UI Components
 

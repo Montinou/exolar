@@ -30,7 +30,7 @@ export async function GET() {
     const interfaces = await db.getMockInterfaces()
 
     // Add public URL to each interface
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
     const interfacesWithUrls = interfaces.map((iface) => ({
       ...iface,
       public_url: `${baseUrl}/api/mock/${context.organizationSlug}/${iface.slug}/`,
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     )
 
     // Add public URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
     const interfaceWithUrl = {
       ...mockInterface,
       public_url: `${baseUrl}/api/mock/${context.organizationSlug}/${mockInterface.slug}/`,

@@ -163,7 +163,7 @@ export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
         icon: "🔐",
         title: "One-Command Setup",
         description:
-          "Run 'claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp' and authenticate via browser. Done!",
+          "Run 'claude mcp add --transport http exolar-qa https://exolar.agentical.work/api/mcp/mcp' and authenticate via browser. Done!",
         docsUrl: "/docs/mcp#installation",
       },
       {

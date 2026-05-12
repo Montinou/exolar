@@ -5,13 +5,13 @@ import { Check, Copy } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 const step1Command = `claude mcp add exolar-qa \\
-  --url https://exolar.ai-innovation.site/api/mcp/mcp \\
+  --url https://exolar.agentical.work/api/mcp/mcp \\
   --header "Authorization: Bearer YOUR_TOKEN_HERE"`
 
 const manualConfig = `{
   "mcpServers": {
     "exolar-qa": {
-      "url": "https://exolar.ai-innovation.site/api/mcp/mcp",
+      "url": "https://exolar.agentical.work/api/mcp/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_TOKEN_HERE"
       }
@@ -93,7 +93,7 @@ export function InstallTabs() {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <p className="text-sm font-medium" style={{ color: "oklch(0.8 0 0)" }}>
-                    1. Get your token from <a href="https://exolar.ai-innovation.site/settings/mcp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">Settings → MCP Integration</a>
+                    1. Get your token from <a href="https://exolar.agentical.work/settings/mcp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">Settings → MCP Integration</a>
                   </p>
                 </div>
                 <div className="flex items-center gap-3 mt-4">
@@ -115,7 +115,7 @@ export function InstallTabs() {
               </p>
               <CodeBlock code={manualConfig} language="json" />
               <p className="text-xs" style={{ color: "oklch(0.5 0 0)" }}>
-                Note: Get your authentication token from <a href="https://exolar.ai-innovation.site/settings/mcp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">Settings → MCP Integration</a>
+                Note: Get your authentication token from <a href="https://exolar.agentical.work/settings/mcp" className="underline hover:text-primary" target="_blank" rel="noopener noreferrer">Settings → MCP Integration</a>
               </p>
             </TabsContent>
           </Tabs>

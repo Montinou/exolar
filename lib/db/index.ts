@@ -5,6 +5,19 @@
 // Connection utilities
 export { getSql, setServiceAccountContext } from "./connection"
 
+// Smart test selection (audit table for LLM-driven Playwright suite recommendations)
+export {
+  insertSmartSelectionDecision,
+  listSmartSelectionDecisions,
+  getRecentFalseNegativeStats,
+} from "./smart-selection"
+export type {
+  SmartSelectionMode,
+  SmartSelectionDecisionRecord,
+  ListDecisionsOptions,
+  FalseNegativeStats,
+} from "./smart-selection"
+
 // Shared utilities
 export { generateTestSignature, isTestFlaky } from "./utils"
 

@@ -77,7 +77,7 @@ export async function sendInviteEmail(data: InviteEmailData): Promise<{ success:
       return { success: false, error: "Email service not configured (RESEND_API_KEY missing)" }
     }
 
-    const { email, password, role, name, dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site", template = "attorneyshare" } = data
+    const { email, password, role, name, dashboardUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work", template = "attorneyshare" } = data
 
     // Extract name from email if not provided
     const recipientName = name || email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())

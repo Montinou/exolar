@@ -45,6 +45,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { MockInterfaceWithStats } from "@/lib/types"
+import { PageContainer, PageHeader } from "@/components/shell"
 
 export default function MocksPage() {
   const [interfaces, setInterfaces] = useState<(MockInterfaceWithStats & { public_url: string })[]>([])
@@ -166,84 +167,78 @@ export default function MocksPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Webhook className="h-6 w-6" style={{ color: "var(--exolar-cyan)" }} />
-            Mock APIs
-          </h1>
-          <p className="text-muted-foreground">
-            Create and manage mock HTTP endpoints for testing
-          </p>
-        </div>
-
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Interface
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="glass-card">
-            <DialogHeader>
-              <DialogTitle>Create Mock Interface</DialogTitle>
-              <DialogDescription>
-                Create a new mock API interface. You&apos;ll get a public URL to access your mock endpoints.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  placeholder="User API Mock"
-                  value={newInterface.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  placeholder="user-api"
-                  value={newInterface.slug}
-                  onChange={(e) =>
-                    setNewInterface((prev) => ({ ...prev, slug: e.target.value }))
-                  }
-                />
-                <p className="text-xs text-muted-foreground">
-                  URL-safe identifier. Lowercase letters, numbers, and hyphens only.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (optional)</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Mock for user service during testing"
-                  value={newInterface.description}
-                  onChange={(e) =>
-                    setNewInterface((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancel
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Mock APIs"
+        title="Mock APIs"
+        lede="Create and manage mock HTTP endpoints for testing. Each interface gets a public URL your suite can hit."
+        actions={
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Create interface
               </Button>
-              <Button onClick={handleCreate} disabled={creating || !newInterface.name}>
-                {creating ? "Creating..." : "Create"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create mock interface</DialogTitle>
+                <DialogDescription>
+                  Create a new mock API interface. You&apos;ll get a public URL to access your mock endpoints.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="User API Mock"
+                    value={newInterface.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="slug">Slug</Label>
+                  <Input
+                    id="slug"
+                    placeholder="user-api"
+                    value={newInterface.slug}
+                    onChange={(e) =>
+                      setNewInterface((prev) => ({ ...prev, slug: e.target.value }))
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    URL-safe identifier. Lowercase letters, numbers, and hyphens only.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description (optional)</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Mock for user service during testing"
+                    value={newInterface.description}
+                    onChange={(e) =>
+                      setNewInterface((prev) => ({ ...prev, description: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate} disabled={creating || !newInterface.name}>
+                  {creating ? "Creating..." : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Error display */}
       {error && (
@@ -416,6 +411,6 @@ export default function MocksPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   )
 }

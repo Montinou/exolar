@@ -32,8 +32,8 @@ Authorization: Bearer exolar_...
 Content-Type: application/json
 
 {
-  "execution_id": "exec_abc123",   // optional — reporter execution ID
-  "run_id": "run_gh_456"           // optional — GitHub Actions run ID
+  "execution_id": "exec_abc123",   // optional · reporter execution ID
+  "run_id": "run_gh_456"           // optional · GitHub Actions run ID
 }
 
 // Response
@@ -73,11 +73,11 @@ export default defineConfig({
   ],
 })`
 
-const sentinelExample = `# Option A — OpenClaw sentinel agent (argus)
+const sentinelExample = `# Option A · OpenClaw sentinel agent (argus)
 # In ~/.openclaw-nix/hosts/montino.nix, argus is already configured.
 # Add the ci-analysis webhook URL to its trigger list.
 
-# Option B — GitHub Actions (Claude Code Action)
+# Option B · GitHub Actions (Claude Code Action)
 - name: Trigger Exolar CI Analysis
   if: failure()
   uses: anthropics/claude-code-action@v1
@@ -94,17 +94,10 @@ export default function CIAnalysisPage() {
 
       {/* Hero */}
       <div className="space-y-4">
-        <h1
-          className="text-3xl sm:text-4xl font-bold tracking-tight"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >CI Auto-Analysis</h1>
-        <p className="text-base sm:text-lg text-muted-foreground max-w-2xl">
-          When CI runs fail, Exolar classifies the failure and takes the right action automatically —
+        <p className="page-eyebrow">Docs · CI analysis</p>
+        <h1 className="page-title">CI auto-analysis</h1>
+        <p className="page-lede">
+          When CI runs fail, Exolar classifies the failure and takes the right action automatically:
           opening a fix PR, filing a bug, annotating a flake, or alerting on infrastructure issues.
         </p>
       </div>
@@ -138,7 +131,7 @@ export default function CIAnalysisPage() {
             <Settings className="h-5 w-5 text-primary mb-2" />
             <h3 className="font-medium mb-1">Flexible Trigger</h3>
             <p className="text-sm text-muted-foreground">
-              Trigger via webhook, the REST API, or a Claude Code Action step — whatever fits your CI setup.
+              Trigger via webhook, the REST API, or a Claude Code Action step · whatever fits your CI setup.
             </p>
           </div>
         </div>
@@ -193,7 +186,7 @@ export default function CIAnalysisPage() {
             <p className="text-sm text-muted-foreground">
               Go to <Link href="/settings/webhooks" className="text-primary hover:underline">Settings &rarr; Webhooks</Link> and
               add your endpoint. Subscribe to <code className="px-1 py-0.5 rounded glass-panel">ci.run.failed</code> events.
-              Exolar signs every request with HMAC-SHA256 — see the <a href="#webhooks" className="text-primary hover:underline">Webhooks</a> section below.
+              Exolar signs every request with HMAC-SHA256 · see the <a href="#webhooks" className="text-primary hover:underline">Webhooks</a> section below.
             </p>
           </div>
 
@@ -229,8 +222,8 @@ export default function CIAnalysisPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {[
-                { field: "execution_id", type: "string?", desc: "Reporter execution ID — preferred when available" },
-                { field: "run_id", type: "string?", desc: "GitHub Actions run ID — fallback if no execution_id" },
+                { field: "execution_id", type: "string?", desc: "Reporter execution ID · preferred when available" },
+                { field: "run_id", type: "string?", desc: "GitHub Actions run ID · fallback if no execution_id" },
                 { field: "analysis_id", type: "string", desc: "Unique ID for this analysis result" },
                 { field: "classification", type: "enum", desc: "HEALABLE | REAL_BUG | KNOWN_FLAKE | INFRA" },
                 { field: "confidence", type: "number", desc: "0–1 score; actions only fire above configured threshold" },
@@ -246,8 +239,8 @@ export default function CIAnalysisPage() {
           </table>
           <div className="sm:hidden space-y-3">
             {[
-              { field: "execution_id", type: "string?", desc: "Reporter execution ID — preferred when available" },
-              { field: "run_id", type: "string?", desc: "GitHub Actions run ID — fallback if no execution_id" },
+              { field: "execution_id", type: "string?", desc: "Reporter execution ID · preferred when available" },
+              { field: "run_id", type: "string?", desc: "GitHub Actions run ID · fallback if no execution_id" },
               { field: "classification", type: "enum", desc: "HEALABLE | REAL_BUG | KNOWN_FLAKE | INFRA" },
               { field: "confidence", type: "number", desc: "0–1; actions only fire above configured threshold" },
             ].map(row => (

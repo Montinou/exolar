@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Loader2, Mail, CheckCircle2, XCircle, Users } from "lucide-react"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 // Team members from USER_CREDENTIALS.md
@@ -127,21 +128,12 @@ export default function SendCredentialsPage() {
   const failedCount = results.filter((r) => r.status === "failed").length
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      <div className="mb-8">
-        <h1
-          className="text-3xl font-bold mb-2"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >Send Credentials</h1>
-        <p className="text-muted-foreground">
-          Bulk email credentials to team members. Select users and choose the appropriate email template.
-        </p>
-      </div>
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Admin · Credentials"
+        title="Send credentials"
+        lede="Bulk email credentials to team members. Select users and choose the appropriate email template."
+      />
 
       <Tabs value={activeTemplate} onValueChange={(v) => setActiveTemplate(v as "attorneyshare" | "exolar")}>
         <TabsList className="mb-6">
@@ -239,7 +231,7 @@ export default function SendCredentialsPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   )
 }
 

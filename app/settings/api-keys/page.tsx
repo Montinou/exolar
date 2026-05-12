@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { AnimatedLogo } from "@/components/ui/animated-logo"
+import { PageContainer, PageHeader } from "@/components/shell"
 import {
   Card,
   CardHeader,
@@ -173,43 +173,32 @@ export default function ApiKeysSettingsPage() {
   const revokedKeys = apiKeys.filter((k) => k.revoked_at)
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 max-w-4xl px-4">
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Dashboard
-          </Link>
-        </div>
+    <PageContainer width="default">
+      <div className="mb-6">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to dashboard
+        </Link>
+      </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <AnimatedLogo size="md" />
-              <h1
-                className="text-2xl font-bold"
-                style={{
-                  background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >{isAdmin ? "Organization API Keys" : "Your API Keys"}</h1>
-            </div>
-            <p className="text-muted-foreground">
-              {isAdmin
-                ? "Manage API keys for your organization's CI/CD integrations"
-                : "Manage your personal API keys for CI/CD integration"}
-            </p>
-          </div>
-          <Button className="btn-amber" onClick={() => setCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create API Key
+      <PageHeader
+        eyebrow="Settings · API keys"
+        title={isAdmin ? "Organization API keys" : "Your API keys"}
+        lede={
+          isAdmin
+            ? "Manage API keys for your organization's CI/CD integrations."
+            : "Manage your personal API keys for CI/CD integration."
+        }
+        actions={
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create API key
           </Button>
-        </div>
+        }
+      />
 
         {error && (
           <Card className="mb-6 border-destructive glass-card">
@@ -426,8 +415,7 @@ export default function ApiKeysSettingsPage() {
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </div>
+      </AlertDialog>
+    </PageContainer>
   )
 }

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { UserMenu } from "@/components/dashboard/user-menu"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { ArrowLeft, UserPlus, Trash2, Shield, Loader2, Users, Mail, Building2 } from "lucide-react"
 
 interface Member {
@@ -217,47 +218,34 @@ export default function TeamSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => router.push("/settings")}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <Users className="h-6 w-6" />
-                  <span
-                    style={{
-                      background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                  >Team Management</span>
-                </h1>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Building2 className="h-3 w-3" />
-                  {organization?.name || "Organization"}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className={roleColors[currentUserRole || "viewer"]}>
-                Your role: {currentUserRole}
-              </Badge>
-              <UserMenu />
-            </div>
+    <PageContainer width="default">
+      <PageHeader
+        eyebrow="Settings · Team"
+        title="Team management"
+        lede={
+          organization?.name
+            ? `Members, roles, and invitations for ${organization.name}.`
+            : "Members, roles, and invitations for your organization."
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Back to settings"
+              onClick={() => router.push("/settings")}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <Badge className={roleColors[currentUserRole || "viewer"]}>
+              Your role: {currentUserRole}
+            </Badge>
+            <UserMenu />
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="container mx-auto px-4 py-8 space-y-8">
+      <div className="space-y-8">
         {/* Status Messages */}
         {error && (
           <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-md">
@@ -444,6 +432,6 @@ export default function TeamSettingsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageContainer>
   )
 }

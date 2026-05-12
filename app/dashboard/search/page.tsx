@@ -38,6 +38,7 @@ import {
   Layers,
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { AIAnswerCard, type SearchResultForAI } from "@/components/dashboard/ai-answer-card"
 import { ClustersTabContent } from "@/components/dashboard/clusters-tab-content"
 
@@ -189,19 +190,13 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
-      {/* Page Title and Search Bar */}
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-cyan-400" />
-            Semantic Search
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Search tests by intent using AI-powered semantic matching
-          </p>
-        </div>
-
+    <PageContainer width="wide">
+      <PageHeader
+        eyebrow="Dashboard · Semantic search"
+        title="Semantic search"
+        lede="Search your tests by intent. Vector embeddings find matches even when the query and the test name don't share keywords."
+      />
+      <div className="mt-2 space-y-6">
         {/* Search Bar */}
         <div className="flex gap-3">
           <div className="relative flex-1">
@@ -443,7 +438,7 @@ export default function SearchPage() {
               <Sparkles className="h-12 w-12 mx-auto mb-4 text-cyan-400" />
               <p className="text-lg font-medium">AI-Powered Test Search</p>
               <p className="text-sm text-muted-foreground mb-6">
-                Search tests by behavior, error patterns, or description — not just keywords
+                Search tests by behavior, error patterns, or description (not just keywords)
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {["timeout errors", "login failures", "API rate limiting", "flaky tests", "network issues"].map((example) => (
@@ -468,6 +463,6 @@ export default function SearchPage() {
           <ClustersTabContent />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   )
 }

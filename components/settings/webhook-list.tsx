@@ -197,25 +197,6 @@ export function WebhookList({ initialWebhooks }: WebhookListProps) {
 
   return (
     <>
-      <div className="mb-8 flex items-center gap-4">
-        <Link href="/settings">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
-        <h1
-          className="text-3xl font-bold"
-          style={{
-            background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}
-        >
-          Webhooks
-        </h1>
-      </div>
-
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">

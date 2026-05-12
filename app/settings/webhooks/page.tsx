@@ -1,6 +1,7 @@
+import { redirect } from "next/navigation"
 import { getSessionContext, isOrgAdmin } from "@/lib/session-context"
 import { getSql } from "@/lib/db/connection"
-import { redirect } from "next/navigation"
+import { PageContainer, PageHeader } from "@/components/shell"
 import { WebhookList, type OrgWebhook } from "@/components/settings/webhook-list"
 
 export default async function WebhooksSettingsPage() {
@@ -22,8 +23,13 @@ export default async function WebhooksSettingsPage() {
   `
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
+    <PageContainer width="narrow">
+      <PageHeader
+        eyebrow="Settings · Webhooks"
+        title="Outgoing webhooks"
+        lede="Push test executions and failures to your own services. Filter by suite, branch, or outcome."
+      />
       <WebhookList initialWebhooks={webhooks as OrgWebhook[]} />
-    </div>
+    </PageContainer>
   )
 }

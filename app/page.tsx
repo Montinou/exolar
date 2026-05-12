@@ -1,31 +1,36 @@
 import { redirect } from "next/navigation"
 import { getSessionContext } from "@/lib/session-context"
-import { Hero } from "@/components/landing/Hero"
-import { MCPShowcase } from "@/components/landing/MCPShowcase"
-import { DeviceShowcase } from "@/components/landing/DeviceShowcase"
-import { FeaturesGrid } from "@/components/landing/FeaturesGrid"
-import { InstallTabs } from "@/components/landing/InstallTabs"
-import { WishlistFooter } from "@/components/landing/WishlistFooter"
-import { EcosystemBanner } from "@/components/landing/EcosystemBanner"
+import { LandingNav } from "@/components/landing-v2/LandingNav"
+import { Hero } from "@/components/landing-v2/Hero"
+import { ProblemSection } from "@/components/landing-v2/ProblemSection"
+import { MechanismReveal } from "@/components/landing-v2/MechanismReveal"
+import { SmartSelectionDemo } from "@/components/landing-v2/SmartSelectionDemo"
+import { IntegrationsCode } from "@/components/landing-v2/IntegrationsCode"
+import { RoadmapTeaser } from "@/components/landing-v2/RoadmapTeaser"
+import { WishlistCTA } from "@/components/landing-v2/WishlistCTA"
+import { LandingFooter } from "@/components/landing-v2/LandingFooter"
 
 export const dynamic = "force-dynamic"
 
 export default async function LandingPage() {
-  // Redirect signed-in users to dashboard
   const session = await getSessionContext()
   if (session) {
     redirect("/dashboard")
   }
 
   return (
-    <main className="min-h-screen" style={{ background: "var(--deep-void)" }}>
-      <Hero />
-      <MCPShowcase />
-      <DeviceShowcase />
-      <FeaturesGrid />
-      <InstallTabs />
-      <EcosystemBanner />
-      <WishlistFooter />
-    </main>
+    <>
+      <LandingNav />
+      <main className="relative overflow-x-clip">
+        <Hero />
+        <ProblemSection />
+        <MechanismReveal />
+        <SmartSelectionDemo />
+        <IntegrationsCode />
+        <RoadmapTeaser />
+        <WishlistCTA />
+      </main>
+      <LandingFooter />
+    </>
   )
 }

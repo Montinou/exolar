@@ -36,7 +36,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const routes = await db.getMockRoutes(interfaceId)
 
     // Add public URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
     const interfaceWithUrl = {
       ...mockInterface,
       public_url: `${baseUrl}/api/mock/${context.organizationSlug}/${mockInterface.slug}/`,
@@ -91,7 +91,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     }
 
     // Add public URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.ai-innovation.site"
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://exolar.agentical.work"
     const interfaceWithUrl = {
       ...updated,
       public_url: `${baseUrl}/api/mock/${context.organizationSlug}/${updated.slug}/`,

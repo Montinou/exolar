@@ -127,15 +127,9 @@ function DocsSidebarContent() {
       <SidebarHeader className="border-b border-border/40 px-4 py-3 group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:justify-center">
         <Link href="/docs" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
           <BrandLogo variant="animated-icon" width={24} />
-          <span
-            className="font-semibold group-data-[collapsible=icon]:hidden"
-            style={{
-              background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 30%, #f97316 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >Documentation</span>
+          <span className="font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            Documentation
+          </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>

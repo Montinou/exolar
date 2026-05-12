@@ -18,7 +18,7 @@ Exolar QA includes a built-in MCP server that allows Claude Code to access your 
 Run this command in your terminal — no token copying needed:
 
 ```bash
-claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp
+claude mcp add --transport http exolar-qa https://exolar.agentical.work/api/mcp/mcp
 ```
 
 When prompted, select **"Authenticate"** → browser opens → log in → done!
@@ -28,7 +28,7 @@ When prompted, select **"Authenticate"** → browser opens → log in → done!
 If OAuth doesn't work, get a token from `/settings/mcp` and use:
 
 ```bash
-claude mcp add --transport http exolar-qa https://exolar.ai-innovation.site/api/mcp/mcp \
+claude mcp add --transport http exolar-qa https://exolar.agentical.work/api/mcp/mcp \
   --header "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
@@ -40,7 +40,7 @@ If you prefer manual configuration, add this to your `~/.claude.json`:
 {
   "mcpServers": {
     "exolar-qa": {
-      "url": "https://exolar.ai-innovation.site/api/mcp/mcp",
+      "url": "https://exolar.agentical.work/api/mcp/mcp",
       "headers": {
         "Authorization": "Bearer <your-token>"
       }
