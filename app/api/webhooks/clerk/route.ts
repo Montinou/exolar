@@ -49,13 +49,62 @@ export async function POST(request: NextRequest) {
 
         const name = [first_name, last_name].filter(Boolean).join(" ") || email.split("@")[0]
 
-        // Only create if user doesn't exist (might have been pre-created via invite)
-        await sql`
-          INSERT INTO dashboard_users (email, clerk_user_id, name, role)
-          VALUES (${email}, ${id}, ${name}, 'viewer')
-          ON CONFLICT (email) DO UPDATE SET clerk_user_id = ${id}
-        `
-        console.log(`[clerk-webhook] user.created: ${email} (${id})`)
+        // Provisioning contract: every new Clerk user lands in the AttorneyShare
+        // org as a viewer. Previously the row was created without default_org_id
+        // and without an organization_members row, which dropped users on the
+        // /auth/no-access page. The schema now enforces NOT NULL on
+        // default_org_id (migration 030), so we MUST supply it on INSERT.
+        //
+        // The three statements are submitted as one sql.transaction so they hit
+        // the same connection — same pattern used by the smart-selection insert
+        // (lib/db/smart-selection.ts) — and either all land or none do.
+        const orgSlug = "attorneyshare"
+        const results = await sql.transaction([
+          // 1. Resolve (or create) the AttorneyShare org and capture its id.
+          //    009_add_organizations + 030_backfill_attorneyshare_org already
+          //    create it; this INSERT…ON CONFLICT is just a safety net.
+          sql`
+            INSERT INTO organizations (name, slug, created_at)
+            VALUES ('AttorneyShare', ${orgSlug}, NOW())
+            ON CONFLICT (slug) DO UPDATE SET slug = EXCLUDED.slug
+            RETURNING id
+          `,
+          // 2. Upsert the dashboard_users row with clerk_user_id +
+          //    default_org_id resolved to the AttorneyShare org. The subquery
+          //    keeps everything in one round-trip even though the org id was
+          //    returned by statement 1 — Postgres re-evaluates per statement.
+          sql`
+            INSERT INTO dashboard_users (email, clerk_user_id, name, role, default_org_id)
+            VALUES (
+              ${email},
+              ${id},
+              ${name},
+              'viewer',
+              (SELECT id FROM organizations WHERE slug = ${orgSlug})
+            )
+            ON CONFLICT (email) DO UPDATE SET
+              clerk_user_id  = EXCLUDED.clerk_user_id,
+              default_org_id = COALESCE(dashboard_users.default_org_id, EXCLUDED.default_org_id),
+              name           = COALESCE(dashboard_users.name, EXCLUDED.name)
+            RETURNING id
+          `,
+          // 3. Ensure organization_members row exists for the user.
+          sql`
+            INSERT INTO organization_members (organization_id, user_id, role, joined_at)
+            SELECT
+              (SELECT id FROM organizations WHERE slug = ${orgSlug}),
+              (SELECT id FROM dashboard_users WHERE clerk_user_id = ${id}),
+              'viewer',
+              NOW()
+            ON CONFLICT (organization_id, user_id) DO NOTHING
+          `,
+        ])
+
+        const userRows = results[1] as Array<{ id: number | string }>
+        const userId = userRows[0]?.id
+        console.log(
+          `[clerk-webhook] user.created: ${email} (clerk=${id}, dashboard_users.id=${userId}, org=${orgSlug})`,
+        )
         break
       }
 
