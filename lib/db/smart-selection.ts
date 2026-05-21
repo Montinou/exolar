@@ -20,7 +20,9 @@ export interface SmartSelectionDecisionRecord {
     file_count: number
     sanitized_token_count: number
     dropped_paths_count: number
-    sanitizer_tier: 1 | 2 | 3
+    // Optional since ENG-1444 simplified the client-side sanitizer
+    // ("let the LLM do its work" removed tier-based size gating).
+    sanitizer_tier?: 1 | 2 | 3
   }
   output: {
     selected_suites: string[]
