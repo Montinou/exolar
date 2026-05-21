@@ -32,7 +32,11 @@ const smartSelectionEventSchema = z.object({
     file_count: z.number().int().nonnegative(),
     sanitized_token_count: z.number().int().nonnegative(),
     dropped_paths_count: z.number().int().nonnegative(),
-    sanitizer_tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    // Optional since ENG-1444 simplified the client-side sanitizer ("let the
+    // LLM do its work" — the tier-based size gating was removed because the
+    // LLM handles oversized diffs natively). Older clients that still send
+    // the tier will continue to round-trip it.
+    sanitizer_tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
   }),
 
   output: z.object({

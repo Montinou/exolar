@@ -9,6 +9,13 @@ const isPublicRoute = createRouteMatcher([
   "/auth/no-access(.*)",
   "/api/webhooks/clerk(.*)",
   "/api/test-results(.*)",
+  // CI ingestion endpoint for the smart-selection client. Same auth pattern
+  // as /api/test-results — the route handler validates the org API key or
+  // legacy DASHBOARD_API_KEY itself, so Clerk middleware should let it
+  // through. Without this entry, the middleware returns 404 (not 401)
+  // before the route handler runs, which silently broke the smart-selection
+  // shadow loop for ~9 days (ENG-1482).
+  "/api/smart-selection-decisions(.*)",
   "/api/v1/health(.*)",
   "/docs(.*)",
   "/api/mcp/(.*)",
