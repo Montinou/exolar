@@ -179,22 +179,22 @@ export async function insertTestResults(
       completed_at
     )
     SELECT * FROM UNNEST(
-      ${sql.array(executionIds)}::int[],
-      ${sql.array(testNames)}::text[],
-      ${sql.array(testFiles)}::text[],
-      ${sql.array(signatures)}::text[],
-      ${sql.array(statuses)}::text[],
-      ${sql.array(durations)}::int[],
-      ${sql.array(criticals)}::boolean[],
-      ${sql.array(flakies)}::boolean[],
-      ${sql.array(errors)}::text[],
-      ${sql.array(stacks)}::text[],
-      ${sql.array(browsers)}::text[],
-      ${sql.array(retryCounts)}::int[],
-      ${sql.array(logs)}::text[],
-      ${sql.array(aiContexts)}::text[],
-      ${sql.array(startedAts)}::timestamptz[],
-      ${sql.array(completedAts)}::timestamptz[]
+      ${executionIds}::int[],
+      ${testNames}::text[],
+      ${testFiles}::text[],
+      ${signatures}::text[],
+      ${statuses}::text[],
+      ${durations}::int[],
+      ${criticals}::boolean[],
+      ${flakies}::boolean[],
+      ${errors}::text[],
+      ${stacks}::text[],
+      ${browsers}::text[],
+      ${retryCounts}::int[],
+      ${logs}::jsonb[],
+      ${aiContexts}::jsonb[],
+      ${startedAts}::timestamptz[],
+      ${completedAts}::timestamptz[]
     ) AS t(
       execution_id,
       test_name,
