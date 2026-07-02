@@ -31,7 +31,7 @@ export const allTools = [
     description: `Discover available data. ALWAYS call this FIRST before using query_exolar_data - it shows what datasets exist and their required filters.
 
 Categories:
-- datasets: See all 24 queryable datasets with descriptions
+- datasets: See all 25 queryable datasets with descriptions
 - branches: List branches with execution counts
 - suites: List test suites with pass rates
 - metrics: See metric definitions (use with get_semantic_definition)
@@ -75,6 +75,7 @@ Dataset Patterns:
 - Search: test_search, semantic_search (require: query)
 - Time-series: trends, dashboard_stats (optional: branch, period)
 - Mock API: mock_interfaces, mock_routes, mock_rules, mock_logs
+- AI suite-selection calibration: smart_selection_decisions (optional: repository, pr_number, mode; view_mode:"summary" for false-negative rates)
 
 Use view_mode: "summary" for metrics, "detailed" for analysis, "list" for tables.
 
@@ -112,6 +113,7 @@ Examples:
             "mock_routes",
             "mock_rules",
             "mock_logs",
+            "smart_selection_decisions",
           ],
           description: "Dataset to query",
         },
@@ -150,6 +152,11 @@ Examples:
             // Mock API filters
             interface_id: { type: "number", description: "Mock interface ID (mock_routes, mock_rules, mock_logs)" },
             route_id: { type: "number", description: "Mock route ID (mock_rules)" },
+            // Smart selection filters
+            repository: { type: "string", description: "\"owner/repo\" (smart_selection_decisions)" },
+            pr_number: { type: "number", description: "Pull request number (smart_selection_decisions)" },
+            mode: { type: "string", enum: ["shadow", "active", "active_overridden"], description: "Decision mode (smart_selection_decisions)" },
+            window_days: { type: "number", description: "Lookback window for view_mode:\"summary\" (smart_selection_decisions, default 7)" },
           },
         },
         view_mode: {

@@ -57,6 +57,8 @@ const AVAILABLE_DATASETS = [
   { id: "mock_routes", description: "Routes configured for a mock interface", filters: "interface_id (required)" },
   { id: "mock_rules", description: "Response rules for a mock route", filters: "route_id (required)" },
   { id: "mock_logs", description: "Request logs for a mock interface", filters: "interface_id (required), limit" },
+  // Smart Test Selection
+  { id: "smart_selection_decisions", description: "AI test-suite-selection decisions with confidence and outcome-matched accuracy (TP/FP/TN/FN)", filters: "repository, pr_number, mode, window_days (view_mode:\"summary\")" },
 ]
 
 export async function handleExplore(

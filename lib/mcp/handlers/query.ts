@@ -45,6 +45,8 @@ const QueryInputSchema = z.object({
     "mock_routes", // List routes for an interface
     "mock_rules", // List rules for a route
     "mock_logs", // Request logs for an interface
+    // Smart Test Selection (AI suite-selection calibration audit)
+    "smart_selection_decisions", // List decisions, or view_mode:"summary" for false-negative rates
   ]),
   filters: z
     .object({
@@ -94,6 +96,11 @@ const QueryInputSchema = z.object({
       // Mock API filters
       interface_id: z.number().optional(), // Mock interface ID
       route_id: z.number().optional(), // Mock route ID
+      // Smart selection filters
+      repository: z.string().optional(), // "owner/repo" (smart_selection_decisions)
+      pr_number: z.number().optional(), // Pull request number (smart_selection_decisions)
+      mode: z.enum(["shadow", "active", "active_overridden"]).optional(), // Decision mode (smart_selection_decisions)
+      window_days: z.number().min(1).optional(), // Lookback window for view_mode:"summary" (smart_selection_decisions, default 7)
     })
     .optional()
     .default({}),
@@ -1026,6 +1033,58 @@ export async function handleQuery(
         for (const log of logs) {
           const time = new Date(log.request_at).toLocaleString()
           output += `| ${time} | ${log.method} | ${log.path.slice(0, 30)} | ${log.response_status} | ${log.matched ? "Yes" : "No"} | ${log.response_time_ms}ms |\n`
+        }
+
+        return textResponse(output)
+      }
+
+      case "smart_selection_decisions": {
+        if (input.view_mode === "summary") {
+          const windowDays = f.window_days ?? 7
+          const stats = await db.getRecentFalseNegativeStats(orgId, windowDays)
+          const activeFnRate = stats.total_active_decisions > 0 ? stats.active_false_negatives / stats.total_active_decisions : 0
+          const shadowFnRate = stats.shadow_decisions_count > 0 ? stats.shadow_false_negatives / stats.shadow_decisions_count : 0
+
+          if (format === "json") {
+            return jsonResponse({
+              organization: authContext.organizationSlug,
+              dataset: "smart_selection_decisions",
+              view_mode: "summary",
+              window_days: windowDays,
+              data: { ...stats, active_false_negative_rate: activeFnRate, shadow_false_negative_rate: shadowFnRate },
+            })
+          }
+
+          let output = `## Smart Selection Calibration (last ${windowDays}d)\n\n`
+          output += "| Mode | Decisions | False Negatives | FN Rate |\n"
+          output += "|------|-----------|------------------|--------|\n"
+          output += `| active | ${stats.total_active_decisions} | ${stats.active_false_negatives} | ${(activeFnRate * 100).toFixed(1)}% |\n`
+          output += `| shadow | ${stats.shadow_decisions_count} | ${stats.shadow_false_negatives} | ${(shadowFnRate * 100).toFixed(1)}% |\n`
+          return textResponse(output)
+        }
+
+        const decisions = await db.listSmartSelectionDecisions({
+          organizationId: orgId,
+          repository: f.repository,
+          prNumber: f.pr_number,
+          mode: f.mode,
+          limit: f.limit,
+        })
+
+        if (format === "json") {
+          return jsonResponse({
+            organization: authContext.organizationSlug,
+            dataset: "smart_selection_decisions",
+            count: decisions.length,
+            data: decisions,
+          })
+        }
+
+        let output = `## Smart Selection Decisions (${decisions.length})\n\n`
+        output += "| PR | Mode | Confidence | Selected | Skipped | TP | FP | TN | FN |\n"
+        output += "|----|------|------------|----------|---------|----|----|----|----|\n"
+        for (const d of decisions) {
+          output += `| #${d.pr_number} | ${d.mode} | ${d.output.confidence.toFixed(2)} | ${d.output.selected_suites.length} | ${d.output.skipped_suites.length} | ${d.metrics.true_positives} | ${d.metrics.false_positives} | ${d.metrics.true_negatives} | ${d.metrics.false_negatives} |\n`
         }
 
         return textResponse(output)
