@@ -73,11 +73,16 @@ const smartSelectionEventSchema = z.object({
     })
     .optional(),
 
-  timing: z.object({
-    inference_latency_ms: z.number().nonnegative(),
-    input_tokens: z.number().int().nonnegative(),
-    output_tokens: z.number().int().nonnegative(),
-  }),
+  // Optional since ENG-1434: the Eve agent's decision-only events may not
+  // have per-turn inference latency / token usage available from its tool
+  // context, so `timing` can be omitted entirely.
+  timing: z
+    .object({
+      inference_latency_ms: z.number().nonnegative(),
+      input_tokens: z.number().int().nonnegative(),
+      output_tokens: z.number().int().nonnegative(),
+    })
+    .optional(),
 
   catalog_drift: z
     .object({

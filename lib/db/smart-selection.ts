@@ -49,7 +49,10 @@ export interface SmartSelectionDecisionRecord {
     true_positives: number
     true_negatives: number
   }
-  timing: {
+  // Optional since ENG-1434: the Eve agent's decision-only events may not
+  // have per-turn inference latency / token usage available from its tool
+  // context.
+  timing?: {
     inference_latency_ms: number
     input_tokens: number
     output_tokens: number
@@ -103,7 +106,7 @@ export async function insertSmartSelectionDecision(
       ${JSON.stringify(rec.output)}::jsonb,
       ${rec.actual_run ? JSON.stringify(rec.actual_run) : null}::jsonb,
       ${rec.metrics ? JSON.stringify(rec.metrics) : null}::jsonb,
-      ${JSON.stringify(rec.timing)}::jsonb,
+      ${rec.timing ? JSON.stringify(rec.timing) : null}::jsonb,
       ${JSON.stringify(rec.catalog_drift)}::jsonb
     )
     ON CONFLICT (organization_id, repository, pr_number, head_sha, mode) DO UPDATE SET

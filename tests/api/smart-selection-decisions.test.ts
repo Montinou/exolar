@@ -92,6 +92,29 @@ const decisionOnlyPayload = {
   },
 }
 
+// Decision-only payload with no `timing` — the Eve agent may not have
+// per-turn inference latency / token usage available from its tool context.
+const decisionOnlyNoTimingPayload = {
+  pr_number: 42,
+  repository: "attorneyshare/attorney_share_mvp_web",
+  base_sha: "base123",
+  head_sha: "head999",
+  author: "eve-agent",
+  mode: "shadow",
+  model: "eve-agent-v1",
+  system_prompt_hash: "abcd1234ef56",
+  input: {
+    file_count: 12,
+  },
+  output: {
+    selected_suites: ["referrals.spec.ts"],
+    skipped_suites: ["billing.spec.ts"],
+    confidence: null,
+    observation: "Changes confined to referrals module.",
+    uncertainty_flags: [],
+  },
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   ;(validateApiKey as ReturnType<typeof vi.fn>).mockReturnValue(true)
@@ -115,6 +138,20 @@ describe("POST /api/smart-selection-decisions", () => {
     expect(storedRecord.output.confidence).toBeNull()
     expect(storedRecord.actual_run).toBeUndefined()
     expect(storedRecord.metrics).toBeUndefined()
+  })
+
+  it("accepts a decision-only payload without timing (with input.file_count) and stores null timing", async () => {
+    const response = await POST(makeRequest(decisionOnlyNoTimingPayload))
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ success: true, event_id: "1" })
+
+    expect(insertSmartSelectionDecision).toHaveBeenCalledTimes(1)
+    const storedRecord = (insertSmartSelectionDecision as ReturnType<typeof vi.fn>).mock
+      .calls[0][0]
+    expect(storedRecord.input.file_count).toBe(12)
+    expect(storedRecord.timing).toBeUndefined()
   })
 
   it("still accepts a legacy full payload with confidence + metrics + actual_run", async () => {

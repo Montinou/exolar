@@ -99,4 +99,19 @@ describe("insertSmartSelectionDecision", () => {
     expect(insertFragment.values[11]).toBe(JSON.stringify(fullRecord.actual_run))
     expect(insertFragment.values[12]).toBe(JSON.stringify(fullRecord.metrics))
   })
+
+  it("stores a decision-only record with timing omitted as NULL", async () => {
+    const { transaction } = mockTransaction([{ id: 303 }])
+
+    const { timing: _timing, ...recordWithoutTiming } = baseRecord
+    const result = await insertSmartSelectionDecision(
+      recordWithoutTiming as SmartSelectionDecisionRecord,
+    )
+    expect(result).toEqual({ event_id: "303" })
+
+    const passedFragments = transaction.mock.calls[0][0] as Array<{ values: unknown[] }>
+    const insertFragment = passedFragments[1]
+
+    expect(insertFragment.values[13]).toBeNull() // timing
+  })
 })
