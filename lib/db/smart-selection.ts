@@ -3,6 +3,7 @@
 // See migration scripts/029_add_smart_selection_decisions.sql.
 
 import { getSql } from "./connection"
+import { mapCatalogSuiteToExolar } from "../smart-selection/suite-map"
 
 export type SmartSelectionMode = "shadow" | "active" | "active_overridden"
 
@@ -201,4 +202,213 @@ export async function getRecentFalseNegativeStats(
     shadow_decisions_count: Number(r.shadow_decisions_count ?? 0),
     shadow_false_negatives: Number(r.shadow_false_negatives ?? 0),
   }
+}
+
+// =====================================================
+// Metrics-via-join (ENG-1434)
+// =====================================================
+//
+// Decision-only rows (the Eve agent) have no `metrics`/`actual_run` blob —
+// they only say what was selected/skipped. Exolar separately records what
+// actually happened per suite per commit in `test_executions`/`test_results`.
+// Instead of trusting a stored blob (which legacy CI clients wrote at
+// decision-time, before tests even ran), we derive the confusion matrix at
+// query time by joining the decision's (organization, head_sha) to the test
+// outcomes recorded for that same commit.
+
+export type SuiteVerdict = "passed" | "failed" | "timed_out"
+
+export interface ComputedConfusionMatrix {
+  false_negatives: number
+  false_positives: number
+  true_positives: number
+  true_negatives: number
+}
+
+export type UnmeasurableReason = "unmappable_suite" | "no_execution_for_commit"
+
+export interface UnmeasurableSuite {
+  suite: string
+  reason: UnmeasurableReason
+}
+
+export interface SmartSelectionMetricsResult {
+  /** null when no test_executions have landed yet for this commit at all. */
+  metrics: ComputedConfusionMatrix | null
+  unmeasurable: UnmeasurableSuite[]
+  source: "computed" | "legacy" | "none"
+}
+
+/**
+ * Mirrors the CI `classify` semantics for a suite's outcome on a single
+ * execution, given aggregate test_results counts for that execution:
+ *   - any failed result -> failed
+ *   - else any timed-out result -> timed_out
+ *   - else no results at all (nothing ran) -> failed (conservative: we never
+ *     want "nothing ran" to look like a pass)
+ *   - else -> passed
+ */
+export function verdictFromCounts(
+  failedCount: number,
+  timedOutCount: number,
+  resultCount: number,
+): SuiteVerdict {
+  if (failedCount > 0) return "failed"
+  if (timedOutCount > 0) return "timed_out"
+  if (resultCount === 0) return "failed"
+  return "passed"
+}
+
+/**
+ * Fetch the latest per-suite verdict for every Exolar-recorded suite that
+ * ran on `commitSha` within `organizationId`. Suites with multiple
+ * executions for the same commit (e.g. re-runs) only contribute their most
+ * recent execution.
+ *
+ * Returns an empty Map when no test_executions exist yet for this commit —
+ * callers treat that as "tests haven't finished" rather than an error.
+ */
+export async function getSuiteVerdictsForCommit(
+  organizationId: number,
+  commitSha: string,
+): Promise<Map<string, SuiteVerdict>> {
+  const sql = getSql()
+  const rows = (await sql`
+    SELECT
+      te.suite AS suite,
+      te.started_at AS started_at,
+      COUNT(*) FILTER (WHERE tr.status = 'failed') AS failed_count,
+      COUNT(*) FILTER (WHERE tr.status = 'timedout') AS timed_out_count,
+      COUNT(tr.id) AS result_count
+    FROM test_executions te
+    LEFT JOIN test_results tr ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND te.commit_sha = ${commitSha}
+      AND te.suite IS NOT NULL
+    GROUP BY te.id, te.suite, te.started_at
+    ORDER BY te.suite ASC, te.started_at DESC
+  `) as Array<{
+    suite: string
+    started_at: string
+    failed_count: number | string
+    timed_out_count: number | string
+    result_count: number | string
+  }>
+
+  const verdicts = new Map<string, SuiteVerdict>()
+  const seenSuites = new Set<string>()
+  for (const row of rows) {
+    // Rows are ordered per-suite by started_at DESC, so the first row seen
+    // for a suite is its latest execution — skip any older re-runs.
+    if (seenSuites.has(row.suite)) continue
+    seenSuites.add(row.suite)
+    verdicts.set(
+      row.suite,
+      verdictFromCounts(
+        Number(row.failed_count),
+        Number(row.timed_out_count),
+        Number(row.result_count),
+      ),
+    )
+  }
+  return verdicts
+}
+
+/**
+ * Pure confusion-matrix derivation from already-fetched suite verdicts.
+ * Kept separate from the DB fetch so it's trivially unit-testable.
+ *
+ * FN = mapped SKIPPED suite that failed/timed_out
+ * FP = mapped SELECTED suite that passed
+ * TP = mapped SELECTED suite that failed/timed_out
+ * TN = mapped SKIPPED suite that passed
+ * Unmappable suites and suites with no execution for the commit are
+ * EXCLUDED from the counts (never counted as passing) and reported as
+ * unmeasurable.
+ */
+export function deriveSmartSelectionMetrics(
+  selectedSuites: string[],
+  skippedSuites: string[],
+  verdictsByExolarSuite: Map<string, SuiteVerdict>,
+): { metrics: ComputedConfusionMatrix; unmeasurable: UnmeasurableSuite[] } {
+  let true_positives = 0
+  let false_positives = 0
+  let true_negatives = 0
+  let false_negatives = 0
+  const unmeasurable: UnmeasurableSuite[] = []
+
+  function classify(catalogSuite: string, disposition: "selected" | "skipped") {
+    const exolarName = mapCatalogSuiteToExolar(catalogSuite)
+    if (exolarName === null) {
+      unmeasurable.push({ suite: catalogSuite, reason: "unmappable_suite" })
+      return
+    }
+    const verdict = verdictsByExolarSuite.get(exolarName)
+    if (!verdict) {
+      unmeasurable.push({ suite: catalogSuite, reason: "no_execution_for_commit" })
+      return
+    }
+    const failedOrTimedOut = verdict === "failed" || verdict === "timed_out"
+    if (disposition === "selected") {
+      if (failedOrTimedOut) true_positives++
+      else false_positives++
+    } else {
+      if (failedOrTimedOut) false_negatives++
+      else true_negatives++
+    }
+  }
+
+  for (const suite of selectedSuites) classify(suite, "selected")
+  for (const suite of skippedSuites) classify(suite, "skipped")
+
+  return {
+    metrics: { true_positives, false_positives, true_negatives, false_negatives },
+    unmeasurable,
+  }
+}
+
+/**
+ * Compute (or fall back to legacy) confusion-matrix metrics for a single
+ * decision row. Never throws on missing data — decision-only rows
+ * self-heal once the corresponding test_executions land.
+ */
+export async function getComputedMetricsForDecision(
+  organizationId: number,
+  headSha: string,
+  output: { selected_suites: string[]; skipped_suites: string[] },
+  legacyMetrics?: ComputedConfusionMatrix | null,
+): Promise<SmartSelectionMetricsResult> {
+  const verdicts = await getSuiteVerdictsForCommit(organizationId, headSha)
+
+  if (verdicts.size === 0) {
+    // No test_executions have landed yet for this commit at all — tests are
+    // still running, or this commit never got tested. Don't error; either
+    // fall back to a legacy stored blob or report empty/null metrics so the
+    // UI can show "pending" instead of crashing.
+    if (legacyMetrics) {
+      return { metrics: legacyMetrics, unmeasurable: [], source: "legacy" }
+    }
+    const unmeasurable: UnmeasurableSuite[] = [
+      ...output.selected_suites.map((suite) => ({
+        suite,
+        reason: (mapCatalogSuiteToExolar(suite) === null
+          ? "unmappable_suite"
+          : "no_execution_for_commit") as UnmeasurableReason,
+      })),
+      ...output.skipped_suites.map((suite) => ({
+        suite,
+        reason: (mapCatalogSuiteToExolar(suite) === null
+          ? "unmappable_suite"
+          : "no_execution_for_commit") as UnmeasurableReason,
+      })),
+    ]
+    return { metrics: null, unmeasurable, source: "none" }
+  }
+
+  const { metrics, unmeasurable } = deriveSmartSelectionMetrics(
+    output.selected_suites,
+    output.skipped_suites,
+    verdicts,
+  )
+  return { metrics, unmeasurable, source: "computed" }
 }

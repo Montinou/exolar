@@ -1071,20 +1071,45 @@ export async function handleQuery(
           limit: f.limit,
         })
 
+        // Decision-only rows (Eve agent, ENG-1434) have no stored `metrics`
+        // blob — compute the confusion matrix at query time by joining each
+        // decision to the test outcomes recorded for the same commit. Legacy
+        // rows with a stored blob are used as a fallback only when the join
+        // finds no executions at all for that commit yet.
+        const decisionsWithMetrics = await Promise.all(
+          decisions.map(async (d) => ({
+            ...d,
+            computed: await db.getComputedMetricsForDecision(
+              orgId,
+              d.head_sha,
+              d.output,
+              d.metrics ?? null,
+            ),
+          })),
+        )
+
         if (format === "json") {
           return jsonResponse({
             organization: authContext.organizationSlug,
             dataset: "smart_selection_decisions",
-            count: decisions.length,
-            data: decisions,
+            count: decisionsWithMetrics.length,
+            data: decisionsWithMetrics,
           })
         }
 
-        let output = `## Smart Selection Decisions (${decisions.length})\n\n`
-        output += "| PR | Mode | Confidence | Selected | Skipped | TP | FP | TN | FN |\n"
-        output += "|----|------|------------|----------|---------|----|----|----|----|\n"
-        for (const d of decisions) {
-          output += `| #${d.pr_number} | ${d.mode} | ${d.output.confidence.toFixed(2)} | ${d.output.selected_suites.length} | ${d.output.skipped_suites.length} | ${d.metrics.true_positives} | ${d.metrics.false_positives} | ${d.metrics.true_negatives} | ${d.metrics.false_negatives} |\n`
+        let output = `## Smart Selection Decisions (${decisionsWithMetrics.length})\n\n`
+        output += "| PR | Mode | Confidence | Selected | Skipped | TP | FP | TN | FN | Unmeasurable |\n"
+        output += "|----|------|------------|----------|---------|----|----|----|----|--------------|\n"
+        for (const d of decisionsWithMetrics) {
+          const confidence =
+            typeof d.output.confidence === "number" ? d.output.confidence.toFixed(2) : "—"
+          const m = d.computed.metrics
+          const tp = m ? m.true_positives : "—"
+          const fp = m ? m.false_positives : "—"
+          const tn = m ? m.true_negatives : "—"
+          const fn = m ? m.false_negatives : "—"
+          const unmeasurable = d.computed.unmeasurable.length
+          output += `| #${d.pr_number} | ${d.mode} | ${confidence} | ${d.output.selected_suites.length} | ${d.output.skipped_suites.length} | ${tp} | ${fp} | ${tn} | ${fn} | ${unmeasurable > 0 ? unmeasurable : "—"} |\n`
         }
 
         return textResponse(output)

@@ -10,12 +10,21 @@ export {
   insertSmartSelectionDecision,
   listSmartSelectionDecisions,
   getRecentFalseNegativeStats,
+  getSuiteVerdictsForCommit,
+  deriveSmartSelectionMetrics,
+  getComputedMetricsForDecision,
+  verdictFromCounts,
 } from "./smart-selection"
 export type {
   SmartSelectionMode,
   SmartSelectionDecisionRecord,
   ListDecisionsOptions,
   FalseNegativeStats,
+  SuiteVerdict,
+  ComputedConfusionMatrix,
+  UnmeasurableReason,
+  UnmeasurableSuite,
+  SmartSelectionMetricsResult,
 } from "./smart-selection"
 
 // Shared utilities

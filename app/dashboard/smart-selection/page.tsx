@@ -170,7 +170,7 @@ async function SmartSelectionContent() {
                   const driftCount =
                     r.catalog_drift.structural.length +
                     r.catalog_drift.coverage.length
-                  const fn = Number(r.metrics.false_negatives ?? 0)
+                  const fn = Number(r.metrics?.false_negatives ?? 0)
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="text-muted-foreground">
