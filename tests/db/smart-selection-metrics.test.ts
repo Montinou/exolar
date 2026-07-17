@@ -99,6 +99,88 @@ describe("getSuiteVerdictsForCommit", () => {
   })
 })
 
+describe("getSuiteVerdictsForCommit — hybrid join keys (ENG-1434 join-key fix)", () => {
+  // ENG-1434 cross-repo review: test_executions.commit_sha is populated from
+  // the PR's MERGE commit, not head_sha, so head_sha-only joins never match.
+  // These cover the hybrid PRIMARY (merge_commit_sha/head_sha) + FALLBACK
+  // (branch) behavior added to close that gap.
+
+  it("matches PRIMARY via merge_commit_sha when head_sha alone would never match", async () => {
+    mockSqlRows([
+      {
+        suite: "Marketplace",
+        started_at: "2026-07-17T12:00:00Z",
+        failed_count: 1,
+        timed_out_count: 0,
+        result_count: 10,
+      },
+    ])
+
+    const verdicts = await getSuiteVerdictsForCommit(7, "pr-head-sha-never-stored", {
+      mergeCommitSha: "merge-sha-that-is-actually-stored",
+    })
+
+    expect(verdicts.get("Marketplace")).toBe("failed")
+  })
+
+  it("falls back to a branch match (latest execution per suite) when neither sha matches", async () => {
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([]) // PRIMARY: no rows for either sha
+    sqlTag.mockResolvedValueOnce([
+      // FALLBACK by branch: latest run passed; an older run on the same
+      // branch had failed and must be ignored.
+      {
+        suite: "Marketplace",
+        started_at: "2026-07-17T12:00:00Z",
+        failed_count: 0,
+        timed_out_count: 0,
+        result_count: 10,
+      },
+      {
+        suite: "Marketplace",
+        started_at: "2026-07-17T09:00:00Z",
+        failed_count: 1,
+        timed_out_count: 0,
+        result_count: 10,
+      },
+    ])
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const verdicts = await getSuiteVerdictsForCommit(7, "unmatched-head-sha", {
+      mergeCommitSha: "unmatched-merge-sha",
+      branch: "feat/some-branch",
+    })
+
+    expect(sqlTag).toHaveBeenCalledTimes(2)
+    expect(verdicts.get("Marketplace")).toBe("passed")
+  })
+
+  it("returns an empty map (no throw) when neither sha nor branch matches anything", async () => {
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([]) // PRIMARY
+    sqlTag.mockResolvedValueOnce([]) // FALLBACK
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const verdicts = await getSuiteVerdictsForCommit(7, "no-match-sha", {
+      mergeCommitSha: "no-match-merge-sha",
+      branch: "no-match-branch",
+    })
+
+    expect(verdicts.size).toBe(0)
+  })
+
+  it("does not attempt a branch fallback query when no branch is available", async () => {
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([]) // PRIMARY only
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const verdicts = await getSuiteVerdictsForCommit(7, "no-match-sha")
+
+    expect(sqlTag).toHaveBeenCalledTimes(1)
+    expect(verdicts.size).toBe(0)
+  })
+})
+
 describe("deriveSmartSelectionMetrics", () => {
   it("computes TP/FP/TN/FN across renamed suites", () => {
     const verdicts = new Map([
@@ -212,6 +294,73 @@ describe("getComputedMetricsForDecision", () => {
       true_negatives: 1, // profile skipped + passed
       false_negatives: 0,
     })
+  })
+
+  it("computes metrics via the PRIMARY path when head_sha differs from executions but merge_commit_sha matches", async () => {
+    mockSqlRows([
+      { suite: "Marketplace", started_at: "2026-07-17T12:00:00Z", failed_count: 1, timed_out_count: 0, result_count: 10 },
+      { suite: "Edit Profile", started_at: "2026-07-17T12:00:00Z", failed_count: 0, timed_out_count: 0, result_count: 8 },
+    ])
+
+    const result = await getComputedMetricsForDecision(
+      7,
+      "pr-head-sha-never-stored",
+      output,
+      null,
+      { mergeCommitSha: "merge-sha-that-is-actually-stored" },
+    )
+
+    expect(result.source).toBe("computed")
+    expect(result.metrics).toEqual({
+      true_positives: 1,
+      false_positives: 0,
+      true_negatives: 1,
+      false_negatives: 0,
+    })
+  })
+
+  it("computes metrics via the branch FALLBACK when no sha (head or merge_commit) matches anything", async () => {
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([]) // PRIMARY: no sha match
+    sqlTag.mockResolvedValueOnce([
+      { suite: "Marketplace", started_at: "2026-07-17T12:00:00Z", failed_count: 1, timed_out_count: 0, result_count: 10 },
+      { suite: "Edit Profile", started_at: "2026-07-17T12:00:00Z", failed_count: 0, timed_out_count: 0, result_count: 8 },
+    ])
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const result = await getComputedMetricsForDecision(
+      7,
+      "unmatched-head-sha",
+      output,
+      null,
+      { mergeCommitSha: "unmatched-merge-sha", branch: "feat/some-branch" },
+    )
+
+    expect(result.source).toBe("computed")
+    expect(result.metrics).toEqual({
+      true_positives: 1,
+      false_positives: 0,
+      true_negatives: 1,
+      false_negatives: 0,
+    })
+  })
+
+  it("still returns null without throwing when neither sha nor branch matches anything at all", async () => {
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([]) // PRIMARY
+    sqlTag.mockResolvedValueOnce([]) // FALLBACK
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const result = await getComputedMetricsForDecision(
+      7,
+      "no-match-sha",
+      output,
+      null,
+      { mergeCommitSha: "no-match-merge-sha", branch: "no-match-branch" },
+    )
+
+    expect(result.source).toBe("none")
+    expect(result.metrics).toBeNull()
   })
 })
 

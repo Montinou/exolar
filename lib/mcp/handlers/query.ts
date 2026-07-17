@@ -1084,6 +1084,7 @@ export async function handleQuery(
               d.head_sha,
               d.output,
               d.metrics ?? null,
+              { mergeCommitSha: d.merge_commit_sha, branch: d.branch },
             ),
           })),
         )

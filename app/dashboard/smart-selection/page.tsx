@@ -89,6 +89,7 @@ async function SmartSelectionContent() {
         r.head_sha,
         r.output,
         r.metrics ?? null,
+        { mergeCommitSha: r.merge_commit_sha, branch: r.branch },
       ),
     })),
   )
@@ -210,7 +211,9 @@ async function SmartSelectionContent() {
                         <Badge variant={mode.variant}>{mode.label}</Badge>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {Number(r.output.confidence ?? 0).toFixed(2)}
+                        {typeof r.output.confidence === "number"
+                          ? r.output.confidence.toFixed(2)
+                          : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="text-muted-foreground">

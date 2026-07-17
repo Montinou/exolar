@@ -23,6 +23,17 @@ const smartSelectionEventSchema = z.object({
   repository: z.string().min(1),
   base_sha: z.string().min(1),
   head_sha: z.string().min(1),
+  // Optional since ENG-1434 join-key follow-up: `test_executions.commit_sha`
+  // is populated from the PR's MERGE commit, not the head sha (verified:
+  // PR#2003 merge 48250267 == execution 3434's commit_sha; head sha 1f8844b
+  // is never stored). Eve now sends this so the metrics join can match
+  // precisely instead of never matching. Nullable because it isn't known
+  // until GitHub actually merges the PR.
+  merge_commit_sha: z.string().nullable().optional(),
+  // Optional since ENG-1434 join-key follow-up: the PR's head ref, used as a
+  // fallback join key when neither merge_commit_sha nor head_sha matches any
+  // recorded test_executions row.
+  branch: z.string().optional(),
   author: z.string().min(1),
   mode: z.enum(["shadow", "active", "active_overridden"]),
   model: z.string().min(1),
@@ -164,6 +175,8 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
     pr_number: event.pr_number,
     base_sha: event.base_sha,
     head_sha: event.head_sha,
+    merge_commit_sha: event.merge_commit_sha ?? null,
+    branch: event.branch,
     author: event.author,
     mode: event.mode,
     model: event.model,

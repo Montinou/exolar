@@ -115,6 +115,15 @@ const decisionOnlyNoTimingPayload = {
   },
 }
 
+// Decision-only payload with the ENG-1434 join-key fields (merge_commit_sha,
+// branch) that Eve is being changed to send alongside head_sha.
+const decisionOnlyWithJoinKeysPayload = {
+  ...decisionOnlyPayload,
+  head_sha: "head-not-the-merge-sha",
+  merge_commit_sha: "merge-sha-abc123",
+  branch: "feat/eng-1434-eve-logging",
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   ;(validateApiKey as ReturnType<typeof vi.fn>).mockReturnValue(true)
@@ -152,6 +161,33 @@ describe("POST /api/smart-selection-decisions", () => {
       .calls[0][0]
     expect(storedRecord.input.file_count).toBe(12)
     expect(storedRecord.timing).toBeUndefined()
+  })
+
+  it("accepts and stores merge_commit_sha + branch when the client sends them", async () => {
+    const response = await POST(makeRequest(decisionOnlyWithJoinKeysPayload))
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ success: true, event_id: "1" })
+
+    expect(insertSmartSelectionDecision).toHaveBeenCalledTimes(1)
+    const storedRecord = (insertSmartSelectionDecision as ReturnType<typeof vi.fn>).mock
+      .calls[0][0]
+    expect(storedRecord.merge_commit_sha).toBe("merge-sha-abc123")
+    expect(storedRecord.branch).toBe("feat/eng-1434-eve-logging")
+  })
+
+  it("defaults merge_commit_sha to null and branch to undefined when the client omits them", async () => {
+    const response = await POST(makeRequest(decisionOnlyPayload))
+    const json = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(json).toEqual({ success: true, event_id: "1" })
+
+    const storedRecord = (insertSmartSelectionDecision as ReturnType<typeof vi.fn>).mock
+      .calls[0][0]
+    expect(storedRecord.merge_commit_sha).toBeNull()
+    expect(storedRecord.branch).toBeUndefined()
   })
 
   it("still accepts a legacy full payload with confidence + metrics + actual_run", async () => {

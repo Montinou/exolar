@@ -114,4 +114,36 @@ describe("insertSmartSelectionDecision", () => {
 
     expect(insertFragment.values[13]).toBeNull() // timing
   })
+
+  it("stores merge_commit_sha and branch when present, appended after catalog_drift", async () => {
+    const { transaction } = mockTransaction([{ id: 404 }])
+
+    const recordWithJoinKeys: SmartSelectionDecisionRecord = {
+      ...baseRecord,
+      merge_commit_sha: "merge-sha-abc123",
+      branch: "feat/eng-1434-eve-logging",
+    }
+
+    const result = await insertSmartSelectionDecision(recordWithJoinKeys)
+    expect(result).toEqual({ event_id: "404" })
+
+    const passedFragments = transaction.mock.calls[0][0] as Array<{ values: unknown[] }>
+    const insertFragment = passedFragments[1]
+
+    expect(insertFragment.values[15]).toBe("merge-sha-abc123") // merge_commit_sha
+    expect(insertFragment.values[16]).toBe("feat/eng-1434-eve-logging") // branch
+  })
+
+  it("binds merge_commit_sha and branch as NULL when the record omits them", async () => {
+    const { transaction } = mockTransaction([{ id: 505 }])
+
+    const result = await insertSmartSelectionDecision(baseRecord)
+    expect(result).toEqual({ event_id: "505" })
+
+    const passedFragments = transaction.mock.calls[0][0] as Array<{ values: unknown[] }>
+    const insertFragment = passedFragments[1]
+
+    expect(insertFragment.values[15]).toBeNull()
+    expect(insertFragment.values[16]).toBeNull()
+  })
 })

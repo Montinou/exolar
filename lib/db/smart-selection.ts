@@ -13,6 +13,11 @@ export interface SmartSelectionDecisionRecord {
   pr_number: number
   base_sha: string
   head_sha: string
+  // Nullable/optional since ENG-1434 join-key follow-up: the PR merge commit
+  // sha (what test_executions.commit_sha actually stores) and head ref,
+  // used by getSuiteVerdictsForCommit()'s hybrid join. See migration 034.
+  merge_commit_sha?: string | null
+  branch?: string | null
   author: string
   mode: SmartSelectionMode
   model: string
@@ -91,7 +96,9 @@ export async function insertSmartSelectionDecision(
       actual_run,
       metrics,
       timing,
-      catalog_drift
+      catalog_drift,
+      merge_commit_sha,
+      branch
     ) VALUES (
       ${rec.organization_id},
       ${rec.repository},
@@ -107,7 +114,9 @@ export async function insertSmartSelectionDecision(
       ${rec.actual_run ? JSON.stringify(rec.actual_run) : null}::jsonb,
       ${rec.metrics ? JSON.stringify(rec.metrics) : null}::jsonb,
       ${rec.timing ? JSON.stringify(rec.timing) : null}::jsonb,
-      ${JSON.stringify(rec.catalog_drift)}::jsonb
+      ${JSON.stringify(rec.catalog_drift)}::jsonb,
+      ${rec.merge_commit_sha ?? null},
+      ${rec.branch ?? null}
     )
     ON CONFLICT (organization_id, repository, pr_number, head_sha, mode) DO UPDATE SET
       base_sha = EXCLUDED.base_sha,
@@ -120,6 +129,8 @@ export async function insertSmartSelectionDecision(
       metrics = EXCLUDED.metrics,
       timing = EXCLUDED.timing,
       catalog_drift = EXCLUDED.catalog_drift,
+      merge_commit_sha = EXCLUDED.merge_commit_sha,
+      branch = EXCLUDED.branch,
       created_at = NOW()
     RETURNING id
   `,
@@ -160,6 +171,8 @@ export async function listSmartSelectionDecisions(
       metrics,
       timing,
       catalog_drift,
+      merge_commit_sha,
+      branch,
       created_at
     FROM smart_selection_decisions
     WHERE organization_id = ${options.organizationId}
@@ -200,6 +213,8 @@ export async function getRecentFalseNegativeStats(
     SELECT
       mode,
       head_sha,
+      merge_commit_sha,
+      branch,
       output,
       metrics
     FROM smart_selection_decisions
@@ -209,6 +224,8 @@ export async function getRecentFalseNegativeStats(
   `) as Array<{
     mode: SmartSelectionMode
     head_sha: string
+    merge_commit_sha: string | null
+    branch: string | null
     output: { selected_suites: string[]; skipped_suites: string[] }
     metrics: ComputedConfusionMatrix | null
   }>
@@ -225,6 +242,7 @@ export async function getRecentFalseNegativeStats(
         row.head_sha,
         row.output,
         row.metrics ?? null,
+        { mergeCommitSha: row.merge_commit_sha, branch: row.branch },
       )
       const hasFalseNegative = (metrics?.false_negatives ?? 0) > 0
       if (row.mode === "active") {
@@ -301,47 +319,17 @@ export function verdictFromCounts(
   return "passed"
 }
 
-/**
- * Fetch the latest per-suite verdict for every Exolar-recorded suite that
- * ran on `commitSha` within `organizationId`. Suites with multiple
- * executions for the same commit (e.g. re-runs) only contribute their most
- * recent execution.
- *
- * Returns an empty Map when no test_executions exist yet for this commit —
- * callers treat that as "tests haven't finished" rather than an error.
- */
-export async function getSuiteVerdictsForCommit(
-  organizationId: number,
-  commitSha: string,
-): Promise<Map<string, SuiteVerdict>> {
-  const sql = getSql()
-  // Join key: (organization_id, commit_sha). `test_executions` has no
-  // `repository` column, so org-scoping is used as a proxy for repo-scoping.
-  // Safe given one repo per org today; the only risk is a cross-repo
-  // same-SHA collision within the same org, which isn't possible until an
-  // org owns more than one repo.
-  const rows = (await sql`
-    SELECT
-      te.suite AS suite,
-      te.started_at AS started_at,
-      COUNT(*) FILTER (WHERE tr.status = 'failed') AS failed_count,
-      COUNT(*) FILTER (WHERE tr.status = 'timedout') AS timed_out_count,
-      COUNT(tr.id) FILTER (WHERE tr.status <> 'skipped') AS result_count
-    FROM test_executions te
-    LEFT JOIN test_results tr ON tr.execution_id = te.id
-    WHERE te.organization_id = ${organizationId}
-      AND te.commit_sha = ${commitSha}
-      AND te.suite IS NOT NULL
-    GROUP BY te.id, te.suite, te.started_at
-    ORDER BY te.suite ASC, te.started_at DESC
-  `) as Array<{
-    suite: string
-    started_at: string
-    failed_count: number | string
-    timed_out_count: number | string
-    result_count: number | string
-  }>
+type SuiteVerdictRow = {
+  suite: string
+  started_at: string
+  failed_count: number | string
+  timed_out_count: number | string
+  result_count: number | string
+}
 
+/** Collapse execution rows (ordered per-suite by started_at DESC) into a
+ * per-suite verdict map, keeping only the latest execution per suite. */
+function buildVerdictsMap(rows: SuiteVerdictRow[]): Map<string, SuiteVerdict> {
   const verdicts = new Map<string, SuiteVerdict>()
   const seenSuites = new Set<string>()
   for (const row of rows) {
@@ -359,6 +347,100 @@ export async function getSuiteVerdictsForCommit(
     )
   }
   return verdicts
+}
+
+export interface SuiteVerdictJoinKeys {
+  /** PR merge commit sha, when known (see migration 034). Tried first. */
+  mergeCommitSha?: string | null
+  /** PR head ref (branch name). Used only as a fallback when no sha matches. */
+  branch?: string | null
+}
+
+/**
+ * Fetch the latest per-suite verdict for every Exolar-recorded suite that
+ * ran on the decision's commit within `organizationId`. Suites with multiple
+ * executions for the same commit (e.g. re-runs) only contribute their most
+ * recent execution.
+ *
+ * Hybrid join (ENG-1434 cross-repo review): `test_executions.commit_sha` is
+ * populated from the PR's MERGE commit, not the head sha — a plain
+ * `commit_sha = head_sha` join can never match (verified: PR#2003 merge sha
+ * 48250267 == execution 3434's commit_sha; head sha 1f8844b is never
+ * stored). So:
+ *   1. PRIMARY: match `commit_sha` against `merge_commit_sha` (preferred,
+ *      since that's what's actually stored) OR `head_sha` (kept for legacy
+ *      CI clients that only send head_sha, and as a harmless second chance),
+ *      scoped to this organization. Null candidates are dropped before the
+ *      query so they can't spuriously match a NULL commit_sha.
+ *   2. FALLBACK: only when PRIMARY finds zero executions at all, and a
+ *      `branch` is available, match by branch instead — taking the
+ *      most-recent execution PER SUITE across the branch. This is a safety
+ *      net so metrics never silently fail to compute just because the sha's
+ *      don't line up; it's coarser (not scoped to this exact commit) but
+ *      still far better than "no data".
+ *
+ * Returns an empty Map when neither PRIMARY nor FALLBACK finds any
+ * test_executions — callers treat that as "tests haven't finished" rather
+ * than an error.
+ */
+export async function getSuiteVerdictsForCommit(
+  organizationId: number,
+  headSha: string,
+  joinKeys?: SuiteVerdictJoinKeys,
+): Promise<Map<string, SuiteVerdict>> {
+  const sql = getSql()
+  const mergeCommitSha = joinKeys?.mergeCommitSha ?? null
+  const branch = joinKeys?.branch ?? null
+
+  // Join key: (organization_id, commit_sha). `test_executions` has no
+  // `repository` column, so org-scoping is used as a proxy for repo-scoping.
+  // Safe given one repo per org today; the only risk is a cross-repo
+  // same-SHA collision within the same org, which isn't possible until an
+  // org owns more than one repo.
+  const candidateShas = [mergeCommitSha, headSha].filter(
+    (sha): sha is string => Boolean(sha),
+  )
+
+  const primaryRows = (await sql`
+    SELECT
+      te.suite AS suite,
+      te.started_at AS started_at,
+      COUNT(*) FILTER (WHERE tr.status = 'failed') AS failed_count,
+      COUNT(*) FILTER (WHERE tr.status = 'timedout') AS timed_out_count,
+      COUNT(tr.id) FILTER (WHERE tr.status <> 'skipped') AS result_count
+    FROM test_executions te
+    LEFT JOIN test_results tr ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND te.commit_sha = ANY(${candidateShas}::text[])
+      AND te.suite IS NOT NULL
+    GROUP BY te.id, te.suite, te.started_at
+    ORDER BY te.suite ASC, te.started_at DESC
+  `) as SuiteVerdictRow[]
+
+  const primaryVerdicts = buildVerdictsMap(primaryRows)
+  if (primaryVerdicts.size > 0 || !branch) {
+    return primaryVerdicts
+  }
+
+  // FALLBACK: no execution matched either sha. Match by branch for this org,
+  // taking the most-recent execution per suite (not scoped to this commit).
+  const fallbackRows = (await sql`
+    SELECT
+      te.suite AS suite,
+      te.started_at AS started_at,
+      COUNT(*) FILTER (WHERE tr.status = 'failed') AS failed_count,
+      COUNT(*) FILTER (WHERE tr.status = 'timedout') AS timed_out_count,
+      COUNT(tr.id) FILTER (WHERE tr.status <> 'skipped') AS result_count
+    FROM test_executions te
+    LEFT JOIN test_results tr ON tr.execution_id = te.id
+    WHERE te.organization_id = ${organizationId}
+      AND te.branch = ${branch}
+      AND te.suite IS NOT NULL
+    GROUP BY te.id, te.suite, te.started_at
+    ORDER BY te.suite ASC, te.started_at DESC
+  `) as SuiteVerdictRow[]
+
+  return buildVerdictsMap(fallbackRows)
 }
 
 /**
@@ -418,14 +500,19 @@ export function deriveSmartSelectionMetrics(
  * Compute (or fall back to legacy) confusion-matrix metrics for a single
  * decision row. Never throws on missing data — decision-only rows
  * self-heal once the corresponding test_executions land.
+ *
+ * `joinKeys` (merge_commit_sha / branch) are optional so existing callers
+ * that only have `head_sha` keep working — see getSuiteVerdictsForCommit for
+ * the hybrid join semantics.
  */
 export async function getComputedMetricsForDecision(
   organizationId: number,
   headSha: string,
   output: { selected_suites: string[]; skipped_suites: string[] },
   legacyMetrics?: ComputedConfusionMatrix | null,
+  joinKeys?: SuiteVerdictJoinKeys,
 ): Promise<SmartSelectionMetricsResult> {
-  const verdicts = await getSuiteVerdictsForCommit(organizationId, headSha)
+  const verdicts = await getSuiteVerdictsForCommit(organizationId, headSha, joinKeys)
 
   if (verdicts.size === 0) {
     // No test_executions have landed yet for this commit at all — tests are
