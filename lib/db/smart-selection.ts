@@ -182,28 +182,66 @@ export interface FalseNegativeStats {
 /**
  * Phase D circuit-breaker query: count active-mode false negatives in the last N days.
  * Plus shadow-mode counts for the calibration audit.
+ *
+ * Derives false-negatives from the COMPUTED test-outcome join (ENG-1434),
+ * not the stored `metrics` blob: decision-only rows (the Eve agent) have
+ * `metrics` NULL forever, so a SQL-side `(metrics->>'false_negatives')::int`
+ * filter would silently never count them. Instead we fetch the in-window
+ * decisions and run each through `getComputedMetricsForDecision` (the same
+ * join `smart_selection_decisions` MCP queries use), then aggregate —
+ * counting a decision once it has at least one computed false negative.
  */
 export async function getRecentFalseNegativeStats(
   organizationId: number,
   windowDays = 7,
 ): Promise<FalseNegativeStats> {
   const sql = getSql()
-  const rows = await sql`
+  const rows = (await sql`
     SELECT
-      COUNT(*) FILTER (WHERE mode = 'active') AS total_active_decisions,
-      COUNT(*) FILTER (WHERE mode = 'active' AND (metrics->>'false_negatives')::int > 0) AS active_false_negatives,
-      COUNT(*) FILTER (WHERE mode = 'shadow') AS shadow_decisions_count,
-      COUNT(*) FILTER (WHERE mode = 'shadow' AND (metrics->>'false_negatives')::int > 0) AS shadow_false_negatives
+      mode,
+      head_sha,
+      output,
+      metrics
     FROM smart_selection_decisions
     WHERE organization_id = ${organizationId}
       AND created_at > NOW() - (${windowDays} * INTERVAL '1 day')
-  `
-  const r = rows[0]
+      AND mode IN ('active', 'shadow')
+  `) as Array<{
+    mode: SmartSelectionMode
+    head_sha: string
+    output: { selected_suites: string[]; skipped_suites: string[] }
+    metrics: ComputedConfusionMatrix | null
+  }>
+
+  let total_active_decisions = 0
+  let active_false_negatives = 0
+  let shadow_decisions_count = 0
+  let shadow_false_negatives = 0
+
+  await Promise.all(
+    rows.map(async (row) => {
+      const { metrics } = await getComputedMetricsForDecision(
+        organizationId,
+        row.head_sha,
+        row.output,
+        row.metrics ?? null,
+      )
+      const hasFalseNegative = (metrics?.false_negatives ?? 0) > 0
+      if (row.mode === "active") {
+        total_active_decisions++
+        if (hasFalseNegative) active_false_negatives++
+      } else if (row.mode === "shadow") {
+        shadow_decisions_count++
+        if (hasFalseNegative) shadow_false_negatives++
+      }
+    }),
+  )
+
   return {
-    total_active_decisions: Number(r.total_active_decisions ?? 0),
-    active_false_negatives: Number(r.active_false_negatives ?? 0),
-    shadow_decisions_count: Number(r.shadow_decisions_count ?? 0),
-    shadow_false_negatives: Number(r.shadow_false_negatives ?? 0),
+    total_active_decisions,
+    active_false_negatives,
+    shadow_decisions_count,
+    shadow_false_negatives,
   }
 }
 
@@ -245,8 +283,9 @@ export interface SmartSelectionMetricsResult {
 /**
  * Mirrors the CI `classify` semantics for a suite's outcome on a single
  * execution, given aggregate test_results counts for that execution:
- *   - any failed result -> failed
- *   - else any timed-out result -> timed_out
+ *   - any timed-out result -> timed_out (CI's classify() checks timeout
+ *     first — a timeout wins over a failure)
+ *   - else any failed result -> failed
  *   - else no results at all (nothing ran) -> failed (conservative: we never
  *     want "nothing ran" to look like a pass)
  *   - else -> passed
@@ -256,8 +295,8 @@ export function verdictFromCounts(
   timedOutCount: number,
   resultCount: number,
 ): SuiteVerdict {
-  if (failedCount > 0) return "failed"
   if (timedOutCount > 0) return "timed_out"
+  if (failedCount > 0) return "failed"
   if (resultCount === 0) return "failed"
   return "passed"
 }
@@ -276,13 +315,18 @@ export async function getSuiteVerdictsForCommit(
   commitSha: string,
 ): Promise<Map<string, SuiteVerdict>> {
   const sql = getSql()
+  // Join key: (organization_id, commit_sha). `test_executions` has no
+  // `repository` column, so org-scoping is used as a proxy for repo-scoping.
+  // Safe given one repo per org today; the only risk is a cross-repo
+  // same-SHA collision within the same org, which isn't possible until an
+  // org owns more than one repo.
   const rows = (await sql`
     SELECT
       te.suite AS suite,
       te.started_at AS started_at,
       COUNT(*) FILTER (WHERE tr.status = 'failed') AS failed_count,
       COUNT(*) FILTER (WHERE tr.status = 'timedout') AS timed_out_count,
-      COUNT(tr.id) AS result_count
+      COUNT(tr.id) FILTER (WHERE tr.status <> 'skipped') AS result_count
     FROM test_executions te
     LEFT JOIN test_results tr ON tr.execution_id = te.id
     WHERE te.organization_id = ${organizationId}

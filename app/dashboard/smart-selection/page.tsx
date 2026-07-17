@@ -13,6 +13,7 @@ import { getSessionContext } from "@/lib/session-context"
 import {
   listSmartSelectionDecisions,
   getRecentFalseNegativeStats,
+  getComputedMetricsForDecision,
   type SmartSelectionDecisionRecord,
 } from "@/lib/db/smart-selection"
 import { Badge } from "@/components/ui/badge"
@@ -68,13 +69,29 @@ async function SmartSelectionContent() {
     redirect("/auth/no-access")
   }
 
-  const [recent, stats] = await Promise.all([
+  const [rawRecent, stats] = await Promise.all([
     listSmartSelectionDecisions({
       organizationId: context.organizationId,
       limit: 50,
     }),
     getRecentFalseNegativeStats(context.organizationId, 7),
   ])
+
+  // Decision-only rows (Eve agent, ENG-1434) have no stored `metrics` blob —
+  // it's NULL forever for those rows. Compute the confusion matrix at query
+  // time via the test-outcome join, same as the MCP handler does, so FN/FP
+  // counts reflect reality instead of always showing 0.
+  const recent = await Promise.all(
+    rawRecent.map(async (r) => ({
+      ...r,
+      computed: await getComputedMetricsForDecision(
+        context.organizationId,
+        r.head_sha,
+        r.output,
+        r.metrics ?? null,
+      ),
+    })),
+  )
 
   // Aggregate stats over the latest 50 decisions
   const totalDecisions = recent.length
@@ -170,7 +187,7 @@ async function SmartSelectionContent() {
                   const driftCount =
                     r.catalog_drift.structural.length +
                     r.catalog_drift.coverage.length
-                  const fn = Number(r.metrics?.false_negatives ?? 0)
+                  const fn = Number(r.computed.metrics?.false_negatives ?? 0)
                   return (
                     <TableRow key={r.id}>
                       <TableCell className="text-muted-foreground">

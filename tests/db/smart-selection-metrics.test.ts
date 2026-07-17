@@ -10,6 +10,7 @@ import {
   deriveSmartSelectionMetrics,
   getSuiteVerdictsForCommit,
   getComputedMetricsForDecision,
+  getRecentFalseNegativeStats,
 } from "@/lib/db/smart-selection"
 import { mapCatalogSuiteToExolar } from "@/lib/smart-selection/suite-map"
 
@@ -49,8 +50,8 @@ describe("verdictFromCounts (multi-result aggregation)", () => {
     expect(verdictFromCounts(0, 1, 10)).toBe("timed_out")
   })
 
-  it("prioritizes failed over timed_out when both are present", () => {
-    expect(verdictFromCounts(1, 1, 10)).toBe("failed")
+  it("prioritizes timed_out over failed when both are present (mirrors CI's classify(), timeout wins)", () => {
+    expect(verdictFromCounts(1, 1, 10)).toBe("timed_out")
   })
 
   it("returns failed when nothing ran (conservative default)", () => {
@@ -82,6 +83,19 @@ describe("getSuiteVerdictsForCommit", () => {
     mockSqlRows([])
     const verdicts = await getSuiteVerdictsForCommit(7, "nonexistent-sha")
     expect(verdicts.size).toBe(0)
+  })
+
+  it("treats an all-skipped suite as 'nothing ran' -> failed (CI excludes declared-skip tests from result_count)", async () => {
+    // Every test_results row for this execution is status='skipped'; the SQL
+    // excludes skipped rows from result_count (COUNT(tr.id) FILTER (WHERE
+    // tr.status <> 'skipped')), so this must resolve like "nothing ran"
+    // rather than silently passing.
+    mockSqlRows([
+      { suite: "Negotiation", started_at: "2026-07-17T12:00:00Z", failed_count: 0, timed_out_count: 0, result_count: 0 },
+    ])
+
+    const verdicts = await getSuiteVerdictsForCommit(7, "all-skipped-sha")
+    expect(verdicts.get("Negotiation")).toBe("failed")
   })
 })
 
@@ -198,5 +212,57 @@ describe("getComputedMetricsForDecision", () => {
       true_negatives: 1, // profile skipped + passed
       false_negatives: 0,
     })
+  })
+})
+
+describe("getRecentFalseNegativeStats (circuit-breaker, computed join)", () => {
+  it("counts a computed false-negative from a decision-only row (metrics NULL) via the join", async () => {
+    // Decision-only row (Eve agent): stored `metrics` is NULL, so a naive
+    // SQL-side (metrics->>'false_negatives')::int filter would never count
+    // this row. The FN must come from computing the join instead.
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([
+      {
+        mode: "active",
+        head_sha: "shaX",
+        output: { selected_suites: ["marketplace-v2"], skipped_suites: ["negotiation"] },
+        metrics: null,
+      },
+    ])
+    sqlTag.mockResolvedValueOnce([
+      { suite: "Marketplace", started_at: "2026-07-17T12:00:00Z", failed_count: 0, timed_out_count: 0, result_count: 5 },
+      { suite: "Negotiation", started_at: "2026-07-17T12:00:00Z", failed_count: 1, timed_out_count: 0, result_count: 5 },
+    ])
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const stats = await getRecentFalseNegativeStats(7, 7)
+
+    expect(stats.total_active_decisions).toBe(1)
+    expect(stats.active_false_negatives).toBe(1) // negotiation skipped + failed -> FN
+    expect(stats.shadow_decisions_count).toBe(0)
+    expect(stats.shadow_false_negatives).toBe(0)
+  })
+
+  it("does not count a decision with no false negatives, even in shadow mode", async () => {
+    const sqlTag = vi.fn()
+    sqlTag.mockResolvedValueOnce([
+      {
+        mode: "shadow",
+        head_sha: "shaY",
+        output: { selected_suites: ["marketplace-v2"], skipped_suites: ["negotiation"] },
+        metrics: null,
+      },
+    ])
+    sqlTag.mockResolvedValueOnce([
+      { suite: "Marketplace", started_at: "2026-07-17T12:00:00Z", failed_count: 1, timed_out_count: 0, result_count: 5 },
+      { suite: "Negotiation", started_at: "2026-07-17T12:00:00Z", failed_count: 0, timed_out_count: 0, result_count: 5 },
+    ])
+    ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(sqlTag)
+
+    const stats = await getRecentFalseNegativeStats(7, 7)
+
+    expect(stats.shadow_decisions_count).toBe(1)
+    expect(stats.shadow_false_negatives).toBe(0)
+    expect(stats.total_active_decisions).toBe(0)
   })
 })
