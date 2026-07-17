@@ -27,15 +27,22 @@ export interface SmartSelectionDecisionRecord {
   output: {
     selected_suites: string[]
     skipped_suites: string[]
-    confidence: number
+    // Nullable since ENG-1434: the Eve agent sends decision-only events with
+    // no confidence score. Metrics/confidence get backfilled later by a
+    // query-time join — not implemented here.
+    confidence: number | null
     observation: string
     uncertainty_flags: string[]
   }
-  actual_run: {
+  // Optional since ENG-1434: decision-only rows (Eve agent) omit what
+  // actually ran.
+  actual_run?: {
     suites_run: string[]
     outcomes: Record<string, "passed" | "failed" | "timed_out">
   }
-  metrics: {
+  // Optional since ENG-1434: decision-only rows have no confusion-matrix
+  // metrics yet.
+  metrics?: {
     false_negatives: number
     false_positives: number
     true_positives: number
@@ -93,8 +100,8 @@ export async function insertSmartSelectionDecision(
       ${rec.system_prompt_hash},
       ${JSON.stringify(rec.input)}::jsonb,
       ${JSON.stringify(rec.output)}::jsonb,
-      ${JSON.stringify(rec.actual_run)}::jsonb,
-      ${JSON.stringify(rec.metrics)}::jsonb,
+      ${rec.actual_run ? JSON.stringify(rec.actual_run) : null}::jsonb,
+      ${rec.metrics ? JSON.stringify(rec.metrics) : null}::jsonb,
       ${JSON.stringify(rec.timing)}::jsonb,
       ${JSON.stringify(rec.catalog_drift)}::jsonb
     )

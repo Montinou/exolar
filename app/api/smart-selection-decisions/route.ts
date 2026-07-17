@@ -30,8 +30,10 @@ const smartSelectionEventSchema = z.object({
 
   input: z.object({
     file_count: z.number().int().nonnegative(),
-    sanitized_token_count: z.number().int().nonnegative(),
-    dropped_paths_count: z.number().int().nonnegative(),
+    // Optional since ENG-1434: the Eve agent's decision-only events don't
+    // run the token sanitizer, so these counts don't exist for that client.
+    sanitized_token_count: z.number().int().nonnegative().optional(),
+    dropped_paths_count: z.number().int().nonnegative().optional(),
     // Optional since ENG-1444 simplified the client-side sanitizer ("let the
     // LLM do its work" — the tier-based size gating was removed because the
     // LLM handles oversized diffs natively). Older clients that still send
@@ -42,22 +44,34 @@ const smartSelectionEventSchema = z.object({
   output: z.object({
     selected_suites: z.array(z.string()),
     skipped_suites: z.array(z.string()),
-    confidence: z.number().min(0).max(1),
+    // Nullable since ENG-1434: the Eve agent client sends decision-only
+    // events (which suites it picked/skipped) with no confidence score.
+    // Metrics/confidence get backfilled later by a query-time join — see
+    // the ENG-1434 follow-up task, not implemented here.
+    confidence: z.number().min(0).max(1).nullable(),
     observation: z.string(),
     uncertainty_flags: z.array(z.string()),
   }),
 
-  actual_run: z.object({
-    suites_run: z.array(z.string()),
-    outcomes: z.record(suiteOutcomeEnum),
-  }),
+  // Optional since ENG-1434: decision-only rows (Eve agent) omit what
+  // actually ran — that gets joined in later from the classic CI run.
+  actual_run: z
+    .object({
+      suites_run: z.array(z.string()),
+      outcomes: z.record(suiteOutcomeEnum),
+    })
+    .optional(),
 
-  metrics: z.object({
-    false_negatives: z.number().int().nonnegative(),
-    false_positives: z.number().int().nonnegative(),
-    true_positives: z.number().int().nonnegative(),
-    true_negatives: z.number().int().nonnegative(),
-  }),
+  // Optional since ENG-1434: decision-only rows have no confusion-matrix
+  // metrics yet — computed later by a query-time join against actual_run.
+  metrics: z
+    .object({
+      false_negatives: z.number().int().nonnegative(),
+      false_positives: z.number().int().nonnegative(),
+      true_positives: z.number().int().nonnegative(),
+      true_negatives: z.number().int().nonnegative(),
+    })
+    .optional(),
 
   timing: z.object({
     inference_latency_ms: z.number().nonnegative(),
