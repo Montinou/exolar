@@ -118,10 +118,9 @@ export async function insertSmartSelectionDecision(
       ${rec.merge_commit_sha ?? null},
       ${rec.branch ?? null}
     )
-    ON CONFLICT (organization_id, repository, pr_number, head_sha, mode) DO UPDATE SET
+    ON CONFLICT (organization_id, repository, pr_number, head_sha, mode, model) DO UPDATE SET
       base_sha = EXCLUDED.base_sha,
       author = EXCLUDED.author,
-      model = EXCLUDED.model,
       system_prompt_hash = EXCLUDED.system_prompt_hash,
       input = EXCLUDED.input,
       output = EXCLUDED.output,
