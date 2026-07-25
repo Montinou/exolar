@@ -367,17 +367,23 @@ export async function handleQuery(
           })
         }
 
+        // getFlakinessSummary returns snake_case
+        // { total_flaky_tests, avg_flakiness_rate, most_flaky_tests }. This read
+        // camelCase totalFlakyTests / averageFlakinessRate / worstOffenders, so
+        // the counts printed literally as "undefined" and the offenders table
+        // never rendered. `testsAnalyzed` has no equivalent at all and is
+        // dropped rather than faked.
         let output = "## Flakiness Summary\n\n"
-        output += `- **Total Flaky Tests:** ${summary.totalFlakyTests}\n`
-        output += `- **Average Flakiness Rate:** ${summary.averageFlakinessRate?.toFixed(1) || 0}%\n`
-        output += `- **Tests Analyzed:** ${summary.testsAnalyzed}\n`
+        output += `- **Total Flaky Tests:** ${summary.total_flaky_tests ?? 0}\n`
+        output += `- **Average Flakiness Rate:** ${Number(summary.avg_flakiness_rate ?? 0).toFixed(1)}%\n`
 
-        if (summary.worstOffenders && summary.worstOffenders.length > 0) {
+        if (summary.most_flaky_tests && summary.most_flaky_tests.length > 0) {
           output += "\n### Worst Offenders\n\n"
           output += "| Test | Flaky % |\n"
           output += "|------|--------|\n"
-          for (const t of summary.worstOffenders.slice(0, 5)) {
-            output += `| ${t.test_name.slice(0, 40)} | ${t.flakiness_rate.toFixed(1)}% |\n`
+          for (const t of summary.most_flaky_tests.slice(0, 5)) {
+            // flakiness_rate arrives as a numeric string from Postgres.
+            output += `| ${(t.test_name ?? "").slice(0, 40)} | ${Number(t.flakiness_rate ?? 0).toFixed(1)}% |\n`
           }
         }
 
@@ -543,12 +549,24 @@ export async function handleQuery(
           })
         }
 
+        // The measured rates live on `rawMetrics`; `breakdown` holds their
+        // WEIGHTED contributions to the score. This read breakdown.passRate /
+        // .flakyRate / .durationStability — none of which exist on either
+        // return path — so `?? 0` rendered a healthy 88/100 next to a
+        // breakdown of 0%/0%/0%, which reads as a broken suite.
         let output = `## Reliability Score\n\n`
-        output += `**Score:** ${score.score}/100 (${score.status})\n\n`
-        output += `### Breakdown\n`
-        output += `- Pass Rate: ${score.breakdown?.passRate?.toFixed(1) || 0}%\n`
-        output += `- Flaky Rate: ${score.breakdown?.flakyRate?.toFixed(1) || 0}%\n`
-        output += `- Duration Stability: ${score.breakdown?.durationStability?.toFixed(1) || 0}%\n`
+        output += `**Score:** ${score.score}/100 (${score.status})`
+        output += score.trend
+          ? ` — ${score.trend > 0 ? "+" : ""}${score.trend} vs previous period\n\n`
+          : `\n\n`
+        output += `### Measured\n`
+        output += `- Pass Rate: ${score.rawMetrics?.passRate?.toFixed(1) ?? 0}%\n`
+        output += `- Flaky Rate: ${score.rawMetrics?.flakyRate?.toFixed(1) ?? 0}%\n`
+        output += `- Duration CV: ${score.rawMetrics?.durationCV ?? 0}\n\n`
+        output += `### Score contributions (weighted)\n`
+        output += `- Pass rate: ${score.breakdown?.passRateContribution ?? 0}/40\n`
+        output += `- Flakiness: ${score.breakdown?.flakinessContribution ?? 0}/30\n`
+        output += `- Stability: ${score.breakdown?.stabilityContribution ?? 0}/30\n`
 
         return textResponse(output)
       }
