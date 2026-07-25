@@ -307,7 +307,14 @@ export async function handleQuery(
         const total = distribution.reduce((s, e) => s + e.count, 0)
         for (const e of distribution) {
           const pct = total > 0 ? ((e.count / total) * 100).toFixed(1) : "0"
-          output += `| ${e.error_pattern.slice(0, 50)} | ${e.count} | ${pct}% |\n`
+          // `error_type` is the column getErrorTypeDistribution selects (it is
+          // the grouped value for every group_by, including file and branch).
+          // This read `e.error_pattern` — a field of the UNRELATED
+          // execution_summary shape — and threw once the query started
+          // returning rows at all. Coalesced because a group_by of file or
+          // branch can legitimately group NULLs.
+          const label = String(e.error_type ?? "unknown")
+          output += `| ${label.slice(0, 50)} | ${e.count} | ${pct}% |\n`
         }
 
         return textResponse(output)
