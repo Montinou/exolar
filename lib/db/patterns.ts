@@ -170,7 +170,7 @@ export async function getCategoryDistribution(
     ORDER BY failure_count DESC
   `
 
-  const results = await sql.unsafe(query)
+  const results = await sql.query(query)
 
   const totalFailures = results.reduce((sum, row) => sum + Number(row.failure_count), 0)
 

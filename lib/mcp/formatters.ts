@@ -239,9 +239,12 @@ export function formatExecutions(
     id: number
     branch: string
     status: string
-    passed_count?: number
-    failed_count?: number
-    duration_ms?: number
+    // Column names as selected by getExecutions() from test_executions —
+    // NOT passed_count/failed_count, which silently rendered every row as 0/0.
+    passed?: number
+    failed?: number
+    total_tests?: number
+    duration_ms?: number | null
     started_at: string
   }>,
   format: OutputFormat = "markdown"
@@ -253,13 +256,18 @@ export function formatExecutions(
       { key: "branch", label: "Branch" },
       { key: "status", label: "Status" },
       {
-        key: "passed_count",
+        key: "passed",
         label: "Passed",
         formatter: (v) => String(v ?? 0),
       },
       {
-        key: "failed_count",
+        key: "failed",
         label: "Failed",
+        formatter: (v) => String(v ?? 0),
+      },
+      {
+        key: "total_tests",
+        label: "Total",
         formatter: (v) => String(v ?? 0),
       },
       {

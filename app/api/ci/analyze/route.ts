@@ -68,7 +68,7 @@ export async function POST(request: Request): Promise<NextResponse<AnalysisResul
         return NextResponse.json({ error: "execution_id must be a positive integer" }, { status: 400 })
       }
     } else {
-      const rows = await sql.unsafe(
+      const rows = await sql.query(
         `SELECT id FROM test_executions WHERE run_id = $1 AND organization_id = $2 LIMIT 1`,
         [String(run_id), organizationId]
       )
@@ -83,7 +83,7 @@ export async function POST(request: Request): Promise<NextResponse<AnalysisResul
 
     // 5. Persist result to ci_analysis_results
     const actionPlanJson = JSON.stringify(result.action_plan)
-    await sql.unsafe(
+    await sql.query(
       `INSERT INTO ci_analysis_results (
         organization_id,
         execution_id,

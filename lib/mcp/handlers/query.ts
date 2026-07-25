@@ -115,13 +115,47 @@ interface ToolResponse {
   isError?: boolean
 }
 
+const DATE_RANGE_HOURS: Record<string, number> = {
+  last_24h: 24,
+  last_7d: 24 * 7,
+  last_30d: 24 * 30,
+  last_90d: 24 * 90,
+}
+
+/**
+ * Expand the `date_range` preset into the concrete `from`/`to` bounds every
+ * dataset already reads.
+ *
+ * `date_range` was declared in the input schema and advertised in tools.ts,
+ * but no handler ever consulted it — so a caller filtering "last_24h" silently
+ * got the UNFILTERED result set and read it as if it were scoped. That is worse
+ * than an unsupported filter: it reports stale rows as current ones.
+ *
+ * An explicit `from` always wins, so callers that already pass exact bounds are
+ * unaffected.
+ */
+export function withResolvedDateRange<T extends { date_range?: string; from?: string; to?: string }>(
+  filters: T,
+): T {
+  const hours = filters.date_range ? DATE_RANGE_HOURS[filters.date_range] : undefined
+  if (hours === undefined || filters.from) return filters
+
+  const to = new Date()
+  const from = new Date(to.getTime() - hours * 60 * 60 * 1000)
+  return {
+    ...filters,
+    from: from.toISOString(),
+    to: filters.to ?? to.toISOString(),
+  }
+}
+
 export async function handleQuery(
   args: Record<string, unknown>,
   authContext: MCPAuthContext
 ): Promise<ToolResponse> {
   const input = QueryInputSchema.parse(args)
   const orgId = authContext.organizationId
-  const f = input.filters
+  const f = withResolvedDateRange(input.filters)
   const format: OutputFormat = input.format
 
   try {
@@ -151,18 +185,10 @@ export async function handleQuery(
           })
         }
 
-        const output = formatExecutions(
-          executions as Array<{
-            id: number
-            branch: string
-            status: string
-            passed_count?: number
-            failed_count?: number
-            duration_ms?: number
-            started_at: string
-          }>,
-          "markdown"
-        )
+        // No cast: the previous `as Array<{... passed_count ...}>` asserted a
+        // shape getExecutions never returns, which is exactly what let the
+        // Passed/Failed columns silently render 0 for every row.
+        const output = formatExecutions(executions, "markdown")
 
         return textResponse(
           `## Test Executions (${executions.length} results)\n\n${output}${executions.length === (f.limit ?? 20) ? "\n\n_More results available, use offset filter_" : ""}`

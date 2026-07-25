@@ -309,7 +309,7 @@ export async function getFailureClassification(
     `
   }
 
-  const failureResult = await sql.unsafe(failureQuery)
+  const failureResult = await sql.query(failureQuery)
 
   // Defensive check: ensure result is an array before accessing
   if (!Array.isArray(failureResult) || failureResult.length === 0) {

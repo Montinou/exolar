@@ -173,7 +173,7 @@ export async function getFailuresWithAIContext(
     OFFSET ${offset}
   `
 
-  const result = await sql.unsafe(query)
+  const result = await sql.query(query)
 
   // Defensive check: ensure result is an array before returning
   if (!Array.isArray(result)) {
@@ -326,7 +326,7 @@ export async function getErrorTypeDistribution(
     ORDER BY g.count DESC
   `
 
-  const result = await sql.unsafe(query)
+  const result = await sql.query(query)
 
   // Defensive check: ensure result is an array before returning
   if (!Array.isArray(result)) {

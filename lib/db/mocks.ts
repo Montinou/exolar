@@ -698,7 +698,7 @@ export async function getMockRequestLogsFiltered(
   const whereClause = conditions.join(" AND ")
 
   // Get total count
-  const countResult = await sql.unsafe(`
+  const countResult = await sql.query(`
     SELECT COUNT(*) as count
     FROM mock_request_logs
     WHERE ${whereClause}
@@ -706,7 +706,7 @@ export async function getMockRequestLogsFiltered(
   const total = Number(countResult[0]?.count ?? 0)
 
   // Get filtered logs
-  const result = await sql.unsafe(`
+  const result = await sql.query(`
     SELECT *
     FROM mock_request_logs
     WHERE ${whereClause}

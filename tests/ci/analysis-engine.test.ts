@@ -15,8 +15,12 @@ import { getFailureClassification } from "@/lib/db/classification"
 import { clusterFailures } from "@/lib/db/clustering"
 import { analyzeExecution } from "@/lib/ci/analysis-engine"
 
-const mockSql = vi.fn() as ReturnType<typeof vi.fn> & { unsafe: ReturnType<typeof vi.fn> }
-mockSql.unsafe = vi.fn()
+// Mocks `query`, not `unsafe`: in @neondatabase/serverless `sql.unsafe()`
+// returns an UnsafeRawSql marker for template interpolation and executes
+// nothing, so mocking it as a row-returning executor made these tests pass
+// against an API contract the real driver never had.
+const mockSql = vi.fn() as ReturnType<typeof vi.fn> & { query: ReturnType<typeof vi.fn> }
+mockSql.query = vi.fn()
 
 function makeRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -57,13 +61,13 @@ function makeClassification(overrides: Partial<{
 beforeEach(() => {
   vi.clearAllMocks()
   ;(getSql as ReturnType<typeof vi.fn>).mockReturnValue(mockSql)
-  mockSql.unsafe = vi.fn()
+  mockSql.query = vi.fn()
   ;(clusterFailures as ReturnType<typeof vi.fn>).mockResolvedValue([])
 })
 
 describe("analyzeExecution — HEALABLE: TimeoutError → wait_adjustment", () => {
   it("classifies TimeoutError FLAKE as HEALABLE with wait_adjustment strategy", async () => {
-    mockSql.unsafe.mockResolvedValue([makeRow({ error_message: "Timed out waiting" })])
+    mockSql.query.mockResolvedValue([makeRow({ error_message: "Timed out waiting" })])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeClassification({ classification: "FLAKE", confidence: 0.92, error_type: "TimeoutError" })
     )
@@ -78,7 +82,7 @@ describe("analyzeExecution — HEALABLE: TimeoutError → wait_adjustment", () =
 
 describe("analyzeExecution — HEALABLE: LocatorError → selector_update", () => {
   it("classifies LocatorError FLAKE as HEALABLE with selector_update strategy", async () => {
-    mockSql.unsafe.mockResolvedValue([makeRow({ error_message: "Locator not found" })])
+    mockSql.query.mockResolvedValue([makeRow({ error_message: "Locator not found" })])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeClassification({ classification: "FLAKE", confidence: 0.88, error_type: "LocatorError" })
     )
@@ -93,7 +97,7 @@ describe("analyzeExecution — HEALABLE: LocatorError → selector_update", () =
 describe("analyzeExecution — REAL_BUG: new failure in commit", () => {
   it("classifies BUG classification as REAL_BUG and adds to bugs via unclustered path", async () => {
     const row = makeRow({ test_name: "login flow fails", error_message: "Assert failed" })
-    mockSql.unsafe.mockResolvedValue([row])
+    mockSql.query.mockResolvedValue([row])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeClassification({ classification: "BUG", confidence: 0.95, error_type: "AssertionError" })
     )
@@ -111,7 +115,7 @@ describe("analyzeExecution — REAL_BUG: new failure in commit", () => {
 describe("analyzeExecution — KNOWN_FLAKE: high flakiness + passes on retry", () => {
   it("classifies high-flakiness FLAKE that passed on retry as KNOWN_FLAKE", async () => {
     // passed_on_retry is now a DB column (EXISTS subquery) rather than status check
-    mockSql.unsafe.mockResolvedValue([
+    mockSql.query.mockResolvedValue([
       makeRow({ retry_count: 1, status: "failed", error_message: "Element not attached to the DOM", passed_on_retry: true }),
     ])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -127,7 +131,7 @@ describe("analyzeExecution — KNOWN_FLAKE: high flakiness + passes on retry", (
 
 describe("analyzeExecution — INFRA: NetworkError / ECONNREFUSED", () => {
   it("groups NetworkError type failures into infra_issues", async () => {
-    mockSql.unsafe.mockResolvedValue([makeRow({ error_message: "fetch failed" })])
+    mockSql.query.mockResolvedValue([makeRow({ error_message: "fetch failed" })])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeClassification({ classification: "FLAKE", confidence: 0.9, error_type: "NetworkError" })
     )
@@ -139,7 +143,7 @@ describe("analyzeExecution — INFRA: NetworkError / ECONNREFUSED", () => {
   })
 
   it("groups ECONNREFUSED message failures into infra_issues", async () => {
-    mockSql.unsafe.mockResolvedValue([makeRow({ error_message: "connect ECONNREFUSED 127.0.0.1:5432" })])
+    mockSql.query.mockResolvedValue([makeRow({ error_message: "connect ECONNREFUSED 127.0.0.1:5432" })])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeClassification({ classification: "FLAKE", confidence: 0.9, error_type: "Error" })
     )
@@ -152,7 +156,7 @@ describe("analyzeExecution — INFRA: NetworkError / ECONNREFUSED", () => {
 
 describe("analyzeExecution — MANUAL_REVIEW: confidence < 70%", () => {
   it("routes low-confidence failures to manual_review", async () => {
-    mockSql.unsafe.mockResolvedValue([makeRow()])
+    mockSql.query.mockResolvedValue([makeRow()])
     ;(getFailureClassification as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeClassification({ classification: "FLAKE", confidence: 0.5, error_type: "UnknownError" })
     )

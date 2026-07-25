@@ -123,7 +123,7 @@ export async function analyzeExecution(
   const sql = getSql()
 
   // 1. Fetch all failed/timedout test results (parameterized to prevent SQL injection)
-  const rawFailures = await sql.unsafe(
+  const rawFailures = await sql.query(
     `SELECT
       tr.id,
       COALESCE(tr.test_signature, MD5(tr.test_file || '::' || tr.test_name)) AS test_signature,

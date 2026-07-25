@@ -308,7 +308,7 @@ export async function getTrendData(
     ORDER BY period ASC
   `
 
-  const result = await sql.unsafe(query)
+  const result = await sql.query(query)
 
   // Defensive check: ensure result is an array before mapping
   if (!Array.isArray(result)) {
