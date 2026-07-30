@@ -140,18 +140,21 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
         // Upload each artifact to R2 and prepare for DB insertion
         const uploadedArtifacts: ArtifactRequest[] = []
 
-        for (const artifact of artifacts) {
+        for (const [seq, artifact] of artifacts.entries()) {
           try {
             // Decode base64 data
             const buffer = Buffer.from(artifact.data, "base64")
 
-            // Generate unique R2 key
+            // Generate unique R2 key. `seq` (position in this payload) is what
+            // guarantees uniqueness: without it, every retry of a test wrote to
+            // the same object and overwrote the previous attempt's evidence.
             const testSignature = generateTestSignature(artifact.test_file, artifact.test_name)
             const r2Key = generateArtifactKey(
               executionId,
               testSignature,
               artifact.type,
-              artifact.filename
+              artifact.filename,
+              { attempt: artifact.retry_count, seq }
             )
 
             // Determine content type
@@ -169,6 +172,7 @@ export async function POST(request: Request): Promise<NextResponse<IngestRespons
               r2_key: r2Key,
               mime_type: contentType,
               size_bytes: buffer.length,
+              retry_count: artifact.retry_count,
             })
 
             console.log(`[POST /api/test-results] Uploaded artifact: ${r2Key}`)

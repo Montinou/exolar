@@ -93,18 +93,38 @@ export async function uploadToR2(
  * Generate a unique R2 key for an artifact
  * Format: artifacts/{execution_id}/{test_signature}/{type}/{filename}
  */
+export interface ArtifactKeyDiscriminator {
+  /** Playwright retry index of the attempt this artifact belongs to. */
+  attempt?: number
+  /** Position of the artifact within the payload — unique per execution. */
+  seq: number
+}
+
 export function generateArtifactKey(
   executionId: number,
   testSignature: string,
   type: string,
-  filename: string
+  filename: string,
+  discriminator: ArtifactKeyDiscriminator
 ): string {
   // Sanitize the test signature for use in path
   const sanitizedSignature = testSignature
     .replace(/[^a-zA-Z0-9-_]/g, "_")
     .substring(0, 100)
 
-  return `artifacts/${executionId}/${sanitizedSignature}/${type}/${filename}`
+  // The filename is the Playwright attachment name — untrusted input that must
+  // not be able to walk out of its prefix.
+  const sanitizedFilename = filename
+    .replace(/[^a-zA-Z0-9-_.]/g, "_")
+    .replace(/\.{2,}/g, ".")
+    .substring(0, 100)
+
+  // `attempt` and `seq` are what make the key unique. Without them every retry
+  // of a test wrote to the same object and silently overwrote the previous
+  // attempt's evidence.
+  const attempt = discriminator.attempt ?? 0
+
+  return `artifacts/${executionId}/${sanitizedSignature}/${type}/a${attempt}-${discriminator.seq}-${sanitizedFilename}`
 }
 
 /**

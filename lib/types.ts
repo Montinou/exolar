@@ -238,6 +238,8 @@ export interface ArtifactUploadRequest {
   data: string // base64 encoded file data
   mime_type?: string
   size_bytes?: number
+  /** Playwright retry index of the attempt this artifact came from. */
+  retry_count?: number
 }
 
 // Artifact for database insertion (after R2 upload)
@@ -249,6 +251,12 @@ export interface ArtifactRequest {
   r2_key: string
   mime_type?: string
   size_bytes?: number
+  /**
+   * Playwright retry index of the attempt this artifact came from. Optional so
+   * reporters that predate it keep ingesting — they fall back to the last
+   * attempt. See resolveArtifactResultId.
+   */
+  retry_count?: number
 }
 
 /**

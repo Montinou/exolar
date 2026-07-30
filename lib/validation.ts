@@ -113,6 +113,9 @@ export const artifactSchema = z.object({
   data: z.string().min(1, "data is required"),
   mime_type: z.string().optional(),
   size_bytes: z.number().int().min(0).optional(),
+  // Ties the artifact to the attempt it came from. Optional: reporters that
+  // predate it fall back to the last attempt (see resolveArtifactResultId).
+  retry_count: z.number().int().min(0).optional(),
 })
 
 // Complete ingestion request schema

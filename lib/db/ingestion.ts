@@ -213,11 +213,17 @@ export async function insertTestResults(
       started_at,
       completed_at
     )
-    RETURNING id, test_signature
+    RETURNING id, test_signature, retry_count
   `
 
   for (const row of inserted) {
-    signatureToIdMap.set(row.test_signature as string, row.id as number)
+    const signature = row.test_signature as string
+    const id = row.id as number
+    // Per-attempt key: a retried test has one row per attempt, all sharing a
+    // signature. Without this, the signature-only entry below (last write wins)
+    // sent every attempt's artifacts to the final attempt's row.
+    signatureToIdMap.set(attemptKey(signature, Number(row.retry_count ?? 0)), id)
+    signatureToIdMap.set(signature, id)
   }
 
   // -------------------------------------------------------
@@ -280,6 +286,30 @@ export async function insertTestResults(
  * @param artifacts Array of artifact requests
  * @returns Number of artifacts inserted
  */
+/** Map key that identifies one attempt of a test within an execution. */
+export function attemptKey(signature: string, retryCount: number): string {
+  return `${signature}::attempt-${retryCount}`
+}
+
+/**
+ * Find the `test_results` row an artifact belongs to.
+ *
+ * Prefers the row for the artifact's own attempt. Falls back to the
+ * signature-only entry (the last attempt) for reporters that predate
+ * `retry_count` on the artifact payload, so older senders keep ingesting.
+ */
+export function resolveArtifactResultId(
+  signatureToIdMap: Map<string, number>,
+  signature: string,
+  retryCount: number | undefined
+): number | undefined {
+  if (retryCount !== undefined) {
+    const exact = signatureToIdMap.get(attemptKey(signature, retryCount))
+    if (exact !== undefined) return exact
+  }
+  return signatureToIdMap.get(signature)
+}
+
 export async function insertArtifacts(
   signatureToIdMap: Map<string, number>,
   artifacts: ArtifactRequest[]
@@ -289,7 +319,7 @@ export async function insertArtifacts(
 
   for (const artifact of artifacts) {
     const signature = generateTestSignature(artifact.test_file, artifact.test_name)
-    const resultId = signatureToIdMap.get(signature)
+    const resultId = resolveArtifactResultId(signatureToIdMap, signature, artifact.retry_count)
 
     if (!resultId) {
       console.warn(
