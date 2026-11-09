@@ -1,7 +1,13 @@
 import { getSql } from "./connection"
 import { generateTestSignature, isTestFlaky } from "./utils"
 import { updateFlakinessHistory } from "./flakiness"
-import { detectTechStack, upsertSuite, upsertSuiteTest, updateSuiteTestCounts } from "./suites"
+import {
+  detectTechStack,
+  upsertSuite,
+  upsertSuiteTest,
+  updateSuiteTestCounts,
+  markInactiveTests,
+} from "./suites"
 import type { ExecutionRequest, TestResultRequest, ArtifactRequest } from "../types"
 
 // ============================================
@@ -271,6 +277,15 @@ export async function insertTestResults(
   )
 
   await runInBatches(suiteTasks, BATCH_SIZE)
+
+  // Org-wide housekeeping: flag tests not seen in 30 days as inactive. Without
+  // this call is_active never flips, so inactive_tests stays empty (ENG-2275).
+  // Never let it fail an ingestion whose results are already stored.
+  try {
+    await markInactiveTests(organizationId)
+  } catch (err) {
+    console.error("[ingestion] markInactiveTests failed", err)
+  }
 
   // Update suite test count if suiteId is provided
   if (suiteId) {
